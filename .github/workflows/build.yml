@@ -19,8 +19,14 @@ defaults:
 
 jobs:
   build:
-    name: Build unsigned IPA
-    runs-on: macos-15
+    name: Build unsigned IPA (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-26
+          - macos-15-intel
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
 
     steps:
@@ -30,13 +36,15 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          # macos-15 ships Xcode 16.4; pin it so a runner default change cannot
-          # silently change the Swift/iOS toolchain. Fall back to the default.
-          # CMAKE_POLICY_VERSION_MINIMUM keeps SDL 2.26's old CMake minimum
-          # working under CMake 4.x (macos-15 ships CMake 4.4).
+          # The macos-15 images ship Xcode 16.4; pin it there so a runner
+          # default change cannot silently change the Swift/iOS toolchain.
+          # macos-26 uses its default Xcode. CMAKE_POLICY_VERSION_MINIMUM
+          # keeps SDL 2.26's old CMake minimum working under CMake 4.x.
           if [ -d /Applications/Xcode_16.4.app ]; then
             sudo xcode-select -s /Applications/Xcode_16.4.app
           fi
+          uname -m
+          sw_vers
           xcodebuild -version
           swift --version
           cmake --version
@@ -81,7 +89,7 @@ jobs:
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: fallout-ce-ios-unsigned
+          name: fallout-ce-ios-unsigned-${{ matrix.runner }}
           path: fallout-ce-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
@@ -91,6 +99,6 @@ jobs:
           {
             echo "### Fallout iOS IPA"
             echo ""
-            echo "Unsigned IPA built from \`${{ github.sha }}\`."
+            echo "Unsigned IPA built from \`${{ github.sha }}\` on ${{ matrix.runner }}."
             echo "Install it with AltStore or Sideloadly, which sign it with your own Apple ID."
           } >> "$GITHUB_STEP_SUMMARY"
