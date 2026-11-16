@@ -13,7 +13,6 @@ struct DisplayPreset: Identifiable, Hashable {
 final class LauncherModel: ObservableObject {
     @Published var width: Int
     @Published var height: Int
-    @Published var scale2x: Bool
     @Published var sound: Bool
     @Published var music: Bool
     @Published var speech: Bool
@@ -43,10 +42,17 @@ final class LauncherModel: ObservableObject {
         installDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         let native = LauncherModel.nativeResolution()
-        width = defaults.object(forKey: "launcher.width") as? Int ?? native.0
-        height = defaults.object(forKey: "launcher.height") as? Int ?? native.1
+        // Earlier builds stored point dimensions - and capped the short side at
+        // 480 - so upgrade once to the panel's real pixel dimensions.
+        if defaults.integer(forKey: "launcher.resolutionVersion") < 2 {
+            width = native.0
+            height = native.1
+            defaults.set(2, forKey: "launcher.resolutionVersion")
+        } else {
+            width = defaults.object(forKey: "launcher.width") as? Int ?? native.0
+            height = defaults.object(forKey: "launcher.height") as? Int ?? native.1
+        }
 
-        scale2x = defaults.bool(forKey: "launcher.scale2x")
         sound = defaults.object(forKey: "launcher.sound") as? Bool ?? true
         music = defaults.object(forKey: "launcher.music") as? Bool ?? true
         speech = defaults.object(forKey: "launcher.speech") as? Bool ?? true
@@ -63,46 +69,33 @@ final class LauncherModel: ObservableObject {
 
     // MARK: - Screen size
 
-    /// Logical screen size in points. Tall screens get a 480 pixel high,
-    /// aspect-correct resolution, as recommended by the engine's README.
+    /// The screen's real pixel size in landscape. This is what the display
+    /// panel exposes as FULL, and the default for every device.
     static func nativeResolution() -> (Int, Int) {
-        let bounds = UIScreen.main.bounds
-        let longSide = Int(max(bounds.width, bounds.height).rounded())
-        let shortSide = Int(min(bounds.width, bounds.height).rounded())
-        let aspect = Double(longSide) / Double(max(shortSide, 1))
+        let nativeBounds = UIScreen.main.nativeBounds
+        let scale = max(UIScreen.main.nativeScale, 1)
+        let pixelWidth = nativeBounds.width > 0 ? nativeBounds.width : UIScreen.main.bounds.width * scale
+        let pixelHeight = nativeBounds.height > 0 ? nativeBounds.height : UIScreen.main.bounds.height * scale
+        let longSide = Int(max(pixelWidth, pixelHeight).rounded())
+        let shortSide = Int(min(pixelWidth, pixelHeight).rounded())
 
-        if shortSide >= 480 {
-            return (max(640, longSide), shortSide)
-        }
+        return (max(640, longSide), max(480, shortSide))
+    }
 
-        let height = 480
-        let width = max(640, Int((Double(height) * aspect).rounded()))
-        return (width, height)
+    var nativeResolutionLabel: String {
+        let native = LauncherModel.nativeResolution()
+        return "\(native.0)x\(native.1)"
     }
 
     var presets: [DisplayPreset] {
         let native = LauncherModel.nativeResolution()
-        var list = [
-            DisplayPreset(id: "device", label: "DEVICE \(native.0)x\(native.1)", width: native.0, height: native.1),
-            DisplayPreset(id: "640", label: "640x480", width: 640, height: 480),
-            DisplayPreset(id: "800", label: "800x600", width: 800, height: 600),
-            DisplayPreset(id: "1024", label: "1024x768", width: 1024, height: 768),
-            DisplayPreset(id: "1280", label: "1280x720", width: 1280, height: 720),
-            DisplayPreset(id: "1600", label: "1600x900", width: 1600, height: 900),
-            DisplayPreset(id: "1920", label: "1920x1080", width: 1920, height: 1080),
+        let halfWidth = max(640, (native.0 / 2) & ~1)
+        let halfHeight = max(480, (native.1 / 2) & ~1)
+
+        return [
+            DisplayPreset(id: "full", label: "FULL  \(native.0)x\(native.1)", width: native.0, height: native.1),
+            DisplayPreset(id: "half", label: "HALF  \(halfWidth)x\(halfHeight)", width: halfWidth, height: halfHeight),
         ]
-
-        var seen = Set<String>()
-        list = list.filter { preset in
-            let key = "\(preset.width)x\(preset.height)"
-            if seen.contains(key) {
-                return false
-            }
-            seen.insert(key)
-            return true
-        }
-
-        return list
     }
 
     func selected(preset: DisplayPreset) -> Bool {
@@ -196,7 +189,7 @@ final class LauncherModel: ObservableObject {
         var raw = LauncherOptions()
         raw.width = Int32(width)
         raw.height = Int32(height)
-        raw.scale_2x = scale2x ? 1 : 0
+        raw.scale_2x = 0
         raw.sound = sound ? 1 : 0
         raw.music = music ? 1 : 0
         raw.speech = speech ? 1 : 0
@@ -213,7 +206,7 @@ final class LauncherModel: ObservableObject {
     private func persist() {
         defaults.set(width, forKey: "launcher.width")
         defaults.set(height, forKey: "launcher.height")
-        defaults.set(scale2x, forKey: "launcher.scale2x")
+        defaults.set(2, forKey: "launcher.resolutionVersion")
         defaults.set(sound, forKey: "launcher.sound")
         defaults.set(music, forKey: "launcher.music")
         defaults.set(speech, forKey: "launcher.speech")
