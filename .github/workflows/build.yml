@@ -71,16 +71,6 @@ jobs:
           unzip -l fallout-ce-ios-unsigned.ipa > ipa-contents.txt
           sed -n '1,20p' ipa-contents.txt
 
-      - name: Verify launcher is linked
-        run: |
-          set -euo pipefail
-          rm -rf ipa-check
-          unzip -q fallout-ce-ios-unsigned.ipa -d ipa-check
-          APP_BINARY="$(find ipa-check/Payload -name fallout-ce -type f -print -quit)"
-          test -n "$APP_BINARY"
-          nm -g "$APP_BINARY" | grep -q fallout_ios_present_launcher
-          echo "Launcher entry point found in $APP_BINARY"
-
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
@@ -88,6 +78,17 @@ jobs:
           path: fallout-ce-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
+
+      - name: Verify launcher is linked
+        run: |
+          set -euo pipefail
+          rm -rf ipa-check
+          unzip -q fallout-ce-ios-unsigned.ipa -d ipa-check
+          APP_BINARY="$(find ipa-check/Payload -name fallout-ce -type f -print -quit)"
+          test -n "$APP_BINARY"
+          nm -g "$APP_BINARY" > ipa-check/symbols.txt
+          grep -q fallout_ios_present_launcher ipa-check/symbols.txt
+          echo "Launcher entry point found in $APP_BINARY"
 
       - name: Summary
         run: |
