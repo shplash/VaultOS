@@ -57,6 +57,11 @@ void mouse_enable();
 bool mouse_is_disabled();
 void mouse_set_sensitivity(double value);
 double mouse_get_sensitivity();
+
+// iOS: when enabled, single-finger taps and long presses are sent as right
+// mouse button events. Used by the on-screen right-click toggle.
+void mouse_set_ios_right_click_mode(bool enabled);
+bool mouse_get_ios_right_click_mode();
 unsigned int mouse_elapsed_time();
 void mouse_reset_elapsed_time();
 
