@@ -19,15 +19,9 @@ defaults:
 
 jobs:
   build:
-    name: Build unsigned IPA (${{ matrix.runner }})
-    strategy:
-      fail-fast: false
-      matrix:
-        runner:
-          - macos-26
-          - macos-15-intel
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    name: Build unsigned IPA
+    runs-on: macos-15-intel
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -36,10 +30,10 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          # The macos-15 images ship Xcode 16.4; pin it there so a runner
+          # The macos-15-intel image ships Xcode 16.4; pin it so a runner
           # default change cannot silently change the Swift/iOS toolchain.
-          # macos-26 uses its default Xcode. CMAKE_POLICY_VERSION_MINIMUM
-          # keeps SDL 2.26's old CMake minimum working under CMake 4.x.
+          # CMAKE_POLICY_VERSION_MINIMUM keeps SDL 2.26's old CMake minimum
+          # working under CMake 4.x.
           if [ -d /Applications/Xcode_16.4.app ]; then
             sudo xcode-select -s /Applications/Xcode_16.4.app
           fi
@@ -56,6 +50,7 @@ jobs:
             -D CMAKE_BUILD_TYPE=RelWithDebInfo \
             -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/ios.toolchain.cmake \
             -D PLATFORM=OS64 \
+            -D DEPLOYMENT_TARGET=14.0 \
             -D ENABLE_BITCODE=0 \
             -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
@@ -89,7 +84,7 @@ jobs:
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: fallout-ce-ios-unsigned-${{ matrix.runner }}
+          name: fallout-ce-ios-unsigned
           path: fallout-ce-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
@@ -99,6 +94,6 @@ jobs:
           {
             echo "### Fallout iOS IPA"
             echo ""
-            echo "Unsigned IPA built from \`${{ github.sha }}\` on ${{ matrix.runner }}."
+            echo "Unsigned IPA built from ${{ github.sha }} on the macos-15-intel runner."
             echo "Install it with AltStore or Sideloadly, which sign it with your own Apple ID."
           } >> "$GITHUB_STEP_SUMMARY"

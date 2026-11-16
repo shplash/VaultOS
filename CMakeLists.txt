@@ -7,7 +7,10 @@ set(EXECUTABLE_NAME fallout-ce)
 if (APPLE)
     if(IOS)
         # SwiftUI launcher requires iOS 14 (SwiftUI is 13, file importers are 14).
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "14" CACHE STRING "")
+        # The ios-cmake toolchain reads DEPLOYMENT_TARGET and otherwise defaults
+        # to iOS 11, so set both that and CMake's own deployment target.
+        set(DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum iOS deployment target")
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "")
         set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
     else()
         set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "")
