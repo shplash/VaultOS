@@ -1,0 +1,96 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          # macos-15 ships Xcode 16.4; pin it so a runner default change cannot
+          # silently change the Swift/iOS toolchain. Fall back to the default.
+          # CMAKE_POLICY_VERSION_MINIMUM keeps SDL 2.26's old CMake minimum
+          # working under CMake 4.x (macos-15 ships CMake 4.4).
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          fi
+          xcodebuild -version
+          swift --version
+          cmake --version
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          cmake -B build -G Xcode \
+            -D CMAKE_BUILD_TYPE=RelWithDebInfo \
+            -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/ios.toolchain.cmake \
+            -D PLATFORM=OS64 \
+            -D ENABLE_BITCODE=0 \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+
+      - name: Build
+        run: cmake --build build --config RelWithDebInfo --parallel 3
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          cd build
+          cpack -C RelWithDebInfo
+          test -f fallout-ce.ipa
+          cd ..
+          cp build/fallout-ce.ipa fallout-ce-ios-unsigned.ipa
+          unzip -l fallout-ce-ios-unsigned.ipa > ipa-contents.txt
+          sed -n '1,20p' ipa-contents.txt
+
+      - name: Verify launcher is linked
+        run: |
+          set -euo pipefail
+          rm -rf ipa-check
+          unzip -q fallout-ce-ios-unsigned.ipa -d ipa-check
+          APP_BINARY="$(find ipa-check/Payload -name fallout-ce -type f -print -quit)"
+          test -n "$APP_BINARY"
+          nm -g "$APP_BINARY" | grep -q fallout_ios_present_launcher
+          echo "Launcher entry point found in $APP_BINARY"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallout-ce-ios-unsigned
+          path: fallout-ce-ios-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          {
+            echo "### Fallout iOS IPA"
+            echo ""
+            echo "Unsigned IPA built from \`${{ github.sha }}\`."
+            echo "Install it with AltStore or Sideloadly, which sign it with your own Apple ID."
+          } >> "$GITHUB_STEP_SUMMARY"
