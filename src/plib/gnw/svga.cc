@@ -1,9 +1,17 @@
 #include "plib/gnw/svga.h"
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/winmain.h"
+
+#if defined(__APPLE__) && TARGET_OS_IOS
+#include "launcher/launcher.h"
+#endif
 
 namespace fallout {
 
@@ -144,6 +152,11 @@ bool svga_init(VideoOptions* video_options)
     mouse_blit_trans = NULL;
     scr_blit = GNW95_ShowRect;
     mouse_blit = GNW95_ShowRect;
+
+#if defined(__APPLE__) && TARGET_OS_IOS
+    // SDL's view is now on screen; put the touch controls above it.
+    fallout_ios_install_game_controls();
+#endif
 
     return true;
 }

@@ -27,6 +27,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Restore CMake build tree
+        uses: actions/cache@v4
+        with:
+          # CMake's configure pass dominates a cold build (SDL feature
+          # detection alone takes several minutes). Keeping the generated
+          # Xcode project and SDL build tree lets source-only changes resume
+          # with an incremental build instead of repeating it.
+          path: build
+          key: ios-cmake-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'third_party/**') }}
+          restore-keys: |
+            ios-cmake-${{ runner.os }}-
+
       - name: Select Xcode
         run: |
           set -euo pipefail
