@@ -6,7 +6,8 @@ set(EXECUTABLE_NAME fallout-ce)
 
 if (APPLE)
     if(IOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "12" CACHE STRING "")
+        # SwiftUI launcher requires iOS 14 (SwiftUI is 13, file importers are 14).
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "14" CACHE STRING "")
         set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
     else()
         set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "")
@@ -15,6 +16,12 @@ if (APPLE)
 endif()
 
 project(${EXECUTABLE_NAME})
+
+if(APPLE AND IOS)
+    # The launcher UI is written in Swift.
+    set(CMAKE_Swift_LANGUAGE_VERSION 5.0)
+    enable_language(Swift)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -276,7 +283,15 @@ if(IOS)
     target_sources(${EXECUTABLE_NAME} PUBLIC
         "src/platform/ios/paths.h"
         "src/platform/ios/paths.mm"
+        "src/launcher/launcher.h"
+        "src/launcher/launcher_core.cc"
+        "os/ios/launcher/LauncherBridge.mm"
+        "os/ios/launcher/LauncherHost.swift"
+        "os/ios/launcher/LauncherModel.swift"
+        "os/ios/launcher/LauncherView.swift"
     )
+
+    target_link_libraries(${EXECUTABLE_NAME} z)
 endif()
 
 if(WIN32)
@@ -316,6 +331,10 @@ if(APPLE)
             XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
             XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.alexbatalov.fallout-ce"
             XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+            Swift_MODULE_NAME "FalloutCE"
+            XCODE_ATTRIBUTE_PRODUCT_MODULE_NAME "FalloutCE"
+            XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
+            XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_SOURCE_DIR}/src/launcher/launcher.h"
         )
 
         set(MACOSX_BUNDLE_BUNDLE_NAME "${EXECUTABLE_NAME}")

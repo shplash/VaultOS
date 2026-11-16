@@ -13,7 +13,11 @@
 #include "plib/gnw/svga.h"
 
 #if __APPLE__ && TARGET_OS_IOS
+#include "launcher/launcher.h"
 #include "platform/ios/paths.h"
+
+// Implemented in Swift (LauncherHost.swift).
+extern "C" void fallout_ios_present_launcher(void);
 #endif
 
 namespace fallout {
@@ -44,6 +48,14 @@ int main(int argc, char* argv[])
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     chdir(iOSGetDocumentsPath());
+
+    // The launcher installs/validates the game data in Documents and only
+    // returns once the player is ready to start the engine.
+    fallout_ios_present_launcher();
+
+    if (!fallout_ios_should_launch_game()) {
+        return 0;
+    }
 #endif
 
 #if __APPLE__ && TARGET_OS_OSX

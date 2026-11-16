@@ -72,13 +72,24 @@ $ mv app /Applications/Fallout
 
 ### iOS
 
+> **NOTE**: iOS 14 (or later) is required.
+
 > **NOTE**: See Android note on controls.
 
 - Download `fallout-ce.ipa`. Use sideloading applications ([AltStore](https://altstore.io/) or [Sideloadly](https://sideloadly.io/)) to install it to your device. Alternatively you can always build from source with your own signing certificate.
 
-- Run the game once. You'll see error message saying "Could not find the master datafile...". This step is needed for iOS to expose the game via File Sharing feature.
+- Prepare a ZIP of your Fallout installation. It must contain `master.dat`, `critter.dat` and the `data` folder, either at the top level or inside a single folder (for example `Fallout/`). On Windows, right-click the `Fallout` folder and choose **Send to > Compressed (zipped) folder**; on macOS, right-click it and choose **Compress**.
 
-- Use Finder (macOS Catalina and later) or iTunes (Windows and macOS Mojave or earlier) to copy `master.dat`, `critter.dat`, and `data` folder to "Fallout" app ([how-to](https://support.apple.com/HT210598)). Watch for file names - keep (or make) them lowercased (see [Configuration](#configuration)).
+- Run the app. The launcher starts instead of the game:
+    - **IMPORT GAME ZIP** opens the Files picker and installs the game data into the app's Documents folder. Re-importing replaces the game files and keeps your savegames.
+    - The file list shows whether `master.dat`, `critter.dat` and the data folder were found.
+    - **DISPLAY** sets the internal resolution (including a preset matching your device's logical screen size), pixel doubling, and is where the `f1_res.ini` options live.
+    - **AUDIO** controls sound, music, speech and their volumes. **GAMEPLAY** sets language, subtitles and always-run.
+    - **SAVE OPTIONS** writes `fallout.cfg`/`f1_res.ini` without starting the game; **PLAY** saves and starts it.
+
+- Imported game data lives in the app's Documents folder, together with `fallout.cfg`, `f1_res.ini` and `SAVEGAME`. File Sharing remains enabled, so you can still copy `master.dat`, `critter.dat` and `data` manually with Finder or iTunes ([how-to](https://support.apple.com/HT210598)) - the launcher detects them.
+
+- Pushing to `main`, or running **Actions > Build iOS IPA > Run workflow**, builds an unsigned IPA and uploads it as the `fallout-ce-ios-unsigned` artifact. Use AltStore or Sideloadly to sign it with your own Apple ID before installing.
 
 ## Configuration
 
@@ -100,7 +111,7 @@ Recommendations:
 - **Tablets**: Set these values to logical resolution of your device, for example iPad Pro 11 is 1668x2388 (pixels), but it's logical resolution is 834x1194 (points).
 - **Mobile phones**: Set height to 480, calculate width according to your device screen (aspect) ratio, for example Samsung S21 is 20:9 device, so the width should be 480 * 20 / 9 = 1067.
 
-In time this stuff will receive in-game interface, right now you have to do it manually.
+On iOS all of these settings are available in the launcher, which writes `fallout.cfg` and `f1_res.ini` for you. On desktop you have to edit the files manually for now.
 
 ## Contributing
 
