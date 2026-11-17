@@ -67,14 +67,9 @@ extern "C" void fallout_ios_camera_stop(void)
     }
 }
 
-extern "C" void fallout_ios_set_right_click_mode(int enabled)
+extern "C" void fallout_ios_right_click(void)
 {
-    fallout::mouse_set_ios_right_click_mode(enabled != 0);
-}
-
-extern "C" int fallout_ios_get_right_click_mode(void)
-{
-    return fallout::mouse_get_ios_right_click_mode() ? 1 : 0;
+    fallout::mouse_ios_right_click();
 }
 
 // MARK: - Launcher music decoding

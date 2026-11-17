@@ -120,11 +120,13 @@ final class GameControlsOverlay: UIView {
         rightClickButton.layer.cornerRadius = 10
         rightClickButton.layer.borderWidth = 1.5
         rightClickButton.layer.borderColor = ControlTheme.green.withAlphaComponent(0.6).cgColor
-        rightClickButton.setTitle("RMB", for: .normal)
+        rightClickButton.setTitle("LOOT/RMB", for: .normal)
         rightClickButton.setTitleColor(ControlTheme.green, for: .normal)
-        rightClickButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .bold)
-        rightClickButton.accessibilityLabel = "Right mouse button mode"
-        rightClickButton.addTarget(self, action: #selector(toggleRightClick), for: .touchUpInside)
+        rightClickButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .bold)
+        rightClickButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        rightClickButton.titleLabel?.minimumScaleFactor = 0.7
+        rightClickButton.accessibilityLabel = "Loot or right click"
+        rightClickButton.addTarget(self, action: #selector(rightClick), for: .touchUpInside)
         addSubview(rightClickButton)
     }
 
@@ -165,26 +167,29 @@ final class GameControlsOverlay: UIView {
         return false
     }
 
-    @objc private func toggleRightClick() {
-        let enabled = !rightClickButton.isSelected
-        rightClickButton.isSelected = enabled
-
-        if enabled {
-            rightClickButton.backgroundColor = ControlTheme.amber.withAlphaComponent(0.22)
-            rightClickButton.layer.borderColor = ControlTheme.amber.cgColor
-            rightClickButton.setTitleColor(ControlTheme.amber, for: .normal)
-        } else {
-            rightClickButton.backgroundColor = ControlTheme.panel
-            rightClickButton.layer.borderColor = ControlTheme.green.withAlphaComponent(0.6).cgColor
-            rightClickButton.setTitleColor(ControlTheme.green, for: .normal)
-        }
-
-        fallout_ios_set_right_click_mode(enabled ? 1 : 0)
+    @objc private func rightClick() {
+        fallout_ios_right_click()
+        setRightClickActive(true)
         UISelectionFeedbackGenerator().selectionChanged()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            self?.setRightClickActive(false)
+        }
+    }
+
+    private func setRightClickActive(_ active: Bool) {
+        rightClickButton.backgroundColor = active
+            ? ControlTheme.amber.withAlphaComponent(0.22)
+            : ControlTheme.panel
+        rightClickButton.layer.borderColor = active
+            ? ControlTheme.amber.cgColor
+            : ControlTheme.green.withAlphaComponent(0.6).cgColor
+        rightClickButton.setTitleColor(active ? ControlTheme.amber : ControlTheme.green, for: .normal)
     }
 }
 
 private final class CameraJoystickControl: UIControl {
+    private let ring = CAShapeLayer()
     private let knob = UIView()
     private let crosshair = CAShapeLayer()
     private let caption = UILabel()
@@ -192,21 +197,33 @@ private final class CameraJoystickControl: UIControl {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        backgroundColor = ControlTheme.panel.withAlphaComponent(0.45)
+        backgroundColor = .clear
         isMultipleTouchEnabled = false
         isExclusiveTouch = true
-        layer.borderWidth = 1
-        layer.borderColor = ControlTheme.green.withAlphaComponent(0.5).cgColor
+
+        ring.fillColor = ControlTheme.panel.withAlphaComponent(0.40).cgColor
+        ring.strokeColor = ControlTheme.green.withAlphaComponent(0.55).cgColor
+        ring.lineWidth = 1.5
+        ring.shadowColor = ControlTheme.green.cgColor
+        ring.shadowOpacity = 0.20
+        ring.shadowRadius = 8
+        ring.shadowOffset = .zero
+        layer.addSublayer(ring)
 
         crosshair.fillColor = UIColor.clear.cgColor
-        crosshair.strokeColor = ControlTheme.green.withAlphaComponent(0.22).cgColor
-        crosshair.lineWidth = 1
+        crosshair.strokeColor = ControlTheme.green.withAlphaComponent(0.24).cgColor
+        crosshair.lineWidth = 1.2
+        crosshair.lineCap = .round
         layer.addSublayer(crosshair)
 
         knob.isUserInteractionEnabled = false
-        knob.backgroundColor = ControlTheme.green.withAlphaComponent(0.12)
+        knob.backgroundColor = ControlTheme.green.withAlphaComponent(0.14)
         knob.layer.borderWidth = 1.5
-        knob.layer.borderColor = ControlTheme.green.withAlphaComponent(0.8).cgColor
+        knob.layer.borderColor = ControlTheme.green.withAlphaComponent(0.85).cgColor
+        knob.layer.shadowColor = ControlTheme.green.cgColor
+        knob.layer.shadowOpacity = 0.35
+        knob.layer.shadowRadius = 6
+        knob.layer.shadowOffset = .zero
         addSubview(knob)
 
         caption.text = "LOOK"
@@ -226,12 +243,16 @@ private final class CameraJoystickControl: UIControl {
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        layer.cornerRadius = bounds.width / 2
+        ring.frame = bounds
+        let ringInset: CGFloat = 1.5
+        ring.path = UIBezierPath(ovalIn: bounds.insetBy(dx: ringInset, dy: ringInset)).cgPath
+        ring.shadowPath = ring.path
 
         let knobSize = max(38, bounds.width * 0.36)
         knob.bounds = CGRect(x: 0, y: 0, width: knobSize, height: knobSize)
         knob.center = CGPoint(x: bounds.midX, y: bounds.midY)
         knob.layer.cornerRadius = knobSize / 2
+        knob.layer.shadowPath = UIBezierPath(ovalIn: knob.bounds).cgPath
 
         caption.frame = CGRect(
             x: 0,
@@ -283,12 +304,23 @@ private final class CameraJoystickControl: UIControl {
             dy = dy / distance * maxRadius
         }
 
-        knob.center = CGPoint(x: center.x + dx, y: center.y + dy)
+        let target = CGPoint(x: center.x + dx, y: center.y + dy)
+        UIView.animate(withDuration: 0.07,
+                       delay: 0,
+                       options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut]) {
+            self.knob.center = target
+            self.knob.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
+        }
         fallout_ios_camera_pan(Double(dx / maxRadius), Double(dy / maxRadius))
     }
 
     private func reset() {
-        knob.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        UIView.animate(withDuration: 0.12,
+                       delay: 0,
+                       options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut]) {
+            self.knob.center = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
+            self.knob.transform = .identity
+        }
         fallout_ios_camera_stop()
     }
 }

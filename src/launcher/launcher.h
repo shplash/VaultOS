@@ -97,8 +97,7 @@ int launcher_prepare_music(const char* install_dir, const char* output_path);
 void fallout_ios_install_game_controls(void);
 void fallout_ios_camera_pan(double x, double y);
 void fallout_ios_camera_stop(void);
-void fallout_ios_set_right_click_mode(int enabled);
-int fallout_ios_get_right_click_mode(void);
+void fallout_ios_right_click(void);
 
 // Installation progress, 0..1. Only meaningful while an install is running.
 double launcher_progress(void);
