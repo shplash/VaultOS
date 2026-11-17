@@ -206,6 +206,12 @@ void resume_audio()
     fallout::audioEngineResume();
 }
 
+int fire_mode()
+{
+    // Fallout 1 has no fire-mode cycle to report.
+    return -1;
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout1",
@@ -223,6 +229,7 @@ const FalloutEngineAPI g_api = {
     set_cursor_speed,
     pause_audio,
     resume_audio,
+    fire_mode,
 };
 
 } // namespace

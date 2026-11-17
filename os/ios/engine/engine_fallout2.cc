@@ -91,10 +91,18 @@ void send_mouse_button(Uint8 button, bool down)
     SDL_PushEvent(&event);
 }
 
-// The reload and fire-mode keys only make sense while the player is actually
-// aiming a firearm. The game targets with its crosshair cursor, and the active
-// hand must hold a weapon that takes ammunition (melee weapons have no ammo
-// capacity).
+// Reload and fire mode only make sense with a weapon in hand; reloading also
+// needs a weapon that takes ammunition (melee weapons have no ammo capacity).
+int has_weapon_in_hand()
+{
+    fallout::Object* item = nullptr;
+    if (fallout::interfaceGetActiveItem(&item) != 0 || item == nullptr) {
+        return 0;
+    }
+
+    return fallout::itemGetType(item) == fallout::ITEM_TYPE_WEAPON ? 1 : 0;
+}
+
 int has_firearm_in_hand()
 {
     fallout::Object* item = nullptr;
@@ -108,13 +116,48 @@ int has_firearm_in_hand()
         : 0;
 }
 
-int is_targeting()
+// 0 is HAND_LEFT, 1 is HAND_RIGHT in the engine.
+int active_item_action()
 {
-    const int mode = fallout::gameMouseGetMode();
-    return mode == fallout::GAME_MOUSE_MODE_CROSSHAIR
-            || mode == fallout::GAME_MOUSE_MODE_USE_CROSSHAIR
-        ? 1
-        : 0;
+    int left = -1;
+    int right = -1;
+    if (fallout::interfaceGetItemActions(&left, &right) != 0) {
+        return -1;
+    }
+
+    return fallout::interfaceGetCurrentHand() == 0 ? left : right;
+}
+
+int fire_mode()
+{
+    return active_item_action();
+}
+
+// In Fallout 2 reloading is one of the attack modes cycled with N. Walk to the
+// RELOAD mode and use the active item so the game applies its own AP cost,
+// animation and sound.
+void reload_active_weapon()
+{
+    fallout::Object* item = nullptr;
+    if (fallout::interfaceGetActiveItem(&item) != 0 || item == nullptr) {
+        return;
+    }
+
+    const int capacity = fallout::ammoGetCapacity(item);
+    if (capacity <= 0 || fallout::ammoGetQuantity(item) >= capacity) {
+        return;
+    }
+
+    int action = active_item_action();
+    for (int attempt = 0; attempt < fallout::INTERFACE_ITEM_ACTION_COUNT; attempt++) {
+        if (action == fallout::INTERFACE_ITEM_ACTION_RELOAD) {
+            fallout::_intface_use_item();
+            return;
+        }
+
+        fallout::interfaceCycleItemAction();
+        action = active_item_action();
+    }
 }
 
 int action_available(int action)
@@ -131,9 +174,11 @@ int action_available(int action)
     case 6:
         return fallout::isInCombat() ? 1 : 0;
     case 8:
+        // Reload: a firearm is in hand.
+        return has_firearm_in_hand();
     case 9:
-        // Reload and fire mode: only while aiming a firearm.
-        return is_targeting() && has_firearm_in_hand() ? 1 : 0;
+        // Fire mode: any weapon has attack modes to cycle.
+        return has_weapon_in_hand();
     default:
         return 1;
     }
@@ -167,10 +212,11 @@ void press_action(int action)
         send_key(SDL_SCANCODE_B);
         break;
     case 8:
-        send_key(SDL_SCANCODE_R);
+        reload_active_weapon();
         break;
     case 9:
-        send_key(SDL_SCANCODE_F);
+        // N cycles the attack/fire mode in Fallout 2.
+        send_key(SDL_SCANCODE_N);
         break;
     default:
         break;
@@ -281,6 +327,7 @@ const FalloutEngineAPI g_api = {
     set_cursor_speed,
     pause_audio,
     resume_audio,
+    fire_mode,
 };
 
 } // namespace

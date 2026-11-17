@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 1
+#define FALLOUT_ENGINE_ABI_VERSION 2
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -74,6 +74,10 @@ typedef struct FalloutEngineAPI {
     // Pause and resume the engine's audio when the app leaves the foreground.
     void (*pause_audio)(void);
     void (*resume_audio)(void);
+
+    // Fallout 2: the selected attack/fire mode (INTERFACE_ITEM_ACTION_*), or
+    // -1 when the game has no weapon mode to report. Fallout 1 returns -1.
+    int (*fire_mode)(void);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

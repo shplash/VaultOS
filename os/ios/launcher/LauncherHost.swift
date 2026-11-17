@@ -224,7 +224,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// Normalized center of the control on the game view. The editor stores
     /// the same coordinates, so layouts survive resolution and orientation
     /// changes.
-    func defaultCenter(for profile: LayoutProfile = .full) -> CGPoint {
+    func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds) -> CGPoint {
         switch profile {
         case .full:
             switch self {
@@ -241,9 +241,17 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill: return CGPoint(x: 0.9594, y: 0.2000)
             case .swap: return CGPoint(x: 0.9594, y: 0.3250)
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
-            // Fallout 2 adds two small controls just inside ACTION and SKIP.
+            // Fallout 2 adds RELOAD next to ACTION and puts MODE under SWAP.
             case .reload: return CGPoint(x: 0.8550, y: 0.6900)
-            case .fireMode: return CGPoint(x: 0.8550, y: 0.5320)
+            case .fireMode:
+                let swap = TouchControl.swap.defaultCenter(for: profile, in: bounds)
+                let swapHeight = TouchControl.swap.defaultSize(in: bounds, profile: profile).height
+                let modeHeight = defaultSize(in: bounds, profile: profile).height
+                let gap = max(3.0, swapHeight * 0.08)
+                return CGPoint(
+                    x: swap.x,
+                    y: swap.y + (swapHeight / 2 + gap + modeHeight / 2) / max(bounds.height, 1)
+                )
             }
         case .half:
             switch self {
@@ -261,7 +269,15 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .swap: return CGPoint(x: 0.9594, y: 0.3250)
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
             case .reload: return CGPoint(x: 0.8550, y: 0.6900)
-            case .fireMode: return CGPoint(x: 0.8550, y: 0.5320)
+            case .fireMode:
+                let swap = TouchControl.swap.defaultCenter(for: profile, in: bounds)
+                let swapHeight = TouchControl.swap.defaultSize(in: bounds, profile: profile).height
+                let modeHeight = defaultSize(in: bounds, profile: profile).height
+                let gap = max(3.0, swapHeight * 0.08)
+                return CGPoint(
+                    x: swap.x,
+                    y: swap.y + (swapHeight / 2 + gap + modeHeight / 2) / max(bounds.height, 1)
+                )
             }
         }
     }
@@ -288,9 +304,13 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill, .swap, .end:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
-            case .reload, .fireMode:
+            case .reload:
                 let side = min(bounds.width * 0.055, bounds.height * 0.125)
                 return CGSize(width: side, height: side)
+            case .fireMode:
+                // Same width as SWAP, half the height, sitting underneath it.
+                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
+                return CGSize(width: side, height: side * 0.5)
             }
         case .half:
             switch self {
@@ -312,9 +332,13 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill, .swap, .end:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
-            case .reload, .fireMode:
+            case .reload:
                 let side = min(bounds.width * 0.055, bounds.height * 0.125)
                 return CGSize(width: side, height: side)
+            case .fireMode:
+                // Same width as SWAP, half the height, sitting underneath it.
+                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
+                return CGSize(width: side, height: side * 0.5)
             }
         }
     }
@@ -514,6 +538,7 @@ final class GameControlsOverlay: UIView {
     private var cursorModeIcon: String?
     private var cursorModeTitle: String?
     private var cursorModeTimer: Timer?
+    private var fireModeValue: Int32 = -2
 
     static func install() {
         ControlLayout.migrateIfNeeded()
@@ -782,17 +807,48 @@ final class GameControlsOverlay: UIView {
 
         let showFallout2Controls = game == .fallout2
         if showFallout2Controls {
-            // Reload and fire mode belong to an aimed firearm, so they only
-            // appear while the game reports them as usable.
+            // Reload needs a firearm; fire mode applies to any held weapon.
             let canReload = fallout_ios_action_available(8) != 0
             let canChangeMode = fallout_ios_action_available(9) != 0
             reloadButton.isHidden = !canReload
             fireModeButton.isHidden = !canChangeMode
             reloadButton.isEnabled = canReload
             fireModeButton.isEnabled = canChangeMode
+
+            if canChangeMode {
+                let mode = fallout_ios_fire_mode()
+                if mode != fireModeValue {
+                    fireModeValue = mode
+                    updateFireModeButton(mode)
+                }
+            }
         } else {
             reloadButton.isHidden = true
             fireModeButton.isHidden = true
+        }
+    }
+
+    /// The game exposes its selected attack mode through the interface item
+    /// action: primary, primary aiming, secondary (burst) and secondary aiming.
+    /// Show one dot per step so the button reflects the mode the N key selected.
+    private func updateFireModeButton(_ mode: Int32) {
+        switch mode {
+        case 1:
+            fireModeButton.set(symbol: "circle.fill", title: "•",
+                               accessibilityLabel: "Fire mode: single")
+        case 2:
+            fireModeButton.set(symbol: "circle.fill", title: "••",
+                               accessibilityLabel: "Fire mode: aimed")
+        case 3:
+            fireModeButton.set(symbol: "circle.fill", title: "•••",
+                               accessibilityLabel: "Fire mode: burst")
+        case 4:
+            fireModeButton.set(symbol: "circle.fill", title: "••••",
+                               accessibilityLabel: "Fire mode: aimed burst")
+        default:
+            // No readable mode: hollow bullet and a spelled-out label.
+            fireModeButton.set(symbol: "circle", title: "FIREMODE",
+                               accessibilityLabel: "Fire mode")
         }
     }
 }
@@ -836,13 +892,13 @@ private final class LabeledControlButton: UIControl {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func set(symbol: String, title: String) {
+    func set(symbol: String, title: String, accessibilityLabel: String? = nil) {
         iconView.image = UIImage(
             systemName: symbol,
             withConfiguration: UIImage.SymbolConfiguration(pointSize: iconPointSize, weight: .semibold)
         )
         label.text = title
-        accessibilityLabel = title
+        self.accessibilityLabel = accessibilityLabel ?? title
     }
 
     override var isEnabled: Bool {

@@ -112,6 +112,7 @@ int fallout_ios_cursor_mode(void);
 void fallout_ios_screen_size(int* width, int* height);
 int fallout_ios_action_available(int action);
 void fallout_ios_press_action(int action);
+int fallout_ios_fire_mode(void);
 void fallout_ios_menu_music_start(void);
 void fallout_ios_menu_music_stop(void);
 void fallout_ios_pause_game_audio(void);
