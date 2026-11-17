@@ -625,15 +625,15 @@ private struct TouchControlEditor: View {
             // exact footprint the controls have to avoid.
             Rectangle()
                 .fill(Color.red)
-                .frame(width: size.width * 0.60, height: size.height * 0.125)
-                .position(x: size.width * 0.50, y: size.height * 0.929)
+                .frame(width: size.width * 0.484, height: size.height * 0.125)
+                .position(x: size.width * 0.492, y: size.height * 0.929)
 
-            // The camera cutout, drawn at the same left edge position as the
-            // real device so controls are not placed underneath it.
-            RoundedRectangle(cornerRadius: 8)
+            // The cutout disappears from iOS screenshots, so draw it at the
+            // same left-edge position as the device to keep the preview honest.
+            RoundedRectangle(cornerRadius: max(6, size.width * 0.010))
                 .fill(Color.black)
-                .frame(width: max(12, size.width * 0.02), height: size.height * 0.25)
-                .position(x: max(12, size.width * 0.02), y: size.height * 0.45)
+                .frame(width: size.width * 0.045, height: size.height * 0.240)
+                .position(x: size.width * 0.0475, y: size.height * 0.417)
         }
         .clipped()
         .allowsHitTesting(false)

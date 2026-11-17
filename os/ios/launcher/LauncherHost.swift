@@ -145,18 +145,18 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// changes.
     var defaultCenter: CGPoint {
         switch self {
-        case .joystick: return CGPoint(x: 0.1330, y: 0.7670)
-        case .back: return CGPoint(x: 0.0345, y: 0.4445)
-        case .action: return CGPoint(x: 0.9350, y: 0.5690)
-        case .skip: return CGPoint(x: 0.9350, y: 0.4470)
-        // Four equal cells filling the black strip to the right of the HUD.
-        case .inv: return CGPoint(x: 0.8420, y: 0.9290)
-        case .map: return CGPoint(x: 0.8836, y: 0.9290)
-        case .cha: return CGPoint(x: 0.9252, y: 0.9290)
-        case .pip: return CGPoint(x: 0.9668, y: 0.9290)
-        // END is the tall top cell; SKILL sits directly underneath it.
-        case .skill: return CGPoint(x: 0.9594, y: 0.2595)
-        case .end: return CGPoint(x: 0.9594, y: 0.0972)
+        case .joystick: return CGPoint(x: 0.1880, y: 0.8110)
+        case .back: return CGPoint(x: 0.1160, y: 0.5725)
+        case .action: return CGPoint(x: 0.9444, y: 0.5688)
+        case .skip: return CGPoint(x: 0.9444, y: 0.4479)
+        // Four equal cells filling the strip to the right of the HUD.
+        case .inv: return CGPoint(x: 0.7795, y: 0.9215)
+        case .map: return CGPoint(x: 0.8386, y: 0.9215)
+        case .cha: return CGPoint(x: 0.8977, y: 0.9215)
+        case .pip: return CGPoint(x: 0.9567, y: 0.9215)
+        // Two equal squares in the top-right corner, END first.
+        case .skill: return CGPoint(x: 0.9594, y: 0.1875)
+        case .end: return CGPoint(x: 0.9594, y: 0.0625)
         }
     }
 
@@ -166,25 +166,25 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     func defaultSize(in bounds: CGSize) -> CGSize {
         switch self {
         case .joystick:
-            let side = bounds.height * 0.310
+            let side = bounds.height * 0.318
             return CGSize(width: side, height: side)
         case .back:
-            return CGSize(width: bounds.width * 0.047, height: bounds.height * 0.112)
+            let side = min(bounds.width * 0.0644, bounds.height * 0.143)
+            return CGSize(width: side, height: side)
         case .action, .skip:
-            return CGSize(width: bounds.width * 0.052, height: bounds.height * 0.114)
+            return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.1125)
         case .inv, .map, .cha, .pip:
-            return CGSize(width: bounds.width * 0.0416, height: bounds.height * 0.125)
-        case .skill:
-            return CGSize(width: bounds.width * 0.056, height: bounds.height * 0.130)
-        case .end:
-            return CGSize(width: bounds.width * 0.056, height: bounds.height * 0.195)
+            return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
+        case .skill, .end:
+            let side = min(bounds.width * 0.05625, bounds.height * 0.130)
+            return CGSize(width: side, height: side)
         }
     }
 }
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 5
+    private static let layoutVersion = 6
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
