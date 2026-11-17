@@ -79,18 +79,6 @@ void send_key(SDL_Scancode scanCode)
     SDL_PushEvent(&event);
 }
 
-void send_mouse_button(Uint8 button, bool down)
-{
-    SDL_Event event;
-    SDL_zero(event);
-    event.type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
-    event.button.button = button;
-    event.button.state = down ? SDL_PRESSED : SDL_RELEASED;
-    event.button.clicks = 1;
-    SDL_GetMouseState(&event.button.x, &event.button.y);
-    SDL_PushEvent(&event);
-}
-
 // Reload and fire mode only make sense with a weapon in hand; reloading also
 // needs a weapon that takes ammunition (melee weapons have no ammo capacity).
 // The interface seeds both hands with (Object*)-1 until its first
@@ -280,12 +268,12 @@ void camera_stop()
     }
 }
 
+// A right click is what cycles move/action/target in the game view. The
+// engine's own handler for it is gameMouseCycleMode; injecting SDL button
+// events does not reach the game's mouse state, so call the cycle directly.
 void right_click()
 {
-    // Two-finger tap in the engine's own touch handling is a right click; the
-    // on-screen ACTION button sends the same pair of events directly.
-    send_mouse_button(SDL_BUTTON_RIGHT, true);
-    send_mouse_button(SDL_BUTTON_RIGHT, false);
+    fallout::gameMouseCycleMode();
 }
 
 void back()
