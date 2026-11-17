@@ -830,25 +830,80 @@ final class GameControlsOverlay: UIView {
 
     /// The game exposes its selected attack mode through the interface item
     /// action: primary, primary aiming, secondary (burst) and secondary aiming.
-    /// Show one dot per step so the button reflects the mode the N key selected.
+    /// The icon carries the mode: one dot for the primary attack, two for the
+    /// secondary, plus a crosshair when that mode is aimed — so the small
+    /// button needs no text.
     private func updateFireModeButton(_ mode: Int32) {
         switch mode {
         case 1:
-            fireModeButton.set(symbol: "circle.fill", title: "•",
+            fireModeButton.set(image: fireModeImage(mode), title: "",
                                accessibilityLabel: "Fire mode: single")
         case 2:
-            fireModeButton.set(symbol: "circle.fill", title: "••",
+            fireModeButton.set(image: fireModeImage(mode), title: "",
                                accessibilityLabel: "Fire mode: aimed")
         case 3:
-            fireModeButton.set(symbol: "circle.fill", title: "•••",
+            fireModeButton.set(image: fireModeImage(mode), title: "",
                                accessibilityLabel: "Fire mode: burst")
         case 4:
-            fireModeButton.set(symbol: "circle.fill", title: "••••",
+            fireModeButton.set(image: fireModeImage(mode), title: "",
                                accessibilityLabel: "Fire mode: aimed secondary")
         default:
             // No readable mode: hollow bullet and a spelled-out label.
             fireModeButton.set(symbol: "circle", title: "FIREMODE",
                                accessibilityLabel: "Fire mode")
+        }
+    }
+
+    /// One 40x20 pictogram: one dot for the primary attack, two for the
+    /// secondary (burst), and a crosshair when the mode is aimed.
+    private func fireModeImage(_ mode: Int32) -> UIImage {
+        let size = CGSize(width: 42, height: 20)
+        let color = ControlTheme.green
+
+        return UIGraphicsImageRenderer(size: size).image { context in
+            let cg = context.cgContext
+            cg.setFillColor(color.cgColor)
+            cg.setStrokeColor(color.cgColor)
+
+            let aimed = mode == 2 || mode == 4
+            let dotCount = (mode == 3 || mode == 4) ? 2 : 1
+            let centerY = size.height / 2
+            let dotRadius: CGFloat = 2.6
+
+            for index in 0..<dotCount {
+                let x = 6 + CGFloat(index) * 8
+                cg.fillEllipse(in: CGRect(
+                    x: x - dotRadius,
+                    y: centerY - dotRadius,
+                    width: dotRadius * 2,
+                    height: dotRadius * 2
+                ))
+            }
+
+            guard aimed else {
+                return
+            }
+
+            let centerX: CGFloat = dotCount == 2 ? 29 : 27
+            let radius: CGFloat = 6.5
+            cg.setLineWidth(1.2)
+            cg.strokeEllipse(in: CGRect(
+                x: centerX - radius,
+                y: centerY - radius,
+                width: radius * 2,
+                height: radius * 2
+            ))
+
+            let tick: CGFloat = 2.4
+            cg.move(to: CGPoint(x: centerX, y: centerY - radius - tick))
+            cg.addLine(to: CGPoint(x: centerX, y: centerY - radius + 1.2))
+            cg.move(to: CGPoint(x: centerX, y: centerY + radius - 1.2))
+            cg.addLine(to: CGPoint(x: centerX, y: centerY + radius + tick))
+            cg.move(to: CGPoint(x: centerX - radius - tick, y: centerY))
+            cg.addLine(to: CGPoint(x: centerX - radius + 1.2, y: centerY))
+            cg.move(to: CGPoint(x: centerX + radius - 1.2, y: centerY))
+            cg.addLine(to: CGPoint(x: centerX + radius + tick, y: centerY))
+            cg.strokePath()
         }
     }
 }
@@ -899,6 +954,14 @@ private final class LabeledControlButton: UIControl {
         )
         label.text = title
         self.accessibilityLabel = accessibilityLabel ?? title
+        setNeedsLayout()
+    }
+
+    func set(image: UIImage, title: String, accessibilityLabel: String? = nil) {
+        iconView.image = image.withRenderingMode(.alwaysOriginal)
+        label.text = title
+        self.accessibilityLabel = accessibilityLabel ?? title
+        setNeedsLayout()
     }
 
     override var isEnabled: Bool {
@@ -921,13 +984,16 @@ private final class LabeledControlButton: UIControl {
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        let labelHeight = max(9, min(11, bounds.height * 0.22))
+        let hasLabel = !(label.text?.isEmpty ?? true)
+        let labelHeight = hasLabel ? max(9, min(11, bounds.height * 0.22)) : 0
+
         iconView.frame = CGRect(
             x: 3,
             y: 2,
             width: bounds.width - 6,
             height: max(0, bounds.height - labelHeight - 4)
         )
+        label.isHidden = !hasLabel
         label.frame = CGRect(
             x: 1,
             y: bounds.height - labelHeight - 1,
