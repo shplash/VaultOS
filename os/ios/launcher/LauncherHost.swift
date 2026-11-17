@@ -1286,6 +1286,19 @@ final class LauncherMusic {
 
     private init() {}
 
+    private static let mutedKey = "launcher.musicMuted"
+
+    /// Kept across launches, so muting the launcher track sticks.
+    static var isMuted: Bool {
+        get {
+            return UserDefaults.standard.bool(forKey: mutedKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: mutedKey)
+            LauncherMusic.shared.player?.volume = newValue ? 0 : LauncherMusic.volume
+        }
+    }
+
     /// The track a game plays, or nil when the app carries no music at all.
     /// A game's own theme wins; otherwise the shared track covers it, which is
     /// how one generic file keeps both games scored until the real songs land.
@@ -1320,7 +1333,7 @@ final class LauncherMusic {
 
             let next = try AVAudioPlayer(contentsOf: url)
             next.numberOfLoops = -1
-            next.volume = crossfade ? 0 : LauncherMusic.volume
+            next.volume = crossfade || LauncherMusic.isMuted ? 0 : LauncherMusic.volume
             // Loading the buffers now is what keeps the first second of the
             // track from being late; the game's ACMs take seconds to decode,
             // an MP3 prepared this way starts at once.
@@ -1343,7 +1356,7 @@ final class LauncherMusic {
             // Both tracks keep playing while they swap volumes, so the change
             // of game is a fade rather than a cut. The old player is released
             // by its own stop, which is all it needs to disappear.
-            next.setVolume(LauncherMusic.volume, fadeDuration: LauncherMusic.fade)
+            next.setVolume(LauncherMusic.isMuted ? 0 : LauncherMusic.volume, fadeDuration: LauncherMusic.fade)
             outgoing.setVolume(0, fadeDuration: LauncherMusic.fade)
             DispatchQueue.main.asyncAfter(deadline: .now() + LauncherMusic.fade) {
                 outgoing.stop()

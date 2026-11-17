@@ -14,7 +14,7 @@ struct LauncherView: View {
     @State private var page: LauncherPage = .home
     @State private var showControlEditor = false
     @State private var tipGroup: TipGroup = .touch
-    @State private var musicMuted = false
+    @State private var musicMuted = LauncherMusic.isMuted
 
     private var accent: Color {
         return model.selectedGame.accent
@@ -38,7 +38,9 @@ struct LauncherView: View {
         }
         .onAppear {
             model.refreshInstall()
-            LauncherMusic.shared.playIfAvailable()
+            if !musicMuted {
+                LauncherMusic.shared.playIfAvailable()
+            }
         }
         .onDisappear {
             model.saveSettingsNow()
@@ -98,6 +100,7 @@ struct LauncherView: View {
 
                 Button {
                     musicMuted.toggle()
+                    LauncherMusic.isMuted = musicMuted
                     if musicMuted {
                         LauncherMusic.shared.stop()
                     } else {
