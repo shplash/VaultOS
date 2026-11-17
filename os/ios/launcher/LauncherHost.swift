@@ -1282,11 +1282,13 @@ final class LauncherMusic {
 
     private static let volume: Float = 0.32
     private static let fade: TimeInterval = 0.9
-    /// The track bundled with the app, used by any game without its own.
+    /// The track bundled with the app, used by any game that has no theme of
+    /// its own. It stops being used once both games have theirs.
     private static let sharedTrack = "intro music"
-    private static let trackNames: [FalloutGame: String] = [
-        .fallout1: "intro music",
-        .fallout2: "fallout2 music",
+    /// Per-game themes, in the order they are looked for in the bundle.
+    private static let themeNames: [FalloutGame: [String]] = [
+        .fallout1: ["maybe", "fallout1 music"],
+        .fallout2: ["blue moon", "fallout2 music"],
     ]
 
     private var player: AVAudioPlayer?
@@ -1294,14 +1296,26 @@ final class LauncherMusic {
 
     private init() {}
 
-    private static func trackName(for game: FalloutGame) -> String? {
-        let names = [trackNames[game] ?? sharedTrack, sharedTrack]
+    /// The track a game plays, or nil when the app carries no music at all.
+    /// A game's own theme wins; otherwise the shared track covers it, which is
+    /// how one generic file keeps both games scored until the real songs land.
+    static func themeName(for game: FalloutGame) -> String? {
+        let names = (themeNames[game] ?? []) + [sharedTrack]
         for name in names where !name.isEmpty {
             if Bundle.main.url(forResource: name, withExtension: "mp3") != nil {
                 return name
             }
         }
         return nil
+    }
+
+    /// What the launcher shows for a game's music: the theme's name, or SHARED
+    /// when the fallback is standing in for it.
+    static func themeLabel(for game: FalloutGame) -> String {
+        guard let name = themeName(for: game) else {
+            return "NONE"
+        }
+        return name == sharedTrack ? "SHARED" : name.uppercased()
     }
 
     private func play(track: String, crossfade: Bool) {
@@ -1317,6 +1331,10 @@ final class LauncherMusic {
             let next = try AVAudioPlayer(contentsOf: url)
             next.numberOfLoops = -1
             next.volume = crossfade ? 0 : LauncherMusic.volume
+            // Loading the buffers now is what keeps the first second of the
+            // track from being late; the game's ACMs take seconds to decode,
+            // an MP3 prepared this way starts at once.
+            next.prepareToPlay()
             next.play()
 
             let outgoing = player
@@ -1346,7 +1364,7 @@ final class LauncherMusic {
     }
 
     func playIfAvailable() {
-        guard let track = LauncherMusic.trackName(for: ControlLayout.activeGame()) else {
+        guard let track = LauncherMusic.themeName(for: ControlLayout.activeGame()) else {
             return
         }
 
@@ -1362,7 +1380,7 @@ final class LauncherMusic {
 
     /// Called when the player picks the other game in the launcher.
     func crossfade(to game: FalloutGame) {
-        guard let track = LauncherMusic.trackName(for: game) else {
+        guard let track = LauncherMusic.themeName(for: game) else {
             return
         }
         guard track != trackName else {

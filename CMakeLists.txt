@@ -359,10 +359,16 @@ endif()
 
 if(APPLE)
     if(IOS)
+        # Any MP3 in the repository root is bundled as a theme track, so a song
+        # can be dropped in without editing this list. The launcher looks for
+        # "maybe" for Fallout, "blue moon" for Fallout 2, and "intro music" as
+        # the shared fallback used by any game without a theme of its own.
+        file(GLOB MUSIC_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/*.mp3")
+
         set(RESOURCES
             "os/ios/AppIcon.xcassets"
             "os/ios/LaunchScreen.storyboard"
-            "${CMAKE_SOURCE_DIR}/intro music.mp3"
+            ${MUSIC_RESOURCES}
         )
 
         target_sources(${EXECUTABLE_NAME} PUBLIC ${RESOURCES})

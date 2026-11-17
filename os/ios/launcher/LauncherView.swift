@@ -385,6 +385,15 @@ struct LauncherView: View {
             toggleRow("SOUND EFFECTS", isOn: $model.sound)
             toggleRow("MUSIC", isOn: $model.music)
             toggleRow("SPEECH", isOn: $model.speech)
+
+            Spacer(minLength: 4)
+
+            Text("THEME: \(LauncherMusic.themeLabel(for: model.selectedGame))")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundColor(Theme.faint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
             Spacer(minLength: 0)
         }
     }
