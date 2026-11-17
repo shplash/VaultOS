@@ -42,7 +42,7 @@ struct LauncherView: View {
         .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $showControlEditor) {
-            TouchControlEditor()
+            TouchControlEditor(model: model)
         }
         .onAppear {
             model.refreshInstall()
@@ -535,11 +535,21 @@ private struct CompactButtonStyle: ButtonStyle {
 
 private struct TouchControlEditor: View {
     @Environment(\.presentationMode) private var presentationMode
-    @State private var centers = ControlLayout.allCenters()
-    @State private var scales = ControlLayout.allScales()
+    @ObservedObject var model: LauncherModel
+    @State private var centers: [TouchControl: CGPoint]
+    @State private var scales: [TouchControl: CGFloat]
+    @State private var profile: LayoutProfile
     @State private var dragOrigins: [TouchControl: CGPoint] = [:]
     @State private var selected: TouchControl?
     @State private var whiteButtons = UserDefaults.standard.bool(forKey: "launcher.whiteButtons")
+
+    init(model: LauncherModel) {
+        self.model = model
+        let profile = ControlLayout.profileForCurrentResolution()
+        _profile = State(initialValue: profile)
+        _centers = State(initialValue: ControlLayout.allCenters(profile: profile))
+        _scales = State(initialValue: ControlLayout.allScales(profile: profile))
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -583,10 +593,13 @@ private struct TouchControlEditor: View {
                 .font(.system(size: 14, weight: .heavy, design: .monospaced))
                 .foregroundColor(Theme.green)
 
+            presetButton("FULL LAYOUT", profile: .full)
+            presetButton("HALF LAYOUT", profile: .half)
+
             Button("RESET") {
-                ControlLayout.reset()
-                centers = ControlLayout.allCenters()
-                scales = ControlLayout.allScales()
+                ControlLayout.reset(profile: profile)
+                centers = ControlLayout.allCenters(profile: profile)
+                scales = ControlLayout.allScales(profile: profile)
                 dragOrigins.removeAll()
                 selected = nil
             }
@@ -608,6 +621,25 @@ private struct TouchControlEditor: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func presetButton(_ title: String, profile target: LayoutProfile) -> some View {
+        Button(title) {
+            profile = target
+            if let preset = model.presets.first(where: { $0.id == target.rawValue }) {
+                model.apply(preset: preset)
+            }
+            centers = ControlLayout.allCenters(profile: target)
+            scales = ControlLayout.allScales(profile: target)
+            dragOrigins.removeAll()
+            selected = nil
+        }
+        .font(.system(size: 9, weight: .heavy, design: .monospaced))
+        .foregroundColor(profile == target ? Theme.background : Theme.green)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(profile == target ? Theme.green : Theme.panel)
+        .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
+    }
+
     private func previewSurface(_ size: CGSize) -> some View {
         ZStack {
             LinearGradient(
@@ -627,20 +659,13 @@ private struct TouchControlEditor: View {
                 .fill(Color.red)
                 .frame(width: size.width * 0.484, height: size.height * 0.125)
                 .position(x: size.width * 0.492, y: size.height * 0.929)
-
-            // The cutout disappears from iOS screenshots, so draw it at the
-            // same left-edge position as the device to keep the preview honest.
-            RoundedRectangle(cornerRadius: max(6, size.width * 0.010))
-                .fill(Color.black)
-                .frame(width: size.width * 0.045, height: size.height * 0.240)
-                .position(x: size.width * 0.0475, y: size.height * 0.417)
         }
         .clipped()
         .allowsHitTesting(false)
     }
 
     private func editorSize(for control: TouchControl, in size: CGSize) -> CGSize {
-        let base = control.defaultSize(in: size)
+        let base = control.defaultSize(in: size, profile: profile)
         let factor = scales[control] ?? 1
         return CGSize(
             width: max(24, base.width * factor),
@@ -649,7 +674,7 @@ private struct TouchControlEditor: View {
     }
 
     private func editorCenter(for control: TouchControl, in size: CGSize) -> CGPoint {
-        let point = centers[control] ?? control.defaultCenter
+        let point = centers[control] ?? control.defaultCenter(for: profile)
         let controlSize = editorSize(for: control, in: size)
         let halfWidth = controlSize.width / 2
         let halfHeight = controlSize.height / 2
@@ -736,7 +761,7 @@ private struct TouchControlEditor: View {
             set: { newValue in
                 let value = CGFloat(newValue)
                 scales[control] = value
-                ControlLayout.setScale(value, for: control)
+                ControlLayout.setScale(value, for: control, profile: profile)
             }
         )
     }
@@ -747,7 +772,7 @@ private struct TouchControlEditor: View {
                 selected = control
 
                 if dragOrigins[control] == nil {
-                    dragOrigins[control] = centers[control] ?? control.defaultCenter
+                    dragOrigins[control] = centers[control] ?? control.defaultCenter(for: profile)
                 }
                 guard let origin = dragOrigins[control] else {
                     return
@@ -764,7 +789,7 @@ private struct TouchControlEditor: View {
                             (size.height - halfHeight - 4) / max(size.height, 1))
 
                 centers[control] = CGPoint(x: x, y: y)
-                ControlLayout.setCenter(CGPoint(x: x, y: y), for: control)
+                ControlLayout.setCenter(CGPoint(x: x, y: y), for: control, profile: profile)
             }
             .onEnded { _ in
                 dragOrigins[control] = nil

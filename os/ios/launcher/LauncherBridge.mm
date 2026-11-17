@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "audio_engine.h"
 #include "game/combat.h"
 #include "game/gmouse.h"
 #include "game/intface.h"
@@ -174,4 +175,17 @@ extern "C" void fallout_ios_press_action(int action)
     default:
         break;
     }
+}
+
+// Pause the game's SDL audio stream when the app leaves the foreground. SDL's
+// device is shared by music and sound effects, so this silences both without
+// closing the device or losing playback positions.
+extern "C" void fallout_ios_pause_game_audio(void)
+{
+    fallout::audioEnginePause();
+}
+
+extern "C" void fallout_ios_resume_game_audio(void)
+{
+    fallout::audioEngineResume();
 }

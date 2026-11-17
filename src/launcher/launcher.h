@@ -101,6 +101,8 @@ int fallout_ios_action_available(int action);
 void fallout_ios_press_action(int action);
 void fallout_ios_menu_music_start(void);
 void fallout_ios_menu_music_stop(void);
+void fallout_ios_pause_game_audio(void);
+void fallout_ios_resume_game_audio(void);
 
 // Installation progress, 0..1. Only meaningful while an install is running.
 double launcher_progress(void);

@@ -16,6 +16,43 @@ final class LauncherHost {
 
     private var window: UIWindow?
     private var finished = false
+    private var resignObserver: NSObjectProtocol?
+    private var activeObserver: NSObjectProtocol?
+
+    private init() {
+        let center = NotificationCenter.default
+        resignObserver = center.addObserver(forName: UIApplication.willResignActiveNotification,
+                                            object: nil,
+                                            queue: .main) { [weak self] _ in
+            self?.appWillResignActive()
+        }
+        activeObserver = center.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                            object: nil,
+                                            queue: .main) { [weak self] _ in
+            self?.appDidBecomeActive()
+        }
+    }
+
+    private func appWillResignActive() {
+        if finished {
+            // The game is running; pause both its SDL stream and the launcher
+            // track if the main menu is using it.
+            fallout_ios_pause_game_audio()
+            LauncherMusic.shared.pause()
+        } else {
+            // Leaving the launcher in the background should silence its music.
+            LauncherMusic.shared.stop()
+        }
+    }
+
+    private func appDidBecomeActive() {
+        if finished {
+            fallout_ios_resume_game_audio()
+            LauncherMusic.shared.resume()
+        } else if window != nil {
+            LauncherMusic.shared.playIfAvailable()
+        }
+    }
 
     func present() {
         if !Thread.isMainThread {
@@ -141,67 +178,137 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    static let bottomRow: [TouchControl] = [.map, .cha, .inv, .pip]
+    static func bottomRow(for profile: LayoutProfile) -> [TouchControl] {
+        switch profile {
+        case .full: return [.map, .cha, .inv, .pip]
+        case .half: return [.map, .cha, .inv]
+        }
+    }
 
     /// Normalized center of the control on the game view. The editor stores
     /// the same coordinates, so layouts survive resolution and orientation
     /// changes.
-    var defaultCenter: CGPoint {
-        switch self {
-        case .joystick: return CGPoint(x: 0.18125, y: 0.8110)
-        case .back: return CGPoint(x: 0.1160, y: 0.5725)
-        case .action: return CGPoint(x: 0.9415, y: 0.6900)
-        case .skip: return CGPoint(x: 0.9444, y: 0.5320)
-        // Four equal cells filling the strip to the right of the HUD.
-        case .map: return CGPoint(x: 0.7795, y: 0.9215)
-        case .cha: return CGPoint(x: 0.8386, y: 0.9215)
-        case .inv: return CGPoint(x: 0.8977, y: 0.9215)
-        case .pip: return CGPoint(x: 0.9567, y: 0.9215)
-        // Three equal squares in the top-right corner: END, SKILL, SWAP.
-        case .skill: return CGPoint(x: 0.9594, y: 0.2000)
-        case .swap: return CGPoint(x: 0.9594, y: 0.3250)
-        case .end: return CGPoint(x: 0.9594, y: 0.0750)
+    func defaultCenter(for profile: LayoutProfile = .full) -> CGPoint {
+        switch profile {
+        case .full:
+            switch self {
+            case .joystick: return CGPoint(x: 0.18125, y: 0.8110)
+            case .back: return CGPoint(x: 0.1160, y: 0.5725)
+            case .action: return CGPoint(x: 0.9415, y: 0.6900)
+            case .skip: return CGPoint(x: 0.9444, y: 0.5320)
+            // Four equal cells filling the strip to the right of the HUD.
+            case .map: return CGPoint(x: 0.7795, y: 0.9215)
+            case .cha: return CGPoint(x: 0.8386, y: 0.9215)
+            case .inv: return CGPoint(x: 0.8977, y: 0.9215)
+            case .pip: return CGPoint(x: 0.9567, y: 0.9215)
+            // Three equal squares in the top-right corner: END, SKILL, SWAP.
+            case .skill: return CGPoint(x: 0.9594, y: 0.2000)
+            case .swap: return CGPoint(x: 0.9594, y: 0.3250)
+            case .end: return CGPoint(x: 0.9594, y: 0.0750)
+            }
+        case .half:
+            switch self {
+            // Keep the HUD clear at half resolution: PIP moves above BACK,
+            // the other three HUD buttons slide together, and LOOK shifts left.
+            case .joystick: return CGPoint(x: 0.1170, y: 0.8110)
+            case .back: return CGPoint(x: 0.1160, y: 0.5725)
+            case .action: return CGPoint(x: 0.9415, y: 0.6900)
+            case .skip: return CGPoint(x: 0.9444, y: 0.5320)
+            case .map: return CGPoint(x: 0.8347, y: 0.9215)
+            case .cha: return CGPoint(x: 0.8953, y: 0.9215)
+            case .inv: return CGPoint(x: 0.9559, y: 0.9215)
+            case .pip: return CGPoint(x: 0.1080, y: 0.4250)
+            case .skill: return CGPoint(x: 0.9594, y: 0.2000)
+            case .swap: return CGPoint(x: 0.9594, y: 0.3250)
+            case .end: return CGPoint(x: 0.9594, y: 0.0750)
+            }
         }
     }
 
     /// Base size in points before the global and per-control scale settings.
     /// The HUD-row buttons are intentionally rectangles so they fill the side
     /// strip in the same way as the proposed layout.
-    func defaultSize(in bounds: CGSize) -> CGSize {
-        switch self {
-        case .joystick:
-            let side = bounds.height * 0.318
-            return CGSize(width: side, height: side)
-        case .back:
-            let side = min(bounds.width * 0.0670, bounds.height * 0.149)
-            return CGSize(width: side, height: side)
-        case .action:
-            return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.171)
-        case .skip:
-            return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
-        case .inv, .map, .cha, .pip:
-            return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
-        case .skill, .swap, .end:
-            let side = min(bounds.width * 0.05625, bounds.height * 0.130)
-            return CGSize(width: side, height: side)
+    func defaultSize(in bounds: CGSize, profile: LayoutProfile = .full) -> CGSize {
+        switch profile {
+        case .full:
+            switch self {
+            case .joystick:
+                let side = bounds.height * 0.318
+                return CGSize(width: side, height: side)
+            case .back:
+                let side = min(bounds.width * 0.0670, bounds.height * 0.149)
+                return CGSize(width: side, height: side)
+            case .action:
+                return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.171)
+            case .skip:
+                return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
+            case .inv, .map, .cha, .pip:
+                return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
+            case .skill, .swap, .end:
+                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
+                return CGSize(width: side, height: side)
+            }
+        case .half:
+            switch self {
+            case .joystick:
+                let side = bounds.height * 0.318
+                return CGSize(width: side, height: side)
+            case .back:
+                let side = min(bounds.width * 0.0670, bounds.height * 0.149)
+                return CGSize(width: side, height: side)
+            case .action:
+                return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.171)
+            case .skip:
+                return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
+            case .map, .cha, .inv:
+                return CGSize(width: bounds.width * 0.0606, height: bounds.height * 0.1375)
+            case .pip:
+                let side = min(bounds.width * 0.0644, bounds.height * 0.143)
+                return CGSize(width: side, height: side)
+            case .skill, .swap, .end:
+                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
+                return CGSize(width: side, height: side)
+            }
         }
     }
 }
 
+enum LayoutProfile: String {
+    case full
+    case half
+}
+
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 9
+    private static let layoutVersion = 10
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
 
-    private static func key(_ control: TouchControl, _ suffix: String) -> String {
+    private static func key(_ control: TouchControl, _ suffix: String, profile: LayoutProfile) -> String {
+        return "launcher.control.\(profile.rawValue).\(control.rawValue)\(suffix)"
+    }
+
+    private static func legacyKey(_ control: TouchControl, _ suffix: String) -> String {
         return "launcher.control.\(control.rawValue)\(suffix)"
     }
 
+    /// Which layout the current resolution setting uses. The launcher saves
+    /// width/height before handing control to the engine, so the overlay can
+    /// pick the matching layout without a separate switch.
+    static func profileForCurrentResolution() -> LayoutProfile {
+        let defaults = UserDefaults.standard
+        let native = LauncherModel.nativeResolution()
+        let half = LauncherModel.displayResolution(divisor: 3, native: native)
+        let width = defaults.object(forKey: "launcher.width") as? Int ?? 0
+        let height = defaults.object(forKey: "launcher.height") as? Int ?? 0
+        return (width == half.0 && height == half.1) ? .half : .full
+    }
+
     /// The first build with the reference layout used saved drag positions
-    /// from the older oversized layout. Clear those once so the real overlay
-    /// and the editor both start from the same reference geometry.
+    /// from the older oversized layout. This migration copies the existing
+    /// single layout into the FULL profile, then starts a separate HALF
+    /// profile from its own defaults.
     static func migrateIfNeeded() {
         let defaults = UserDefaults.standard
         guard defaults.integer(forKey: layoutVersionKey) < layoutVersion else {
@@ -209,63 +316,66 @@ enum ControlLayout {
         }
 
         for control in TouchControl.allCases {
-            defaults.removeObject(forKey: key(control, xSuffix))
-            defaults.removeObject(forKey: key(control, ySuffix))
-            defaults.removeObject(forKey: key(control, scaleSuffix))
+            for (legacy, target) in [
+                (legacyKey(control, xSuffix), key(control, xSuffix, profile: .full)),
+                (legacyKey(control, ySuffix), key(control, ySuffix, profile: .full)),
+                (legacyKey(control, scaleSuffix), key(control, scaleSuffix, profile: .full)),
+            ] {
+                if let value = defaults.object(forKey: legacy) {
+                    defaults.set(value, forKey: target)
+                }
+                defaults.removeObject(forKey: legacy)
+            }
         }
 
-        // Global scale from the old layout also made BACK and the joystick
-        // dramatically larger than the reference.
-        defaults.removeObject(forKey: "launcher.joystickScale")
-        defaults.removeObject(forKey: "launcher.buttonScale")
         defaults.set(layoutVersion, forKey: layoutVersionKey)
     }
 
-    static func center(for control: TouchControl) -> CGPoint {
+    static func center(for control: TouchControl, profile: LayoutProfile) -> CGPoint {
         let defaults = UserDefaults.standard
-        guard let x = defaults.object(forKey: key(control, xSuffix)) as? Double,
-              let y = defaults.object(forKey: key(control, ySuffix)) as? Double else {
-            return control.defaultCenter
+        guard let x = defaults.object(forKey: key(control, xSuffix, profile: profile)) as? Double,
+              let y = defaults.object(forKey: key(control, ySuffix, profile: profile)) as? Double else {
+            return control.defaultCenter(for: profile)
         }
         return CGPoint(x: min(max(x, 0), 1), y: min(max(y, 0), 1))
     }
 
-    static func setCenter(_ point: CGPoint, for control: TouchControl) {
+    static func setCenter(_ point: CGPoint, for control: TouchControl, profile: LayoutProfile) {
         let defaults = UserDefaults.standard
-        defaults.set(Double(min(max(point.x, 0), 1)), forKey: key(control, xSuffix))
-        defaults.set(Double(min(max(point.y, 0), 1)), forKey: key(control, ySuffix))
+        defaults.set(Double(min(max(point.x, 0), 1)), forKey: key(control, xSuffix, profile: profile))
+        defaults.set(Double(min(max(point.y, 0), 1)), forKey: key(control, ySuffix, profile: profile))
     }
 
-    static func scale(for control: TouchControl) -> CGFloat {
-        let value = UserDefaults.standard.object(forKey: key(control, scaleSuffix)) as? Double ?? 1.0
+    static func scale(for control: TouchControl, profile: LayoutProfile) -> CGFloat {
+        let value = UserDefaults.standard.object(forKey: key(control, scaleSuffix, profile: profile)) as? Double ?? 1.0
         return CGFloat(min(max(value, 0.55), 2.0))
     }
 
-    static func setScale(_ scale: CGFloat, for control: TouchControl) {
-        UserDefaults.standard.set(Double(min(max(scale, 0.55), 2.0)), forKey: key(control, scaleSuffix))
+    static func setScale(_ scale: CGFloat, for control: TouchControl, profile: LayoutProfile) {
+        UserDefaults.standard.set(Double(min(max(scale, 0.55), 2.0)), forKey: key(control, scaleSuffix, profile: profile))
     }
 
-    static func reset() {
+    static func reset(profile: LayoutProfile) {
         let defaults = UserDefaults.standard
         for control in TouchControl.allCases {
-            defaults.removeObject(forKey: key(control, xSuffix))
-            defaults.removeObject(forKey: key(control, ySuffix))
-            defaults.removeObject(forKey: key(control, scaleSuffix))
+            defaults.removeObject(forKey: key(control, xSuffix, profile: profile))
+            defaults.removeObject(forKey: key(control, ySuffix, profile: profile))
+            defaults.removeObject(forKey: key(control, scaleSuffix, profile: profile))
         }
     }
 
-    static func allCenters() -> [TouchControl: CGPoint] {
+    static func allCenters(profile: LayoutProfile) -> [TouchControl: CGPoint] {
         var centers: [TouchControl: CGPoint] = [:]
         for control in TouchControl.allCases {
-            centers[control] = center(for: control)
+            centers[control] = center(for: control, profile: profile)
         }
         return centers
     }
 
-    static func allScales() -> [TouchControl: CGFloat] {
+    static func allScales(profile: LayoutProfile) -> [TouchControl: CGFloat] {
         var scales: [TouchControl: CGFloat] = [:]
         for control in TouchControl.allCases {
-            scales[control] = scale(for: control)
+            scales[control] = scale(for: control, profile: profile)
         }
         return scales
     }
@@ -415,33 +525,41 @@ final class GameControlsOverlay: UIView {
         let defaults = UserDefaults.standard
         let joystickScale = CGFloat(defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0)
         let buttonScale = CGFloat(defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0)
+        let profile = ControlLayout.profileForCurrentResolution()
 
-        place(joystick, at: .joystick, size: scaledSize(for: .joystick, in: bounds.size, globalScale: joystickScale))
-        place(backButton, at: .back, size: scaledSize(for: .back, in: bounds.size, globalScale: buttonScale))
-        place(actionButton, at: .action, size: scaledSize(for: .action, in: bounds.size, globalScale: buttonScale))
-        place(skipButton, at: .skip, size: scaledSize(for: .skip, in: bounds.size, globalScale: buttonScale))
+        place(joystick, at: .joystick, profile: profile, size: scaledSize(for: .joystick, in: bounds.size, globalScale: joystickScale, profile: profile))
+        place(backButton, at: .back, profile: profile, size: scaledSize(for: .back, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(actionButton, at: .action, profile: profile, size: scaledSize(for: .action, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(skipButton, at: .skip, profile: profile, size: scaledSize(for: .skip, in: bounds.size, globalScale: buttonScale, profile: profile))
 
-        for (index, button) in sideButtons.enumerated() where index < TouchControl.bottomRow.count {
-            let control = TouchControl.bottomRow[index]
-            place(button, at: control, size: scaledSize(for: control, in: bounds.size, globalScale: buttonScale))
+        let row = TouchControl.bottomRow(for: profile)
+        for (index, control) in row.enumerated() where index < sideButtons.count {
+            place(sideButtons[index], at: control, profile: profile,
+                  size: scaledSize(for: control, in: bounds.size, globalScale: buttonScale, profile: profile))
+        }
+        // At half resolution PIP leaves the row and sits above BACK.
+        if row.count < sideButtons.count {
+            let pip = sideButtons[row.count]
+            place(pip, at: .pip, profile: profile,
+                  size: scaledSize(for: .pip, in: bounds.size, globalScale: buttonScale, profile: profile))
         }
 
-        place(skillButton, at: .skill, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale))
-        place(swapButton, at: .swap, size: scaledSize(for: .swap, in: bounds.size, globalScale: buttonScale))
-        place(endButton, at: .end, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale))
+        place(skillButton, at: .skill, profile: profile, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(swapButton, at: .swap, profile: profile, size: scaledSize(for: .swap, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(endButton, at: .end, profile: profile, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale, profile: profile))
     }
 
-    private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat) -> CGSize {
-        let base = control.defaultSize(in: bounds)
-        let factor = max(0.55, globalScale) * ControlLayout.scale(for: control)
+    private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
+        let base = control.defaultSize(in: bounds, profile: profile)
+        let factor = max(0.55, globalScale) * ControlLayout.scale(for: control, profile: profile)
         return CGSize(
             width: max(22, min(bounds.width * 0.45, base.width * factor)),
             height: max(22, min(bounds.height * 0.45, base.height * factor))
         )
     }
 
-    private func place(_ view: UIView, at control: TouchControl, size: CGSize) {
-        let normalized = ControlLayout.center(for: control)
+    private func place(_ view: UIView, at control: TouchControl, profile: LayoutProfile, size: CGSize) {
+        let normalized = ControlLayout.center(for: control, profile: profile)
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
         // Use the full screen. Subtracting the window's safe-area insets here
@@ -783,6 +901,14 @@ final class LauncherMusic {
         } catch {
             // The launcher still works without music.
         }
+    }
+
+    func pause() {
+        player?.pause()
+    }
+
+    func resume() {
+        player?.play()
     }
 
     func stop() {

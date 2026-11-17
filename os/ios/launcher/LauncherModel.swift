@@ -51,19 +51,24 @@ final class LauncherModel: ObservableObject {
         installDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         let native = LauncherModel.nativeResolution()
-        // Version 3 uses a logical resolution that keeps Fallout's interface
-        // readable. Earlier builds saved the raw panel size, which was so large
-        // that the world and HUD looked zoomed out.
-        if defaults.integer(forKey: "launcher.resolutionVersion") < 3 {
-            let full = LauncherModel.displayResolution(divisor: 2, native: native)
-            width = full.0
-            height = full.1
-            defaults.set(3, forKey: "launcher.resolutionVersion")
+        // Version 4 defaults to HALF, which scales the interface up. Version 3
+        // and earlier defaulted to FULL; migrate those once so the new default
+        // is visible without requiring a fresh install.
+        let selected: (Int, Int)
+        if defaults.integer(forKey: "launcher.resolutionVersion") < 4 {
+            selected = LauncherModel.displayResolution(divisor: 3, native: native)
+            defaults.set(4, forKey: "launcher.resolutionVersion")
         } else {
-            let fallback = LauncherModel.displayResolution(divisor: 2, native: native)
-            width = defaults.object(forKey: "launcher.width") as? Int ?? fallback.0
-            height = defaults.object(forKey: "launcher.height") as? Int ?? fallback.1
+            let fallback = LauncherModel.displayResolution(divisor: 3, native: native)
+            selected = (
+                defaults.object(forKey: "launcher.width") as? Int ?? fallback.0,
+                defaults.object(forKey: "launcher.height") as? Int ?? fallback.1
+            )
         }
+        width = selected.0
+        height = selected.1
+        defaults.set(selected.0, forKey: "launcher.width")
+        defaults.set(selected.1, forKey: "launcher.height")
 
         sound = defaults.object(forKey: "launcher.sound") as? Bool ?? true
         music = defaults.object(forKey: "launcher.music") as? Bool ?? true
@@ -136,6 +141,10 @@ final class LauncherModel: ObservableObject {
     func apply(preset: DisplayPreset) {
         width = preset.width
         height = preset.height
+        // Persist immediately so the control overlay can choose the matching
+        // FULL/HALF layout even if the editor is closed without tapping Play.
+        defaults.set(width, forKey: "launcher.width")
+        defaults.set(height, forKey: "launcher.height")
     }
 
     var languageNames: [String] {
