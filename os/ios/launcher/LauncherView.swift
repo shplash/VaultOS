@@ -91,6 +91,11 @@ struct LauncherView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
+        // The palette is derived from the selected game, so SwiftUI has to
+        // rebuild the whole launcher when it changes. Without this, subviews
+        // that do not themselves read selectedGame keep the previous game's
+        // colours and the panel ends up mixing both themes.
+        .id(model.selectedGame)
     }
 
     // MARK: - Header

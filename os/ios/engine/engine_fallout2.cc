@@ -15,8 +15,10 @@
 #include "fallout_engine.h"
 #include "game_mouse.h"
 #include "interface.h"
+#include "item.h"
 #include "main.h"
 #include "mouse.h"
+#include "proto_types.h"
 #include "svga.h"
 #include "win32.h"
 
@@ -89,6 +91,32 @@ void send_mouse_button(Uint8 button, bool down)
     SDL_PushEvent(&event);
 }
 
+// The reload and fire-mode keys only make sense while the player is actually
+// aiming a firearm. The game targets with its crosshair cursor, and the active
+// hand must hold a weapon that takes ammunition (melee weapons have no ammo
+// capacity).
+int has_firearm_in_hand()
+{
+    fallout::Object* item = nullptr;
+    if (fallout::interfaceGetActiveItem(&item) != 0 || item == nullptr) {
+        return 0;
+    }
+
+    return fallout::itemGetType(item) == fallout::ITEM_TYPE_WEAPON
+            && fallout::ammoGetCapacity(item) > 0
+        ? 1
+        : 0;
+}
+
+int is_targeting()
+{
+    const int mode = fallout::gameMouseGetMode();
+    return mode == fallout::GAME_MOUSE_MODE_CROSSHAIR
+            || mode == fallout::GAME_MOUSE_MODE_USE_CROSSHAIR
+        ? 1
+        : 0;
+}
+
 int action_available(int action)
 {
     if (!fallout::interfaceBarEnabled()) {
@@ -102,6 +130,10 @@ int action_available(int action)
     case 5:
     case 6:
         return fallout::isInCombat() ? 1 : 0;
+    case 8:
+    case 9:
+        // Reload and fire mode: only while aiming a firearm.
+        return is_targeting() && has_firearm_in_hand() ? 1 : 0;
     default:
         return 1;
     }

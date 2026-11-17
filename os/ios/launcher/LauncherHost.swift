@@ -781,11 +781,18 @@ final class GameControlsOverlay: UIView {
         skipButton.isHidden = fallout_ios_action_available(6) == 0
 
         let showFallout2Controls = game == .fallout2
-        reloadButton.isHidden = !showFallout2Controls
-        fireModeButton.isHidden = !showFallout2Controls
         if showFallout2Controls {
-            reloadButton.isEnabled = fallout_ios_action_available(8) != 0
-            fireModeButton.isEnabled = fallout_ios_action_available(9) != 0
+            // Reload and fire mode belong to an aimed firearm, so they only
+            // appear while the game reports them as usable.
+            let canReload = fallout_ios_action_available(8) != 0
+            let canChangeMode = fallout_ios_action_available(9) != 0
+            reloadButton.isHidden = !canReload
+            fireModeButton.isHidden = !canChangeMode
+            reloadButton.isEnabled = canReload
+            fireModeButton.isEnabled = canChangeMode
+        } else {
+            reloadButton.isHidden = true
+            fireModeButton.isHidden = true
         }
     }
 }
