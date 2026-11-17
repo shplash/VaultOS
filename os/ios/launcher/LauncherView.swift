@@ -6,46 +6,41 @@ struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     let onPlay: () -> Void
 
-    @State private var cursorOn = true
-
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                TerminalBackground()
+            VStack(spacing: 12) {
+                header
 
-                VStack(spacing: 8) {
-                    header
+                HStack(alignment: .top, spacing: 14) {
+                    installPane
+                        .frame(width: max(250, min(geometry.size.width * 0.35, 330)), alignment: .top)
 
-                    HStack(alignment: .top, spacing: 10) {
-                        installPane
-                            .frame(width: max(300, min(geometry.size.width * 0.41, 390)))
+                    Rectangle()
+                        .fill(Theme.line)
+                        .frame(width: 1)
 
-                        Rectangle()
-                            .fill(Theme.line)
-                            .frame(width: 1)
-
-                        optionsPane
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                    footer
+                    optionsPane
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                Text("Settings apply when you tap Play.")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .onAppear {
             model.refreshInstall()
-            LauncherMusic.shared.playIfAvailable(installDirectory: model.installDirectory)
-            withAnimation(Animation.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                cursorOn = false
-            }
+            LauncherMusic.shared.playIfAvailable()
         }
         .onChange(of: model.install.installed) { installed in
             if installed == 1 {
-                LauncherMusic.shared.playIfAvailable(installDirectory: model.installDirectory)
+                LauncherMusic.shared.playIfAvailable()
             }
         }
         .fileImporter(
@@ -73,7 +68,7 @@ struct LauncherView: View {
             )
         ) {
             Alert(
-                title: Text("FALLOUT LAUNCHER"),
+                title: Text("FALLOUT"),
                 message: Text(model.errorMessage ?? ""),
                 dismissButton: .default(Text("OK"))
             )
@@ -83,136 +78,75 @@ struct LauncherView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 10) {
-            Text("☢")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(Theme.amber)
+        HStack(alignment: .center, spacing: 10) {
+            Text("FALLOUT")
+                .font(.system(size: 27, weight: .heavy, design: .monospaced))
+                .foregroundColor(Theme.green)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text("VAULT-TEC INDUSTRIES")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .kerning(2)
-                    .foregroundColor(Theme.amber)
-
-                Text("ROBCO TERMLINK // PERSONAL COMPUTER")
-                    .font(.system(size: 8, weight: .medium, design: .monospaced))
-                    .kerning(1.2)
-                    .foregroundColor(Theme.dim)
-            }
+            Text("Community Edition")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundColor(Theme.dim)
 
             Spacer()
 
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(model.install.installed == 1 ? Theme.green : Theme.amber)
-                    .frame(width: 6, height: 6)
+            Circle()
+                .fill(model.install.installed == 1 ? Theme.green : Theme.amber)
+                .frame(width: 7, height: 7)
 
-                Text(model.install.installed == 1 ? "DATA LINK ONLINE" : "AWAITING GAME DATA")
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                    .foregroundColor(model.install.installed == 1 ? Theme.green : Theme.amber)
-            }
+            Text(model.isInstalling ? "INSTALLING" : (model.install.installed == 1 ? "READY" : "NO GAME DATA"))
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundColor(model.install.installed == 1 ? Theme.green : Theme.amber)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Theme.panel.opacity(0.92))
-        .overlay(
-            Rectangle()
-                .stroke(Theme.line, lineWidth: 1)
-        )
+        .padding(.bottom, 2)
     }
 
-    // MARK: - Install pane
+    // MARK: - Install
 
     private var installPane: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(alignment: .center, spacing: 3) {
-                            Text("FALLOUT")
-                                .font(.system(size: 38, weight: .black, design: .monospaced))
-                                .kerning(1)
-                                .foregroundColor(Theme.green)
-                                .shadow(color: Theme.green.opacity(0.45), radius: 9)
-                                .minimumScaleFactor(0.65)
-                                .lineLimit(1)
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("GAME DATA")
 
-                            Text("█")
-                                .font(.system(size: 20, weight: .bold, design: .monospaced))
-                                .foregroundColor(Theme.green)
-                                .opacity(cursorOn ? 1 : 0.1)
-                        }
+            if model.install.installed == 1 {
+                Text("Ready to play")
+                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.green)
+            } else {
+                Text("Import your own Fallout files")
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.text)
 
-                        HStack(spacing: 5) {
-                            Rectangle()
-                                .fill(Theme.amber)
-                                .frame(width: 22, height: 1)
-
-                            Text("COMMUNITY EDITION // iOS")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .kerning(1.4)
-                                .foregroundColor(Theme.dim)
-
-                            Spacer(minLength: 0)
-                        }
-                    }
-
-                    Text("OVERSEER TERMINAL // INSTALLATION CONTROL")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .kerning(0.8)
-                        .foregroundColor(Theme.amber)
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        fileRow("master.dat", present: model.install.has_master_dat == 1)
-                        fileRow("critter.dat", present: model.install.has_critter_dat == 1)
-                        fileRow("data folder", present: model.install.has_data_folder == 1)
-                        fileRow("music archive", present: model.install.has_music == 1)
-                    }
-                    .padding(7)
-                    .background(Theme.panel.opacity(0.75))
-                    .overlay(
-                        Rectangle()
-                            .stroke(Theme.line, lineWidth: 1)
-                    )
-
-                    if model.isInstalling {
-                        VStack(alignment: .leading, spacing: 5) {
-                            ProgressView(value: min(max(model.progress, 0), 1))
-                                .accentColor(Theme.green)
-
-                            Text(model.statusText)
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(Theme.dim)
-                                .lineLimit(2)
-                                .truncationMode(.middle)
-                        }
-                    } else if !model.statusText.isEmpty {
-                        Text(model.statusText)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(Theme.dim)
-                            .lineLimit(2)
-                            .truncationMode(.middle)
-                    }
-
-                    if model.install.has_saves == 1 {
-                        Text("SAVEGAMES DETECTED // preserved on re-import")
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
-                            .foregroundColor(Theme.dim)
-                            .lineLimit(2)
-                    }
-
-                    Text("Import a ZIP of your own Fallout installation. master.dat, critter.dat and the data folder are required.")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundColor(Theme.dim)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Choose a ZIP containing master.dat, critter.dat and the data folder.")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+
+            VStack(alignment: .leading, spacing: 4) {
+                fileRow("master.dat", present: model.install.has_master_dat == 1)
+                fileRow("critter.dat", present: model.install.has_critter_dat == 1)
+                fileRow("data folder", present: model.install.has_data_folder == 1)
+            }
+
+            if model.isInstalling {
+                ProgressView(value: min(max(model.progress, 0), 1))
+                    .accentColor(Theme.green)
+
+                Text(model.statusText)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .lineLimit(2)
+            } else if model.install.has_saves == 1 {
+                Text("Existing saves are kept.")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+            }
+
+            Spacer(minLength: 4)
 
             Button(action: {
                 model.showImporter = true
             }) {
-                Text(model.install.installed == 1 ? "REPLACE GAME FILES" : "IMPORT GAME ZIP")
+                Text(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP")
             }
             .buttonStyle(LauncherButtonStyle(filled: false))
             .disabled(model.isInstalling)
@@ -221,10 +155,7 @@ struct LauncherView: View {
                 LauncherMusic.shared.stop()
                 model.play(onPlay: onPlay)
             }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                    Text("PLAY")
-                }
+                Text("PLAY")
             }
             .buttonStyle(LauncherButtonStyle(filled: true))
             .disabled(model.install.installed == 0 || model.isInstalling)
@@ -234,168 +165,117 @@ struct LauncherView: View {
 
     private func fileRow(_ name: String, present: Bool) -> some View {
         HStack(spacing: 6) {
-            Text(present ? "[ OK ]" : "[ -- ]")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
+            Text(present ? "✓" : "✕")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(present ? Theme.green : Theme.amber)
+                .frame(width: 12, alignment: .leading)
 
             Text(name)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundColor(present ? Theme.text : Theme.dim)
 
-            Spacer(minLength: 2)
-
-            Text(present ? "LINKED" : "MISSING")
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundColor(present ? Theme.green : Theme.amber)
+            Spacer(minLength: 0)
         }
     }
 
-    // MARK: - Options pane
+    // MARK: - Options
 
     private var optionsPane: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 10) {
-                section("DISPLAY // \(model.nativeResolutionLabel) NATIVE") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.flexible(), spacing: 6),
-                                GridItem(.flexible(), spacing: 6),
-                            ],
-                            spacing: 6
-                        ) {
-                            ForEach(model.presets) { preset in
-                                Button(action: {
-                                    model.apply(preset: preset)
-                                }) {
-                                    Text(preset.label)
-                                }
-                                .buttonStyle(ChipButtonStyle(selected: model.selected(preset: preset)))
-                            }
-                        }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                displaySection
+                audioSection
+            }
 
-                        HStack(alignment: .bottom, spacing: 8) {
-                            DimensionField(title: "WIDTH", value: $model.width, range: 640...4096)
-
-                            Text("x")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(Theme.dim)
-                                .padding(.bottom, 7)
-
-                            DimensionField(title: "HEIGHT", value: $model.height, range: 480...4096)
-                        }
-
-                        caption("FULL uses the panel's native pixel grid. HALF is the optional lighter mode. Type a custom value in the fields - no steppers.")
-                    }
-                }
-
-                section("AUDIO") {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Toggle(isOn: $model.sound) {
-                            caption("SOUND")
-                        }
-                        .toggleStyle(SwitchToggleStyle())
-                        .accentColor(Theme.green)
-
-                        Toggle(isOn: $model.music) {
-                            caption("MUSIC")
-                        }
-                        .toggleStyle(SwitchToggleStyle())
-                        .accentColor(Theme.green)
-
-                        Toggle(isOn: $model.speech) {
-                            caption("SPEECH")
-                        }
-                        .toggleStyle(SwitchToggleStyle())
-                        .accentColor(Theme.green)
-
-                        caption("Volume and subtitles are set in the game's own options menu.")
-                    }
-                }
-
-                section("GAMEPLAY") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            caption("LANGUAGE")
-
-                            Spacer()
-
-                            Picker(selection: $model.language, label: EmptyView()) {
-                                ForEach(0..<model.languageNames.count, id: \.self) { index in
-                                    Text(model.languageNames[index]).tag(index)
-                                }
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                            .accentColor(Theme.green)
-                        }
-
-                        Toggle(isOn: $model.alwaysRun) {
-                            caption("ALWAYS RUN")
-                        }
-                        .toggleStyle(SwitchToggleStyle())
-                        .accentColor(Theme.green)
-                    }
-                }
-
-                Button(action: {
-                    model.saveOptions()
-                }) {
-                    Text("SAVE OPTIONS")
-                }
-                .buttonStyle(LauncherButtonStyle(filled: false))
-                .disabled(model.install.installed == 0 || model.isInstalling)
-
-                if model.savedNotice {
-                    Text(">> SETTINGS WRITTEN TO fallout.cfg")
+            section("GAMEPLAY") {
+                HStack(spacing: 8) {
+                    Text("LANGUAGE")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundColor(Theme.green)
+                        .foregroundColor(Theme.dim)
+
+                    Spacer(minLength: 4)
+
+                    Picker(selection: $model.language, label: EmptyView()) {
+                        ForEach(0..<model.languageNames.count, id: \.self) { index in
+                            Text(model.languageNames[index]).tag(index)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .accentColor(Theme.green)
+                }
+
+                Toggle(isOn: $model.alwaysRun) {
+                    Text("ALWAYS RUN")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+                }
+                .toggleStyle(SwitchToggleStyle())
+                .accentColor(Theme.green)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var displaySection: some View {
+        section("DISPLAY") {
+            HStack(spacing: 6) {
+                ForEach(model.presets) { preset in
+                    Button(action: {
+                        model.apply(preset: preset)
+                    }) {
+                        Text(preset.label)
+                    }
+                    .buttonStyle(ChipButtonStyle(selected: model.selected(preset: preset)))
                 }
             }
-            .padding(.bottom, 4)
+
+            HStack(alignment: .bottom, spacing: 6) {
+                DimensionField(title: "WIDTH", value: $model.width, range: 640...4096)
+
+                Text("×")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .padding(.bottom, 8)
+
+                DimensionField(title: "HEIGHT", value: $model.height, range: 480...4096)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
-    private var footer: some View {
-        HStack(spacing: 8) {
-            Text("VAULT-TEC(R) PERSONAL COMPUTER // MODEL 3000")
-                .font(.system(size: 7, weight: .medium, design: .monospaced))
-                .foregroundColor(Theme.dim)
+    private var audioSection: some View {
+        section("AUDIO") {
+            Toggle(isOn: $model.sound) {
+                settingLabel("SOUND")
+            }
+            .toggleStyle(SwitchToggleStyle())
+            .accentColor(Theme.green)
 
-            Spacer()
+            Toggle(isOn: $model.music) {
+                settingLabel("MUSIC")
+            }
+            .toggleStyle(SwitchToggleStyle())
+            .accentColor(Theme.green)
 
-            Text("READY")
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundColor(Theme.green)
-
-            Text("//")
-                .font(.system(size: 8, design: .monospaced))
-                .foregroundColor(Theme.line)
-
-            Text(model.install.installed == 1 ? "GAME DATA OK" : "NO DATA")
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundColor(model.install.installed == 1 ? Theme.green : Theme.amber)
+            Toggle(isOn: $model.speech) {
+                settingLabel("SPEECH")
+            }
+            .toggleStyle(SwitchToggleStyle())
+            .accentColor(Theme.green)
         }
-        .padding(.horizontal, 2)
+        .frame(width: 180, alignment: .top)
     }
+
+    // MARK: - Shared pieces
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 6) {
-                Text(">>")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(Theme.green)
-
-                Text(title)
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .kerning(1.4)
-                    .foregroundColor(Theme.amber)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(title)
             content()
         }
-        .padding(9)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.panel)
         .overlay(
@@ -404,11 +284,17 @@ struct LauncherView: View {
         )
     }
 
-    private func caption(_ text: String) -> some View {
+    private func sectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .kerning(1.2)
+            .foregroundColor(Theme.amber)
+    }
+
+    private func settingLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .medium, design: .monospaced))
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
             .foregroundColor(Theme.dim)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -468,33 +354,6 @@ private struct DimensionField: View {
 
 // MARK: - Styling
 
-private struct TerminalBackground: View {
-    var body: some View {
-        ZStack {
-            Theme.background
-
-            LinearGradient(
-                gradient: Gradient(stops: (0..<150).map { index in
-                    Gradient.Stop(
-                        color: Theme.green.opacity(index % 2 == 0 ? 0.028 : 0.0),
-                        location: Double(index) / 150.0
-                    )
-                }),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            RadialGradient(
-                gradient: Gradient(colors: [Color.clear, Color.black.opacity(0.58)]),
-                center: .center,
-                startRadius: 40,
-                endRadius: 680
-            )
-        }
-        .ignoresSafeArea()
-    }
-}
-
 private enum Theme {
     static let background = Color(red: 0.012, green: 0.026, blue: 0.012)
     static let panel = Color(red: 0.030, green: 0.055, blue: 0.030)
@@ -528,10 +387,12 @@ private struct ChipButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 9, weight: selected ? .bold : .medium, design: .monospaced))
+            .font(.system(size: 8, weight: selected ? .bold : .medium, design: .monospaced))
             .foregroundColor(selected ? Theme.background : Theme.green)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .padding(.vertical, 6)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 3)
             .frame(maxWidth: .infinity)
             .background(selected ? Theme.green : Theme.background)
             .overlay(
