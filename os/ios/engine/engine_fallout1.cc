@@ -21,6 +21,7 @@
 #include "game/item.h"
 #include "game/main.h"
 #include "game/object.h"
+#include "game/object_types.h"
 #include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/svga.h"
@@ -88,7 +89,11 @@ int has_reloadable_weapon()
         return 0;
     }
 
-    return fallout::item_w_max_ammo(item) > 0 ? 1 : 0;
+    // Same rule as Fallout 2's button: a weapon that takes ammunition.
+    return fallout::item_get_type(item) == fallout::ITEM_TYPE_WEAPON
+            && fallout::item_w_max_ammo(item) > 0
+        ? 1
+        : 0;
 }
 
 void reload_active_weapon()
@@ -98,8 +103,13 @@ void reload_active_weapon()
         return;
     }
 
+    // The interface's own reload, step for step: fill the weapon, then let the
+    // item state and the ammo lights catch up so the HUD updates at once.
     while (fallout::item_w_try_reload(fallout::obj_dude, item) != -1) {
     }
+
+    fallout::intface_toggle_item_state();
+    fallout::intface_update_items(false);
 }
 
 int action_available(int action)
