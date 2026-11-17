@@ -688,3 +688,15 @@ final class LauncherMusic {
         try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
     }
 }
+
+// The game's own main menu asks for 07desert.acm. On iOS the launcher MP3 is
+// used there too, so the bundled track replaces the game-data ACM cleanly.
+@_cdecl("fallout_ios_menu_music_start")
+public func fallout_ios_menu_music_start() {
+    LauncherMusic.shared.playIfAvailable()
+}
+
+@_cdecl("fallout_ios_menu_music_stop")
+public func fallout_ios_menu_music_stop() {
+    LauncherMusic.shared.stop()
+}

@@ -13,6 +13,14 @@
 #include <limits.h>
 #include <stddef.h>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+#include "launcher/launcher.h"
+#endif
+
 #include "game/amutex.h"
 #include "game/art.h"
 #include "game/credits.h"
@@ -107,12 +115,19 @@ int gnw_main(int argc, char** argv)
 
         while (!done) {
             kb_clear();
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+            fallout_ios_menu_music_start();
+#else
             gsound_background_play_level_music("07desert", 11);
+#endif
             main_menu_show(1);
 
             mouse_show();
             int mainMenuRc = main_menu_loop();
             mouse_hide();
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+            fallout_ios_menu_music_stop();
+#endif
 
             switch (mainMenuRc) {
             case MAIN_MENU_INTRO:
