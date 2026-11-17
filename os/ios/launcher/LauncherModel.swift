@@ -127,6 +127,7 @@ final class LauncherModel: ObservableObject {
     init() {
         ControlLayout.migrateIfNeeded()
         LauncherModel.migrateSettings()
+        LauncherModel.applyDefaultResolution()
         documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         selectedGame = FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
         loadSettings(for: selectedGame)
@@ -226,6 +227,26 @@ final class LauncherModel: ObservableObject {
     /// reads the same keys, so it always sees the settings of the game it runs.
     static func optionKey(_ name: String, for game: FalloutGame) -> String {
         return "launcher.\(game.rawValue).\(name)"
+    }
+
+    private static let displayVersionKey = "launcher.displayVersion"
+    private static let displayVersion = 2
+
+    /// Both games start at HALF. Earlier builds defaulted to FULL and could
+    /// have any resolution stored, so it is reset once here; a resolution the
+    /// player picks afterwards is kept.
+    private static func applyDefaultResolution() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: displayVersionKey) < displayVersion else {
+            return
+        }
+
+        let half = displayResolution(divisor: 3)
+        for game in FalloutGame.allCases {
+            defaults.set(half.0, forKey: optionKey("width", for: game))
+            defaults.set(half.1, forKey: optionKey("height", for: game))
+        }
+        defaults.set(displayVersion, forKey: displayVersionKey)
     }
 
     /// Earlier builds stored a single set of options for the only game the app

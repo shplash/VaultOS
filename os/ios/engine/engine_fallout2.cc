@@ -52,6 +52,13 @@ int run(int argc, char** argv)
 
     SDL_ShowCursor(SDL_DISABLE);
 
+    // Fallout 2 draws leather side panels beside the interface bar whenever the
+    // bar is narrower than the screen. A panel image id of zero makes
+    // sidePanelsInit skip them, so the gaps stay the game's own black, the way
+    // Fallout 1 looks. The bar itself is untouched, so every HUD button keeps
+    // its position and the on-screen controls stay aligned with it.
+    fallout::gInterfaceSidePanelsImageId = 0;
+
     fallout::gProgramIsActive = true;
     return fallout::falloutMain(argc, argv);
 }
