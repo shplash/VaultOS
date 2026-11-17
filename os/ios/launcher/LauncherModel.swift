@@ -181,7 +181,9 @@ final class LauncherModel: ObservableObject {
     }
 
     func selected(preset: DisplayPreset) -> Bool {
-        return width == preset.width && height == preset.height
+        // A pixel or two of slack: a size saved on another screen is still
+        // meant to be that preset, so the tile has to read as in use.
+        return abs(width - preset.width) <= 2 && abs(height - preset.height) <= 2
     }
 
     func apply(preset: DisplayPreset) {
@@ -495,5 +497,12 @@ final class LauncherModel: ObservableObject {
 
     func dismissError() {
         errorMessage = nil
+    }
+
+    /// Writes the launcher's own settings without touching the game's config,
+    /// so a change survives quitting the app without pressing Play.
+    func saveSettingsNow() {
+        saveSettings(for: selectedGame)
+        defaults.set(selectedGame.rawValue, forKey: "launcher.game")
     }
 }

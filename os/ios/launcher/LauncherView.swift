@@ -38,6 +38,9 @@ struct LauncherView: View {
             model.refreshInstall()
             LauncherMusic.shared.playIfAvailable()
         }
+        .onDisappear {
+            model.saveSettingsNow()
+        }
         .onChange(of: model.selectedGame) { game in
             LauncherMusic.shared.crossfade(to: game)
         }
@@ -409,9 +412,9 @@ struct LauncherView: View {
 
     private var creditsSheet: some View {
         sheet(title: "Credits", detail: "Who made this, and what it is built on") {
+            tip("Launcher", "shplash: the launcher, its interface, the touch controls and the artwork treatment, and the packaging that runs both engines from one app.")
             tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
             tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
-            tip("Launcher", "Interface, touch controls and artwork treatment by shplash.")
             tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games.")
             footnote("The app contains no game data; the screenshots are taken from the games themselves.")
         }
