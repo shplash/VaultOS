@@ -1,0 +1,95 @@
+name: Apply half layout
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: Base64 encoded patch
+        required: true
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  apply-build:
+    name: Apply and build
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply layout patch
+        env:
+          PAYLOAD: ${{ inputs.payload }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PAYLOAD" | base64 -D > /tmp/half-layout.patch
+          git apply --check /tmp/half-layout.patch
+          git apply /tmp/half-layout.patch
+          git diff --check
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          fi
+          xcodebuild -version
+          swift --version
+          cmake --version
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          cmake -B build -G Xcode \
+            -D CMAKE_BUILD_TYPE=RelWithDebInfo \
+            -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/ios.toolchain.cmake \
+            -D PLATFORM=OS64 \
+            -D ENABLE_BITCODE=0 \
+            -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+
+      - name: Build
+        run: cmake --build build --config RelWithDebInfo --parallel 3
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          cd build
+          cpack -C RelWithDebInfo
+          test -f fallout-ce.ipa
+          cd ..
+          cp build/fallout-ce.ipa fallout-ce-ios-unsigned.ipa
+          unzip -t fallout-ce-ios-unsigned.ipa > /dev/null
+          shasum -a 256 fallout-ce-ios-unsigned.ipa
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-ipa
+          path: fallout-ce-ios-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Update release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload private-builds fallout-ce-ios-unsigned.ipa --clobber
+
+      - name: Commit layout source
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add os/ios/launcher/LauncherBridge.mm os/ios/launcher/LauncherHost.swift os/ios/launcher/LauncherModel.swift os/ios/launcher/LauncherView.swift src/launcher/launcher.h
+          git commit -m "Add half resolution control layout and pause audio in background"
+          git push origin HEAD:main
