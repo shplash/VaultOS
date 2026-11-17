@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/dual-engine
+      - feature/launcher-redesign
 
 permissions:
   contents: read
