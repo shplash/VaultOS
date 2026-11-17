@@ -50,7 +50,18 @@ endif()
 
 target_include_directories(${EXECUTABLE_NAME} PUBLIC src)
 
-target_sources(${EXECUTABLE_NAME} PUBLIC
+# ---------------------------------------------------------------------------
+# Fallout 1 CE engine
+#
+# On iOS the launcher is the executable and the Fallout 1 engine is linked into
+# it, entered through os/ios/engine/engine_fallout1.cc. The standalone entry
+# point in winmain.cc (which also owns the host application's `main`/`SDL_main`
+# and the launcher presentation) is therefore only compiled when this repository
+# is built as a standalone game. Every other platform keeps the original
+# single-executable layout untouched.
+# ---------------------------------------------------------------------------
+
+set(FALLOUT1_ENGINE_SOURCES
     "src/game/actions.cc"
     "src/game/actions.h"
     "src/game/amutex.cc"
@@ -263,13 +274,12 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/plib/gnw/text.h"
     "src/plib/gnw/vcr.cc"
     "src/plib/gnw/vcr.h"
-    "src/plib/gnw/winmain.cc"
     "src/plib/gnw/winmain.h"
     "src/movie_lib.cc"
     "src/movie_lib.h"
 )
 
-target_sources(${EXECUTABLE_NAME} PUBLIC
+set(FALLOUT1_RUNTIME_SOURCES
     "src/audio_engine.cc"
     "src/audio_engine.h"
     "src/fps_limiter.cc"
@@ -282,16 +292,44 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/plib/gnw/touch.h"
 )
 
+target_sources(${EXECUTABLE_NAME} PUBLIC
+    ${FALLOUT1_ENGINE_SOURCES}
+    ${FALLOUT1_RUNTIME_SOURCES}
+)
+
+if(NOT IOS)
+    # Standalone builds keep the engine's own process entry point.
+    target_sources(${EXECUTABLE_NAME} PUBLIC
+        "src/plib/gnw/winmain.cc"
+    )
+endif()
+
 if(IOS)
+    # The launcher application owns the process entry point (os/ios/host) and
+    # links the Fallout 1 engine through its adapter. src/platform/ios/paths.mm
+    # is replaced by engine_paths.cc, which returns the installation the
+    # launcher selected instead of always using the Documents folder.
     target_sources(${EXECUTABLE_NAME} PUBLIC
         "src/platform/ios/paths.h"
-        "src/platform/ios/paths.mm"
         "src/launcher/launcher.h"
         "src/launcher/launcher_core.cc"
+        "os/ios/host/HostMain.mm"
+        "os/ios/host/host.h"
+        "os/ios/engine/engine_glue.cc"
+        "os/ios/engine/engine_glue.h"
+        "os/ios/engine/engine_paths.cc"
+        "os/ios/engine/engine_fallout1.cc"
+        "os/ios/engine/engine_fallout1_globals.cc"
+        "os/ios/engine/fallout_engine.h"
         "os/ios/launcher/LauncherBridge.mm"
         "os/ios/launcher/LauncherHost.swift"
         "os/ios/launcher/LauncherModel.swift"
         "os/ios/launcher/LauncherView.swift"
+    )
+
+    target_include_directories(${EXECUTABLE_NAME} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/os/ios"
+        "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine"
     )
 
     target_link_libraries(${EXECUTABLE_NAME} z)
@@ -335,6 +373,9 @@ if(APPLE)
             XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
             XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.alexbatalov.fallout-ce"
             XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+            # The Fallout 2 framework resolves SDL through the executable's
+            # exported symbols, so those symbols must survive into the IPA.
+            XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "NO"
             Swift_MODULE_NAME "FalloutCE"
             XCODE_ATTRIBUTE_PRODUCT_MODULE_NAME "FalloutCE"
             XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
@@ -382,6 +423,110 @@ target_link_libraries(${EXECUTABLE_NAME} fpattern::fpattern)
 
 target_link_libraries(${EXECUTABLE_NAME} ${SDL2_LIBRARIES})
 target_include_directories(${EXECUTABLE_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+
+if(IOS)
+    # Fallout 2 CE is built as Fallout2Engine.framework and loaded with dlopen
+    # only when the player selects Fallout 2. Both engines define thousands of
+    # identical C++ symbols (namespace fallout, global state, SDL entry points),
+    # so a single executable cannot contain both. A framework gives the second
+    # engine its own image, its own globals and its own shutdown path, while
+    # still shipping inside this one application.
+    #
+    # SDL is deliberately NOT duplicated: the launcher executable already owns
+    # the one SDL instance and the UIKit classes it installs. Exporting the
+    # executable's symbols (and force-loading all of SDL so none of it is
+    # dropped by the linker) lets the framework bind to that same SDL, so only
+    # one event pump and one set of SDL globals exist in the process.
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES ENABLE_EXPORTS TRUE)
+    target_link_options(${EXECUTABLE_NAME} PRIVATE
+        "-Wl,-export_dynamic"
+        "-Wl,-force_load,$<TARGET_FILE:SDL2-static>"
+    )
+
+    include(FetchContent)
+
+    # Pinned upstream revision:
+    #   alexbatalov/fallout2-ce e97087b9582f37075db347a89898887320753f8b
+    #     "Remove pause window", 2025-02-16
+    FetchContent_Declare(fallout2_ce
+        GIT_REPOSITORY "https://github.com/alexbatalov/fallout2-ce"
+        GIT_TAG "e97087b9582f37075db347a89898887320753f8b"
+        GIT_PROGRESS TRUE
+    )
+
+    FetchContent_GetProperties(fallout2_ce)
+    if(NOT fallout2_ce_POPULATED)
+        FetchContent_Populate(fallout2_ce)
+    endif()
+
+    if(NOT EXISTS "${fallout2_ce_SOURCE_DIR}/src/main.cc")
+        message(FATAL_ERROR "Fallout 2 CE sources are missing from ${fallout2_ce_SOURCE_DIR}.")
+    endif()
+
+    # Upstream's own CMakeLists builds a second application bundle with its own
+    # copies of SDL, zlib and fpattern. Only its engine sources are wanted here,
+    # so every translation unit under src/ is compiled. win32.cc is excluded
+    # because it owns the standalone entry point and gProgramIsActive, both
+    # provided by the adapter; platform/ios/paths.mm is a .mm file and is
+    # provided by engine_paths.cc.
+    file(GLOB FALLOUT2_CE_SOURCES CONFIGURE_DEPENDS
+        "${fallout2_ce_SOURCE_DIR}/src/*.cc"
+    )
+    list(REMOVE_ITEM FALLOUT2_CE_SOURCES
+        "${fallout2_ce_SOURCE_DIR}/src/win32.cc"
+    )
+
+    if(NOT FALLOUT2_CE_SOURCES)
+        message(FATAL_ERROR "Fallout 2 CE source files were not found.")
+    endif()
+
+    add_library(Fallout2Engine SHARED
+        ${FALLOUT2_CE_SOURCES}
+        "os/ios/engine/engine_glue.cc"
+        "os/ios/engine/engine_paths.cc"
+        "os/ios/engine/engine_fallout2.cc"
+        "os/ios/engine/engine_fallout2_globals.cc"
+    )
+
+    target_include_directories(Fallout2Engine PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine"
+        "${fallout2_ce_SOURCE_DIR}/src"
+        ${SDL2_INCLUDE_DIRS}
+    )
+
+    # zlib comes from the iOS SDK; fpattern is shared with the engine already in
+    # the executable (static, so each image gets its own copy).
+    target_link_libraries(Fallout2Engine fpattern::fpattern z)
+
+    # SDL symbols intentionally remain undefined in the framework; they are
+    # resolved from the launcher executable when the framework is loaded. Every
+    # other dependency must be linked normally above.
+    target_link_options(Fallout2Engine PRIVATE "-Wl,-undefined,dynamic_lookup")
+
+    set_target_properties(Fallout2Engine PROPERTIES
+        FRAMEWORK TRUE
+        MACOSX_FRAMEWORK_IDENTIFIER "com.alexbatalov.fallout-ce.Fallout2Engine"
+        MACOSX_FRAMEWORK_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine/FrameworkInfo.plist.in"
+        INSTALL_NAME_DIR "@rpath"
+        XCODE_ATTRIBUTE_SKIP_INSTALL YES
+        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
+        XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
+    )
+
+    add_dependencies(${EXECUTABLE_NAME} Fallout2Engine)
+
+    # The framework has to live in App.app/Frameworks for dlopen to find it.
+    # CMake's bundle copy phase does not include targets that are not linked
+    # into the application, so copy the built framework in afterwards.
+    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "$<TARGET_BUNDLE_DIR:Fallout2Engine>"
+            "$<TARGET_BUNDLE_DIR:${EXECUTABLE_NAME}>/Frameworks/Fallout2Engine.framework"
+        COMMAND ${CMAKE_COMMAND} -E echo
+            "Embedded Fallout2Engine.framework in $<TARGET_BUNDLE_DIR:${EXECUTABLE_NAME}>/Frameworks"
+        VERBATIM
+    )
+endif()
 
 if(APPLE)
     if(IOS)

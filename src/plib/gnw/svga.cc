@@ -10,7 +10,9 @@
 #include "plib/gnw/winmain.h"
 
 #if defined(__APPLE__) && TARGET_OS_IOS
-#include "launcher/launcher.h"
+// The engine runs as a framework; the launcher's overlay is installed through
+// the host callbacks instead of a direct application symbol.
+#include "engine_glue.h"
 #endif
 
 namespace fallout {
@@ -155,7 +157,7 @@ bool svga_init(VideoOptions* video_options)
 
 #if defined(__APPLE__) && TARGET_OS_IOS
     // SDL's view is now on screen; put the touch controls above it.
-    fallout_ios_install_game_controls();
+    fallout_engine_install_controls();
 #endif
 
     return true;

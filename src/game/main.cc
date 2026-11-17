@@ -18,7 +18,9 @@
 #endif
 
 #if defined(__APPLE__) && TARGET_OS_IPHONE
-#include "launcher/launcher.h"
+// The engine runs as a framework; the bundled launcher track is started and
+// stopped through the host callbacks.
+#include "engine_glue.h"
 #endif
 
 #include "game/amutex.h"
@@ -116,7 +118,7 @@ int gnw_main(int argc, char** argv)
         while (!done) {
             kb_clear();
 #if defined(__APPLE__) && TARGET_OS_IPHONE
-            fallout_ios_menu_music_start();
+            fallout_engine_menu_music_start();
 #else
             gsound_background_play_level_music("07desert", 11);
 #endif
@@ -126,7 +128,7 @@ int gnw_main(int argc, char** argv)
             int mainMenuRc = main_menu_loop();
             mouse_hide();
 #if defined(__APPLE__) && TARGET_OS_IPHONE
-            fallout_ios_menu_music_stop();
+            fallout_engine_menu_music_stop();
 #endif
 
             switch (mainMenuRc) {

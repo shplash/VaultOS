@@ -535,9 +535,14 @@ struct InstallLayout {
     std::string music_path;
 };
 
+bool is_fallout2(int32_t game)
+{
+    return game == LAUNCHER_GAME_FALLOUT2;
+}
+
 bool is_fallout2(const LauncherOptions& options)
 {
-    return options.game == LAUNCHER_GAME_FALLOUT2;
+    return is_fallout2(options.game);
 }
 
 const char* game_name(const LauncherOptions& options)
@@ -642,14 +647,18 @@ bool has_save_files(const fs::path& install_dir)
     return false;
 }
 
-bool layout_is_complete(const InstallLayout& layout)
+// Fallout 1 needs master.dat, critter.dat and the data folder.
+// Fallout 2 additionally needs patch000.dat: upstream's installation notes list
+// it as part of the required data, and the engine loads it as its patch archive.
+bool layout_is_complete(const InstallLayout& layout, int32_t game)
 {
     return !layout.master_dat.empty()
         && !layout.critter_dat.empty()
-        && !layout.data_folder.empty();
+        && !layout.data_folder.empty()
+        && (!is_fallout2(game) || !layout.patch000_dat.empty());
 }
 
-std::string describe_missing(const InstallLayout& layout)
+std::string describe_missing(const InstallLayout& layout, int32_t game)
 {
     std::string missing;
     if (layout.master_dat.empty()) {
@@ -660,6 +669,12 @@ std::string describe_missing(const InstallLayout& layout)
             missing += ", ";
         }
         missing += "critter.dat";
+    }
+    if (is_fallout2(game) && layout.patch000_dat.empty()) {
+        if (!missing.empty()) {
+            missing += ", ";
+        }
+        missing += "patch000.dat";
     }
     if (layout.data_folder.empty()) {
         if (!missing.empty()) {
@@ -793,7 +808,7 @@ bool write_configs(const fs::path& install_dir, const InstallLayout& layout, con
 // Public API helpers
 // ---------------------------------------------------------------------------
 
-bool get_install_info(const fs::path& install_dir, LauncherInstallInfo& info, InstallLayout& layout)
+bool get_install_info(const fs::path& install_dir, int32_t game, LauncherInstallInfo& info, InstallLayout& layout)
 {
     std::memset(&info, 0, sizeof(info));
 
@@ -808,7 +823,7 @@ bool get_install_info(const fs::path& install_dir, LauncherInstallInfo& info, In
     info.has_data_folder = !layout.data_folder.empty();
     info.has_patch_dat = !layout.patch000_dat.empty();
     info.has_ce_dat = !layout.ce_dat.empty();
-    info.installed = layout_is_complete(layout) ? 1 : 0;
+    info.installed = layout_is_complete(layout, game) ? 1 : 0;
 
     info.has_music = find_child(install_dir, "sound", true).empty() ? 0 : 1;
     if (!layout.data_folder.empty()) {
@@ -887,10 +902,8 @@ void launcher_scan(const char* install_dir, int32_t game, LauncherInstallInfo* i
         return;
     }
 
-    (void)game;
-
     InstallLayout layout;
-    get_install_info(fs::path(install_dir), *info, layout);
+    get_install_info(fs::path(install_dir), game, *info, layout);
 }
 
 int launcher_install_zip(const char* zip_path, const char* install_dir, const LauncherOptions* options)
@@ -932,6 +945,7 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
     std::string prefix = find_game_prefix(entries);
     bool has_master = false;
     bool has_critter = false;
+    bool has_patch = false;
     for (const ZipEntry& entry : entries) {
         std::string name = lower_ascii(entry.name);
         if (name.size() < prefix.size() || name.compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
@@ -942,10 +956,13 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
             has_master = true;
         } else if (relative == "critter.dat") {
             has_critter = true;
+        } else if (relative == "patch000.dat") {
+            has_patch = true;
         }
     }
 
-    if (!has_master || !has_critter) {
+    const bool requires_patch = is_fallout2(*options);
+    if (!has_master || !has_critter || (requires_patch && !has_patch)) {
         std::string missing;
         if (!has_master) {
             missing = "master.dat";
@@ -955,6 +972,12 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
                 missing += " and ";
             }
             missing += "critter.dat";
+        }
+        if (requires_patch && !has_patch) {
+            if (!missing.empty()) {
+                missing += " and ";
+            }
+            missing += "patch000.dat";
         }
         fail("This ZIP doesn't look like a " + std::string(game_name(*options)) + " installation: " + missing + " not found.");
         return LAUNCHER_ERROR;
@@ -987,6 +1010,12 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
             continue;
         }
 
+        // Savegames are the player's data, never installation data. Ignore any
+        // archive entry that tries to replace them.
+        if (lower_ascii(relative).rfind("savegame/", 0) == 0) {
+            continue;
+        }
+
         set_status("Installing " + relative + "...");
 
         fs::path output = destination / fs::path(relative);
@@ -1006,8 +1035,8 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
 
     set_status("Checking game data...");
     InstallLayout layout = detect_layout(destination);
-    if (!layout_is_complete(layout)) {
-        fail("Some game files are missing after extraction: " + describe_missing(layout) + ".");
+    if (!layout_is_complete(layout, options->game)) {
+        fail("Some game files are missing after extraction: " + describe_missing(layout, options->game) + ".");
         return LAUNCHER_ERROR;
     }
 
@@ -1040,8 +1069,8 @@ int launcher_write_options(const char* install_dir, const LauncherOptions* optio
 
     fs::path destination(install_dir);
     InstallLayout layout = detect_layout(destination);
-    if (!layout_is_complete(layout)) {
-        fail("Install the game data first (" + describe_missing(layout) + " missing).");
+    if (!layout_is_complete(layout, options->game)) {
+        fail("Install the game data first (" + describe_missing(layout, options->game) + " missing).");
         return LAUNCHER_ERROR;
     }
 

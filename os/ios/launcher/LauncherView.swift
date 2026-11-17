@@ -228,13 +228,6 @@ struct LauncherView: View {
             .background(RoundedRectangle(cornerRadius: 6).fill(Theme.panel))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.line, lineWidth: 1))
 
-            if !model.selectedGame.supportsLaunch {
-                Text("The Fallout 2 engine is not part of this build. Your imported files are kept for the dedicated Fallout 2 app.")
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundColor(Theme.amber)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
             Spacer(minLength: 4)
 
             VStack(spacing: 7) {
@@ -250,22 +243,20 @@ struct LauncherView: View {
                     LauncherMusic.shared.stop()
                     model.play(onPlay: onPlay)
                 }) {
-                    Text(model.selectedGame.supportsLaunch ? "PLAY" : "ENGINE NOT INCLUDED")
+                    Text("PLAY")
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
                 .buttonStyle(LauncherButtonStyle(filled: true))
-                .disabled(model.install.installed == 0 || model.isInstalling || !model.selectedGame.supportsLaunch)
-                .opacity(model.install.installed == 1 && model.selectedGame.supportsLaunch ? 1 : 0.4)
+                .disabled(model.install.installed == 0 || model.isInstalling)
+                .opacity(model.install.installed == 1 ? 1 : 0.4)
             }
         }
     }
 
     private var installDescription: String {
         if model.install.installed == 1 {
-            return model.selectedGame.supportsLaunch
-                ? "Your installation is ready. Choose Play to launch the game."
-                : "Your Fallout 2 data is ready for the dedicated engine build."
+            return "Your installation is ready. Choose Play to launch the game."
         }
 
         switch model.selectedGame {

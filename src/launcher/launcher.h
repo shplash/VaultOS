@@ -132,8 +132,8 @@ void fallout_ios_run_launcher_loop(void);
 
 // iOS only: called by the launcher when the user is done configuring. Implemented
 // in Objective-C++. This header is also the Swift bridging header, so the entry
-// point (`fallout_ios_present_launcher`, implemented in Swift) is declared in
-// winmain.cc instead to avoid a duplicate declaration.
+// point (`fallout_ios_present_launcher`, implemented in Swift) is declared by
+// os/ios/host/HostMain.mm instead to avoid a duplicate declaration.
 void fallout_launcher_finish(int launch_game);
 
 // iOS only: whether the engine should boot after the launcher closed.

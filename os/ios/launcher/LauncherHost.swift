@@ -458,7 +458,10 @@ enum ControlLayout {
 }
 
 final class GameControlsOverlay: UIView {
-    private static let overlayTag = 0xF0110
+    /// The overlay lives in its own window above the engine's SDL window. That
+    /// keeps it independent of the engine that created the window below and
+    /// lets the launcher install it before the engine starts.
+    private static var overlayWindow: UIWindow?
 
     private let joystick = CameraJoystickControl()
     private let actionButton = LabeledControlButton(
@@ -510,21 +513,22 @@ final class GameControlsOverlay: UIView {
 
     static func install() {
         ControlLayout.migrateIfNeeded()
-        let windows = UIApplication.shared.windows
-        guard let window = windows.first(where: { $0.isKeyWindow && !$0.isHidden })
-            ?? windows.first(where: { !$0.isHidden }) else {
+        if overlayWindow != nil {
             return
         }
 
-        if window.viewWithTag(overlayTag) != nil {
-            return
-        }
+        let controller = UIViewController()
+        let overlay = GameControlsOverlay(frame: UIScreen.main.bounds)
+        controller.view = overlay
 
-        let overlay = GameControlsOverlay(frame: window.bounds)
-        overlay.tag = overlayTag
-        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        window.addSubview(overlay)
-        window.bringSubviewToFront(overlay)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        // Above SDL's window, below the launcher's (which is hidden by now).
+        window.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.normal.rawValue + 1)
+        window.backgroundColor = .clear
+        window.rootViewController = controller
+        window.isHidden = false
+        overlayWindow = window
+
         overlay.setNeedsLayout()
     }
 

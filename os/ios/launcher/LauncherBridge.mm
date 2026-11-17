@@ -1,21 +1,39 @@
+// Launcher side of the dual-engine app.
+//
+// The application executable owns the launcher UI, the installation core, the
+// in-game overlay and the Fallout 1 engine. Fallout 2 lives in
+// Fallout2Engine.framework and is loaded with dlopen only when the player picks
+// Fallout 2, so the two codebases never become one image and never share engine
+// globals. Only one engine is started per process; switching games restarts the
+// application, which keeps a running engine from having to unwind itself.
+//
+// The application's SDL is the only SDL in the process: the framework resolves
+// its SDL symbols from the executable (see CMakeLists.txt), so the launcher's
+// UIKit setup, event pump and video subsystem are reused by whichever engine
+// starts.
+
 #include <CoreFoundation/CoreFoundation.h>
+#include <Foundation/Foundation.h>
+#include <UIKit/UIKit.h>
+#include <dlfcn.h>
+#include <unistd.h>
 
-#include <algorithm>
-#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
-#include "audio_engine.h"
-#include "game/combat.h"
-#include "game/gmouse.h"
-#include "game/intface.h"
+#include "fallout_engine.h"
+#include "host/host.h"
 #include "launcher/launcher.h"
-#include "plib/gnw/kb.h"
-#include "plib/gnw/mouse.h"
-#include "plib/gnw/svga.h"
 
-// Set by the Swift launcher when the user taps Play. `main` checks it after the
-// launcher closes; keeping it false lets the app return without booting the
-// engine (currently only reachable if the launcher is dismissed programmatically).
+// Set by the Swift launcher when the user taps Play. `SDL_main` checks it after
+// the launcher closes; keeping it false lets the app return without booting an
+// engine.
 static bool g_should_launch_game = true;
+
+// The engine selected for this run. Null until Play is tapped.
+static const FalloutEngineAPI* g_engine = NULL;
+
+// MARK: - Launcher run loop
 
 extern "C" void fallout_ios_run_launcher_loop(void)
 {
@@ -33,84 +51,235 @@ extern "C" int fallout_ios_should_launch_game(void)
     return g_should_launch_game ? 1 : 0;
 }
 
-extern "C" void fallout_ios_camera_pan(double x, double y)
+// MARK: - Host callbacks handed to the engine
+
+static void host_install_controls(void)
 {
-    const int width = fallout::screenGetWidth();
-    const int height = fallout::screenGetHeight();
-    if (width <= 1 || height <= 1) {
+    fallout_ios_install_game_controls();
+}
+
+static void host_menu_music_start(void)
+{
+    fallout_ios_menu_music_start();
+}
+
+static void host_menu_music_stop(void)
+{
+    fallout_ios_menu_music_stop();
+}
+
+static const FalloutEngineHost g_host = {
+    FALLOUT_ENGINE_ABI_VERSION,
+    host_install_controls,
+    host_menu_music_start,
+    host_menu_music_stop,
+};
+
+// MARK: - Engine loading
+
+static NSString* documentsDirectory(void)
+{
+    NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    return [paths count] > 0 ? [paths objectAtIndex:0] : NSTemporaryDirectory();
+}
+
+// Fallout 1 keeps the Documents folder it has always used, so existing
+// installations and saves stay where they are. Fallout 2 gets its own folder,
+// which gives it a separate working directory, configuration, install data and
+// SAVEGAME.
+static NSString* installDirectoryForGame(NSString* identifier)
+{
+    NSString* documents = documentsDirectory();
+    if ([identifier isEqualToString:@"fallout2"]) {
+        return [documents stringByAppendingPathComponent:@"Fallout2" isDirectory:YES];
+    }
+    return documents;
+}
+
+static NSString* fallout2FrameworkPath(void)
+{
+    NSString* frameworks = [[NSBundle mainBundle] privateFrameworksPath];
+    return [frameworks stringByAppendingPathComponent:@"Fallout2Engine.framework/Fallout2Engine"];
+}
+
+// Fallout 1 is part of this executable. Fallout 2 is loaded from the app
+// bundle; RTLD_LOCAL keeps its symbols out of the global namespace.
+static const FalloutEngineAPI* load_engine(NSString* identifier, NSString** failure)
+{
+    if ([identifier isEqualToString:@"fallout1"]) {
+        const FalloutEngineAPI* engine = fallout_engine_api();
+        if (engine == NULL) {
+            *failure = @"The Fallout engine is missing from this build.";
+            return NULL;
+        }
+        return engine;
+    }
+
+    NSString* path = fallout2FrameworkPath();
+    if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        NSLog(@"Fallout 2 engine not found at %@", path);
+        *failure = @"This build does not contain the Fallout 2 engine.";
+        return NULL;
+    }
+
+    void* handle = dlopen([path fileSystemRepresentation], RTLD_NOW | RTLD_LOCAL);
+    if (handle == NULL) {
+        const char* error = dlerror();
+        NSString* reason = error != NULL ? [NSString stringWithUTF8String:error] : @"unknown error";
+        NSLog(@"Cannot load %@: %@", path, reason);
+        *failure = [NSString stringWithFormat:@"The Fallout 2 engine could not be loaded: %@", reason];
+        return NULL;
+    }
+
+    typedef const FalloutEngineAPI* (*EngineApiFunction)(void);
+    EngineApiFunction getApi = (EngineApiFunction)dlsym(handle, "fallout_engine_api");
+    if (getApi == NULL) {
+        const char* error = dlerror();
+        NSString* reason = error != NULL ? [NSString stringWithUTF8String:error] : @"unknown error";
+        NSLog(@"%@ does not export fallout_engine_api: %@", path, reason);
+        *failure = @"The Fallout 2 engine in this build is not usable.";
+        return NULL;
+    }
+
+    return getApi();
+}
+
+// Shows a blocking alert when no engine can be started. The launcher window is
+// already gone at this point, so without this the app would sit on a black
+// screen with only a log message.
+static void present_engine_failure(NSString* message)
+{
+    if (![NSThread isMainThread]) {
         return;
     }
 
-    // The engine scrolls only when the cursor touches a screen edge, so turn
-    // the joystick into a directional edge target instead of a free cursor.
-    const double deadzone = 0.30;
-    const int dx = x < -deadzone ? -1 : (x > deadzone ? 1 : 0);
-    const int dy = y < -deadzone ? -1 : (y > deadzone ? 1 : 0);
+    UIWindow* window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    window.windowLevel = UIWindowLevelAlert + 1;
 
-    int targetX = width / 2;
-    int targetY = height / 2;
-    if (dx < 0) {
-        targetX = 0;
-    } else if (dx > 0) {
-        targetX = width - 1;
-    }
-    if (dy < 0) {
-        targetY = 0;
-    } else if (dy > 0) {
-        targetY = height - 1;
+    UIViewController* controller = [[UIViewController alloc] init];
+    controller.view.backgroundColor = [UIColor blackColor];
+    window.rootViewController = controller;
+    [window makeKeyAndVisible];
+
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Cannot start the game"
+                                                                   message:message
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Close"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction* action) {
+                                                [window setHidden:YES];
+                                                CFRunLoopStop(CFRunLoopGetMain());
+                                            }]];
+    [controller presentViewController:alert animated:NO completion:nil];
+
+    // The launch path runs on the main thread inside SDL's run loop; run it
+    // until the alert is dismissed.
+    CFRunLoopRun();
+
+    exit(EXIT_FAILURE);
+}
+
+int fallout_ios_launch_selected_engine(int argc, char** argv)
+{
+    NSString* identifier = [[NSUserDefaults standardUserDefaults] stringForKey:@"launcher.game"];
+    if (![identifier isEqualToString:@"fallout2"]) {
+        identifier = @"fallout1";
     }
 
-    fallout::mouse_set_position(targetX, targetY);
+    NSString* failure = nil;
+    const FalloutEngineAPI* engine = load_engine(identifier, &failure);
+    if (engine == NULL
+        || engine->abi_version != FALLOUT_ENGINE_ABI_VERSION
+        || engine->identifier == NULL
+        || engine->run == NULL
+        || engine->set_install_dir == NULL
+        || engine->set_host == NULL
+        || strcmp(engine->identifier, [identifier UTF8String]) != 0) {
+        NSLog(@"The %@ engine does not match the launcher's engine ABI", identifier);
+        present_engine_failure(failure != nil
+                ? failure
+                : @"The selected engine does not match this launcher version.");
+        return 1;
+    }
+
+    g_engine = engine;
+
+    NSString* installDirectory = installDirectoryForGame(identifier);
+    [[NSFileManager defaultManager] createDirectoryAtPath:installDirectory
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:NULL];
+
+    engine->set_host(&g_host);
+    engine->set_install_dir([installDirectory fileSystemRepresentation]);
+
+    // The overlay lives in its own window above the engine's SDL window, so it
+    // can be created before the engine starts and does not depend on the
+    // engine's window hierarchy. Installing it again from the engine (as the
+    // Fallout 1 adapter does) is a no-op.
+    host_install_controls();
+
+    return engine->run(argc, argv);
+}
+
+// MARK: - In-game controls
+
+// These are called by the Swift overlay. They forward to the loaded engine and
+// stay harmless before the engine starts.
+
+extern "C" void fallout_ios_camera_pan(double x, double y)
+{
+    if (g_engine != NULL && g_engine->camera_pan != NULL) {
+        g_engine->camera_pan(x, y);
+    }
 }
 
 extern "C" void fallout_ios_camera_stop(void)
 {
-    const int width = fallout::screenGetWidth();
-    const int height = fallout::screenGetHeight();
-    if (width > 0 && height > 0) {
-        fallout::mouse_set_position(width / 2, height / 2);
+    if (g_engine != NULL && g_engine->camera_stop != NULL) {
+        g_engine->camera_stop();
     }
 }
 
 extern "C" void fallout_ios_right_click(void)
 {
-    fallout::mouse_ios_right_click();
+    if (g_engine != NULL && g_engine->right_click != NULL) {
+        g_engine->right_click();
+    }
 }
 
 extern "C" void fallout_ios_back(void)
 {
-    fallout::KeyboardData key = {};
-    key.key = SDL_SCANCODE_ESCAPE;
-    key.down = 1;
-    fallout::kb_simulate_key(&key);
-    key.down = 0;
-    fallout::kb_simulate_key(&key);
+    if (g_engine != NULL && g_engine->back != NULL) {
+        g_engine->back();
+    }
 }
 
 extern "C" void fallout_ios_set_cursor_speed(double value)
 {
-    fallout::mouse_set_ios_touch_sensitivity(value);
+    if (g_engine != NULL && g_engine->set_cursor_speed != NULL) {
+        g_engine->set_cursor_speed(value);
+    }
 }
 
 extern "C" int fallout_ios_cursor_mode(void)
 {
-    const int mode = fallout::gmouse_3d_get_mode();
-    if (mode == fallout::GAME_MOUSE_MODE_MOVE) {
-        return 0;
-    }
-    if (mode == fallout::GAME_MOUSE_MODE_CROSSHAIR) {
-        return 2;
-    }
-    return 1;
+    return g_engine != NULL && g_engine->cursor_mode != NULL
+        ? g_engine->cursor_mode()
+        : 0;
 }
 
 extern "C" void fallout_ios_screen_size(int* width, int* height)
 {
+    if (g_engine != NULL && g_engine->screen_size != NULL) {
+        g_engine->screen_size(width, height);
+        return;
+    }
     if (width != NULL) {
-        *width = fallout::screenGetWidth();
+        *width = 0;
     }
     if (height != NULL) {
-        *height = fallout::screenGetHeight();
+        *height = 0;
     }
 }
 
@@ -118,70 +287,15 @@ extern "C" void fallout_ios_screen_size(int* width, int* height)
 // 6 skip turn, 7 swap the active hand/weapon, 8 reload, 9 fire mode.
 extern "C" int fallout_ios_action_available(int action)
 {
-    if (!fallout::intface_is_enabled()) {
-        return 0;
-    }
-
-    switch (action) {
-    case 3:
-        return fallout::isInCombat() ? 0 : 1;
-    case 5:
-        return fallout::isInCombat() ? 1 : 0;
-    case 6:
-        return fallout::combat_can_skip_turn() ? 1 : 0;
-    default:
-        return 1;
-    }
-}
-
-static void ios_send_scan_code(SDL_Scancode scanCode)
-{
-    fallout::KeyboardData key = {};
-    key.key = scanCode;
-    key.down = 1;
-    fallout::kb_simulate_key(&key);
-    key.down = 0;
-    fallout::kb_simulate_key(&key);
+    return g_engine != NULL && g_engine->action_available != NULL
+        ? g_engine->action_available(action)
+        : 0;
 }
 
 extern "C" void fallout_ios_press_action(int action)
 {
-    switch (action) {
-    case 0:
-        ios_send_scan_code(SDL_SCANCODE_I);
-        break;
-    case 1:
-        ios_send_scan_code(SDL_SCANCODE_TAB);
-        break;
-    case 2:
-        ios_send_scan_code(SDL_SCANCODE_C);
-        break;
-    case 3:
-        ios_send_scan_code(SDL_SCANCODE_P);
-        break;
-    case 4:
-        ios_send_scan_code(SDL_SCANCODE_S);
-        break;
-    case 5:
-        ios_send_scan_code(SDL_SCANCODE_RETURN);
-        break;
-    case 6:
-        ios_send_scan_code(SDL_SCANCODE_SPACE);
-        break;
-    case 7:
-        // B is the game's change-active-hand binding.
-        ios_send_scan_code(SDL_SCANCODE_B);
-        break;
-    case 8:
-        // Fallout 2's reload binding.
-        ios_send_scan_code(SDL_SCANCODE_R);
-        break;
-    case 9:
-        // Fallout 2's fire-mode binding.
-        ios_send_scan_code(SDL_SCANCODE_F);
-        break;
-    default:
-        break;
+    if (g_engine != NULL && g_engine->press_action != NULL) {
+        g_engine->press_action(action);
     }
 }
 
@@ -190,10 +304,14 @@ extern "C" void fallout_ios_press_action(int action)
 // closing the device or losing playback positions.
 extern "C" void fallout_ios_pause_game_audio(void)
 {
-    fallout::audioEnginePause();
+    if (g_engine != NULL && g_engine->pause_audio != NULL) {
+        g_engine->pause_audio();
+    }
 }
 
 extern "C" void fallout_ios_resume_game_audio(void)
 {
-    fallout::audioEngineResume();
+    if (g_engine != NULL && g_engine->resume_audio != NULL) {
+        g_engine->resume_audio();
+    }
 }

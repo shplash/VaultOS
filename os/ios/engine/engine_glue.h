@@ -1,0 +1,25 @@
+#ifndef FALLOUT_IOS_ENGINE_GLUE_H_
+#define FALLOUT_IOS_ENGINE_GLUE_H_
+
+// Small helpers shared by the Fallout 1 and Fallout 2 engine adapters. The file
+// is compiled once for the engine in the application (Fallout 1) and once for
+// the engine in Fallout2Engine.framework (Fallout 2); each image gets its own
+// copy, so the two never share install paths or host callbacks.
+
+#include "fallout_engine.h"
+
+// Stores the install directory the launcher selected for this engine.
+void fallout_engine_set_install_dir(const char* path);
+
+// The install directory, always with a trailing slash, or an empty string.
+const char* fallout_engine_install_dir();
+
+void fallout_engine_set_host(const FalloutEngineHost* host);
+const FalloutEngineHost* fallout_engine_host();
+
+// Forwards to the host. Safe to call when no host is attached.
+void fallout_engine_install_controls();
+void fallout_engine_menu_music_start();
+void fallout_engine_menu_music_stop();
+
+#endif /* FALLOUT_IOS_ENGINE_GLUE_H_ */

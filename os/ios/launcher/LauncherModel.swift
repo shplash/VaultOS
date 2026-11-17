@@ -36,10 +36,10 @@ enum FalloutGame: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The current app contains the Fallout 1 engine. Fallout 2 data can be
-    /// imported and managed here, but its engine is a separate codebase.
+    /// Both engines ship inside this application. Kept so the interface can
+    /// describe a game whose data is missing without special cases.
     var supportsLaunch: Bool {
-        return self == .fallout1
+        return true
     }
 }
 
@@ -386,10 +386,6 @@ final class LauncherModel: ObservableObject {
 
     func play(onPlay: () -> Void) {
         guard install.installed == 1, !isInstalling else {
-            return
-        }
-        guard selectedGame.supportsLaunch else {
-            errorMessage = "Fallout 2 needs its own game engine. This build contains the Fallout 1 engine; the Fallout 2 files you imported are ready for the dedicated Fallout 2 build."
             return
         }
         if applyOptions() {
