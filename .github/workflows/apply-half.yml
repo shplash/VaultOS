@@ -3,8 +3,8 @@ name: Apply half layout
 on:
   workflow_dispatch:
     inputs:
-      payload:
-        description: Gzipped base64 patch
+      patch_url:
+        description: Raw patch URL
         required: true
 
 permissions:
@@ -30,12 +30,20 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      - name: Restore CMake build tree
+        uses: actions/cache/restore@v4
+        with:
+          path: build
+          key: ios-cmake-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'third_party/**') }}
+          restore-keys: |
+            ios-cmake-${{ runner.os }}-
+
       - name: Apply layout patch
         env:
-          PAYLOAD: ${{ inputs.payload }}
+          PATCH_URL: ${{ inputs.patch_url }}
         run: |
           set -euo pipefail
-          printf '%s' "$PAYLOAD" | base64 -D | gunzip > /tmp/half-layout.patch
+          curl -fsSL "$PATCH_URL" -o /tmp/half-layout.patch
           git apply --check /tmp/half-layout.patch
           git apply /tmp/half-layout.patch
           git diff --check
@@ -84,6 +92,7 @@ jobs:
           name: final-ipa
           path: fallout-ce-ios-unsigned.ipa
           if-no-files-found: error
+          retention-days: 7
 
       - name: Update release asset
         env:
