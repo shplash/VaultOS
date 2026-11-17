@@ -539,7 +539,7 @@ struct LauncherView: View {
     }
 
     private var displaySheet: some View {
-        sheet(title: "Display", detail: "How large the game world and its interface are drawn") {
+        sheet(title: "Display", detail: "How large the game world and its interface are drawn", onReset: resetDisplay) {
             HStack(spacing: 12) {
                 ForEach(model.presets) { preset in
                     presetTile(preset)
@@ -611,7 +611,7 @@ struct LauncherView: View {
     }
 
     private var audioSheet: some View {
-        sheet(title: "Audio", detail: "Volumes, kept per game") {
+        sheet(title: "Audio", detail: "Volumes, kept per game", onReset: resetAudio) {
             volumeRow("Master", value: $model.masterVolume)
             volumeRow("Music", value: $model.musicVolume)
             volumeRow("Effects", value: $model.sfxVolume)
@@ -639,7 +639,7 @@ struct LauncherView: View {
     }
 
     private var gameSheet: some View {
-        sheet(title: "Game", detail: "Language, subtitles and how the character moves") {
+        sheet(title: "Game", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
             row("Language", detail: "Text and voice") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
@@ -683,7 +683,7 @@ struct LauncherView: View {
     }
 
     private var controlsSheet: some View {
-        sheet(title: "Controls", detail: "Size and opacity of the on-screen controls") {
+        sheet(title: "Controls", detail: "Size and opacity of the on-screen controls", onReset: resetControls) {
             scaleRow("Joystick", detail: "Camera pad in the lower left", value: $model.joystickScale)
             scaleRow("Buttons", detail: "All on-screen buttons", value: $model.buttonScale)
             scaleRow("Opacity", detail: "Unusable buttons hold their dimming until the slider goes below it",
@@ -745,20 +745,81 @@ struct LauncherView: View {
         }
     }
 
+    // MARK: - Resetting a page
+
+    private func resetDisplay() {
+        if let half = model.presets.last {
+            model.apply(preset: half)
+        }
+    }
+
+    private func resetAudio() {
+        model.sound = true
+        model.music = true
+        model.speech = true
+        model.masterVolume = 70
+        model.musicVolume = 70
+        model.sfxVolume = 70
+        model.speechVolume = 70
+    }
+
+    private func resetGame() {
+        model.language = 0
+        model.subtitles = false
+        model.alwaysRun = false
+    }
+
+    private func resetControls() {
+        model.joystickScale = 1
+        model.buttonScale = 1
+        model.controlsOpacity = 1
+        model.whiteButtons = false
+    }
+
     // MARK: - Sheet pieces
 
-    private func sheet<C: View>(title: String, detail: String, @ViewBuilder rows: () -> C) -> some View {
+    private func sheet<C: View>(title: String, detail: String, onReset: (() -> Void)? = nil, @ViewBuilder rows: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 25, weight: .bold))
-                    .foregroundColor(Theme.text)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 25, weight: .bold))
+                        .foregroundColor(Theme.text)
 
-                Text(detail)
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(Theme.faint)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    Text(detail)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(Theme.faint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+
+                Spacer(minLength: 8)
+
+                if let onReset = onReset {
+                    Button(action: onReset) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 9, weight: .bold))
+
+                            Text("RESET")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .kerning(0.8)
+                        }
+                        .foregroundColor(Theme.faint)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.white.opacity(0.04))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Theme.hairline, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Reset \(title) to defaults")
+                }
             }
             .padding(.horizontal, 22)
             .padding(.top, 16)
