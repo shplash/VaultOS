@@ -42,15 +42,18 @@ final class LauncherModel: ObservableObject {
         installDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         let native = LauncherModel.nativeResolution()
-        // Earlier builds stored point dimensions - and capped the short side at
-        // 480 - so upgrade once to the panel's real pixel dimensions.
-        if defaults.integer(forKey: "launcher.resolutionVersion") < 2 {
-            width = native.0
-            height = native.1
-            defaults.set(2, forKey: "launcher.resolutionVersion")
+        // Version 3 uses a logical resolution that keeps Fallout's interface
+        // readable. Earlier builds saved the raw panel size, which was so large
+        // that the world and HUD looked zoomed out.
+        if defaults.integer(forKey: "launcher.resolutionVersion") < 3 {
+            let full = LauncherModel.displayResolution(divisor: 2, native: native)
+            width = full.0
+            height = full.1
+            defaults.set(3, forKey: "launcher.resolutionVersion")
         } else {
-            width = defaults.object(forKey: "launcher.width") as? Int ?? native.0
-            height = defaults.object(forKey: "launcher.height") as? Int ?? native.1
+            let fallback = LauncherModel.displayResolution(divisor: 2, native: native)
+            width = defaults.object(forKey: "launcher.width") as? Int ?? fallback.0
+            height = defaults.object(forKey: "launcher.height") as? Int ?? fallback.1
         }
 
         sound = defaults.object(forKey: "launcher.sound") as? Bool ?? true
@@ -69,8 +72,8 @@ final class LauncherModel: ObservableObject {
 
     // MARK: - Screen size
 
-    /// The screen's real pixel size in landscape. This is what the display
-    /// panel exposes as FULL, and the default for every device.
+    /// The screen's real pixel size in landscape. It is the basis for the
+    /// FULL/HALF logical sizes, not a game resolution by itself.
     static func nativeResolution() -> (Int, Int) {
         let nativeBounds = UIScreen.main.nativeBounds
         let scale = max(UIScreen.main.nativeScale, 1)
@@ -87,14 +90,29 @@ final class LauncherModel: ObservableObject {
         return "\(native.0)x\(native.1)"
     }
 
+    /// Logical game sizes, matched to the screen's aspect ratio. Rendering at
+    /// every physical pixel made the world tiny; two pixels per game pixel
+    /// keeps the HUD readable and is still sharp on a Retina panel.
+    static func displayResolution(divisor: Int, native: (Int, Int)? = nil) -> (Int, Int) {
+        let screen = native ?? LauncherModel.nativeResolution()
+        let aspect = Double(screen.0) / Double(max(screen.1, 1))
+
+        // Keep FULL and HALF distinct even on shorter screens, where both
+        // would otherwise be clamped to the engine's 480 pixel minimum.
+        let minimumHeight = divisor == 2 ? 540 : 480
+        let height = max(minimumHeight, (screen.1 / divisor) & ~1)
+        let width = max(640, min(4096, Int((Double(height) * aspect).rounded()) & ~1))
+        return (width, height)
+    }
+
     var presets: [DisplayPreset] {
         let native = LauncherModel.nativeResolution()
-        let halfWidth = max(640, (native.0 / 2) & ~1)
-        let halfHeight = max(480, (native.1 / 2) & ~1)
+        let full = LauncherModel.displayResolution(divisor: 2, native: native)
+        let half = LauncherModel.displayResolution(divisor: 3, native: native)
 
         return [
-            DisplayPreset(id: "full", label: "FULL  \(native.0)x\(native.1)", width: native.0, height: native.1),
-            DisplayPreset(id: "half", label: "HALF  \(halfWidth)x\(halfHeight)", width: halfWidth, height: halfHeight),
+            DisplayPreset(id: "full", label: "FULL  \(full.0)x\(full.1)", width: full.0, height: full.1),
+            DisplayPreset(id: "half", label: "HALF  \(half.0)x\(half.1)", width: half.0, height: half.1),
         ]
     }
 
@@ -206,7 +224,7 @@ final class LauncherModel: ObservableObject {
     private func persist() {
         defaults.set(width, forKey: "launcher.width")
         defaults.set(height, forKey: "launcher.height")
-        defaults.set(2, forKey: "launcher.resolutionVersion")
+        defaults.set(3, forKey: "launcher.resolutionVersion")
         defaults.set(sound, forKey: "launcher.sound")
         defaults.set(music, forKey: "launcher.music")
         defaults.set(speech, forKey: "launcher.speech")
