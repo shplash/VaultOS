@@ -1,0 +1,186 @@
+diff --git a/os/ios/launcher/LauncherBridge.mm b/os/ios/launcher/LauncherBridge.mm
+index 41afd2f..4555f49 100644
+--- a/os/ios/launcher/LauncherBridge.mm
++++ b/os/ios/launcher/LauncherBridge.mm
+@@ -3,6 +3,7 @@
+ #include <algorithm>
+ #include <cmath>
+ 
++#include "game/gmouse.h"
+ #include "launcher/launcher.h"
+ #include "plib/gnw/mouse.h"
+ #include "plib/gnw/svga.h"
+@@ -72,6 +73,12 @@ extern "C" void fallout_ios_right_click(void)
+     fallout::mouse_ios_right_click();
+ }
+ 
++extern "C" int fallout_ios_cursor_mode(void)
++{
++    // 0 is the hexagon "move" cursor; everything else is an action cursor.
++    return fallout::gmouse_3d_get_mode() == fallout::GAME_MOUSE_MODE_MOVE ? 0 : 1;
++}
++
+ // MARK: - Launcher music decoding
+ 
+ #include "launcher/launcher.h"
+diff --git a/os/ios/launcher/LauncherHost.swift b/os/ios/launcher/LauncherHost.swift
+index 0cb6360..e6817a8 100644
+--- a/os/ios/launcher/LauncherHost.swift
++++ b/os/ios/launcher/LauncherHost.swift
+@@ -86,6 +86,7 @@ final class GameControlsOverlay: UIView {
+ 
+     private let joystick = CameraJoystickControl()
+     private let rightClickButton = UIButton(type: .custom)
++    private var cursorModeTimer: Timer?
+ 
+     static func install() {
+         let windows = UIApplication.shared.windows
+@@ -120,20 +121,37 @@ final class GameControlsOverlay: UIView {
+         rightClickButton.layer.cornerRadius = 10
+         rightClickButton.layer.borderWidth = 1.5
+         rightClickButton.layer.borderColor = ControlTheme.green.withAlphaComponent(0.6).cgColor
+-        rightClickButton.setTitle("LOOT/RMB", for: .normal)
++        rightClickButton.setTitle("MOVE", for: .normal)
+         rightClickButton.setTitleColor(ControlTheme.green, for: .normal)
+         rightClickButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .bold)
+         rightClickButton.titleLabel?.adjustsFontSizeToFitWidth = true
+         rightClickButton.titleLabel?.minimumScaleFactor = 0.7
+-        rightClickButton.accessibilityLabel = "Loot or right click"
++        rightClickButton.accessibilityLabel = "Switch cursor mode"
+         rightClickButton.addTarget(self, action: #selector(rightClick), for: .touchUpInside)
+         addSubview(rightClickButton)
++
++        refreshCursorMode()
++        let timer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
++            self?.refreshCursorMode()
++        }
++        RunLoop.main.add(timer, forMode: .common)
++        cursorModeTimer = timer
+     }
+ 
+     required init?(coder: NSCoder) {
+         fatalError("init(coder:) has not been implemented")
+     }
+ 
++    deinit {
++        cursorModeTimer?.invalidate()
++    }
++
++    override func removeFromSuperview() {
++        cursorModeTimer?.invalidate()
++        cursorModeTimer = nil
++        super.removeFromSuperview()
++    }
++
+     override func layoutSubviews() {
+         super.layoutSubviews()
+ 
+@@ -177,6 +195,15 @@ final class GameControlsOverlay: UIView {
+         }
+     }
+ 
++    private func refreshCursorMode() {
++        let isMove = fallout_ios_cursor_mode() == 0
++        let title = isMove ? "MOVE" : "ACTIONS"
++        if rightClickButton.title(for: .normal) != title {
++            rightClickButton.setTitle(title, for: .normal)
++        }
++        rightClickButton.accessibilityLabel = isMove ? "Switch to actions" : "Switch to move"
++    }
++
+     private func setRightClickActive(_ active: Bool) {
+         rightClickButton.backgroundColor = active
+             ? ControlTheme.amber.withAlphaComponent(0.22)
+             : ControlTheme.panel
+diff --git a/src/int/movie.cc b/src/int/movie.cc
+index 6f7abf0..5bc3898 100644
+--- a/src/int/movie.cc
++++ b/src/int/movie.cc
+@@ -249,24 +249,43 @@ static bool movieRead(void* handle, void* buf, int count)
+ // 0x478464
+ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeight, int srcX, int srcY, int destWidth, int destHeight, int a8, int a9)
+ {
+-    int v14;
+-    int v15;
+-
+     SDL_Rect srcRect;
+     srcRect.x = srcX;
+     srcRect.y = srcY;
+     srcRect.w = srcWidth;
+     srcRect.h = srcHeight;
+ 
+-    v14 = winRect.lrx - winRect.ulx;
+-    v15 = winRect.lrx - winRect.ulx + 1;
++    const int winWidth = winRect.lrx - winRect.ulx + 1;
++    const int winHeight = winRect.lry - winRect.uly + 1;
+ 
+     SDL_Rect destRect;
+ 
+-    if (movieScaleFlag) {
++    // MVE frames are 640x480. Scale them to the largest 4:3 rectangle that
++    // fits the window instead of leaving them at native size in the middle.
++    // This keeps faces proportioned and leaves black bars only on the sides
++    // or top/bottom where the screen is wider or taller than the video.
++    const bool scaleToWindow = !movieScaleFlag
++        && !movieSubRectFlag
++        && (movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0
++        && srcWidth > 0
++        && srcHeight > 0;
++
++    if (scaleToWindow) {
++        int drawWidth = winWidth;
++        int drawHeight = winWidth * srcHeight / srcWidth;
++        if (drawHeight > winHeight) {
++            drawHeight = winHeight;
++            drawWidth = winHeight * srcWidth / srcHeight;
++        }
++
++        destRect.x = winRect.ulx + (winWidth - drawWidth) / 2;
++        destRect.y = winRect.uly + (winHeight - drawHeight) / 2;
++        destRect.w = drawWidth;
++        destRect.h = drawHeight;
++    } else if (movieScaleFlag) {
+         if ((movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0) {
+-            destRect.y = (winRect.lry - winRect.uly + 1 - destHeight) / 2;
+-            destRect.x = (v15 - 4 * srcWidth / 3) / 2;
++            destRect.y = (winHeight - destHeight) / 2;
++            destRect.x = (winWidth - 4 * srcWidth / 3) / 2;
+         } else {
+             destRect.y = movieY + winRect.uly;
+             destRect.x = winRect.ulx + movieX;
+@@ -276,8 +295,8 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
+         destRect.h = destHeight + destRect.y;
+     } else {
+         if ((movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0) {
+-            destRect.y = (winRect.lry - winRect.uly + 1 - destHeight) / 2;
+-            destRect.x = (v15 - destWidth) / 2;
++            destRect.y = (winHeight - destHeight) / 2;
++            destRect.x = (winWidth - destWidth) / 2;
+         } else {
+             destRect.y = movieY + winRect.uly;
+             destRect.x = winRect.ulx + movieX;
+@@ -314,7 +333,11 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
+     }
+ 
+     SDL_SetSurfacePalette(surface, gSdlSurface->format->palette);
+-    SDL_BlitSurface(surface, &srcRect, gSdlSurface, &destRect);
++    if (scaleToWindow) {
++        SDL_BlitScaled(surface, &srcRect, gSdlSurface, &destRect);
++    } else {
++        SDL_BlitSurface(surface, &srcRect, gSdlSurface, &destRect);
++    }
+     SDL_BlitSurface(gSdlSurface, NULL, gSdlTextureSurface, NULL);
+     renderPresent();
+ }
+diff --git a/src/launcher/launcher.h b/src/launcher/launcher.h
+index d1cbcee..d158415 100644
+--- a/src/launcher/launcher.h
++++ b/src/launcher/launcher.h
+@@ -98,6 +98,7 @@ void fallout_ios_install_game_controls(void);
+ void fallout_ios_camera_pan(double x, double y);
+ void fallout_ios_camera_stop(void);
+ void fallout_ios_right_click(void);
++int fallout_ios_cursor_mode(void);
+ 
+ // Installation progress, 0..1. Only meaningful while an install is running.
+ double launcher_progress(void);
