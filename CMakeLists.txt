@@ -521,23 +521,21 @@ if(IOS)
     )
 
     add_dependencies(${EXECUTABLE_NAME} Fallout2Engine)
-
-    # The framework has to live in App.app/Frameworks for dlopen to find it.
-    # CMake's bundle copy phase does not include targets that are not linked
-    # into the application, so copy the built framework in afterwards.
-    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "$<TARGET_BUNDLE_DIR:Fallout2Engine>"
-            "$<TARGET_BUNDLE_DIR:${EXECUTABLE_NAME}>/Frameworks/Fallout2Engine.framework"
-        COMMAND ${CMAKE_COMMAND} -E echo
-            "Embedded Fallout2Engine.framework in $<TARGET_BUNDLE_DIR:${EXECUTABLE_NAME}>/Frameworks"
-        VERBATIM
-    )
 endif()
 
 if(APPLE)
     if(IOS)
         install(TARGETS ${EXECUTABLE_NAME} DESTINATION "Payload")
+
+        # The framework has to live in the application's Frameworks directory.
+        # Installing it after the application bundle puts it inside the bundle
+        # CPack packages. A POST_BUILD copy cannot be used here: the Xcode
+        # generator leaves ${EFFECTIVE_PLATFORM_NAME} unexpanded in the shell
+        # command, so the source path would not exist.
+        install(TARGETS Fallout2Engine
+            FRAMEWORK
+            DESTINATION "Payload/${EXECUTABLE_NAME}.app/Frameworks"
+        )
 
         set(CPACK_GENERATOR "ZIP")
         set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
