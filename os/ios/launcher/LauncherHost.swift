@@ -844,7 +844,7 @@ final class GameControlsOverlay: UIView {
                                accessibilityLabel: "Fire mode: burst")
         case 4:
             fireModeButton.set(symbol: "circle.fill", title: "••••",
-                               accessibilityLabel: "Fire mode: aimed burst")
+                               accessibilityLabel: "Fire mode: aimed secondary")
         default:
             // No readable mode: hollow bullet and a spelled-out label.
             fireModeButton.set(symbol: "circle", title: "FIREMODE",
