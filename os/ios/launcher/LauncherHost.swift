@@ -104,6 +104,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     case cha
     case pip
     case skill
+    case swap
     case end
 
     var id: String { rawValue }
@@ -119,6 +120,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .cha: return "CHA"
         case .pip: return "PIP"
         case .skill: return "SKILL"
+        case .swap: return "SWAP"
         case .end: return "END"
         }
     }
@@ -134,6 +136,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .cha: return "person"
         case .pip: return "book.closed"
         case .skill: return "star"
+        case .swap: return "arrow.left.arrow.right"
         case .end: return "xmark"
         }
     }
@@ -145,17 +148,18 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// changes.
     var defaultCenter: CGPoint {
         switch self {
-        case .joystick: return CGPoint(x: 0.1825, y: 0.8110)
+        case .joystick: return CGPoint(x: 0.18125, y: 0.8110)
         case .back: return CGPoint(x: 0.1160, y: 0.5725)
-        case .action: return CGPoint(x: 0.9444, y: 0.6155)
-        case .skip: return CGPoint(x: 0.9444, y: 0.4685)
+        case .action: return CGPoint(x: 0.9415, y: 0.6230)
+        case .skip: return CGPoint(x: 0.9444, y: 0.4755)
         // Four equal cells filling the strip to the right of the HUD.
         case .map: return CGPoint(x: 0.7795, y: 0.9215)
         case .cha: return CGPoint(x: 0.8386, y: 0.9215)
         case .inv: return CGPoint(x: 0.8977, y: 0.9215)
         case .pip: return CGPoint(x: 0.9567, y: 0.9215)
-        // Two equal squares in the top-right corner, END first.
+        // Three equal squares in the top-right corner: END, SKILL, SWAP.
         case .skill: return CGPoint(x: 0.9594, y: 0.2000)
+        case .swap: return CGPoint(x: 0.9594, y: 0.3250)
         case .end: return CGPoint(x: 0.9594, y: 0.0750)
         }
     }
@@ -172,12 +176,12 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let side = min(bounds.width * 0.0670, bounds.height * 0.149)
             return CGSize(width: side, height: side)
         case .action:
-            return CGSize(width: bounds.width * 0.0865, height: bounds.height * 0.135)
+            return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.150)
         case .skip:
             return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
         case .inv, .map, .cha, .pip:
             return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
-        case .skill, .end:
+        case .skill, .swap, .end:
             let side = min(bounds.width * 0.05625, bounds.height * 0.130)
             return CGSize(width: side, height: side)
         }
@@ -186,7 +190,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 7
+    private static let layoutVersion = 8
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -292,6 +296,11 @@ final class GameControlsOverlay: UIView {
         symbol: "star",
         iconPointSize: 18
     )
+    private let swapButton = LabeledControlButton(
+        title: "SWAP",
+        symbol: "arrow.left.arrow.right",
+        iconPointSize: 18
+    )
     private let endButton = LabeledControlButton(
         title: "END",
         symbol: "xmark",
@@ -364,6 +373,11 @@ final class GameControlsOverlay: UIView {
         skillButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(skillButton)
 
+        swapButton.tag = 7
+        swapButton.accessibilityLabel = "Swap weapon"
+        swapButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(swapButton)
+
         endButton.tag = 5
         endButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(endButton)
@@ -413,6 +427,7 @@ final class GameControlsOverlay: UIView {
         }
 
         place(skillButton, at: .skill, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale))
+        place(swapButton, at: .swap, size: scaledSize(for: .swap, in: bounds.size, globalScale: buttonScale))
         place(endButton, at: .end, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale))
     }
 
@@ -492,6 +507,7 @@ final class GameControlsOverlay: UIView {
             button.isEnabled = fallout_ios_action_available(Int32(index)) != 0
         }
         skillButton.isEnabled = fallout_ios_action_available(4) != 0
+        swapButton.isEnabled = fallout_ios_action_available(7) != 0
         endButton.isEnabled = fallout_ios_action_available(5) != 0
         skipButton.isHidden = fallout_ios_action_available(6) == 0
     }

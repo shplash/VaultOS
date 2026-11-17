@@ -114,7 +114,7 @@ extern "C" void fallout_ios_screen_size(int* width, int* height)
 }
 
 // 0 inventory, 1 map, 2 character, 3 pip-boy, 4 skilldex, 5 end combat,
-// 6 skip turn.
+// 6 skip turn, 7 swap the active hand/weapon.
 extern "C" int fallout_ios_action_available(int action)
 {
     if (!fallout::intface_is_enabled()) {
@@ -166,6 +166,10 @@ extern "C" void fallout_ios_press_action(int action)
         break;
     case 6:
         ios_send_scan_code(SDL_SCANCODE_SPACE);
+        break;
+    case 7:
+        // B is the game's change-active-hand binding.
+        ios_send_scan_code(SDL_SCANCODE_B);
         break;
     default:
         break;
