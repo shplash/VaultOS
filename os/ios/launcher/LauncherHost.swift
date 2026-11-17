@@ -458,10 +458,14 @@ enum ControlLayout {
 }
 
 final class GameControlsOverlay: UIView {
-    /// The overlay lives in its own window above the engine's SDL window. That
-    /// keeps it independent of the engine that created the window below and
-    /// lets the launcher install it before the engine starts.
-    private static var overlayWindow: UIWindow?
+    /// The overlay is a subview of the engine's own window, exactly like the
+    /// original single-engine build. A separate window above SDL looks the same
+    /// but stops the engine from receiving touches in the empty area, which
+    /// kills the trackpad cursor: Fallout 1 turns SDL finger events into mouse
+    /// movement in touch.cc/mouse.cc. Being a sibling above SDL's view keeps
+    /// the buttons working while touches outside them fall through to the game.
+    private static let overlayTag = 0xF0110
+    private static var windowObserver: NSObjectProtocol?
 
     private let joystick = CameraJoystickControl()
     private let actionButton = LabeledControlButton(
@@ -513,22 +517,63 @@ final class GameControlsOverlay: UIView {
 
     static func install() {
         ControlLayout.migrateIfNeeded()
-        if overlayWindow != nil {
+
+        // The engine calls this once its SDL window exists (Fallout 1's
+        // svga_init does), in which case the overlay can attach immediately.
+        if let window = sdlWindow() {
+            attach(to: window)
             return
         }
 
-        let controller = UIViewController()
-        let overlay = GameControlsOverlay(frame: UIScreen.main.bounds)
-        controller.view = overlay
+        // Fallout 2's engine does not call back after creating its window, so
+        // wait for that window to appear instead of covering it with a window
+        // of our own.
+        observeEngineWindow()
+    }
 
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        // Above SDL's window, below the launcher's (which is hidden by now).
-        window.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.normal.rawValue + 1)
-        window.backgroundColor = .clear
-        window.rootViewController = controller
-        window.isHidden = false
-        overlayWindow = window
+    /// SDL's window is the only visible window at the normal level once the
+    /// engine starts: the launcher sits above it and is hidden, and SDL's
+    /// launch-screen window is one level above normal.
+    private static func sdlWindow() -> UIWindow? {
+        return UIApplication.shared.windows.first {
+            !$0.isHidden && $0.windowLevel == .normal
+        }
+    }
 
+    private static func observeEngineWindow() {
+        guard windowObserver == nil else {
+            return
+        }
+
+        // queue: nil delivers synchronously on the thread that posts the
+        // notification, which is the main thread during SDL window creation.
+        // A main-queue observer would only run when the run loop next spins,
+        // and the engine blocks that loop for the whole session.
+        windowObserver = NotificationCenter.default.addObserver(
+            forName: UIWindow.didBecomeVisibleNotification,
+            object: nil,
+            queue: nil
+        ) { notification in
+            guard let window = notification.object as? UIWindow else {
+                return
+            }
+            guard !window.isHidden, window.windowLevel == .normal else {
+                return
+            }
+            attach(to: window)
+        }
+    }
+
+    private static func attach(to window: UIWindow) {
+        guard window.viewWithTag(overlayTag) == nil else {
+            return
+        }
+
+        let overlay = GameControlsOverlay(frame: window.bounds)
+        overlay.tag = overlayTag
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        window.addSubview(overlay)
+        window.bringSubviewToFront(overlay)
         overlay.setNeedsLayout()
     }
 
