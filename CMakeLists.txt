@@ -488,10 +488,16 @@ if(IOS)
         "os/ios/engine/engine_fallout2_globals.cc"
     )
 
+    # The framework does not link SDL (it resolves SDL from the application at
+    # load time), so it cannot inherit SDL's include directories from the
+    # SDL2-static target. SDL 2.26 generates its headers into the build tree
+    # (include/ plus include-config-<config>/), and ${SDL2_INCLUDE_DIRS} only
+    # names the source and build roots, so take the target's include interface
+    # explicitly instead of guessing at the generated layout.
     target_include_directories(Fallout2Engine PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine"
         "${fallout2_ce_SOURCE_DIR}/src"
-        ${SDL2_INCLUDE_DIRS}
+        "$<TARGET_PROPERTY:SDL2-static,INTERFACE_INCLUDE_DIRECTORIES>"
     )
 
     # zlib comes from the iOS SDK; fpattern is shared with the engine already in
