@@ -138,25 +138,25 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    static let bottomRow: [TouchControl] = [.inv, .map, .cha, .pip]
+    static let bottomRow: [TouchControl] = [.map, .cha, .inv, .pip]
 
     /// Normalized center of the control on the game view. The editor stores
     /// the same coordinates, so layouts survive resolution and orientation
     /// changes.
     var defaultCenter: CGPoint {
         switch self {
-        case .joystick: return CGPoint(x: 0.1880, y: 0.8110)
+        case .joystick: return CGPoint(x: 0.1825, y: 0.8110)
         case .back: return CGPoint(x: 0.1160, y: 0.5725)
-        case .action: return CGPoint(x: 0.9444, y: 0.5688)
-        case .skip: return CGPoint(x: 0.9444, y: 0.4479)
+        case .action: return CGPoint(x: 0.9444, y: 0.6155)
+        case .skip: return CGPoint(x: 0.9444, y: 0.4685)
         // Four equal cells filling the strip to the right of the HUD.
-        case .inv: return CGPoint(x: 0.7795, y: 0.9215)
-        case .map: return CGPoint(x: 0.8386, y: 0.9215)
-        case .cha: return CGPoint(x: 0.8977, y: 0.9215)
+        case .map: return CGPoint(x: 0.7795, y: 0.9215)
+        case .cha: return CGPoint(x: 0.8386, y: 0.9215)
+        case .inv: return CGPoint(x: 0.8977, y: 0.9215)
         case .pip: return CGPoint(x: 0.9567, y: 0.9215)
         // Two equal squares in the top-right corner, END first.
-        case .skill: return CGPoint(x: 0.9594, y: 0.1875)
-        case .end: return CGPoint(x: 0.9594, y: 0.0625)
+        case .skill: return CGPoint(x: 0.9594, y: 0.2000)
+        case .end: return CGPoint(x: 0.9594, y: 0.0750)
         }
     }
 
@@ -169,10 +169,12 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let side = bounds.height * 0.318
             return CGSize(width: side, height: side)
         case .back:
-            let side = min(bounds.width * 0.0644, bounds.height * 0.143)
+            let side = min(bounds.width * 0.0670, bounds.height * 0.149)
             return CGSize(width: side, height: side)
-        case .action, .skip:
-            return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.1125)
+        case .action:
+            return CGSize(width: bounds.width * 0.0865, height: bounds.height * 0.135)
+        case .skip:
+            return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
         case .inv, .map, .cha, .pip:
             return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
         case .skill, .end:
@@ -184,7 +186,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 6
+    private static let layoutVersion = 7
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -339,18 +341,18 @@ final class GameControlsOverlay: UIView {
         addSubview(backButton)
 
         let sideActions = [
-            ("INV", "bag"),
-            ("MAP", "map"),
-            ("CHA", "person"),
-            ("PIP", "book.closed"),
+            ("MAP", "map", 1),
+            ("CHA", "person", 2),
+            ("INV", "bag", 0),
+            ("PIP", "book.closed", 3),
         ]
-        for (index, item) in sideActions.enumerated() {
+        for item in sideActions {
             let button = LabeledControlButton(
                 title: item.0,
                 symbol: item.1,
                 iconPointSize: 14
             )
-            button.tag = index
+            button.tag = item.2
             // The four HUD buttons sit edge-to-edge as one strip.
             button.layer.cornerRadius = 3
             button.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
