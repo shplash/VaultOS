@@ -14,6 +14,7 @@
 #include "engine_glue.h"
 #include "fallout_engine.h"
 #include "game/combat.h"
+#include "game/combat_defs.h"
 #include "game/game_vars.h"
 #include "game/gmouse.h"
 #include "game/intface.h"
@@ -264,9 +265,24 @@ int fire_mode()
         return -1;
     }
 
-    // The icon carries the same meaning as in Fallout 2: one dot is the plain
-    // attack, a dot with a crosshair is the aimed one.
-    return aiming ? 2 : 1;
+    // The interface's item states match Fallout 2's, so the same numbers are
+    // reported and the launcher draws identical pictograms: 1 single, 2 aimed,
+    // 3 secondary (burst), 4 aimed secondary.
+    int mode;
+    switch (hitMode) {
+    case fallout::HIT_MODE_LEFT_WEAPON_SECONDARY:
+    case fallout::HIT_MODE_RIGHT_WEAPON_SECONDARY:
+        mode = 3;
+        break;
+    case fallout::HIT_MODE_LEFT_WEAPON_PRIMARY:
+    case fallout::HIT_MODE_RIGHT_WEAPON_PRIMARY:
+        mode = 1;
+        break;
+    default:
+        return -1;
+    }
+
+    return aiming ? mode + 1 : mode;
 }
 
 const FalloutEngineAPI g_api = {
