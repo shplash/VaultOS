@@ -2,6 +2,10 @@ name: Apply half layout
 
 on:
   workflow_dispatch:
+    inputs:
+      payload:
+        description: Base64 gzip patch
+        required: true
 
 permissions:
   contents: write
@@ -23,10 +27,13 @@ jobs:
           fetch-depth: 0
 
       - name: Apply layout patch
+        env:
+          PAYLOAD: ${{ inputs.payload }}
         run: |
           set -euo pipefail
-          git apply --check .github/half-layout.patch
-          git apply .github/half-layout.patch
+          printf '%s' "$PAYLOAD" | base64 -D | gunzip > /tmp/half-layout.patch
+          git apply --check /tmp/half-layout.patch
+          git apply /tmp/half-layout.patch
           git diff --check
 
       - name: Select Xcode
