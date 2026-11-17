@@ -46,6 +46,34 @@ symbols_text() {
     nm "$1" 2>/dev/null | c++filt
 }
 
+# Symbols actually reachable by a dlopen'ed image, taken from the export trie
+# rather than the symbol table. Falls back to the symbol table only when no
+# tool can read the trie.
+exported_symbols() {
+    local binary="$1"
+    local output=""
+
+    if command -v dyld_info >/dev/null 2>&1; then
+        output="$(dyld_info -exports "$binary" 2>/dev/null \
+            | awk '$NF ~ /^_/ { print $NF }' | sort -u || true)"
+        if [ -n "$output" ]; then
+            printf '%s\n' "$output"
+            return 0
+        fi
+    fi
+
+    if xcrun --find llvm-objdump >/dev/null 2>&1; then
+        output="$(xcrun llvm-objdump --macho --exports-trie "$binary" 2>/dev/null \
+            | awk '$NF ~ /^_/ { print $NF }' | sort -u || true)"
+        if [ -n "$output" ]; then
+            printf '%s\n' "$output"
+            return 0
+        fi
+    fi
+
+    defined_symbols "$binary"
+}
+
 check_platform() {
     local binary="$1"
     local label="$2"
@@ -78,9 +106,11 @@ unzip -q "$IPA" -d "$work"
 
 app_count="$(find "$work" -name '*.app' -type d | wc -l | tr -d ' ')"
 [ "$app_count" = "1" ] || fail "expected one application bundle, found $app_count"
-app="$(find "$work" -name '*.app' -type d | head -n 1)"
+app="$(find "$work" -name '*.app' -type d -print -quit)"
 
-if find "$work" -name '*.dSYM' | grep -q .; then
+# -print -quit instead of piping find into grep/head: an early exit there makes
+# find write to a closed pipe, which pipefail would report as a real failure.
+if [ -n "$(find "$work" -name '*.dSYM' -print -quit)" ]; then
     fail "the IPA contains debug symbols"
 fi
 
@@ -106,12 +136,16 @@ symbols_text "$binary" > "$work/app-demangled.txt"
 grep -q 'gnw_main' "$work/app-demangled.txt" \
     || fail "the Fallout 1 engine is not linked into the application"
 
-strings -a "$binary" | grep -qx 'fallout1' \
+# Write strings to a file first: `strings | grep -q` makes grep close the pipe
+# and strings fail while flushing, which pipefail turns into a false failure.
+strings -a "$binary" > "$work/app-strings.txt"
+grep -qx 'fallout1' "$work/app-strings.txt" \
     || fail "the Fallout 1 engine does not identify itself"
 note "Fallout 1 engine: present in the application executable"
 
 # The executable must export SDL: the Fallout 2 framework resolves SDL from it.
-grep -q '^_SDL_Init$' "$work/app-defined.txt" \
+exported_symbols "$binary" > "$work/app-exported.txt"
+grep -q '^_SDL_Init$' "$work/app-exported.txt" \
     || fail "the application does not export SDL_Init for the Fallout 2 engine"
 
 # --- Fallout 2 engine (embedded framework) ----------------------------------
@@ -123,13 +157,13 @@ framework_binary="$framework/Fallout2Engine"
 # A shallow framework keeps its binary and Info.plist at the top; tolerate the
 # versioned layout as well in case the toolchain produces one.
 if [ ! -f "$framework_binary" ]; then
-    framework_binary="$(find "$framework" -type f -name 'Fallout2Engine' | head -n 1)"
+    framework_binary="$(find "$framework" -type f -name 'Fallout2Engine' -print -quit)"
 fi
 [ -f "$framework_binary" ] || fail "the Fallout 2 framework has no binary"
 
 framework_info="$framework/Info.plist"
 if [ ! -f "$framework_info" ]; then
-    framework_info="$(find "$framework" -type f -name 'Info.plist' | head -n 1)"
+    framework_info="$(find "$framework" -type f -name 'Info.plist' -print -quit)"
 fi
 [ -f "$framework_info" ] || fail "the Fallout 2 framework has no Info.plist"
 
@@ -142,13 +176,21 @@ framework_minos="$(check_platform "$framework_binary" "the Fallout 2 framework")
 note "framework minimum iOS: $framework_minos"
 
 defined_symbols "$framework_binary" > "$work/f2-defined.txt"
-grep -q '^_fallout_engine_api$' "$work/f2-defined.txt" \
+exported_symbols "$framework_binary" > "$work/f2-exported.txt"
+grep -q '^_fallout_engine_api$' "$work/f2-exported.txt" \
     || fail "the Fallout 2 framework does not export its engine adapter"
+
+# The framework must not carry its own SDL: it has to resolve SDL from the
+# application so the process keeps one event pump and one set of UIKit classes.
+if grep -q '^_SDL_Init$' "$work/f2-defined.txt"; then
+    fail "the Fallout 2 framework contains its own SDL instead of using the application's"
+fi
 
 symbols_text "$framework_binary" > "$work/f2-demangled.txt"
 grep -q 'falloutMain' "$work/f2-demangled.txt" \
     || fail "the Fallout 2 engine is not linked into the framework"
-strings -a "$framework_binary" | grep -qx 'fallout2' \
+strings -a "$framework_binary" > "$work/f2-strings.txt"
+grep -qx 'fallout2' "$work/f2-strings.txt" \
     || fail "the Fallout 2 engine does not identify itself"
 note "Fallout 2 engine: present in Fallout2Engine.framework"
 
@@ -186,7 +228,7 @@ undefined_symbols "$framework_binary" \
     | sort -u > "$work/f2-sdl-undefined.txt" || true
 
 if [ -s "$work/f2-sdl-undefined.txt" ]; then
-    comm -23 "$work/f2-sdl-undefined.txt" "$work/app-defined.txt" > "$work/f2-sdl-missing.txt"
+    comm -23 "$work/f2-sdl-undefined.txt" "$work/app-exported.txt" > "$work/f2-sdl-missing.txt"
     if [ -s "$work/f2-sdl-missing.txt" ]; then
         echo "missing SDL symbols:" >&2
         sed -n '1,40p' "$work/f2-sdl-missing.txt" >&2
@@ -208,7 +250,7 @@ fi
 
 # --- IPA structure ----------------------------------------------------------
 
-if find "$work/Payload" -mindepth 1 -maxdepth 1 ! -name '*.app' | grep -q .; then
+if [ -n "$(find "$work/Payload" -mindepth 1 -maxdepth 1 ! -name '*.app' -print -quit)" ]; then
     fail "Payload contains entries other than the application"
 fi
 
