@@ -23,6 +23,9 @@ final class LauncherModel: ObservableObject {
     @Published var language: Int
     @Published var subtitles: Bool
     @Published var alwaysRun: Bool
+    @Published var joystickScale: Double
+    @Published var buttonScale: Double
+    @Published var leftHanded: Bool
 
     @Published var install = LauncherInstallInfo()
     @Published var isInstalling = false
@@ -66,6 +69,9 @@ final class LauncherModel: ObservableObject {
         language = defaults.object(forKey: "launcher.language") as? Int ?? 0
         subtitles = defaults.bool(forKey: "launcher.subtitles")
         alwaysRun = defaults.bool(forKey: "launcher.alwaysRun")
+        joystickScale = defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0
+        buttonScale = defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0
+        leftHanded = defaults.bool(forKey: "launcher.leftHanded")
 
         refreshInstall()
     }
@@ -235,6 +241,9 @@ final class LauncherModel: ObservableObject {
         defaults.set(language, forKey: "launcher.language")
         defaults.set(subtitles, forKey: "launcher.subtitles")
         defaults.set(alwaysRun, forKey: "launcher.alwaysRun")
+        defaults.set(joystickScale, forKey: "launcher.joystickScale")
+        defaults.set(buttonScale, forKey: "launcher.buttonScale")
+        defaults.set(leftHanded, forKey: "launcher.leftHanded")
     }
 
     @discardableResult

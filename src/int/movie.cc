@@ -278,8 +278,8 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
             drawWidth = winHeight * srcWidth / srcHeight;
         }
 
-        destRect.x = winRect.ulx + (winWidth - drawWidth) / 2;
-        destRect.y = winRect.uly + (winHeight - drawHeight) / 2;
+        destRect.x = (winWidth - drawWidth) / 2;
+        destRect.y = (winHeight - drawHeight) / 2;
         destRect.w = drawWidth;
         destRect.h = drawHeight;
     } else if (movieScaleFlag) {
@@ -332,9 +332,34 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
         }
     }
 
-    SDL_SetSurfacePalette(surface, gSdlSurface->format->palette);
-    if (scaleToWindow) {
-        SDL_BlitScaled(surface, &srcRect, gSdlSurface, &destRect);
+    const bool indexedFrames = surface->format->BitsPerPixel == 8
+        && surface->format->palette != NULL
+        && gSdlSurface->format->BitsPerPixel == 8
+        && gSdlSurface->format->palette != NULL;
+
+    if (scaleToWindow && indexedFrames) {
+        // Scale the indexed pixels directly into the indexed screen buffer.
+        // SDL_BlitScaled can produce a blank frame for some 8-bit movie
+        // surfaces, so use the engine's own scaler here.
+        drawScaled((unsigned char*)gSdlSurface->pixels + gSdlSurface->pitch * destRect.y + destRect.x,
+            destRect.w,
+            destRect.h,
+            gSdlSurface->pitch,
+            (unsigned char*)surface->pixels + surface->pitch * srcRect.y + srcRect.x,
+            srcRect.w,
+            srcRect.h,
+            surface->pitch);
+    } else if (scaleToWindow) {
+        // Keep non-indexed movies visible at their native size rather than
+        // asking SDL to convert them to the game's 8-bit palette.
+        SDL_Rect nativeDest;
+        nativeDest.x = (winWidth - srcWidth) / 2;
+        nativeDest.y = (winHeight - srcHeight) / 2;
+        nativeDest.w = srcWidth;
+        nativeDest.h = srcHeight;
+        nativeDest.x += winRect.ulx;
+        nativeDest.y += winRect.uly;
+        SDL_BlitSurface(surface, &srcRect, gSdlSurface, &nativeDest);
     } else {
         SDL_BlitSurface(surface, &srcRect, gSdlSurface, &destRect);
     }

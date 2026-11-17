@@ -86,7 +86,11 @@ final class GameControlsOverlay: UIView {
 
     private let joystick = CameraJoystickControl()
     private let rightClickButton = UIButton(type: .custom)
+    private let backButton = UIButton(type: .custom)
+    private let speedSlider = UISlider()
+    private let speedIcon = UIImageView()
     private var cursorModeTimer: Timer?
+    private var cursorModeIcon: String?
 
     static func install() {
         let windows = UIApplication.shared.windows
@@ -117,19 +121,43 @@ final class GameControlsOverlay: UIView {
 
         addSubview(joystick)
 
-        rightClickButton.backgroundColor = ControlTheme.panel
-        rightClickButton.layer.cornerRadius = 10
-        rightClickButton.layer.borderWidth = 1.5
-        rightClickButton.layer.borderColor = ControlTheme.green.withAlphaComponent(0.6).cgColor
-        rightClickButton.setTitle("MOVE", for: .normal)
-        rightClickButton.setTitleColor(ControlTheme.green, for: .normal)
-        rightClickButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .bold)
-        rightClickButton.titleLabel?.adjustsFontSizeToFitWidth = true
-        rightClickButton.titleLabel?.minimumScaleFactor = 0.7
+        configureControlButton(rightClickButton)
+        rightClickButton.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(pointSize: 27, weight: .semibold),
+            forImageIn: .normal
+        )
         rightClickButton.accessibilityLabel = "Switch cursor mode"
         rightClickButton.addTarget(self, action: #selector(rightClick), for: .touchUpInside)
         addSubview(rightClickButton)
 
+        configureControlButton(backButton)
+        backButton.setImage(UIImage(systemName: "chevron.backward"), for: .normal)
+        backButton.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold),
+            forImageIn: .normal
+        )
+        backButton.accessibilityLabel = "Back"
+        backButton.addTarget(self, action: #selector(goBack), for: .touchUpInside)
+        addSubview(backButton)
+
+        let savedSpeed = UserDefaults.standard.object(forKey: "FalloutCursorSpeed") as? Double ?? 1.0
+        speedSlider.minimumValue = 0.4
+        speedSlider.maximumValue = 2.0
+        speedSlider.value = Float(savedSpeed)
+        speedSlider.minimumTrackTintColor = ControlTheme.green.withAlphaComponent(0.75)
+        speedSlider.maximumTrackTintColor = ControlTheme.dim.withAlphaComponent(0.22)
+        speedSlider.thumbTintColor = ControlTheme.green
+        speedSlider.isContinuous = true
+        speedSlider.addTarget(self, action: #selector(cursorSpeedChanged), for: .valueChanged)
+        addSubview(speedSlider)
+
+        speedIcon.image = UIImage(systemName: "speedometer")
+        speedIcon.tintColor = ControlTheme.dim
+        speedIcon.contentMode = .scaleAspectFit
+        speedIcon.isUserInteractionEnabled = false
+        addSubview(speedIcon)
+
+        fallout_ios_set_cursor_speed(savedSpeed)
         refreshCursorMode()
         let timer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
             self?.refreshCursorMode()
@@ -155,24 +183,62 @@ final class GameControlsOverlay: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
 
+        let defaults = UserDefaults.standard
+        let joystickScale = CGFloat(defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0)
+        let buttonScale = CGFloat(defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0)
+        let leftHanded = defaults.bool(forKey: "launcher.leftHanded")
+
         let insets = safeAreaInsets
-        let baseSize = max(92, min(112, bounds.height * 0.26))
+        let baseSize = max(80, min(132, max(92, min(112, bounds.height * 0.26)) * joystickScale))
         let margin: CGFloat = 16
+        let bottomY = bounds.height - insets.bottom - margin
 
         joystick.frame = CGRect(
-            x: insets.left + margin,
-            y: bounds.height - insets.bottom - baseSize - margin,
+            x: leftHanded ? bounds.width - insets.right - baseSize - margin : insets.left + margin,
+            y: bottomY - baseSize,
             width: baseSize,
             height: baseSize
         )
 
-        let buttonSize: CGFloat = 84
+        let buttonSize = max(60, min(110, 76 * buttonScale))
         rightClickButton.frame = CGRect(
-            x: bounds.width - insets.right - buttonSize - margin,
-            y: bounds.height - insets.bottom - buttonSize - margin,
+            x: leftHanded ? insets.left + margin : bounds.width - insets.right - buttonSize - margin,
+            y: bottomY - buttonSize,
             width: buttonSize,
             height: buttonSize
         )
+
+        let backSize: CGFloat = 44
+        backButton.frame = CGRect(
+            x: leftHanded ? rightClickButton.frame.maxX + 8 : rightClickButton.frame.minX - 8 - backSize,
+            y: bottomY - backSize,
+            width: backSize,
+            height: backSize
+        )
+
+        let sliderWidth: CGFloat = 100
+        let sliderHeight: CGFloat = 28
+        speedSlider.frame = CGRect(
+            x: bounds.width - insets.right - sliderWidth - margin,
+            y: bottomY - max(baseSize, buttonSize) - sliderHeight - 10,
+            width: sliderWidth,
+            height: sliderHeight
+        )
+        speedIcon.frame = CGRect(
+            x: speedSlider.frame.minX - 20,
+            y: speedSlider.frame.midY - 8,
+            width: 16,
+            height: 16
+        )
+    }
+
+    private func configureControlButton(_ button: UIButton) {
+        button.backgroundColor = ControlTheme.panel
+        button.layer.cornerRadius = 10
+        button.layer.borderWidth = 1.5
+        button.layer.borderColor = ControlTheme.green.withAlphaComponent(0.6).cgColor
+        button.tintColor = ControlTheme.green
+        button.imageView?.contentMode = .scaleAspectFit
     }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
@@ -195,13 +261,38 @@ final class GameControlsOverlay: UIView {
         }
     }
 
+    @objc private func goBack() {
+        fallout_ios_back()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    @objc private func cursorSpeedChanged() {
+        let value = Double(speedSlider.value)
+        fallout_ios_set_cursor_speed(value)
+        UserDefaults.standard.set(value, forKey: "FalloutCursorSpeed")
+    }
+
     private func refreshCursorMode() {
-        let isMove = fallout_ios_cursor_mode() == 0
-        let title = isMove ? "MOVE" : "ACTIONS"
-        if rightClickButton.title(for: .normal) != title {
-            rightClickButton.setTitle(title, for: .normal)
+        let mode = fallout_ios_cursor_mode()
+        let symbol: String
+        let label: String
+        switch mode {
+        case 0:
+            symbol = "arrow.up.and.down.and.arrow.left.and.right"
+            label = "Move cursor"
+        case 2:
+            symbol = "scope"
+            label = "Target"
+        default:
+            symbol = "hand.tap"
+            label = "Actions"
         }
-        rightClickButton.accessibilityLabel = isMove ? "Switch to actions" : "Switch to move"
+
+        if cursorModeIcon != symbol {
+            cursorModeIcon = symbol
+            rightClickButton.setImage(UIImage(systemName: symbol), for: .normal)
+        }
+        rightClickButton.accessibilityLabel = label
     }
 
     private func setRightClickActive(_ active: Bool) {
@@ -211,7 +302,7 @@ final class GameControlsOverlay: UIView {
         rightClickButton.layer.borderColor = active
             ? ControlTheme.amber.cgColor
             : ControlTheme.green.withAlphaComponent(0.6).cgColor
-        rightClickButton.setTitleColor(active ? ControlTheme.amber : ControlTheme.green, for: .normal)
+        rightClickButton.tintColor = active ? ControlTheme.amber : ControlTheme.green
     }
 }
 

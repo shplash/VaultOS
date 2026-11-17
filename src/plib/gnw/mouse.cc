@@ -64,6 +64,9 @@ static bool mouse_is_hidden;
 // as a normal press followed by a release from the input loop.
 static bool mouse_ios_right_click_pending = false;
 
+// Trackpad-style one-finger movement multiplier set by the on-screen slider.
+static double mouse_ios_touch_sensitivity = 1.0;
+
 // 0x671F1C
 static int raw_x;
 
@@ -485,15 +488,18 @@ void mouse_info()
                 prevy = gesture.y;
             }
 
+            const int moveX = static_cast<int>((gesture.x - prevx) * mouse_ios_touch_sensitivity);
+            const int moveY = static_cast<int>((gesture.y - prevy) * mouse_ios_touch_sensitivity);
+
             if (gesture.type == kLongPress) {
                 if (gesture.numberOfTouches == 1) {
-                    mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, primaryButton);
+                    mouse_simulate_input(moveX, moveY, primaryButton);
                 } else if (gesture.numberOfTouches == 2) {
-                    mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_RIGHT_BUTTON_DOWN);
+                    mouse_simulate_input(moveX, moveY, MOUSE_STATE_RIGHT_BUTTON_DOWN);
                 }
             } else if (gesture.type == kPan) {
                 if (gesture.numberOfTouches == 1) {
-                    mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, 0);
+                    mouse_simulate_input(moveX, moveY, 0);
                 } else if (gesture.numberOfTouches == 2) {
                     gMouseWheelX = (prevx - gesture.x) / 2;
                     gMouseWheelY = (gesture.y - prevy) / 2;
@@ -864,6 +870,16 @@ double mouse_get_sensitivity()
 void mouse_ios_right_click()
 {
     mouse_ios_right_click_pending = true;
+}
+
+void mouse_set_ios_touch_sensitivity(double value)
+{
+    if (value < 0.35) {
+        value = 0.35;
+    } else if (value > 2.5) {
+        value = 2.5;
+    }
+    mouse_ios_touch_sensitivity = value;
 }
 
 // 0x4B54FC

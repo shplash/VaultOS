@@ -5,6 +5,7 @@
 
 #include "game/gmouse.h"
 #include "launcher/launcher.h"
+#include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/svga.h"
 
@@ -73,10 +74,31 @@ extern "C" void fallout_ios_right_click(void)
     fallout::mouse_ios_right_click();
 }
 
+extern "C" void fallout_ios_back(void)
+{
+    fallout::KeyboardData key = {};
+    key.key = SDL_SCANCODE_ESCAPE;
+    key.down = 1;
+    fallout::kb_simulate_key(&key);
+    key.down = 0;
+    fallout::kb_simulate_key(&key);
+}
+
+extern "C" void fallout_ios_set_cursor_speed(double value)
+{
+    fallout::mouse_set_ios_touch_sensitivity(value);
+}
+
 extern "C" int fallout_ios_cursor_mode(void)
 {
-    // 0 is the hexagon "move" cursor; everything else is an action cursor.
-    return fallout::gmouse_3d_get_mode() == fallout::GAME_MOUSE_MODE_MOVE ? 0 : 1;
+    const int mode = fallout::gmouse_3d_get_mode();
+    if (mode == fallout::GAME_MOUSE_MODE_MOVE) {
+        return 0;
+    }
+    if (mode == fallout::GAME_MOUSE_MODE_CROSSHAIR) {
+        return 2;
+    }
+    return 1;
 }
 
 // MARK: - Launcher music decoding

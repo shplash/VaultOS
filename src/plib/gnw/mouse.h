@@ -61,6 +61,7 @@ double mouse_get_sensitivity();
 // iOS: queue a single right-click at the current cursor, used by the on-screen
 // LOOT/RMB button.
 void mouse_ios_right_click();
+void mouse_set_ios_touch_sensitivity(double value);
 unsigned int mouse_elapsed_time();
 void mouse_reset_elapsed_time();
 

@@ -213,9 +213,39 @@ struct LauncherView: View {
                 .accentColor(Theme.green)
             }
 
+            controlsSection
+
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var controlsSection: some View {
+        section("CONTROLS") {
+            controlScaleRow("JOYSTICK", value: $model.joystickScale)
+            controlScaleRow("BUTTONS", value: $model.buttonScale)
+
+            Toggle(isOn: $model.leftHanded) {
+                settingLabel("LEFT-HANDED")
+            }
+            .toggleStyle(SwitchToggleStyle())
+            .accentColor(Theme.green)
+        }
+    }
+
+    private func controlScaleRow(_ title: String, value: Binding<Double>) -> some View {
+        HStack(spacing: 8) {
+            settingLabel(title)
+                .frame(width: 62, alignment: .leading)
+
+            Slider(value: value, in: 0.75...1.35)
+                .accentColor(Theme.green)
+
+            Text("\(Int((value.wrappedValue * 100).rounded()))%")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundColor(Theme.dim)
+                .frame(width: 34, alignment: .trailing)
+        }
     }
 
     private var displaySection: some View {
