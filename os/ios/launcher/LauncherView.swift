@@ -100,19 +100,6 @@ struct LauncherView: View {
 
             Spacer(minLength: 6)
 
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(model.install.installed == 1 ? accent : Theme.warning)
-                    .frame(width: 5, height: 5)
-
-                Text(statusText)
-                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                    .kerning(1)
-                    .foregroundColor(Theme.faint)
-            }
-            .padding(.leading, 3)
-            .padding(.bottom, 7)
-
             playButton
         }
         .padding(.horizontal, 10)
@@ -151,7 +138,7 @@ struct LauncherView: View {
             }
             .foregroundColor(selected ? Theme.text : Theme.faint)
             .padding(.trailing, 9)
-            .padding(.vertical, 7)
+            .padding(.vertical, 5)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(selected ? Color.white.opacity(0.05) : Color.clear)
@@ -171,9 +158,10 @@ struct LauncherView: View {
                 Text("PLAY")
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
 
-                Text(model.install.installed == 1 ? "START \(model.selectedGame.title)" : "NEEDS GAME DATA")
+                Text(statusText)
                     .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Color.black.opacity(0.5))
+                    .kerning(0.8)
+                    .foregroundColor(Color.black.opacity(0.55))
             }
         }
         .buttonStyle(PrimaryButtonStyle(accent: accent))
@@ -199,8 +187,8 @@ struct LauncherView: View {
                         .frame(width: 5, height: 5)
 
                     Text(game.title)
-                        .font(.system(size: 13, weight: selected ? .bold : .medium))
-                        .kerning(1.4)
+                        .font(.system(size: 15, weight: selected ? .bold : .medium))
+                        .kerning(1.6)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
 
@@ -235,6 +223,10 @@ struct LauncherView: View {
             gameSheet
         case .touch:
             controlsSheet
+        case .tips:
+            tipsSheet
+        case .credits:
+            creditsSheet
         }
     }
 
@@ -405,6 +397,55 @@ struct LauncherView: View {
         return UIImage(contentsOfFile: url.path)
     }
 
+    private var tipsSheet: some View {
+        sheet(title: "Tips", detail: "Getting around on a touch screen") {
+            tip("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target.")
+            tip("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand.")
+            tip("Combat", "END ends your turn and SKIP holds it. RELOAD and the attack mode only appear with a weapon in hand.")
+            tip("Display", "HALF keeps the interface readable on a phone; FULL is sharpest on a tablet.")
+            tip("Saves", "Importing a ZIP again replaces the game data and keeps your savegames.")
+        }
+    }
+
+    private var creditsSheet: some View {
+        sheet(title: "Credits", detail: "Who made this, and what it is built on") {
+            tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
+            tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
+            tip("Launcher", "Interface, touch controls and artwork treatment by shplash.")
+            tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games.")
+            footnote("The app contains no game data; the screenshots are taken from the games themselves.")
+        }
+    }
+
+    private func tip(_ title: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(accent.opacity(0.7))
+                .frame(width: 3, height: 13)
+                .padding(.top, 3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.text)
+
+                Text(text)
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundColor(Theme.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 7)
+        .overlay(
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(height: 1),
+            alignment: .bottom
+        )
+    }
+
     private var displaySheet: some View {
         sheet(title: "Display", detail: "How large the game world and its interface are drawn") {
             HStack(spacing: 12) {
@@ -478,48 +519,17 @@ struct LauncherView: View {
     }
 
     private var audioSheet: some View {
-        sheet(title: "Audio", detail: "Sound, music and speech, kept per game") {
-            row("Channels", detail: "Tap to switch a channel off") {
-                HStack(spacing: 8) {
-                    channelPill("SFX", isOn: $model.sound)
-                    channelPill("MUSIC", isOn: $model.music)
-                    channelPill("SPEECH", isOn: $model.speech)
-                }
-            }
-
+        sheet(title: "Audio", detail: "Volumes, kept per game") {
             volumeRow("Master", value: $model.masterVolume)
             volumeRow("Music", value: $model.musicVolume)
             volumeRow("Effects", value: $model.sfxVolume)
             volumeRow("Speech", value: $model.speechVolume)
 
-            footnote("Launcher theme: \(LauncherMusic.themeLabel(for: model.selectedGame)).")
+            footnote("0% mutes that channel. The same volumes are in each game's own Options screen. Launcher theme: \(LauncherMusic.themeLabel(for: model.selectedGame)).")
         }
     }
 
-    private func channelPill(_ title: String, isOn: Binding<Bool>) -> some View {
-        Button {
-            isOn.wrappedValue.toggle()
-        } label: {
-            Text(title)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .kerning(0.8)
-                .foregroundColor(isOn.wrappedValue ? Color.black.opacity(0.75) : Theme.faint)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isOn.wrappedValue ? accent : Color.white.opacity(0.04))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(isOn.wrappedValue ? Color.clear : Theme.hairline, lineWidth: 1)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
-    }
+    // Channel switching is done with the volume sliders; 0% mutes a channel.
 
     private func volumeRow(_ title: String, value: Binding<Double>) -> some View {
         row(title, detail: nil) {
@@ -556,7 +566,7 @@ struct LauncherView: View {
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 8, weight: .bold))
                     }
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundColor(accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -737,6 +747,8 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
     case audio
     case game
     case touch
+    case tips
+    case credits
 
     var id: String {
         return rawValue
@@ -749,6 +761,8 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
         case .audio: return "Audio"
         case .game: return "Game"
         case .touch: return "Controls"
+        case .tips: return "Tips"
+        case .credits: return "Credits"
         }
     }
 
@@ -759,6 +773,8 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
         case .audio: return "speaker.wave.2"
         case .game: return "person"
         case .touch: return "hand.tap"
+        case .tips: return "lightbulb"
+        case .credits: return "info.circle"
         }
     }
 }
@@ -955,6 +971,7 @@ private struct TouchControlEditor: View {
     @State private var game: FalloutGame
     @State private var dragOrigins: [TouchControl: CGPoint] = [:]
     @State private var selected: TouchControl?
+    @State private var barsHidden = false
 
     init(model: LauncherModel) {
         self.model = model
@@ -986,9 +1003,42 @@ private struct TouchControlEditor: View {
                 }
 
                 VStack(spacing: 0) {
-                    editorBar
-                    opacityBar
+                    if !barsHidden {
+                        editorBar
+                        opacityBar
+                    }
                     Spacer(minLength: 0)
+                }
+
+                if barsHidden {
+                    VStack {
+                        HStack {
+                            Spacer(minLength: 0)
+
+                            Button {
+                                barsHidden = false
+                            } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(accent)
+                                    .padding(.horizontal, 11)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Theme.background.opacity(0.9))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .stroke(Theme.hairline, lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Show toolbars")
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(10)
                 }
 
                 if let selected = selected {
@@ -1025,6 +1075,22 @@ private struct TouchControlEditor: View {
             Text("DRAG TO MOVE, TAP TO SIZE")
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Theme.faint)
+
+            Button {
+                barsHidden = true
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Theme.dim)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Hide toolbars")
 
             Button("DONE") {
                 presentationMode.wrappedValue.dismiss()
