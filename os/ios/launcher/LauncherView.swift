@@ -654,8 +654,8 @@ private struct TouchControlEditor: View {
         let halfWidth = controlSize.width / 2
         let halfHeight = controlSize.height / 2
         return CGPoint(
-            x: min(max(point.x * size.width, halfWidth + 4), size.width - halfWidth - 4),
-            y: min(max(point.y * size.height, halfHeight + 4), size.height - halfHeight - 4)
+            x: min(max(point.x * size.width, halfWidth), size.width - halfWidth),
+            y: min(max(point.y * size.height, halfHeight), size.height - halfHeight)
         )
     }
 

@@ -155,7 +155,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .cha: return CGPoint(x: 0.9252, y: 0.9290)
         case .pip: return CGPoint(x: 0.9668, y: 0.9290)
         // END is the tall top cell; SKILL sits directly underneath it.
-        case .skill: return CGPoint(x: 0.9594, y: 0.2590)
+        case .skill: return CGPoint(x: 0.9594, y: 0.2595)
         case .end: return CGPoint(x: 0.9594, y: 0.0972)
         }
     }
@@ -429,8 +429,8 @@ final class GameControlsOverlay: UIView {
         let halfHeight = size.height / 2
         // Use the full screen. Subtracting the window's safe-area insets here
         // pulled the right-hand column about 100pt inward on notched phones.
-        let x = min(max(normalized.x * bounds.width, halfWidth + 2), bounds.width - halfWidth - 2)
-        let y = min(max(normalized.y * bounds.height, halfHeight + 2), bounds.height - halfHeight - 2)
+        let x = min(max(normalized.x * bounds.width, halfWidth), bounds.width - halfWidth)
+        let y = min(max(normalized.y * bounds.height, halfHeight), bounds.height - halfHeight)
         view.frame = CGRect(x: x - halfWidth, y: y - halfHeight, width: size.width, height: size.height)
     }
 
