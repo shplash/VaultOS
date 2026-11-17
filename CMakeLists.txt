@@ -514,6 +514,7 @@ if(IOS)
         MACOSX_FRAMEWORK_IDENTIFIER "com.alexbatalov.fallout-ce.Fallout2Engine"
         MACOSX_FRAMEWORK_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine/FrameworkInfo.plist.in"
         INSTALL_NAME_DIR "@rpath"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.alexbatalov.fallout-ce.Fallout2Engine"
         XCODE_ATTRIBUTE_SKIP_INSTALL YES
         XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
         XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO

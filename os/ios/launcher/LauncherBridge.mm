@@ -91,7 +91,7 @@ static NSString* installDirectoryForGame(NSString* identifier)
 {
     NSString* documents = documentsDirectory();
     if ([identifier isEqualToString:@"fallout2"]) {
-        return [documents stringByAppendingPathComponent:@"Fallout2" isDirectory:YES];
+        return [documents stringByAppendingPathComponent:@"Fallout2"];
     }
     return documents;
 }
