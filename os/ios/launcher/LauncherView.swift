@@ -449,7 +449,7 @@ struct LauncherView: View {
 
     private var creditsSheet: some View {
         sheet(title: "Credits", detail: "Who made this, and what it is built on") {
-            tip("shplash", "Launcher interface, touch controls, iOS port, build workflows and artwork treatment.")
+            tip("shplash", "Launcher interface and touch controls.")
             tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
             tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
             tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
@@ -617,7 +617,7 @@ struct LauncherView: View {
             volumeRow("Effects", value: $model.sfxVolume)
             volumeRow("Speech", value: $model.speechVolume)
 
-            footnote("0% mutes that channel. The same volumes are in each game's own Options screen. Launcher theme: \(LauncherMusic.themeLabel(for: model.selectedGame)).")
+            footnote("0% mutes that channel. The same volumes are in each game's own Options screen.")
         }
     }
 

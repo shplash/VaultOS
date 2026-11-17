@@ -204,14 +204,11 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Fallout 1 and Fallout 2 keep independent control sets and layouts.
+    /// Both games keep independent control sets and layouts. The reload and
+    /// attack-mode buttons are in both sets; they show themselves only when the
+    /// running engine reports the action as available.
     static func controls(for game: FalloutGame) -> [TouchControl] {
-        switch game {
-        case .fallout1:
-            return allCases.filter { $0 != .reload && $0 != .fireMode }
-        case .fallout2:
-            return allCases
-        }
+        return allCases
     }
 
     static func bottomRow(for profile: LayoutProfile) -> [TouchControl] {
@@ -760,10 +757,8 @@ final class GameControlsOverlay: UIView {
         place(swapButton, at: .swap, profile: profile, size: scaledSize(for: .swap, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(endButton, at: .end, profile: profile, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale, profile: profile))
 
-        if game == .fallout2 {
-            place(reloadButton, at: .reload, profile: profile, size: scaledSize(for: .reload, in: bounds.size, globalScale: buttonScale, profile: profile))
-            place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, globalScale: buttonScale, profile: profile))
-        }
+        place(reloadButton, at: .reload, profile: profile, size: scaledSize(for: .reload, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, globalScale: buttonScale, profile: profile))
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
@@ -879,26 +874,21 @@ final class GameControlsOverlay: UIView {
         endButton.isEnabled = fallout_ios_action_available(5) != 0
         skipButton.isHidden = fallout_ios_action_available(6) == 0
 
-        let showFallout2Controls = game == .fallout2
-        if showFallout2Controls {
-            // Reload needs a firearm; fire mode applies to any held weapon.
-            let canReload = fallout_ios_action_available(8) != 0
-            let canChangeMode = fallout_ios_action_available(9) != 0
-            reloadButton.isHidden = !canReload
-            fireModeButton.isHidden = !canChangeMode
-            reloadButton.isEnabled = canReload
-            fireModeButton.isEnabled = canChangeMode
+        // Reload needs a firearm and the attack mode needs an item in hand; the
+        // engine answers for whichever game is running.
+        let canReload = fallout_ios_action_available(8) != 0
+        let canChangeMode = fallout_ios_action_available(9) != 0
+        reloadButton.isHidden = !canReload
+        fireModeButton.isHidden = !canChangeMode
+        reloadButton.isEnabled = canReload
+        fireModeButton.isEnabled = canChangeMode
 
-            if canChangeMode {
-                let mode = fallout_ios_fire_mode()
-                if mode != fireModeValue {
-                    fireModeValue = mode
-                    updateFireModeButton(mode)
-                }
+        if canChangeMode {
+            let mode = fallout_ios_fire_mode()
+            if mode != fireModeValue {
+                fireModeValue = mode
+                updateFireModeButton(mode)
             }
-        } else {
-            reloadButton.isHidden = true
-            fireModeButton.isHidden = true
         }
     }
 

@@ -60,6 +60,19 @@ void ios_send_scan_code(SDL_Scancode scanCode)
     fallout::kb_simulate_key(&key);
 }
 
+// Fallout 1 has the same attack modes as its sequel; the engine binds N to
+// intface_toggle_item_state and reports the current mode through
+// intface_get_attack, so the on-screen button reads and cycles it the same way.
+int has_item_in_hand()
+{
+    fallout::Object* item = nullptr;
+    if (fallout::intface_get_current_item(&item) != 0) {
+        return 0;
+    }
+
+    return item != nullptr ? 1 : 0;
+}
+
 int action_available(int action)
 {
     if (!fallout::intface_is_enabled()) {
@@ -74,9 +87,11 @@ int action_available(int action)
     case 6:
         return fallout::combat_can_skip_turn() ? 1 : 0;
     case 8:
-    case 9:
-        // Fallout 1 has no reload or fire-mode bindings.
+        // Fallout 1 reloads through the weapon itself, not a separate button.
         return 0;
+    case 9:
+        // Any item in hand can be switched between its attack modes.
+        return has_item_in_hand();
     default:
         return 1;
     }
@@ -109,6 +124,10 @@ void press_action(int action)
     case 7:
         // B is the game's change-active-hand binding.
         ios_send_scan_code(SDL_SCANCODE_B);
+        break;
+    case 9:
+        // N toggles the attack mode, the key the engine binds for it.
+        ios_send_scan_code(SDL_SCANCODE_N);
         break;
     default:
         break;
@@ -208,8 +227,15 @@ void resume_audio()
 
 int fire_mode()
 {
-    // Fallout 1 has no fire-mode cycle to report.
-    return -1;
+    int hitMode = 0;
+    bool aiming = false;
+    if (fallout::intface_get_attack(&hitMode, &aiming) != 0) {
+        return -1;
+    }
+
+    // The icon carries the same meaning as in Fallout 2: one dot is the plain
+    // attack, a dot with a crosshair is the aimed one.
+    return aiming ? 2 : 1;
 }
 
 const FalloutEngineAPI g_api = {
