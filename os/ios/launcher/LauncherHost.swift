@@ -490,6 +490,10 @@ final class GameControlsOverlay: UIView {
     /// the buttons working while touches outside them fall through to the game.
     private static let overlayTag = 0xF0110
     private static var windowObserver: NSObjectProtocol?
+    private static var windowRetryTimer: Timer?
+    /// Keeps the overlay alive across SDL window changes so its timer can put
+    /// it back if the window is recreated.
+    private static var installedOverlay: GameControlsOverlay?
 
     private let joystick = CameraJoystickControl()
     private let actionButton = LabeledControlButton(
@@ -554,6 +558,34 @@ final class GameControlsOverlay: UIView {
         // wait for that window to appear instead of covering it with a window
         // of our own.
         observeEngineWindow()
+        watchForEngineWindow()
+    }
+
+    /// Second way of noticing SDL's window, for the case where the visibility
+    /// notification is not posted or arrives before the window is usable. The
+    /// run loop the engine keeps spinning is the only clock available here.
+    private static func watchForEngineWindow() {
+        guard windowRetryTimer == nil else {
+            return
+        }
+
+        var remaining = 100
+        let timer = Timer(timeInterval: 0.1, repeats: true) { timer in
+            if let window = sdlWindow() {
+                timer.invalidate()
+                windowRetryTimer = nil
+                attach(to: window)
+                return
+            }
+
+            remaining -= 1
+            if remaining <= 0 {
+                timer.invalidate()
+                windowRetryTimer = nil
+            }
+        }
+        windowRetryTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     /// SDL's window is the only visible window at the normal level once the
@@ -590,11 +622,15 @@ final class GameControlsOverlay: UIView {
     }
 
     private static func attach(to window: UIWindow) {
+        windowRetryTimer?.invalidate()
+        windowRetryTimer = nil
+
         guard window.viewWithTag(overlayTag) == nil else {
             return
         }
 
-        let overlay = GameControlsOverlay(frame: window.bounds)
+        let overlay = installedOverlay ?? GameControlsOverlay(frame: window.bounds)
+        installedOverlay = overlay
         overlay.tag = overlayTag
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         window.addSubview(overlay)
@@ -771,6 +807,20 @@ final class GameControlsOverlay: UIView {
     }
 
     private func refreshControls() {
+        // The overlay is attached while SDL is still creating its window, and
+        // SDL's own view may be inserted after it. Keep the controls sized to
+        // the window, above the game view, and alive if SDL recreates it.
+        if tag == Self.overlayTag {
+            if let host = superview {
+                if frame.size != host.bounds.size {
+                    frame = host.bounds
+                }
+                host.bringSubviewToFront(self)
+            } else if let window = Self.sdlWindow() {
+                Self.attach(to: window)
+            }
+        }
+
         let mode = fallout_ios_cursor_mode()
         let symbol: String
         let title: String
