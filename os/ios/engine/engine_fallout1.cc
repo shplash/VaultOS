@@ -19,6 +19,7 @@
 #include "game/intface.h"
 #include "game/item.h"
 #include "game/main.h"
+#include "game/object.h"
 #include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/svga.h"
