@@ -21,7 +21,7 @@ jobs:
   build:
     name: Build unsigned IPA
     runs-on: macos-15-intel
-    timeout-minutes: 90
+    timeout-minutes: 150
 
     steps:
       - name: Checkout
@@ -93,6 +93,9 @@ jobs:
           unzip -l fallout-ce-ios-unsigned.ipa > ipa-contents.txt
           sed -n '1,20p' ipa-contents.txt
 
+      - name: Verify IPA contents
+        run: bash .github/scripts/verify-ipa.sh fallout-ce-ios-unsigned.ipa
+
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
@@ -117,17 +120,6 @@ jobs:
               --target "${{ github.sha }}"
           fi
 
-      - name: Verify launcher is linked
-        run: |
-          set -euo pipefail
-          rm -rf ipa-check
-          unzip -q fallout-ce-ios-unsigned.ipa -d ipa-check
-          APP_BINARY="$(find ipa-check/Payload -name fallout-ce -type f -print -quit)"
-          test -n "$APP_BINARY"
-          nm -g "$APP_BINARY" > ipa-check/symbols.txt
-          grep -q fallout_ios_present_launcher ipa-check/symbols.txt
-          echo "Launcher entry point found in $APP_BINARY"
-
       - name: Summary
         run: |
           {
@@ -136,3 +128,26 @@ jobs:
             echo "Unsigned IPA built from ${{ github.sha }} on the macos-15-intel runner."
             echo "Install it with AltStore or Sideloadly, which sign it with your own Apple ID."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  tests:
+    name: Launcher validation tests
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and run launcher tests
+        run: |
+          set -euo pipefail
+          mkdir -p build-tests
+          # The launcher core is portable C++ and needs no SDL or engine code,
+          # so it can be tested natively instead of through the iOS build.
+          c++ -std=c++17 -Wall -Wextra -I src \
+            tests/launcher_validation_test.cc \
+            src/launcher/launcher_core.cc \
+            -lz \
+            -o build-tests/launcher-tests
+          ./build-tests/launcher-tests
+

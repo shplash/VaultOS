@@ -78,18 +78,24 @@ $ mv app /Applications/Fallout
 
 - Download `fallout-ce.ipa`. Use sideloading applications ([AltStore](https://altstore.io/) or [Sideloadly](https://sideloadly.io/)) to install it to your device. Alternatively you can always build from source with your own signing certificate.
 
-- Prepare a ZIP of your Fallout installation. It must contain `master.dat`, `critter.dat` and the `data` folder, either at the top level or inside a single folder (for example `Fallout/`). On Windows, right-click the `Fallout` folder and choose **Send to > Compressed (zipped) folder**; on macOS, right-click it and choose **Compress**.
+- The app contains both engines. Pick Fallout or Fallout 2 at the top of the launcher; only the selected engine is started. Each game has its own installation, configuration and `SAVEGAME` folder: Fallout 1 keeps using the app's Documents folder, Fallout 2 uses `Documents/Fallout2`. Switching games means relaunching the app.
+
+- Prepare a ZIP of your installation, either at the top level or inside a single folder (for example `Fallout/` or `Fallout2/`):
+    - Fallout 1: `master.dat`, `critter.dat` and the `data` folder.
+    - Fallout 2: `master.dat`, `critter.dat`, `patch000.dat` and the `data` folder.
+
+  On Windows, right-click the game folder and choose **Send to > Compressed (zipped) folder**; on macOS, right-click it and choose **Compress**.
 
 - Run the app. The launcher starts instead of the game:
-    - **IMPORT GAME ZIP** opens the Files picker and installs the game data into the app's Documents folder. Re-importing replaces the game files and keeps your savegames.
-    - The file list shows whether `master.dat`, `critter.dat` and the data folder were found.
-    - **DISPLAY** sets the internal resolution (including a preset matching your device's logical screen size), pixel doubling, and is where the `f1_res.ini` options live.
+    - **IMPORT GAME ZIP** opens the Files picker and installs the game data into the selected game's folder. Re-importing replaces the game files and keeps your savegames.
+    - The file list shows which of that game's data files were found, and incomplete installations are rejected with the missing file names.
+    - **DISPLAY** sets the internal resolution (including a preset matching your device's logical screen size), pixel doubling, and is where the `f1_res.ini`/`f2_res.ini` options live.
     - **AUDIO** controls sound, music, speech and their volumes. **GAMEPLAY** sets language, subtitles and always-run.
-    - **SAVE OPTIONS** writes `fallout.cfg`/`f1_res.ini` without starting the game; **PLAY** saves and starts it.
+    - **SAVE OPTIONS** writes `fallout.cfg`/`f1_res.ini` or `fallout2.cfg`/`f2_res.ini` without starting the game; **PLAY** saves and starts the selected engine.
 
-- Imported game data lives in the app's Documents folder, together with `fallout.cfg`, `f1_res.ini` and `SAVEGAME`. File Sharing remains enabled, so you can still copy `master.dat`, `critter.dat` and `data` manually with Finder or iTunes ([how-to](https://support.apple.com/HT210598)) - the launcher detects them.
+- Imported Fallout 1 data lives in the app's Documents folder, together with `fallout.cfg`, `f1_res.ini` and `SAVEGAME`. Imported Fallout 2 data lives in `Documents/Fallout2` with its own `fallout2.cfg`, `f2_res.ini` and `SAVEGAME`. File Sharing remains enabled, so you can still copy the files manually with Finder or iTunes ([how-to](https://support.apple.com/HT210598)) - the launcher detects them.
 
-- Pushing to `main`, or running **Actions > Build iOS IPA > Run workflow**, builds an unsigned IPA and uploads it as the `fallout-ce-ios-unsigned` artifact. Use AltStore or Sideloadly to sign it with your own Apple ID before installing.
+- Pushing to `main`, or running **Actions > Build iOS IPA > Run workflow**, builds an unsigned IPA and uploads it as the `fallout-ce-ios-unsigned` artifact. Use AltStore or Sideloadly to sign it with your own Apple ID before installing. The iOS build fetches Fallout 2 CE from `alexbatalov/fallout2-ce` at the revision pinned in `CMakeLists.txt` and embeds it as `Fallout2Engine.framework`; the workflow verifies both engines, their entry points, the ARM64/iOS architecture and the framework's SDL linkage before uploading.
 
 ## Configuration
 
