@@ -112,7 +112,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .joystick: return "LOOK"
         case .back: return "BACK"
-        case .action: return "MOVE"
+        case .action: return "ACTION"
         case .skip: return "SKIP"
         case .inv: return "INV"
         case .map: return "MAP"
@@ -127,7 +127,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .joystick: return "circle.dashed"
         case .back: return "chevron.backward"
-        case .action: return "arrow.up.and.down.and.arrow.left.and.right"
+        case .action: return "hand.tap"
         case .skip: return "forward.end"
         case .inv: return "bag"
         case .map: return "map"
@@ -145,18 +145,18 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// changes.
     var defaultCenter: CGPoint {
         switch self {
-        case .joystick: return CGPoint(x: 0.14, y: 0.825)
-        case .back: return CGPoint(x: 0.08, y: 0.50)
-        case .action: return CGPoint(x: 0.958, y: 0.598)
-        case .skip: return CGPoint(x: 0.958, y: 0.478)
+        case .joystick: return CGPoint(x: 0.1330, y: 0.7670)
+        case .back: return CGPoint(x: 0.0345, y: 0.4445)
+        case .action: return CGPoint(x: 0.9350, y: 0.5690)
+        case .skip: return CGPoint(x: 0.9350, y: 0.4470)
         // Four equal cells filling the black strip to the right of the HUD.
-        case .inv: return CGPoint(x: 0.8415, y: 0.9175)
-        case .map: return CGPoint(x: 0.8845, y: 0.9175)
-        case .cha: return CGPoint(x: 0.9275, y: 0.9175)
-        case .pip: return CGPoint(x: 0.9705, y: 0.9175)
-        // END above SKILL, tight against the top-right corner.
-        case .skill: return CGPoint(x: 0.958, y: 0.255)
-        case .end: return CGPoint(x: 0.958, y: 0.078)
+        case .inv: return CGPoint(x: 0.8420, y: 0.9290)
+        case .map: return CGPoint(x: 0.8836, y: 0.9290)
+        case .cha: return CGPoint(x: 0.9252, y: 0.9290)
+        case .pip: return CGPoint(x: 0.9668, y: 0.9290)
+        // END is the tall top cell; SKILL sits directly underneath it.
+        case .skill: return CGPoint(x: 0.9594, y: 0.2590)
+        case .end: return CGPoint(x: 0.9594, y: 0.0972)
         }
     }
 
@@ -166,29 +166,53 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     func defaultSize(in bounds: CGSize) -> CGSize {
         switch self {
         case .joystick:
-            let side = bounds.height * 0.33
+            let side = bounds.height * 0.310
             return CGSize(width: side, height: side)
         case .back:
-            let side = bounds.height * 0.13
-            return CGSize(width: side, height: side)
+            return CGSize(width: bounds.width * 0.047, height: bounds.height * 0.112)
         case .action, .skip:
-            let side = bounds.height * 0.12
-            return CGSize(width: side, height: side)
+            return CGSize(width: bounds.width * 0.052, height: bounds.height * 0.114)
         case .inv, .map, .cha, .pip:
-            return CGSize(width: bounds.width * 0.172 / 4, height: bounds.height * 0.155)
-        case .skill, .end:
-            return CGSize(width: bounds.width * 0.056, height: bounds.height * 0.155)
+            return CGSize(width: bounds.width * 0.0416, height: bounds.height * 0.125)
+        case .skill:
+            return CGSize(width: bounds.width * 0.056, height: bounds.height * 0.130)
+        case .end:
+            return CGSize(width: bounds.width * 0.056, height: bounds.height * 0.195)
         }
     }
 }
 
 enum ControlLayout {
+    private static let layoutVersionKey = "launcher.controlLayoutVersion"
+    private static let layoutVersion = 5
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
 
     private static func key(_ control: TouchControl, _ suffix: String) -> String {
         return "launcher.control.\(control.rawValue)\(suffix)"
+    }
+
+    /// The first build with the reference layout used saved drag positions
+    /// from the older oversized layout. Clear those once so the real overlay
+    /// and the editor both start from the same reference geometry.
+    static func migrateIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: layoutVersionKey) < layoutVersion else {
+            return
+        }
+
+        for control in TouchControl.allCases {
+            defaults.removeObject(forKey: key(control, xSuffix))
+            defaults.removeObject(forKey: key(control, ySuffix))
+            defaults.removeObject(forKey: key(control, scaleSuffix))
+        }
+
+        // Global scale from the old layout also made BACK and the joystick
+        // dramatically larger than the reference.
+        defaults.removeObject(forKey: "launcher.joystickScale")
+        defaults.removeObject(forKey: "launcher.buttonScale")
+        defaults.set(layoutVersion, forKey: layoutVersionKey)
     }
 
     static func center(for control: TouchControl) -> CGPoint {
@@ -246,9 +270,9 @@ final class GameControlsOverlay: UIView {
 
     private let joystick = CameraJoystickControl()
     private let actionButton = LabeledControlButton(
-        title: "MOVE",
-        symbol: "arrow.up.and.down.and.arrow.left.and.right",
-        iconPointSize: 20
+        title: "ACTION",
+        symbol: "hand.tap",
+        iconPointSize: 18
     )
     private let backButton = LabeledControlButton(
         title: "BACK",
@@ -277,6 +301,7 @@ final class GameControlsOverlay: UIView {
     private var cursorModeTimer: Timer?
 
     static func install() {
+        ControlLayout.migrateIfNeeded()
         let windows = UIApplication.shared.windows
         guard let window = windows.first(where: { $0.isKeyWindow && !$0.isHidden })
             ?? windows.first(where: { !$0.isHidden }) else {
@@ -305,7 +330,7 @@ final class GameControlsOverlay: UIView {
 
         addSubview(joystick)
 
-        actionButton.accessibilityLabel = "Move cursor"
+        actionButton.accessibilityLabel = "Action"
         actionButton.addTarget(self, action: #selector(primaryAction), for: .touchUpInside)
         addSubview(actionButton)
 
@@ -402,9 +427,10 @@ final class GameControlsOverlay: UIView {
         let normalized = ControlLayout.center(for: control)
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
-        let insets = safeAreaInsets
-        let x = min(max(normalized.x * bounds.width, insets.left + halfWidth + 4), bounds.width - insets.right - halfWidth - 4)
-        let y = min(max(normalized.y * bounds.height, insets.top + halfHeight + 4), bounds.height - insets.bottom - halfHeight - 4)
+        // Use the full screen. Subtracting the window's safe-area insets here
+        // pulled the right-hand column about 100pt inward on notched phones.
+        let x = min(max(normalized.x * bounds.width, halfWidth + 2), bounds.width - halfWidth - 2)
+        let y = min(max(normalized.y * bounds.height, halfHeight + 2), bounds.height - halfHeight - 2)
         view.frame = CGRect(x: x - halfWidth, y: y - halfHeight, width: size.width, height: size.height)
     }
 

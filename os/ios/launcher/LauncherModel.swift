@@ -47,6 +47,7 @@ final class LauncherModel: ObservableObject {
     private static let languageNames = ["ENGLISH", "FRENCH", "GERMAN", "ITALIAN", "SPANISH"]
 
     init() {
+        ControlLayout.migrateIfNeeded()
         installDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
         let native = LauncherModel.nativeResolution()

@@ -573,6 +573,7 @@ private struct TouchControlEditor: View {
             }
             .statusBar(hidden: true)
         }
+        .ignoresSafeArea()
         .preferredColorScheme(.dark)
     }
 
@@ -619,14 +620,13 @@ private struct TouchControlEditor: View {
                 endPoint: .bottom
             )
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    mockHUD(in: size)
-                    Spacer(minLength: 0)
-                }
-            }
+            // The reference uses a plain opaque red rectangle for the whole
+            // in-game HUD. No fake text, buttons or panel details: only the
+            // exact footprint the controls have to avoid.
+            Rectangle()
+                .fill(Color.red)
+                .frame(width: size.width * 0.60, height: size.height * 0.125)
+                .position(x: size.width * 0.50, y: size.height * 0.929)
 
             // The camera cutout, drawn at the same left edge position as the
             // real device so controls are not placed underneath it.
@@ -637,65 +637,6 @@ private struct TouchControlEditor: View {
         }
         .clipped()
         .allowsHitTesting(false)
-    }
-
-    private func mockHUD(in size: CGSize) -> some View {
-        let hudWidth = size.width * 0.60
-        let hudHeight = max(44, size.height * 0.17)
-
-        return ZStack {
-            Rectangle()
-                .fill(Color(red: 0.14, green: 0.12, blue: 0.085).opacity(0.94))
-
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("INV")
-                    Text("AP 5")
-                }
-                .frame(width: hudWidth * 0.16, alignment: .leading)
-
-                Rectangle()
-                    .fill(Theme.line.opacity(0.8))
-                    .frame(width: 1)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("You see a dark cave.")
-                    Text("The air is cold.")
-                }
-                .padding(.leading, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Rectangle()
-                    .fill(Theme.line.opacity(0.8))
-                    .frame(width: 1)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("HP 039")
-                    Text("AC 007")
-                }
-                .frame(width: hudWidth * 0.18, alignment: .leading)
-                .padding(.leading, 8)
-            }
-            .font(.system(size: max(6, min(9, hudHeight * 0.15)), weight: .bold, design: .monospaced))
-            .foregroundColor(Theme.green.opacity(0.82))
-            .padding(.horizontal, 8)
-            .padding(.top, 12)
-            .padding(.bottom, 6)
-
-            Circle()
-                .fill(Color(red: 0.55, green: 0.08, blue: 0.05))
-                .frame(width: hudHeight * 0.17, height: hudHeight * 0.17)
-                .overlay(Circle().stroke(Theme.amber.opacity(0.6), lineWidth: 1))
-                .position(x: hudWidth * 0.18, y: hudHeight * 0.17)
-
-            Circle()
-                .fill(Color(red: 0.55, green: 0.08, blue: 0.05))
-                .frame(width: hudHeight * 0.17, height: hudHeight * 0.17)
-                .overlay(Circle().stroke(Theme.amber.opacity(0.6), lineWidth: 1))
-                .position(x: hudWidth * 0.82, y: hudHeight * 0.17)
-        }
-        .frame(width: hudWidth, height: hudHeight)
-        .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
     }
 
     private func editorSize(for control: TouchControl, in size: CGSize) -> CGSize {
