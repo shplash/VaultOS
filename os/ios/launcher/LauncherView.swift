@@ -542,7 +542,6 @@ private struct CompactButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 9, weight: .semibold, design: .monospaced))
-            .kerning(1.2)
             .foregroundColor(Theme.accent)
             .opacity(configuration.isPressed ? 0.65 : 1)
     }

@@ -224,7 +224,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// Normalized center of the control on the game view. The editor stores
     /// the same coordinates, so layouts survive resolution and orientation
     /// changes.
-    func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds) -> CGPoint {
+    func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds.size) -> CGPoint {
         switch profile {
         case .full:
             switch self {
