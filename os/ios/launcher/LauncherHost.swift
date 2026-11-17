@@ -241,17 +241,14 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill: return CGPoint(x: 0.9594, y: 0.2000)
             case .swap: return CGPoint(x: 0.9594, y: 0.3250)
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
-            // Fallout 2 adds RELOAD next to ACTION and puts MODE under SWAP.
+            // Fallout 2 adds RELOAD next to ACTION and MODE left of END.
             case .reload: return CGPoint(x: 0.8550, y: 0.6900)
             case .fireMode:
-                let swap = TouchControl.swap.defaultCenter(for: profile, in: bounds)
-                let swapHeight = TouchControl.swap.defaultSize(in: bounds, profile: profile).height
-                let modeHeight = defaultSize(in: bounds, profile: profile).height
-                let gap = max(3.0, swapHeight * 0.08)
-                return CGPoint(
-                    x: swap.x,
-                    y: swap.y + (swapHeight / 2 + gap + modeHeight / 2) / max(bounds.height, 1)
-                )
+                // Same size as END, sitting directly to its left.
+                let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
+                let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
+                let gap = max(3.0, side * 0.12)
+                return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
             }
         case .half:
             switch self {
@@ -270,14 +267,11 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
             case .reload: return CGPoint(x: 0.8550, y: 0.6900)
             case .fireMode:
-                let swap = TouchControl.swap.defaultCenter(for: profile, in: bounds)
-                let swapHeight = TouchControl.swap.defaultSize(in: bounds, profile: profile).height
-                let modeHeight = defaultSize(in: bounds, profile: profile).height
-                let gap = max(3.0, swapHeight * 0.08)
-                return CGPoint(
-                    x: swap.x,
-                    y: swap.y + (swapHeight / 2 + gap + modeHeight / 2) / max(bounds.height, 1)
-                )
+                // Same size as END, sitting directly to its left.
+                let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
+                let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
+                let gap = max(3.0, side * 0.12)
+                return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
             }
         }
     }
@@ -301,16 +295,12 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
             case .inv, .map, .cha, .pip:
                 return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
-            case .skill, .swap, .end:
+            case .skill, .swap, .end, .fireMode:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
                 let side = min(bounds.width * 0.055, bounds.height * 0.125)
                 return CGSize(width: side, height: side)
-            case .fireMode:
-                // Same width as SWAP, half the height, sitting underneath it.
-                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
-                return CGSize(width: side, height: side * 0.5)
             }
         case .half:
             switch self {
@@ -329,16 +319,12 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .pip:
                 let side = min(bounds.width * 0.0644, bounds.height * 0.143)
                 return CGSize(width: side, height: side)
-            case .skill, .swap, .end:
+            case .skill, .swap, .end, .fireMode:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
                 let side = min(bounds.width * 0.055, bounds.height * 0.125)
                 return CGSize(width: side, height: side)
-            case .fireMode:
-                // Same width as SWAP, half the height, sitting underneath it.
-                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
-                return CGSize(width: side, height: side * 0.5)
             }
         }
     }
@@ -351,7 +337,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 11
+    private static let layoutVersion = 12
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -426,6 +412,16 @@ enum ControlLayout {
                 if let value = defaults.object(forKey: previousKey(control, suffix, profile: .half)) {
                     defaults.set(value, forKey: target)
                 }
+            }
+        }
+
+        // Version 12 moved the attack mode control out from under SWAP to the
+        // row with END, so a position saved for its old place no longer fits
+        // the square button. Its size is kept.
+        for game in FalloutGame.allCases {
+            for profile in [LayoutProfile.full, .half] {
+                defaults.removeObject(forKey: key(.fireMode, xSuffix, profile: profile, game: game))
+                defaults.removeObject(forKey: key(.fireMode, ySuffix, profile: profile, game: game))
             }
         }
 
@@ -534,9 +530,10 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16
     )
     private let fireModeButton = LabeledControlButton(
-        title: "MODE",
+        title: "ATTACK\nMODE",
         symbol: "scope",
-        iconPointSize: 16
+        iconPointSize: 16,
+        labelLines: 2
     )
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
@@ -881,32 +878,35 @@ final class GameControlsOverlay: UIView {
 
     /// The game exposes its selected attack mode through the interface item
     /// action: primary, primary aiming, secondary (burst) and secondary aiming.
-    /// The icon carries the mode: one dot for the primary attack, two for the
-    /// secondary, plus a crosshair when that mode is aimed — so the small
-    /// button needs no text.
+    /// The pictogram carries the mode - one dot for the primary attack, two for
+    /// the secondary, plus a crosshair when that mode is aimed - and the label
+    /// underneath says what the button is, since it applies to melee attacks
+    /// as well.
     private func updateFireModeButton(_ mode: Int32) {
+        let title = "ATTACK\nMODE"
         switch mode {
         case 1:
-            fireModeButton.set(image: fireModeImage(mode), title: "",
-                               accessibilityLabel: "Fire mode: single")
+            fireModeButton.set(image: fireModeImage(mode), title: title,
+                               accessibilityLabel: "Attack mode: single")
         case 2:
-            fireModeButton.set(image: fireModeImage(mode), title: "",
-                               accessibilityLabel: "Fire mode: aimed")
+            fireModeButton.set(image: fireModeImage(mode), title: title,
+                               accessibilityLabel: "Attack mode: aimed")
         case 3:
-            fireModeButton.set(image: fireModeImage(mode), title: "",
-                               accessibilityLabel: "Fire mode: burst")
+            fireModeButton.set(image: fireModeImage(mode), title: title,
+                               accessibilityLabel: "Attack mode: burst")
         case 4:
-            fireModeButton.set(image: fireModeImage(mode), title: "",
-                               accessibilityLabel: "Fire mode: aimed secondary")
+            fireModeButton.set(image: fireModeImage(mode), title: title,
+                               accessibilityLabel: "Attack mode: aimed secondary")
         default:
-            // No readable mode: hollow bullet and a spelled-out label.
-            fireModeButton.set(symbol: "circle", title: "FIREMODE",
-                               accessibilityLabel: "Fire mode")
+            // No readable mode: a hollow bullet and the same label.
+            fireModeButton.set(symbol: "circle", title: title,
+                               accessibilityLabel: "Attack mode")
         }
     }
 
-    /// One 40x20 pictogram: one dot for the primary attack, two for the
-    /// secondary (burst), and a crosshair when the mode is aimed.
+    /// One 42x20 pictogram: one dot for the primary attack, two for the
+    /// secondary (burst), and a crosshair when the mode is aimed. The whole
+    /// group is centred in the canvas so all four modes line up in the button.
     private func fireModeImage(_ mode: Int32) -> UIImage {
         let size = CGSize(width: 42, height: 20)
         let color = ControlTheme.green
@@ -918,11 +918,18 @@ final class GameControlsOverlay: UIView {
 
             let aimed = mode == 2 || mode == 4
             let dotCount = (mode == 3 || mode == 4) ? 2 : 1
-            let centerY = size.height / 2
             let dotRadius: CGFloat = 2.6
+            let dotSpacing: CGFloat = 8
+            let crosshairRadius: CGFloat = 6
+            let gap: CGFloat = 3
+
+            let dotsWidth = dotRadius * 2 + CGFloat(dotCount - 1) * dotSpacing
+            let totalWidth = dotsWidth + (aimed ? gap + crosshairRadius * 2 : 0)
+            let startX = (size.width - totalWidth) / 2
+            let centerY = size.height / 2
 
             for index in 0..<dotCount {
-                let x = 6 + CGFloat(index) * 8
+                let x = startX + dotRadius + CGFloat(index) * dotSpacing
                 cg.fillEllipse(in: CGRect(
                     x: x - dotRadius,
                     y: centerY - dotRadius,
@@ -935,25 +942,24 @@ final class GameControlsOverlay: UIView {
                 return
             }
 
-            let centerX: CGFloat = dotCount == 2 ? 29 : 27
-            let radius: CGFloat = 6.5
+            let centerX = startX + dotsWidth + gap + crosshairRadius
             cg.setLineWidth(1.2)
             cg.strokeEllipse(in: CGRect(
-                x: centerX - radius,
-                y: centerY - radius,
-                width: radius * 2,
-                height: radius * 2
+                x: centerX - crosshairRadius,
+                y: centerY - crosshairRadius,
+                width: crosshairRadius * 2,
+                height: crosshairRadius * 2
             ))
 
-            let tick: CGFloat = 2.4
-            cg.move(to: CGPoint(x: centerX, y: centerY - radius - tick))
-            cg.addLine(to: CGPoint(x: centerX, y: centerY - radius + 1.2))
-            cg.move(to: CGPoint(x: centerX, y: centerY + radius - 1.2))
-            cg.addLine(to: CGPoint(x: centerX, y: centerY + radius + tick))
-            cg.move(to: CGPoint(x: centerX - radius - tick, y: centerY))
-            cg.addLine(to: CGPoint(x: centerX - radius + 1.2, y: centerY))
-            cg.move(to: CGPoint(x: centerX + radius - 1.2, y: centerY))
-            cg.addLine(to: CGPoint(x: centerX + radius + tick, y: centerY))
+            let tick: CGFloat = 2.2
+            cg.move(to: CGPoint(x: centerX, y: centerY - crosshairRadius - tick))
+            cg.addLine(to: CGPoint(x: centerX, y: centerY - crosshairRadius + 1.2))
+            cg.move(to: CGPoint(x: centerX, y: centerY + crosshairRadius - 1.2))
+            cg.addLine(to: CGPoint(x: centerX, y: centerY + crosshairRadius + tick))
+            cg.move(to: CGPoint(x: centerX - crosshairRadius - tick, y: centerY))
+            cg.addLine(to: CGPoint(x: centerX - crosshairRadius + 1.2, y: centerY))
+            cg.move(to: CGPoint(x: centerX + crosshairRadius - 1.2, y: centerY))
+            cg.addLine(to: CGPoint(x: centerX + crosshairRadius + tick, y: centerY))
             cg.strokePath()
         }
     }
@@ -964,10 +970,12 @@ private final class LabeledControlButton: UIControl {
     private let label = UILabel()
     private let iconPointSize: CGFloat
     private let accent: Bool
+    private let labelLines: Int
 
-    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false) {
+    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false, labelLines: Int = 1) {
         self.iconPointSize = iconPointSize
         self.accent = accent
+        self.labelLines = max(1, labelLines)
         super.init(frame: .zero)
 
         backgroundColor = ControlTheme.panel
@@ -983,6 +991,7 @@ private final class LabeledControlButton: UIControl {
 
         label.font = UIFont.monospacedSystemFont(ofSize: 9, weight: .bold)
         label.textAlignment = .center
+        label.numberOfLines = self.labelLines
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.6
         label.textColor = accent ? ControlTheme.amber : ControlTheme.green
@@ -1036,7 +1045,15 @@ private final class LabeledControlButton: UIControl {
         super.layoutSubviews()
 
         let hasLabel = !(label.text?.isEmpty ?? true)
-        let labelHeight = hasLabel ? max(9, min(11, bounds.height * 0.22)) : 0
+        // A two-line label has to share the button with the pictogram, so it
+        // gets a smaller font and two line heights instead of one.
+        let fontSize = labelLines > 1
+            ? max(7, min(9, bounds.height * 0.17))
+            : max(8, min(10, bounds.height * 0.19))
+        label.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+
+        let lineHeight = ceil(label.font.lineHeight)
+        let labelHeight = hasLabel ? lineHeight * CGFloat(labelLines) + (labelLines > 1 ? 1 : 0) : 0
 
         iconView.frame = CGRect(
             x: 3,
@@ -1050,10 +1067,6 @@ private final class LabeledControlButton: UIControl {
             y: bounds.height - labelHeight - 1,
             width: bounds.width - 2,
             height: labelHeight
-        )
-        label.font = UIFont.monospacedSystemFont(
-            ofSize: max(8, min(10, bounds.height * 0.19)),
-            weight: .bold
         )
     }
 }
