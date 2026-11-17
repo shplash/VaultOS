@@ -21,7 +21,7 @@ defaults:
 jobs:
   apply-build:
     name: Apply and build
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 90
     steps:
       - name: Checkout main
