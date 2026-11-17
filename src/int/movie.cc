@@ -249,24 +249,43 @@ static bool movieRead(void* handle, void* buf, int count)
 // 0x478464
 static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeight, int srcX, int srcY, int destWidth, int destHeight, int a8, int a9)
 {
-    int v14;
-    int v15;
-
     SDL_Rect srcRect;
     srcRect.x = srcX;
     srcRect.y = srcY;
     srcRect.w = srcWidth;
     srcRect.h = srcHeight;
 
-    v14 = winRect.lrx - winRect.ulx;
-    v15 = winRect.lrx - winRect.ulx + 1;
+    const int winWidth = winRect.lrx - winRect.ulx + 1;
+    const int winHeight = winRect.lry - winRect.uly + 1;
 
     SDL_Rect destRect;
 
-    if (movieScaleFlag) {
+    // MVE frames are 640x480. Scale them to the largest 4:3 rectangle that
+    // fits the window instead of leaving them at native size in the middle.
+    // This keeps faces proportioned and leaves black bars only on the sides
+    // or top/bottom where the screen is wider or taller than the video.
+    const bool scaleToWindow = !movieScaleFlag
+        && !movieSubRectFlag
+        && (movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0
+        && srcWidth > 0
+        && srcHeight > 0;
+
+    if (scaleToWindow) {
+        int drawWidth = winWidth;
+        int drawHeight = winWidth * srcHeight / srcWidth;
+        if (drawHeight > winHeight) {
+            drawHeight = winHeight;
+            drawWidth = winHeight * srcWidth / srcHeight;
+        }
+
+        destRect.x = winRect.ulx + (winWidth - drawWidth) / 2;
+        destRect.y = winRect.uly + (winHeight - drawHeight) / 2;
+        destRect.w = drawWidth;
+        destRect.h = drawHeight;
+    } else if (movieScaleFlag) {
         if ((movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0) {
-            destRect.y = (winRect.lry - winRect.uly + 1 - destHeight) / 2;
-            destRect.x = (v15 - 4 * srcWidth / 3) / 2;
+            destRect.y = (winHeight - destHeight) / 2;
+            destRect.x = (winWidth - 4 * srcWidth / 3) / 2;
         } else {
             destRect.y = movieY + winRect.uly;
             destRect.x = winRect.ulx + movieX;
@@ -276,8 +295,8 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
         destRect.h = destHeight + destRect.y;
     } else {
         if ((movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0) {
-            destRect.y = (winRect.lry - winRect.uly + 1 - destHeight) / 2;
-            destRect.x = (v15 - destWidth) / 2;
+            destRect.y = (winHeight - destHeight) / 2;
+            destRect.x = (winWidth - destWidth) / 2;
         } else {
             destRect.y = movieY + winRect.uly;
             destRect.x = winRect.ulx + movieX;
@@ -314,7 +333,11 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
     }
 
     SDL_SetSurfacePalette(surface, gSdlSurface->format->palette);
-    SDL_BlitSurface(surface, &srcRect, gSdlSurface, &destRect);
+    if (scaleToWindow) {
+        SDL_BlitScaled(surface, &srcRect, gSdlSurface, &destRect);
+    } else {
+        SDL_BlitSurface(surface, &srcRect, gSdlSurface, &destRect);
+    }
     SDL_BlitSurface(gSdlSurface, NULL, gSdlTextureSurface, NULL);
     renderPresent();
 }

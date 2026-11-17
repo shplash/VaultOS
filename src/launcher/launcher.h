@@ -98,6 +98,7 @@ void fallout_ios_install_game_controls(void);
 void fallout_ios_camera_pan(double x, double y);
 void fallout_ios_camera_stop(void);
 void fallout_ios_right_click(void);
+int fallout_ios_cursor_mode(void);
 
 // Installation progress, 0..1. Only meaningful while an install is running.
 double launcher_progress(void);

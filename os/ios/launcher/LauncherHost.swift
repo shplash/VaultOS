@@ -86,6 +86,7 @@ final class GameControlsOverlay: UIView {
 
     private let joystick = CameraJoystickControl()
     private let rightClickButton = UIButton(type: .custom)
+    private var cursorModeTimer: Timer?
 
     static func install() {
         let windows = UIApplication.shared.windows
@@ -120,18 +121,35 @@ final class GameControlsOverlay: UIView {
         rightClickButton.layer.cornerRadius = 10
         rightClickButton.layer.borderWidth = 1.5
         rightClickButton.layer.borderColor = ControlTheme.green.withAlphaComponent(0.6).cgColor
-        rightClickButton.setTitle("LOOT/RMB", for: .normal)
+        rightClickButton.setTitle("MOVE", for: .normal)
         rightClickButton.setTitleColor(ControlTheme.green, for: .normal)
         rightClickButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .bold)
         rightClickButton.titleLabel?.adjustsFontSizeToFitWidth = true
         rightClickButton.titleLabel?.minimumScaleFactor = 0.7
-        rightClickButton.accessibilityLabel = "Loot or right click"
+        rightClickButton.accessibilityLabel = "Switch cursor mode"
         rightClickButton.addTarget(self, action: #selector(rightClick), for: .touchUpInside)
         addSubview(rightClickButton)
+
+        refreshCursorMode()
+        let timer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
+            self?.refreshCursorMode()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        cursorModeTimer = timer
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        cursorModeTimer?.invalidate()
+    }
+
+    override func removeFromSuperview() {
+        cursorModeTimer?.invalidate()
+        cursorModeTimer = nil
+        super.removeFromSuperview()
     }
 
     override func layoutSubviews() {
@@ -175,6 +193,15 @@ final class GameControlsOverlay: UIView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
             self?.setRightClickActive(false)
         }
+    }
+
+    private func refreshCursorMode() {
+        let isMove = fallout_ios_cursor_mode() == 0
+        let title = isMove ? "MOVE" : "ACTIONS"
+        if rightClickButton.title(for: .normal) != title {
+            rightClickButton.setTitle(title, for: .normal)
+        }
+        rightClickButton.accessibilityLabel = isMove ? "Switch to actions" : "Switch to move"
     }
 
     private func setRightClickActive(_ active: Bool) {
