@@ -212,7 +212,7 @@ struct LauncherView: View {
             Button(action: {
                 model.showImporter = true
             }) {
-                Text(model.install.installed == 1 ? "REPLACE GAME FILES" : "IMPORT GAME ZIP)
+                Text(model.install.installed == 1 ? "REPLACE GAME FILES" : "IMPORT GAME ZIP")
             }
             .buttonStyle(LauncherButtonStyle(filled: false))
             .disabled(model.isInstalling)
