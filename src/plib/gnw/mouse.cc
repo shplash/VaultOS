@@ -60,6 +60,9 @@ static int last_buttons = 0;
 // 0x671F18
 static bool mouse_is_hidden;
 
+// When set, one-finger taps are translated to right mouse button clicks.
+static bool mouse_ios_right_click_mode = false;
+
 // 0x671F1C
 static int raw_x;
 
@@ -433,10 +436,14 @@ void mouse_info()
         static int prevx;
         static int prevy;
 
+        const int primaryButton = mouse_ios_right_click_mode
+            ? MOUSE_STATE_RIGHT_BUTTON_DOWN
+            : MOUSE_STATE_LEFT_BUTTON_DOWN;
+
         switch (gesture.type) {
         case kTap:
             if (gesture.numberOfTouches == 1) {
-                mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                mouse_simulate_input(0, 0, primaryButton);
             } else if (gesture.numberOfTouches == 2) {
                 mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
             }
@@ -450,7 +457,7 @@ void mouse_info()
 
             if (gesture.type == kLongPress) {
                 if (gesture.numberOfTouches == 1) {
-                    mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                    mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, primaryButton);
                 } else if (gesture.numberOfTouches == 2) {
                     mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_RIGHT_BUTTON_DOWN);
                 }
@@ -806,6 +813,16 @@ void mouse_set_sensitivity(double value)
 double mouse_get_sensitivity()
 {
     return mouse_sensitivity;
+}
+
+void mouse_set_ios_right_click_mode(bool enabled)
+{
+    mouse_ios_right_click_mode = enabled;
+}
+
+bool mouse_get_ios_right_click_mode()
+{
+    return mouse_ios_right_click_mode;
 }
 
 // 0x4B54FC
