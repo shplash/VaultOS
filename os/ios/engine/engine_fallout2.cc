@@ -209,7 +209,9 @@ void press_action(int action)
         send_key(SDL_SCANCODE_I);
         break;
     case 1:
-        send_key(SDL_SCANCODE_M);
+        // The map is the TAB key, the shortcut the interface bar's own map
+        // button uses. M cycles the mouse mode (move/action/target) instead.
+        send_key(SDL_SCANCODE_TAB);
         break;
     case 2:
         send_key(SDL_SCANCODE_C);
