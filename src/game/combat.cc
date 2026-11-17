@@ -2209,6 +2209,18 @@ void combat_end_turn()
     combat_state &= ~COMBAT_STATE_0x02;
 }
 
+// iOS: whether combat_input would currently accept Space to skip the rest of
+// the player's turn. Keep this in sync with the loop guards below.
+bool combat_can_skip_turn()
+{
+    return isInCombat()
+        && (combat_state & COMBAT_STATE_0x02) != 0
+        && (obj_dude->data.critter.combat.results & (DAM_KNOCKED_OUT | DAM_DEAD | DAM_LOSE_TURN)) == 0
+        && (obj_dude->data.critter.combat.ap > 0 || combat_free_move > 0)
+        && game_user_wants_to_quit == 0
+        && combat_end_due_to_load == 0;
+}
+
 // 0x420798
 static int combat_turn(Object* a1, bool a2)
 {

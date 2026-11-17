@@ -35,6 +35,7 @@ int combat_in_range(Object* critter);
 void combat_end();
 void combat_turn_run();
 void combat_end_turn();
+bool combat_can_skip_turn();
 void combat(STRUCT_664980* attack);
 void combat_ctd_init(Attack* attack, Object* attacker, Object* defender, int hitMode, int hitLocation);
 int combat_attack(Object* a1, Object* a2, int hitMode, int location);

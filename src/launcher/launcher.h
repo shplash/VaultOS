@@ -101,6 +101,9 @@ void fallout_ios_right_click(void);
 void fallout_ios_back(void);
 void fallout_ios_set_cursor_speed(double value);
 int fallout_ios_cursor_mode(void);
+void fallout_ios_screen_size(int* width, int* height);
+int fallout_ios_action_available(int action);
+void fallout_ios_press_action(int action);
 
 // Installation progress, 0..1. Only meaningful while an install is running.
 double launcher_progress(void);

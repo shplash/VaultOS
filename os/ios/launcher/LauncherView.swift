@@ -189,6 +189,8 @@ struct LauncherView: View {
                 audioSection
             }
 
+            controlsSection
+
             section("GAMEPLAY") {
                 HStack(spacing: 8) {
                     Text("LANGUAGE")
@@ -214,8 +216,6 @@ struct LauncherView: View {
                 .toggleStyle(SwitchToggleStyle())
                 .accentColor(Theme.green)
             }
-
-            controlsSection
 
             Spacer(minLength: 0)
         }

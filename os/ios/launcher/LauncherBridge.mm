@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
+#include "game/combat.h"
 #include "game/gmouse.h"
+#include "game/intface.h"
 #include "launcher/launcher.h"
 #include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
@@ -99,6 +101,75 @@ extern "C" int fallout_ios_cursor_mode(void)
         return 2;
     }
     return 1;
+}
+
+extern "C" void fallout_ios_screen_size(int* width, int* height)
+{
+    if (width != NULL) {
+        *width = fallout::screenGetWidth();
+    }
+    if (height != NULL) {
+        *height = fallout::screenGetHeight();
+    }
+}
+
+// 0 inventory, 1 map, 2 character, 3 pip-boy, 4 skilldex, 5 end combat,
+// 6 skip turn.
+extern "C" int fallout_ios_action_available(int action)
+{
+    if (!fallout::intface_is_enabled()) {
+        return 0;
+    }
+
+    switch (action) {
+    case 3:
+        return fallout::isInCombat() ? 0 : 1;
+    case 5:
+        return fallout::isInCombat() ? 1 : 0;
+    case 6:
+        return fallout::combat_can_skip_turn() ? 1 : 0;
+    default:
+        return 1;
+    }
+}
+
+static void ios_send_scan_code(SDL_Scancode scanCode)
+{
+    fallout::KeyboardData key = {};
+    key.key = scanCode;
+    key.down = 1;
+    fallout::kb_simulate_key(&key);
+    key.down = 0;
+    fallout::kb_simulate_key(&key);
+}
+
+extern "C" void fallout_ios_press_action(int action)
+{
+    switch (action) {
+    case 0:
+        ios_send_scan_code(SDL_SCANCODE_I);
+        break;
+    case 1:
+        ios_send_scan_code(SDL_SCANCODE_TAB);
+        break;
+    case 2:
+        ios_send_scan_code(SDL_SCANCODE_C);
+        break;
+    case 3:
+        ios_send_scan_code(SDL_SCANCODE_P);
+        break;
+    case 4:
+        ios_send_scan_code(SDL_SCANCODE_S);
+        break;
+    case 5:
+        ios_send_scan_code(SDL_SCANCODE_RETURN);
+        break;
+    case 6:
+        ios_send_scan_code(SDL_SCANCODE_SPACE);
+        break;
+    default:
+        break;
+    }
 }
 
 // MARK: - Launcher music decoding
