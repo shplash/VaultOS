@@ -28,7 +28,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Restore CMake build tree
-        uses: actions/cache@v4
+        id: build-cache
+        uses: actions/cache/restore@v4
         with:
           # CMake's configure pass dominates a cold build (SDL feature
           # detection alone takes several minutes). Keeping the generated
@@ -68,6 +69,15 @@ jobs:
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+
+      - name: Save configured build tree
+        # Save as soon as configure succeeds. If the compile step later fails,
+        # the next run still starts with a warm CMake/SDL configure.
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: ios-cmake-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'third_party/**') }}
 
       - name: Build
         run: cmake --build build --config RelWithDebInfo --parallel 3
