@@ -314,6 +314,8 @@ final class GameControlsOverlay: UIView {
                 iconPointSize: 14
             )
             button.tag = index
+            // The four HUD buttons sit edge-to-edge as one strip.
+            button.layer.cornerRadius = 3
             button.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
             sideButtons.append(button)
             addSubview(button)
@@ -361,18 +363,18 @@ final class GameControlsOverlay: UIView {
         let joystickScale = CGFloat(defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0)
         let buttonScale = CGFloat(defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0)
 
-        place(joystick, at: .joystick, size: scaledSize(for: .joystick, in: bounds, globalScale: joystickScale))
-        place(backButton, at: .back, size: scaledSize(for: .back, in: bounds, globalScale: buttonScale))
-        place(actionButton, at: .action, size: scaledSize(for: .action, in: bounds, globalScale: buttonScale))
-        place(skipButton, at: .skip, size: scaledSize(for: .skip, in: bounds, globalScale: buttonScale))
+        place(joystick, at: .joystick, size: scaledSize(for: .joystick, in: bounds.size, globalScale: joystickScale))
+        place(backButton, at: .back, size: scaledSize(for: .back, in: bounds.size, globalScale: buttonScale))
+        place(actionButton, at: .action, size: scaledSize(for: .action, in: bounds.size, globalScale: buttonScale))
+        place(skipButton, at: .skip, size: scaledSize(for: .skip, in: bounds.size, globalScale: buttonScale))
 
         for (index, button) in sideButtons.enumerated() where index < TouchControl.bottomRow.count {
             let control = TouchControl.bottomRow[index]
-            place(button, at: control, size: scaledSize(for: control, in: bounds, globalScale: buttonScale))
+            place(button, at: control, size: scaledSize(for: control, in: bounds.size, globalScale: buttonScale))
         }
 
-        place(skillButton, at: .skill, size: scaledSize(for: .skill, in: bounds, globalScale: buttonScale))
-        place(endButton, at: .end, size: scaledSize(for: .end, in: bounds, globalScale: buttonScale))
+        place(skillButton, at: .skill, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale))
+        place(endButton, at: .end, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale))
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat) -> CGSize {
