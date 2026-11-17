@@ -23,9 +23,6 @@
 
 namespace fallout {
 
-#define GAME_MOVIE_WINDOW_WIDTH 640
-#define GAME_MOVIE_WINDOW_HEIGHT 480
-
 static char* gmovie_subtitle_func(char* movieFilePath);
 
 // 0x5053FC
@@ -117,12 +114,12 @@ int gmovie_play(int game_movie, int game_movie_flags)
         palette_fade_to(black_palette);
     }
 
-    int gameMovieWindowX = (screenGetWidth() - GAME_MOVIE_WINDOW_WIDTH) / 2;
-    int gameMovieWindowY = (screenGetHeight() - GAME_MOVIE_WINDOW_HEIGHT) / 2;
-    int win = win_add(gameMovieWindowX,
-        gameMovieWindowY,
-        GAME_MOVIE_WINDOW_WIDTH,
-        GAME_MOVIE_WINDOW_HEIGHT,
+    // Use the whole screen so the movie is letterboxed on black instead of
+    // floating in a small 640x480 window over the game.
+    int win = win_add(0,
+        0,
+        screenGetWidth(),
+        screenGetHeight(),
         0,
         WINDOW_MODAL);
     if (win == -1) {
@@ -185,6 +182,12 @@ int gmovie_play(int game_movie, int game_movie_flags)
 
     moviefx_start(movieFilePath);
 
+    // Movies are only 640x480. Smooth their upscale to the display; the game
+    // itself keeps crisp nearest-neighbor scaling after the movie ends.
+    if (gSdlTexture != NULL) {
+        SDL_SetTextureScaleMode(gSdlTexture, SDL_ScaleModeLinear);
+    }
+
     movieRun(win, movieFilePath);
 
     int v11 = 0;
@@ -209,6 +212,11 @@ int gmovie_play(int game_movie, int game_movie_flags)
     movieStop();
     moviefx_stop();
     movieUpdate();
+
+    if (gSdlTexture != NULL) {
+        SDL_SetTextureScaleMode(gSdlTexture, SDL_ScaleModeNearest);
+    }
+
     palette_set_to(black_palette);
 
     gmovie_played_list[game_movie] = 1;
@@ -234,8 +242,6 @@ int gmovie_play(int game_movie, int game_movie_flags)
 
     win_delete(win);
 
-    // CE: Destroying a window redraws only content it was covering (centered
-    // 640x480). This leads to everything outside this rect to remain black.
     win_refresh_all(&scr_size);
 
     if ((game_movie_flags & GAME_MOVIE_PAUSE_MUSIC) != 0) {
