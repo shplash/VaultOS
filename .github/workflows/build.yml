@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ios-ipa-${{ github.ref }}
@@ -100,6 +100,22 @@ jobs:
           path: fallout-ce-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish draft build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="private-builds"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" fallout-ce-ios-unsigned.ipa --clobber
+          else
+            gh release create "$TAG" fallout-ce-ios-unsigned.ipa \
+              --draft \
+              --title "Private Builds" \
+              --notes "Unsigned development build. Not for public distribution." \
+              --target "${{ github.sha }}"
+          fi
 
       - name: Verify launcher is linked
         run: |
