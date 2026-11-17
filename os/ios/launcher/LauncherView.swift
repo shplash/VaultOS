@@ -506,7 +506,6 @@ private struct LauncherButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
-            .kerning(1.6)
             .foregroundColor(filled ? Theme.background : Theme.text)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
@@ -527,7 +526,6 @@ private struct ChipButtonStyle: ButtonStyle {
         VStack(spacing: 3) {
             configuration.label
                 .font(.system(size: 9, weight: selected ? .semibold : .regular, design: .monospaced))
-                .kerning(1.0)
                 .foregroundColor(selected ? Theme.accent : Theme.dim)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
