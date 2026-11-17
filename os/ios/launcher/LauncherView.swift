@@ -212,7 +212,7 @@ struct LauncherView: View {
             Button(action: {
                 model.showImporter = true
             }) {
-                Text(model.install.installed == 1 ? "REPLACE GAME FILES" : "IMPORT GAME ZIP")
+                Text(model.install.installed == 1 ? "REPLACE GAME FILES" : "IMPORT GAME ZIP)
             }
             .buttonStyle(LauncherButtonStyle(filled: false))
             .disabled(model.isInstalling)
@@ -511,7 +511,6 @@ private struct LauncherButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 12, weight: .bold, design: .monospaced))
-            .kerning(1)
             .foregroundColor(filled ? Theme.background : Theme.green)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity)
