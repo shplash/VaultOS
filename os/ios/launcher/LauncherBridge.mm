@@ -115,7 +115,7 @@ extern "C" void fallout_ios_screen_size(int* width, int* height)
 }
 
 // 0 inventory, 1 map, 2 character, 3 pip-boy, 4 skilldex, 5 end combat,
-// 6 skip turn, 7 swap the active hand/weapon.
+// 6 skip turn, 7 swap the active hand/weapon, 8 reload, 9 fire mode.
 extern "C" int fallout_ios_action_available(int action)
 {
     if (!fallout::intface_is_enabled()) {
@@ -171,6 +171,14 @@ extern "C" void fallout_ios_press_action(int action)
     case 7:
         // B is the game's change-active-hand binding.
         ios_send_scan_code(SDL_SCANCODE_B);
+        break;
+    case 8:
+        // Fallout 2's reload binding.
+        ios_send_scan_code(SDL_SCANCODE_R);
+        break;
+    case 9:
+        // Fallout 2's fire-mode binding.
+        ios_send_scan_code(SDL_SCANCODE_F);
         break;
     default:
         break;

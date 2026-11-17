@@ -19,6 +19,12 @@
 extern "C" {
 #endif
 
+// Games supported by the launcher.
+enum {
+    LAUNCHER_GAME_FALLOUT1 = 1,
+    LAUNCHER_GAME_FALLOUT2 = 2,
+};
+
 // Languages supported by the engine.
 enum {
     LAUNCHER_LANGUAGE_ENGLISH = 0,
@@ -59,6 +65,10 @@ typedef struct LauncherOptions {
 
     // One of LAUNCHER_LANGUAGE_*.
     int32_t language;
+
+    // One of LAUNCHER_GAME_*. Selects the config filenames and the game name
+    // used in diagnostics.
+    int32_t game;
 } LauncherOptions;
 
 typedef struct LauncherInstallInfo {
@@ -67,6 +77,8 @@ typedef struct LauncherInstallInfo {
     int32_t has_master_dat;
     int32_t has_critter_dat;
     int32_t has_data_folder;
+    int32_t has_patch_dat;
+    int32_t has_ce_dat;
     int32_t has_music;
     // Set when a SAVEGAME folder exists (saves are never touched).
     int32_t has_saves;
@@ -78,7 +90,8 @@ typedef struct LauncherInstallInfo {
 void launcher_default_options(LauncherOptions* options);
 
 // Inspects `install_dir` for game data. `info` is always fully initialized.
-void launcher_scan(const char* install_dir, LauncherInstallInfo* info);
+// `game` is one of LAUNCHER_GAME_*.
+void launcher_scan(const char* install_dir, int32_t game, LauncherInstallInfo* info);
 
 // Extracts the game data from `zip_path` into `install_dir` and writes the
 // configuration files. Existing files are overwritten; savegames are left

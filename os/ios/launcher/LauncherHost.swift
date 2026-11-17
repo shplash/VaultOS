@@ -116,18 +116,38 @@ private enum ControlTheme {
         UserDefaults.standard.bool(forKey: "launcher.whiteButtons")
     }
 
+    static var game: FalloutGame {
+        ControlLayout.activeGame()
+    }
+
     static var green: UIColor {
-        whiteButtons ? .white : UIColor(red: 0.55, green: 0.96, blue: 0.45, alpha: 0.95)
+        if whiteButtons {
+            return .white
+        }
+        return game == .fallout2
+            ? UIColor(red: 0.42, green: 0.75, blue: 1.0, alpha: 0.95)
+            : UIColor(red: 0.55, green: 0.96, blue: 0.45, alpha: 0.95)
     }
 
     static var amber: UIColor {
         whiteButtons ? .white : UIColor(red: 0.95, green: 0.72, blue: 0.32, alpha: 0.95)
     }
 
-    static let panel = UIColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.55)
+    static var panel: UIColor {
+        game == .fallout2
+            ? UIColor(red: 0.015, green: 0.030, blue: 0.055, alpha: 0.55)
+            : UIColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.55)
+    }
+
     static let highlight = UIColor.white.withAlphaComponent(0.18)
+
     static var dim: UIColor {
-        whiteButtons ? UIColor.white.withAlphaComponent(0.68) : UIColor(red: 0.45, green: 0.60, blue: 0.45, alpha: 0.9)
+        if whiteButtons {
+            return UIColor.white.withAlphaComponent(0.68)
+        }
+        return game == .fallout2
+            ? UIColor(red: 0.50, green: 0.61, blue: 0.74, alpha: 0.9)
+            : UIColor(red: 0.45, green: 0.60, blue: 0.45, alpha: 0.9)
     }
 }
 
@@ -143,6 +163,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     case skill
     case swap
     case end
+    case reload
+    case fireMode
 
     var id: String { rawValue }
 
@@ -159,6 +181,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .skill: return "SKILL"
         case .swap: return "SWAP"
         case .end: return "END"
+        case .reload: return "RELOAD"
+        case .fireMode: return "MODE"
         }
     }
 
@@ -175,6 +199,18 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .skill: return "star"
         case .swap: return "arrow.left.arrow.right"
         case .end: return "xmark"
+        case .reload: return "arrow.clockwise"
+        case .fireMode: return "scope"
+        }
+    }
+
+    /// Fallout 1 and Fallout 2 keep independent control sets and layouts.
+    static func controls(for game: FalloutGame) -> [TouchControl] {
+        switch game {
+        case .fallout1:
+            return allCases.filter { $0 != .reload && $0 != .fireMode }
+        case .fallout2:
+            return allCases
         }
     }
 
@@ -205,6 +241,9 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill: return CGPoint(x: 0.9594, y: 0.2000)
             case .swap: return CGPoint(x: 0.9594, y: 0.3250)
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
+            // Fallout 2 adds two small controls just inside ACTION and SKIP.
+            case .reload: return CGPoint(x: 0.8550, y: 0.6900)
+            case .fireMode: return CGPoint(x: 0.8550, y: 0.5320)
             }
         case .half:
             switch self {
@@ -221,6 +260,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill: return CGPoint(x: 0.9594, y: 0.2000)
             case .swap: return CGPoint(x: 0.9594, y: 0.3250)
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
+            case .reload: return CGPoint(x: 0.8550, y: 0.6900)
+            case .fireMode: return CGPoint(x: 0.8550, y: 0.5320)
             }
         }
     }
@@ -247,6 +288,9 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill, .swap, .end:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
+            case .reload, .fireMode:
+                let side = min(bounds.width * 0.055, bounds.height * 0.125)
+                return CGSize(width: side, height: side)
             }
         case .half:
             switch self {
@@ -268,6 +312,9 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .skill, .swap, .end:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
+            case .reload, .fireMode:
+                let side = min(bounds.width * 0.055, bounds.height * 0.125)
+                return CGSize(width: side, height: side)
             }
         }
     }
@@ -280,12 +327,20 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 10
+    private static let layoutVersion = 11
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
 
-    private static func key(_ control: TouchControl, _ suffix: String, profile: LayoutProfile) -> String {
+    static func activeGame() -> FalloutGame {
+        FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
+    }
+
+    private static func key(_ control: TouchControl, _ suffix: String, profile: LayoutProfile, game: FalloutGame) -> String {
+        return "launcher.control.\(game.rawValue).\(profile.rawValue).\(control.rawValue)\(suffix)"
+    }
+
+    private static func previousKey(_ control: TouchControl, _ suffix: String, profile: LayoutProfile) -> String {
         return "launcher.control.\(profile.rawValue).\(control.rawValue)\(suffix)"
     }
 
@@ -317,65 +372,86 @@ enum ControlLayout {
 
         for control in TouchControl.allCases {
             for (legacy, target) in [
-                (legacyKey(control, xSuffix), key(control, xSuffix, profile: .full)),
-                (legacyKey(control, ySuffix), key(control, ySuffix, profile: .full)),
-                (legacyKey(control, scaleSuffix), key(control, scaleSuffix, profile: .full)),
+                (legacyKey(control, xSuffix), key(control, xSuffix, profile: .full, game: .fallout1)),
+                (legacyKey(control, ySuffix), key(control, ySuffix, profile: .full, game: .fallout1)),
+                (legacyKey(control, scaleSuffix), key(control, scaleSuffix, profile: .full, game: .fallout1)),
             ] {
                 if let value = defaults.object(forKey: legacy) {
                     defaults.set(value, forKey: target)
                 }
                 defaults.removeObject(forKey: legacy)
             }
+
+            // Version 10 stored one layout per display profile for Fallout 1.
+            // Move it to the game-qualified key so Fallout 2 can own its own.
+            for (suffix, target) in [
+                (xSuffix, key(control, xSuffix, profile: .full, game: .fallout1)),
+                (ySuffix, key(control, ySuffix, profile: .full, game: .fallout1)),
+                (scaleSuffix, key(control, scaleSuffix, profile: .full, game: .fallout1)),
+            ] {
+                if let value = defaults.object(forKey: previousKey(control, suffix, profile: .full)) {
+                    defaults.set(value, forKey: target)
+                }
+            }
+            for (suffix, target) in [
+                (xSuffix, key(control, xSuffix, profile: .half, game: .fallout1)),
+                (ySuffix, key(control, ySuffix, profile: .half, game: .fallout1)),
+                (scaleSuffix, key(control, scaleSuffix, profile: .half, game: .fallout1)),
+            ] {
+                if let value = defaults.object(forKey: previousKey(control, suffix, profile: .half)) {
+                    defaults.set(value, forKey: target)
+                }
+            }
         }
 
         defaults.set(layoutVersion, forKey: layoutVersionKey)
     }
 
-    static func center(for control: TouchControl, profile: LayoutProfile) -> CGPoint {
+    static func center(for control: TouchControl, profile: LayoutProfile, game: FalloutGame) -> CGPoint {
         let defaults = UserDefaults.standard
-        guard let x = defaults.object(forKey: key(control, xSuffix, profile: profile)) as? Double,
-              let y = defaults.object(forKey: key(control, ySuffix, profile: profile)) as? Double else {
+        guard let x = defaults.object(forKey: key(control, xSuffix, profile: profile, game: game)) as? Double,
+              let y = defaults.object(forKey: key(control, ySuffix, profile: profile, game: game)) as? Double else {
             return control.defaultCenter(for: profile)
         }
         return CGPoint(x: min(max(x, 0), 1), y: min(max(y, 0), 1))
     }
 
-    static func setCenter(_ point: CGPoint, for control: TouchControl, profile: LayoutProfile) {
+    static func setCenter(_ point: CGPoint, for control: TouchControl, profile: LayoutProfile, game: FalloutGame) {
         let defaults = UserDefaults.standard
-        defaults.set(Double(min(max(point.x, 0), 1)), forKey: key(control, xSuffix, profile: profile))
-        defaults.set(Double(min(max(point.y, 0), 1)), forKey: key(control, ySuffix, profile: profile))
+        defaults.set(Double(min(max(point.x, 0), 1)), forKey: key(control, xSuffix, profile: profile, game: game))
+        defaults.set(Double(min(max(point.y, 0), 1)), forKey: key(control, ySuffix, profile: profile, game: game))
     }
 
-    static func scale(for control: TouchControl, profile: LayoutProfile) -> CGFloat {
-        let value = UserDefaults.standard.object(forKey: key(control, scaleSuffix, profile: profile)) as? Double ?? 1.0
+    static func scale(for control: TouchControl, profile: LayoutProfile, game: FalloutGame) -> CGFloat {
+        let value = UserDefaults.standard.object(forKey: key(control, scaleSuffix, profile: profile, game: game)) as? Double ?? 1.0
         return CGFloat(min(max(value, 0.55), 2.0))
     }
 
-    static func setScale(_ scale: CGFloat, for control: TouchControl, profile: LayoutProfile) {
-        UserDefaults.standard.set(Double(min(max(scale, 0.55), 2.0)), forKey: key(control, scaleSuffix, profile: profile))
+    static func setScale(_ scale: CGFloat, for control: TouchControl, profile: LayoutProfile, game: FalloutGame) {
+        UserDefaults.standard.set(Double(min(max(scale, 0.55), 2.0)), forKey: key(control, scaleSuffix, profile: profile, game: game))
     }
 
-    static func reset(profile: LayoutProfile) {
+    static func reset(profile: LayoutProfile, game: FalloutGame) {
         let defaults = UserDefaults.standard
-        for control in TouchControl.allCases {
-            defaults.removeObject(forKey: key(control, xSuffix, profile: profile))
-            defaults.removeObject(forKey: key(control, ySuffix, profile: profile))
-            defaults.removeObject(forKey: key(control, scaleSuffix, profile: profile))
+        for control in TouchControl.controls(for: game) {
+            defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
+            defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
+            defaults.removeObject(forKey: key(control, scaleSuffix, profile: profile, game: game))
         }
     }
 
-    static func allCenters(profile: LayoutProfile) -> [TouchControl: CGPoint] {
+    static func allCenters(profile: LayoutProfile, game: FalloutGame) -> [TouchControl: CGPoint] {
         var centers: [TouchControl: CGPoint] = [:]
-        for control in TouchControl.allCases {
-            centers[control] = center(for: control, profile: profile)
+        for control in TouchControl.controls(for: game) {
+            centers[control] = center(for: control, profile: profile, game: game)
         }
         return centers
     }
 
-    static func allScales(profile: LayoutProfile) -> [TouchControl: CGFloat] {
+    static func allScales(profile: LayoutProfile, game: FalloutGame) -> [TouchControl: CGFloat] {
         var scales: [TouchControl: CGFloat] = [:]
-        for control in TouchControl.allCases {
-            scales[control] = scale(for: control, profile: profile)
+        for control in TouchControl.controls(for: game) {
+            scales[control] = scale(for: control, profile: profile, game: game)
         }
         return scales
     }
@@ -416,6 +492,17 @@ final class GameControlsOverlay: UIView {
         symbol: "xmark",
         iconPointSize: 18
     )
+    private let reloadButton = LabeledControlButton(
+        title: "RELOAD",
+        symbol: "arrow.clockwise",
+        iconPointSize: 16
+    )
+    private let fireModeButton = LabeledControlButton(
+        title: "MODE",
+        symbol: "scope",
+        iconPointSize: 16
+    )
+    private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
     private var cursorModeTitle: String?
@@ -497,6 +584,16 @@ final class GameControlsOverlay: UIView {
         skipButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(skipButton)
 
+        reloadButton.tag = 8
+        reloadButton.accessibilityLabel = "Reload weapon"
+        reloadButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(reloadButton)
+
+        fireModeButton.tag = 9
+        fireModeButton.accessibilityLabel = "Change fire mode"
+        fireModeButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(fireModeButton)
+
         refreshControls()
         let timer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
             self?.refreshControls()
@@ -547,11 +644,16 @@ final class GameControlsOverlay: UIView {
         place(skillButton, at: .skill, profile: profile, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(swapButton, at: .swap, profile: profile, size: scaledSize(for: .swap, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(endButton, at: .end, profile: profile, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale, profile: profile))
+
+        if game == .fallout2 {
+            place(reloadButton, at: .reload, profile: profile, size: scaledSize(for: .reload, in: bounds.size, globalScale: buttonScale, profile: profile))
+            place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, globalScale: buttonScale, profile: profile))
+        }
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
         let base = control.defaultSize(in: bounds, profile: profile)
-        let factor = max(0.55, globalScale) * ControlLayout.scale(for: control, profile: profile)
+        let factor = max(0.55, globalScale) * ControlLayout.scale(for: control, profile: profile, game: game)
         return CGSize(
             width: max(22, min(bounds.width * 0.45, base.width * factor)),
             height: max(22, min(bounds.height * 0.45, base.height * factor))
@@ -559,7 +661,7 @@ final class GameControlsOverlay: UIView {
     }
 
     private func place(_ view: UIView, at control: TouchControl, profile: LayoutProfile, size: CGSize) {
-        let normalized = ControlLayout.center(for: control, profile: profile)
+        let normalized = ControlLayout.center(for: control, profile: profile, game: game)
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
         // Use the full screen. Subtracting the window's safe-area insets here
@@ -628,6 +730,14 @@ final class GameControlsOverlay: UIView {
         swapButton.isEnabled = fallout_ios_action_available(7) != 0
         endButton.isEnabled = fallout_ios_action_available(5) != 0
         skipButton.isHidden = fallout_ios_action_available(6) == 0
+
+        let showFallout2Controls = game == .fallout2
+        reloadButton.isHidden = !showFallout2Controls
+        fireModeButton.isHidden = !showFallout2Controls
+        if showFallout2Controls {
+            reloadButton.isEnabled = fallout_ios_action_available(8) != 0
+            fireModeButton.isEnabled = fallout_ios_action_available(9) != 0
+        }
     }
 }
 

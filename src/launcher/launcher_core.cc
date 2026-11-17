@@ -529,9 +529,21 @@ bool extract_entry(std::ifstream& archive, const ZipEntry& entry, const fs::path
 struct InstallLayout {
     std::string master_dat;
     std::string critter_dat;
+    std::string patch000_dat;
+    std::string ce_dat;
     std::string data_folder;
     std::string music_path;
 };
+
+bool is_fallout2(const LauncherOptions& options)
+{
+    return options.game == LAUNCHER_GAME_FALLOUT2;
+}
+
+const char* game_name(const LauncherOptions& options)
+{
+    return is_fallout2(options) ? "Fallout 2" : "Fallout";
+}
 
 std::string find_child(const fs::path& directory, const std::string& wanted, bool want_directory)
 {
@@ -566,6 +578,8 @@ InstallLayout detect_layout(const fs::path& install_dir)
     InstallLayout layout;
     layout.master_dat = find_child(install_dir, "master.dat", false);
     layout.critter_dat = find_child(install_dir, "critter.dat", false);
+    layout.patch000_dat = find_child(install_dir, "patch000.dat", false);
+    layout.ce_dat = find_child(install_dir, "ce.dat", false);
     layout.data_folder = find_child(install_dir, "data", true);
 
     if (!layout.data_folder.empty()) {
@@ -765,10 +779,14 @@ std::string build_resolution_config(const LauncherOptions& options)
 
 bool write_configs(const fs::path& install_dir, const InstallLayout& layout, const LauncherOptions& options)
 {
-    if (!write_text_file(install_dir / "fallout.cfg", build_game_config(layout, options))) {
+    const bool fallout2 = is_fallout2(options);
+    const char* game_config_name = fallout2 ? "fallout2.cfg" : "fallout.cfg";
+    const char* resolution_config_name = fallout2 ? "f2_res.ini" : "f1_res.ini";
+
+    if (!write_text_file(install_dir / game_config_name, build_game_config(layout, options))) {
         return false;
     }
-    return write_text_file(install_dir / "f1_res.ini", build_resolution_config(options));
+    return write_text_file(install_dir / resolution_config_name, build_resolution_config(options));
 }
 
 // ---------------------------------------------------------------------------
@@ -788,6 +806,8 @@ bool get_install_info(const fs::path& install_dir, LauncherInstallInfo& info, In
     info.has_master_dat = !layout.master_dat.empty();
     info.has_critter_dat = !layout.critter_dat.empty();
     info.has_data_folder = !layout.data_folder.empty();
+    info.has_patch_dat = !layout.patch000_dat.empty();
+    info.has_ce_dat = !layout.ce_dat.empty();
     info.installed = layout_is_complete(layout) ? 1 : 0;
 
     info.has_music = find_child(install_dir, "sound", true).empty() ? 0 : 1;
@@ -810,6 +830,16 @@ bool get_install_info(const fs::path& install_dir, LauncherInstallInfo& info, In
     if (info.has_critter_dat) {
         std::error_code size_ec;
         uint64_t size = fs::file_size(install_dir / layout.critter_dat, size_ec);
+        if (!size_ec) {
+            total += size;
+        }
+    }
+    for (const std::string& archive : { layout.patch000_dat, layout.ce_dat }) {
+        if (archive.empty()) {
+            continue;
+        }
+        std::error_code size_ec;
+        uint64_t size = fs::file_size(install_dir / archive, size_ec);
         if (!size_ec) {
             total += size;
         }
@@ -842,9 +872,10 @@ void launcher_default_options(LauncherOptions* options)
     options->sfx_volume = 70;
     options->speech_volume = 70;
     options->language = LAUNCHER_LANGUAGE_ENGLISH;
+    options->game = LAUNCHER_GAME_FALLOUT1;
 }
 
-void launcher_scan(const char* install_dir, LauncherInstallInfo* info)
+void launcher_scan(const char* install_dir, int32_t game, LauncherInstallInfo* info)
 {
     if (info == NULL) {
         return;
@@ -855,6 +886,8 @@ void launcher_scan(const char* install_dir, LauncherInstallInfo* info)
     if (install_dir == NULL || install_dir[0] == '\0') {
         return;
     }
+
+    (void)game;
 
     InstallLayout layout;
     get_install_info(fs::path(install_dir), *info, layout);
@@ -923,12 +956,12 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
             }
             missing += "critter.dat";
         }
-        fail("This ZIP doesn't look like a Fallout installation: " + missing + " not found.");
+        fail("This ZIP doesn't look like a " + std::string(game_name(*options)) + " installation: " + missing + " not found.");
         return LAUNCHER_ERROR;
     }
 
     if (!has_data_folder(entries, prefix)) {
-        fail("This ZIP doesn't look like a Fallout installation: the data folder is missing.");
+        fail("This ZIP doesn't look like a " + std::string(game_name(*options)) + " installation: the data folder is missing.");
         return LAUNCHER_ERROR;
     }
 

@@ -173,8 +173,17 @@ int gmovie_play(int game_movie, int game_movie_flags)
         mouse_show();
     }
 
-    while (mouse_get_buttons() != 0) {
+    // The intro is opened by a tap. On iOS that tap is still being delivered
+    // when the movie starts: its release can look like a skip request, and the
+    // ended touch gesture can look like a second tap. Drain both before the
+    // movie loop starts, and give the hand-off a short grace period below.
+    flush_input_buffer();
+    for (int attempts = 0; attempts < 8 && mouse_get_buttons() != 0; attempts++) {
         mouse_info();
+    }
+
+    Gesture staleGesture;
+    while (touch_get_gesture(&staleGesture)) {
     }
 
     mouse_hide();
@@ -190,16 +199,35 @@ int gmovie_play(int game_movie, int game_movie_flags)
 
     movieRun(win, movieFilePath);
 
+    // Do not accept input for the first few frames. This is long enough for
+    // the tap that opened the intro to finish, but short enough that a real
+    // tap still skips the movie naturally.
+    const unsigned int inputGuardUntil = get_time() + 300;
+
     int v11 = 0;
     int buttons;
     do {
-        if (!moviePlaying() || game_user_wants_to_quit || get_input() != -1) {
+        const bool inputReady = get_time() >= inputGuardUntil;
+
+        if (!moviePlaying() || game_user_wants_to_quit) {
             break;
         }
 
-        Gesture gesture;
-        if (touch_get_gesture(&gesture) && gesture.state == kEnded) {
-            break;
+        if (inputReady) {
+            if (get_input() != -1) {
+                break;
+            }
+
+            Gesture gesture;
+            if (touch_get_gesture(&gesture) && gesture.state == kEnded) {
+                break;
+            }
+        } else {
+            // Consume the tail of the launching tap while it is still arriving.
+            get_input();
+            Gesture ignored;
+            while (touch_get_gesture(&ignored)) {
+            }
         }
 
         int x;

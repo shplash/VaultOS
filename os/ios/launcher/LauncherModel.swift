@@ -2,6 +2,47 @@ import Foundation
 import UIKit
 import Combine
 
+enum FalloutGame: String, CaseIterable, Identifiable {
+    case fallout1
+    case fallout2
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fallout1: return "FALLOUT"
+        case .fallout2: return "FALLOUT 2"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .fallout1: return "F1"
+        case .fallout2: return "F2"
+        }
+    }
+
+    var tagline: String {
+        switch self {
+        case .fallout1: return "A post-nuclear classic"
+        case .fallout2: return "The wasteland continues"
+        }
+    }
+
+    var installFolder: String {
+        switch self {
+        case .fallout1: return ""
+        case .fallout2: return "Fallout2"
+        }
+    }
+
+    /// The current app contains the Fallout 1 engine. Fallout 2 data can be
+    /// imported and managed here, but its engine is a separate codebase.
+    var supportsLaunch: Bool {
+        return self == .fallout1
+    }
+}
+
 struct DisplayPreset: Identifiable, Hashable {
     let id: String
     let label: String
@@ -32,7 +73,15 @@ final class LauncherModel: ObservableObject {
         }
     }
 
+    @Published var selectedGame: FalloutGame {
+        didSet {
+            defaults.set(selectedGame.rawValue, forKey: "launcher.game")
+            refreshInstall()
+        }
+    }
+
     @Published var install = LauncherInstallInfo()
+    @Published private(set) var installedGames: Set<FalloutGame> = []
     @Published var isInstalling = false
     @Published var progress: Double = 0
     @Published var statusText = ""
@@ -40,15 +89,27 @@ final class LauncherModel: ObservableObject {
     @Published var showImporter = false
     @Published var savedNotice = false
 
-    let installDirectory: URL
+    private let documentsDirectory: URL
     private var progressTimer: Timer?
     private let defaults = UserDefaults.standard
+
+    var installDirectory: URL {
+        return installDirectory(for: selectedGame)
+    }
+
+    func installDirectory(for game: FalloutGame) -> URL {
+        if game.installFolder.isEmpty {
+            return documentsDirectory
+        }
+        return documentsDirectory.appendingPathComponent(game.installFolder, isDirectory: true)
+    }
 
     private static let languageNames = ["ENGLISH", "FRENCH", "GERMAN", "ITALIAN", "SPANISH"]
 
     init() {
         ControlLayout.migrateIfNeeded()
-        installDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        selectedGame = FalloutGame(rawValue: defaults.string(forKey: "launcher.game") ?? "") ?? .fallout1
 
         let native = LauncherModel.nativeResolution()
         // Version 4 defaults to HALF, which scales the interface up. Version 3
@@ -155,8 +216,38 @@ final class LauncherModel: ObservableObject {
 
     func refreshInstall() {
         var info = LauncherInstallInfo()
-        launcher_scan(installDirectory.path, &info)
+        launcher_scan(installDirectory.path, Int32(selectedGame == .fallout2 ? LAUNCHER_GAME_FALLOUT2 : LAUNCHER_GAME_FALLOUT1), &info)
         install = info
+
+        var ready: Set<FalloutGame> = []
+        for game in FalloutGame.allCases {
+            var gameInfo = LauncherInstallInfo()
+            launcher_scan(installDirectory(for: game).path,
+                          Int32(game == .fallout2 ? LAUNCHER_GAME_FALLOUT2 : LAUNCHER_GAME_FALLOUT1),
+                          &gameInfo)
+            if gameInfo.installed == 1 {
+                ready.insert(game)
+            }
+        }
+        installedGames = ready
+    }
+
+    var installRows: [(String, Bool)] {
+        switch selectedGame {
+        case .fallout1:
+            return [
+                ("master.dat", install.has_master_dat == 1),
+                ("critter.dat", install.has_critter_dat == 1),
+                ("data folder", install.has_data_folder == 1),
+            ]
+        case .fallout2:
+            return [
+                ("master.dat", install.has_master_dat == 1),
+                ("critter.dat", install.has_critter_dat == 1),
+                ("patch000.dat", install.has_patch_dat == 1),
+                ("data folder", install.has_data_folder == 1),
+            ]
+        }
     }
 
     func importZip(from url: URL) {
@@ -240,6 +331,7 @@ final class LauncherModel: ObservableObject {
         raw.subtitles = subtitles ? 1 : 0
         raw.always_run = alwaysRun ? 1 : 0
         raw.language = Int32(language)
+        raw.game = Int32(selectedGame == .fallout2 ? LAUNCHER_GAME_FALLOUT2 : LAUNCHER_GAME_FALLOUT1)
         return raw
     }
 
@@ -261,6 +353,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(buttonScale, forKey: "launcher.buttonScale")
         defaults.set(leftHanded, forKey: "launcher.leftHanded")
         defaults.set(whiteButtons, forKey: "launcher.whiteButtons")
+        defaults.set(selectedGame.rawValue, forKey: "launcher.game")
     }
 
     @discardableResult
@@ -293,6 +386,10 @@ final class LauncherModel: ObservableObject {
 
     func play(onPlay: () -> Void) {
         guard install.installed == 1, !isInstalling else {
+            return
+        }
+        guard selectedGame.supportsLaunch else {
+            errorMessage = "Fallout 2 needs its own game engine. This build contains the Fallout 1 engine; the Fallout 2 files you imported are ready for the dedicated Fallout 2 build."
             return
         }
         if applyOptions() {

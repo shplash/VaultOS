@@ -9,35 +9,43 @@ struct LauncherView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 10) {
-                header
+            ZStack {
+                LauncherBackdrop(game: model.selectedGame)
 
-                Rectangle()
-                    .fill(Theme.line)
-                    .frame(height: 1)
-
-                HStack(alignment: .top, spacing: 12) {
-                    installPane
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .frame(width: max(220, min(geometry.size.width * 0.30, 300)), alignment: .top)
+                VStack(spacing: 8) {
+                    header
 
                     Rectangle()
                         .fill(Theme.line)
-                        .frame(width: 1)
+                        .frame(height: 1)
 
-                    optionsPane
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    gamePicker
+
+                    HStack(alignment: .top, spacing: 12) {
+                        installPane
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            .frame(width: max(220, min(geometry.size.width * 0.31, 318)), alignment: .top)
+
+                        Rectangle()
+                            .fill(Theme.line)
+                            .frame(width: 1)
+
+                        optionsPane
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                    Text(model.selectedGame.supportsLaunch
+                        ? "Preferences are saved when you play."
+                        : "Preferences are saved with the game data.")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                Text("Settings apply when you tap Play.")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundColor(Theme.dim)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
@@ -78,7 +86,7 @@ struct LauncherView: View {
             )
         ) {
             Alert(
-                title: Text("FALLOUT"),
+                title: Text(model.selectedGame.title),
                 message: Text(model.errorMessage ?? ""),
                 dismissButton: .default(Text("OK"))
             )
@@ -89,47 +97,104 @@ struct LauncherView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
-            Text("FALLOUT")
-                .font(.system(size: 27, weight: .heavy, design: .monospaced))
-                .foregroundColor(Theme.green)
+            Text(model.selectedGame.title)
+                .font(.system(size: 26, weight: .heavy, design: .monospaced))
+                .foregroundColor(Theme.accent)
+                .lineLimit(1)
 
-            Text("Community Edition")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+            Text("COMMUNITY EDITION")
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .kerning(1.4)
                 .foregroundColor(Theme.dim)
 
             Spacer()
 
             Circle()
-                .fill(model.install.installed == 1 ? Theme.green : Theme.amber)
+                .fill(model.install.installed == 1 ? Theme.accent : Theme.amber)
                 .frame(width: 7, height: 7)
 
-            Text(model.isInstalling ? "INSTALLING" : (model.install.installed == 1 ? "READY" : "NO GAME DATA"))
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(model.install.installed == 1 ? Theme.green : Theme.amber)
+            Text(model.isInstalling ? "INSTALLING" : (model.install.installed == 1 ? "DATA READY" : "NEEDS DATA"))
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundColor(model.install.installed == 1 ? Theme.accent : Theme.amber)
         }
-        .padding(.bottom, 2)
+        .padding(.bottom, 1)
+    }
+
+    // MARK: - Game picker
+
+    private var gamePicker: some View {
+        HStack(spacing: 8) {
+            ForEach(FalloutGame.allCases) { game in
+                Button {
+                    model.selectedGame = game
+                } label: {
+                    HStack(spacing: 9) {
+                        Text(game.shortTitle)
+                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                            .foregroundColor(model.selectedGame == game ? Theme.background : game.tint)
+                            .frame(width: 24, height: 24)
+                            .background(model.selectedGame == game ? game.tint : Theme.background)
+                            .overlay(Rectangle().stroke(game.tint.opacity(0.55), lineWidth: 1))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(game.title)
+                                .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                                .foregroundColor(model.selectedGame == game ? Theme.text : Theme.dim)
+                                .lineLimit(1)
+
+                            Text(game.tagline)
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundColor(Theme.dim)
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 4)
+
+                        Circle()
+                            .fill(installed(for: game) ? game.tint : Theme.amber)
+                            .frame(width: 5, height: 5)
+
+                        Text(installed(for: game) ? "READY" : "EMPTY")
+                            .font(.system(size: 8, weight: .bold, design: .monospaced))
+                            .foregroundColor(installed(for: game) ? game.tint : Theme.dim)
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 5)
+                        .fill(model.selectedGame == game ? Theme.panel : Theme.background.opacity(0.45)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(model.selectedGame == game ? game.tint.opacity(0.85) : Theme.line, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func installed(for game: FalloutGame) -> Bool {
+        return model.installedGames.contains(game)
     }
 
     // MARK: - Install
 
     private var installPane: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("GAME DATA")
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("INSTALLATION")
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
                     Circle()
-                        .fill(model.install.installed == 1 ? Theme.green : Theme.amber)
+                        .fill(model.install.installed == 1 ? Theme.accent : Theme.amber)
                         .frame(width: 6, height: 6)
 
-                    Text(model.install.installed == 1 ? "Ready to play" : "Game files required")
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        .foregroundColor(model.install.installed == 1 ? Theme.green : Theme.text)
+                    Text(model.install.installed == 1 ? "Data ready" : "Game files required")
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundColor(model.install.installed == 1 ? Theme.accent : Theme.text)
                 }
 
-                Text(model.install.installed == 1
-                    ? "Your installation is ready. Choose Play to launch the game."
-                    : "Import a ZIP containing master.dat, critter.dat and the data folder.")
+                Text(installDescription)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(Theme.dim)
                     .fixedSize(horizontal: false, vertical: true)
@@ -138,15 +203,15 @@ struct LauncherView: View {
                     .fill(Theme.line)
                     .frame(height: 1)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    fileRow("master.dat", present: model.install.has_master_dat == 1)
-                    fileRow("critter.dat", present: model.install.has_critter_dat == 1)
-                    fileRow("data folder", present: model.install.has_data_folder == 1)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(model.installRows.indices, id: \.self) { index in
+                        fileRow(model.installRows[index].0, present: model.installRows[index].1)
+                    }
                 }
 
                 if model.isInstalling {
                     ProgressView(value: min(max(model.progress, 0), 1))
-                        .accentColor(Theme.green)
+                        .accentColor(Theme.accent)
 
                     Text(model.statusText)
                         .font(.system(size: 9, design: .monospaced))
@@ -160,16 +225,23 @@ struct LauncherView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.panel)
-            .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 6).fill(Theme.panel))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.line, lineWidth: 1))
 
-            Spacer(minLength: 8)
+            if !model.selectedGame.supportsLaunch {
+                Text("The Fallout 2 engine is not part of this build. Your imported files are kept for the dedicated Fallout 2 app.")
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundColor(Theme.amber)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            VStack(spacing: 8) {
+            Spacer(minLength: 4)
+
+            VStack(spacing: 7) {
                 Button(action: {
                     model.showImporter = true
                 }) {
-                    Text(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP")
+                    Text(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP")
                 }
                 .buttonStyle(LauncherButtonStyle(filled: false))
                 .disabled(model.isInstalling)
@@ -178,12 +250,29 @@ struct LauncherView: View {
                     LauncherMusic.shared.stop()
                     model.play(onPlay: onPlay)
                 }) {
-                    Text("PLAY")
+                    Text(model.selectedGame.supportsLaunch ? "PLAY" : "ENGINE NOT INCLUDED")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 .buttonStyle(LauncherButtonStyle(filled: true))
-                .disabled(model.install.installed == 0 || model.isInstalling)
-                .opacity(model.install.installed == 1 ? 1 : 0.4)
+                .disabled(model.install.installed == 0 || model.isInstalling || !model.selectedGame.supportsLaunch)
+                .opacity(model.install.installed == 1 && model.selectedGame.supportsLaunch ? 1 : 0.4)
             }
+        }
+    }
+
+    private var installDescription: String {
+        if model.install.installed == 1 {
+            return model.selectedGame.supportsLaunch
+                ? "Your installation is ready. Choose Play to launch the game."
+                : "Your Fallout 2 data is ready for the dedicated engine build."
+        }
+
+        switch model.selectedGame {
+        case .fallout1:
+            return "Import a ZIP containing master.dat, critter.dat, and the data folder."
+        case .fallout2:
+            return "Import a ZIP containing master.dat, critter.dat, patch000.dat, and the data folder."
         }
     }
 
@@ -266,7 +355,7 @@ struct LauncherView: View {
     private var controlsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                sectionLabel("CONTROL LAYOUT")
+                sectionLabel("TOUCH LAYOUT")
                 Spacer(minLength: 2)
                 whiteButtonsToggle
             }
@@ -277,14 +366,14 @@ struct LauncherView: View {
             Button(action: {
                 showControlEditor = true
             }) {
-                Text("EDIT TOUCH CONTROLS")
+                Text("EDIT LAYOUT")
             }
             .buttonStyle(CompactButtonStyle())
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.panel)
-        .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 6).fill(Theme.panel))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.line, lineWidth: 1))
     }
 
     private var whiteButtonsToggle: some View {
@@ -392,9 +481,9 @@ struct LauncherView: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.panel)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Theme.panel))
         .overlay(
-            Rectangle()
+            RoundedRectangle(cornerRadius: 6)
                 .stroke(Theme.line, lineWidth: 1)
         )
     }
@@ -469,14 +558,121 @@ private struct DimensionField: View {
 
 // MARK: - Styling
 
+private extension FalloutGame {
+    var tint: Color {
+        switch self {
+        case .fallout1:
+            return Color(red: 0.55, green: 0.96, blue: 0.45)
+        case .fallout2:
+            return Color(red: 0.42, green: 0.75, blue: 1.0)
+        }
+    }
+}
+
 private enum Theme {
-    static let background = Color(red: 0.012, green: 0.026, blue: 0.012)
-    static let panel = Color(red: 0.030, green: 0.055, blue: 0.030)
-    static let green = Color(red: 0.55, green: 0.96, blue: 0.45)
-    static let dim = Color(red: 0.44, green: 0.59, blue: 0.42)
-    static let text = Color(red: 0.78, green: 0.90, blue: 0.76)
+    static var game: FalloutGame {
+        FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
+    }
+
+    static var background: Color {
+        game == .fallout2
+            ? Color(red: 0.008, green: 0.016, blue: 0.034)
+            : Color(red: 0.012, green: 0.026, blue: 0.012)
+    }
+
+    static var panel: Color {
+        game == .fallout2
+            ? Color(red: 0.022, green: 0.040, blue: 0.070)
+            : Color(red: 0.030, green: 0.055, blue: 0.030)
+    }
+
+    static var accent: Color { game.tint }
+    // Kept as an alias so the control editor and shared styles can use the
+    // active game's accent without knowing which game is selected.
+    static var green: Color { accent }
+
+    static var dim: Color {
+        game == .fallout2
+            ? Color(red: 0.50, green: 0.61, blue: 0.74)
+            : Color(red: 0.44, green: 0.59, blue: 0.42)
+    }
+
+    static var text: Color {
+        game == .fallout2
+            ? Color(red: 0.80, green: 0.87, blue: 0.96)
+            : Color(red: 0.78, green: 0.90, blue: 0.76)
+    }
+
     static let amber = Color(red: 0.95, green: 0.72, blue: 0.32)
-    static let line = Color(red: 0.16, green: 0.30, blue: 0.16)
+
+    static var line: Color {
+        game == .fallout2
+            ? Color(red: 0.12, green: 0.23, blue: 0.38)
+            : Color(red: 0.16, green: 0.30, blue: 0.16)
+    }
+}
+
+private struct LauncherBackdrop: View {
+    let game: FalloutGame
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Theme.background,
+                    game == .fallout2
+                        ? Color(red: 0.012, green: 0.024, blue: 0.048)
+                        : Color(red: 0.018, green: 0.034, blue: 0.018),
+                    Color.black
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [game.tint.opacity(0.13), .clear],
+                center: UnitPoint(x: 0.08, y: 0.02),
+                startRadius: 4,
+                endRadius: 560
+            )
+
+            GeometryReader { geometry in
+                GridTexture(spacing: 30)
+                    .stroke(game.tint.opacity(0.045), lineWidth: 0.5)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.42)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea()
+    }
+}
+
+private struct GridTexture: Shape {
+    let spacing: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var x: CGFloat = 0
+        while x <= rect.width {
+            path.move(to: CGPoint(x: x, y: 0))
+            path.addLine(to: CGPoint(x: x, y: rect.height))
+            x += spacing
+        }
+
+        var y: CGFloat = 0
+        while y <= rect.height {
+            path.move(to: CGPoint(x: 0, y: y))
+            path.addLine(to: CGPoint(x: rect.width, y: y))
+            y += spacing
+        }
+
+        return path
+    }
 }
 
 private struct LauncherButtonStyle: ButtonStyle {
@@ -488,9 +684,9 @@ private struct LauncherButtonStyle: ButtonStyle {
             .foregroundColor(filled ? Theme.background : Theme.green)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity)
-            .background(filled ? Theme.green : Theme.panel)
+            .background(RoundedRectangle(cornerRadius: 6).fill(filled ? Theme.green : Theme.panel))
             .overlay(
-                Rectangle()
+                RoundedRectangle(cornerRadius: 6)
                     .stroke(filled ? Theme.green : Theme.line, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.62 : 1)
@@ -509,9 +705,9 @@ private struct ChipButtonStyle: ButtonStyle {
             .padding(.vertical, 6)
             .padding(.horizontal, 3)
             .frame(maxWidth: .infinity)
-            .background(selected ? Theme.green : Theme.background)
+            .background(RoundedRectangle(cornerRadius: 4).fill(selected ? Theme.green : Theme.background))
             .overlay(
-                Rectangle()
+                RoundedRectangle(cornerRadius: 4)
                     .stroke(selected ? Theme.green : Theme.line, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.62 : 1)
@@ -525,8 +721,8 @@ private struct CompactButtonStyle: ButtonStyle {
             .foregroundColor(Theme.green)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .background(Theme.panel)
-            .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 5).fill(Theme.panel))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Theme.line, lineWidth: 1))
             .opacity(configuration.isPressed ? 0.62 : 1)
     }
 }
@@ -539,6 +735,7 @@ private struct TouchControlEditor: View {
     @State private var centers: [TouchControl: CGPoint]
     @State private var scales: [TouchControl: CGFloat]
     @State private var profile: LayoutProfile
+    @State private var game: FalloutGame
     @State private var dragOrigins: [TouchControl: CGPoint] = [:]
     @State private var selected: TouchControl?
     @State private var whiteButtons = UserDefaults.standard.bool(forKey: "launcher.whiteButtons")
@@ -546,9 +743,11 @@ private struct TouchControlEditor: View {
     init(model: LauncherModel) {
         self.model = model
         let profile = ControlLayout.profileForCurrentResolution()
+        let game = model.selectedGame
         _profile = State(initialValue: profile)
-        _centers = State(initialValue: ControlLayout.allCenters(profile: profile))
-        _scales = State(initialValue: ControlLayout.allScales(profile: profile))
+        _game = State(initialValue: game)
+        _centers = State(initialValue: ControlLayout.allCenters(profile: profile, game: game))
+        _scales = State(initialValue: ControlLayout.allScales(profile: profile, game: game))
     }
 
     var body: some View {
@@ -558,7 +757,7 @@ private struct TouchControlEditor: View {
 
                 previewSurface(geometry.size)
 
-                ForEach(TouchControl.allCases) { control in
+                ForEach(TouchControl.controls(for: game)) { control in
                     let controlSize = editorSize(for: control, in: geometry.size)
                     editorControl(control, size: controlSize, selected: selected == control)
                         .position(editorCenter(for: control, in: geometry.size))
@@ -597,9 +796,9 @@ private struct TouchControlEditor: View {
             presetButton("HALF LAYOUT", profile: .half)
 
             Button("RESET") {
-                ControlLayout.reset(profile: profile)
-                centers = ControlLayout.allCenters(profile: profile)
-                scales = ControlLayout.allScales(profile: profile)
+                ControlLayout.reset(profile: profile, game: game)
+                centers = ControlLayout.allCenters(profile: profile, game: game)
+                scales = ControlLayout.allScales(profile: profile, game: game)
                 dragOrigins.removeAll()
                 selected = nil
             }
@@ -627,8 +826,8 @@ private struct TouchControlEditor: View {
             if let preset = model.presets.first(where: { $0.id == target.rawValue }) {
                 model.apply(preset: preset)
             }
-            centers = ControlLayout.allCenters(profile: target)
-            scales = ControlLayout.allScales(profile: target)
+            centers = ControlLayout.allCenters(profile: target, game: game)
+            scales = ControlLayout.allScales(profile: target, game: game)
             dragOrigins.removeAll()
             selected = nil
         }
@@ -761,7 +960,7 @@ private struct TouchControlEditor: View {
             set: { newValue in
                 let value = CGFloat(newValue)
                 scales[control] = value
-                ControlLayout.setScale(value, for: control, profile: profile)
+                ControlLayout.setScale(value, for: control, profile: profile, game: game)
             }
         )
     }
@@ -789,7 +988,7 @@ private struct TouchControlEditor: View {
                             (size.height - halfHeight - 4) / max(size.height, 1))
 
                 centers[control] = CGPoint(x: x, y: y)
-                ControlLayout.setCenter(CGPoint(x: x, y: y), for: control, profile: profile)
+                ControlLayout.setCenter(CGPoint(x: x, y: y), for: control, profile: profile, game: game)
             }
             .onEnded { _ in
                 dragOrigins[control] = nil
