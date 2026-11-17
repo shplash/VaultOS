@@ -254,5 +254,14 @@ if [ -n "$(find "$work/Payload" -mindepth 1 -maxdepth 1 ! -name '*.app' -print -
     fail "Payload contains entries other than the application"
 fi
 
+# --- Bundled artwork --------------------------------------------------------
+
+for artwork in IMG_3570.webp IMG_3571.webp; do
+    if [ ! -f "$app/$artwork" ]; then
+        fail "the application bundle is missing $artwork"
+    fi
+done
+note "artwork: both game stills are bundled"
+
 note "IPA structure: Payload/$(basename "$app") with Frameworks/Fallout2Engine.framework"
 note "all checks passed"

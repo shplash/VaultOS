@@ -368,6 +368,10 @@ if(APPLE)
         set(RESOURCES
             "os/ios/AppIcon.xcassets"
             "os/ios/LaunchScreen.storyboard"
+            # The home screen artwork for each game, bundled from the repository
+            # root so the launcher needs no network to show it.
+            "${CMAKE_SOURCE_DIR}/IMG_3570.webp"
+            "${CMAKE_SOURCE_DIR}/IMG_3571.webp"
             ${MUSIC_RESOURCES}
         )
 

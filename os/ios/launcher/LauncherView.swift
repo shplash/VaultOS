@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 // The launcher is one fixed window: a rail of pages down the left, the selected
@@ -133,10 +134,14 @@ struct LauncherView: View {
         return Button {
             page = item
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 9) {
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(selected ? accent : Color.clear)
+                    .frame(width: 3, height: 15)
+
                 Image(systemName: item.symbol)
                     .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 16, alignment: .leading)
+                    .frame(width: 15, alignment: .leading)
 
                 Text(item.title)
                     .font(.system(size: 12, weight: selected ? .semibold : .regular))
@@ -145,16 +150,13 @@ struct LauncherView: View {
                 Spacer(minLength: 0)
             }
             .foregroundColor(selected ? Theme.text : Theme.faint)
-            .padding(.horizontal, 9)
+            .padding(.trailing, 9)
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(selected ? Color.white.opacity(0.06) : Color.clear)
+                    .fill(selected ? Color.white.opacity(0.05) : Color.clear)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(selected ? accent.opacity(0.40) : Color.clear, lineWidth: 1)
-            )
+            .contentShape(Rectangle())
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -185,7 +187,9 @@ struct LauncherView: View {
 
         return Button {
             if model.selectedGame != game {
-                model.selectedGame = game
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    model.selectedGame = game
+                }
             }
         } label: {
             VStack(alignment: .leading, spacing: 6) {
@@ -236,35 +240,7 @@ struct LauncherView: View {
 
     private var homeSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .topTrailing) {
-                VaultRing(accent: accent)
-                    .frame(width: 230, height: 230)
-                    .offset(x: 40, y: -46)
-                    .opacity(0.75)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(model.selectedGame.title)
-                        .font(.system(size: 42, weight: .heavy))
-                        .kerning(1.5)
-                        .foregroundColor(Theme.text)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-
-                    Text(model.selectedGame.tagline)
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundColor(Theme.dim)
-
-                    Text("COMMUNITY EDITION")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .kerning(2.2)
-                        .foregroundColor(accent.opacity(0.8))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, 22)
-            .padding(.top, 18)
-            .padding(.bottom, 14)
-            .clipped()
+            hero
 
             Rectangle()
                 .fill(Theme.line)
@@ -327,6 +303,106 @@ struct LauncherView: View {
         )
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
+    }
+
+    /// The hero: the selected game's own wasteland still on the right, its
+    /// title on the left. The still is masked into the sheet on its left and
+    /// bottom edges and tinted warm, so it reads as part of the panel rather
+    /// than a photograph pinned to it.
+    private var hero: some View {
+        GeometryReader { geometry in
+            let artWidth = min(min(geometry.size.width * 0.46, 300), geometry.size.height * 4 / 3)
+            let artHeight = artWidth * 3 / 4
+
+            ZStack(alignment: .leading) {
+                heroArt(width: artWidth, height: artHeight)
+                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .trailing)
+                    .id(model.selectedGame)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.selectedGame.title)
+                        .font(.system(size: 38, weight: .heavy))
+                        .kerning(1.2)
+                        .foregroundColor(Theme.text)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+
+                    Text(model.selectedGame.tagline)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundColor(Theme.dim)
+                        .lineLimit(1)
+
+                    Text("COMMUNITY EDITION")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .kerning(2.2)
+                        .foregroundColor(accent.opacity(0.85))
+                }
+                .padding(.leading, 22)
+                .frame(maxWidth: geometry.size.width * 0.60, alignment: .leading)
+            }
+        }
+        .frame(height: 190)
+    }
+
+    private func heroArt(width: CGFloat, height: CGFloat) -> some View {
+        Group {
+            if let image = heroImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .saturation(0.82)
+                    .brightness(-0.03)
+                    .overlay(
+                        Color(red: 0.40, green: 0.25, blue: 0.11)
+                            .opacity(0.16)
+                    )
+                    .overlay(
+                        LinearGradient(
+                            colors: [Color.clear, Theme.sheet.opacity(0.92)],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        RadialGradient(
+                            colors: [Color.clear, Color.black.opacity(0.45)],
+                            center: .center,
+                            startRadius: width * 0.22,
+                            endRadius: width * 0.64
+                        )
+                    )
+                    .mask(
+                        LinearGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: Color.black.opacity(0), location: 0),
+                                .init(color: Color.black.opacity(0.55), location: 0.30),
+                                .init(color: Color.black, location: 0.58)
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    /// The selected game's still, bundle first. It follows `selectedGame`
+    /// directly, so the two can never disagree.
+    private var heroImage: UIImage? {
+        let name = model.selectedGame == .fallout2 ? "IMG_3571" : "IMG_3570"
+        if let image = UIImage(named: name) {
+            return image
+        }
+
+        guard let url = Bundle.main.url(forResource: name, withExtension: "webp") else {
+            return nil
+        }
+        return UIImage(contentsOfFile: url.path)
     }
 
     private var displaySheet: some View {
@@ -806,34 +882,8 @@ private struct LauncherBackdrop: View {
     }
 }
 
-/// A quiet vault-door motif: three rings and a ring of ticks, drawn from the
-/// selected game's accent so no artwork has to be bundled.
-private struct VaultRing: View {
-    let accent: Color
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(accent.opacity(0.20), lineWidth: 1.5)
-
-            Circle()
-                .stroke(accent.opacity(0.11), lineWidth: 1)
-                .padding(30)
-
-            Circle()
-                .fill(accent.opacity(0.05))
-                .padding(52)
-
-            ForEach(0..<36) { index in
-                Rectangle()
-                    .fill(accent.opacity(0.16))
-                    .frame(width: 1, height: 8)
-                    .offset(y: -104)
-                    .rotationEffect(.degrees(Double(index) * 10))
-            }
-        }
-    }
-}
+// The home hero uses the game's own still; the drawn vault-door motif was
+// replaced by it.
 
 private struct PillToggle: View {
     let isOn: Bool
