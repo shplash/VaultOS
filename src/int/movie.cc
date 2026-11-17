@@ -36,6 +36,7 @@ static void* movieMalloc(size_t size);
 static void movieFree(void* ptr);
 static bool movieRead(int fileHandle, void* buf, int count);
 static void movie_MVE_ShowFrame(SDL_Surface* a1, int a2, int a3, int a4, int a5, int a6, int a7, int a8, int a9);
+static void movieScaleFrame(unsigned char* dest, int destWidth, int destHeight, int destPitch, const unsigned char* src, int srcWidth, int srcHeight, int srcPitch);
 static void movieShowFrame(SDL_Surface* a1, int a2, int a3, int a4, int a5, int a6, int a7, int a8, int a9);
 static int movieScaleSubRect(int win, unsigned char* data, int width, int height, int pitch);
 static int movieScaleWindowAlpha(int win, unsigned char* data, int width, int height, int pitch);
@@ -246,6 +247,21 @@ static bool movieRead(void* handle, void* buf, int count)
     return db_fread(buf, 1, count, reinterpret_cast<DB_FILE*>(handle)) == count;
 }
 
+static void movieScaleFrame(unsigned char* dest, int destWidth, int destHeight, int destPitch, const unsigned char* src, int srcWidth, int srcHeight, int srcPitch)
+{
+    if (dest == NULL || src == NULL || destWidth <= 0 || destHeight <= 0 || srcWidth <= 0 || srcHeight <= 0) {
+        return;
+    }
+
+    for (int y = 0; y < destHeight; y++) {
+        const unsigned char* srcRow = src + (y * srcHeight / destHeight) * srcPitch;
+        unsigned char* destRow = dest + y * destPitch;
+        for (int x = 0; x < destWidth; x++) {
+            destRow[x] = srcRow[x * srcWidth / destWidth];
+        }
+    }
+}
+
 // 0x478464
 static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeight, int srcX, int srcY, int destWidth, int destHeight, int a8, int a9)
 {
@@ -338,17 +354,23 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
         && gSdlSurface->format->palette != NULL;
 
     if (scaleToWindow && indexedFrames) {
-        // Scale the indexed pixels directly into the indexed screen buffer.
-        // SDL_BlitScaled can produce a blank frame for some 8-bit movie
-        // surfaces, so use the engine's own scaler here.
-        drawScaled((unsigned char*)gSdlSurface->pixels + gSdlSurface->pitch * destRect.y + destRect.x,
-            destRect.w,
-            destRect.h,
-            gSdlSurface->pitch,
-            (unsigned char*)surface->pixels + surface->pitch * srcRect.y + srcRect.x,
-            srcRect.w,
-            srcRect.h,
-            surface->pitch);
+        // Scale indexed pixels ourselves. SDL_BlitScaled leaves some 8-bit
+        // movie frames blank, and the engine's drawScaled helper has a broken
+        // upscaling path (it can repeat the first source pixel across a row).
+        SDL_SetSurfacePalette(surface, gSdlSurface->format->palette);
+        if (SDL_LockSurface(gSdlSurface) == 0) {
+            movieScaleFrame(static_cast<unsigned char*>(gSdlSurface->pixels) + gSdlSurface->pitch * destRect.y + destRect.x,
+                destRect.w,
+                destRect.h,
+                gSdlSurface->pitch,
+                static_cast<unsigned char*>(surface->pixels) + surface->pitch * srcRect.y + srcRect.x,
+                srcRect.w,
+                srcRect.h,
+                surface->pitch);
+            SDL_UnlockSurface(gSdlSurface);
+        } else {
+            SDL_BlitScaled(surface, &srcRect, gSdlSurface, &destRect);
+        }
     } else if (scaleToWindow) {
         // Keep non-indexed movies visible at their native size rather than
         // asking SDL to convert them to the game's 8-bit palette.

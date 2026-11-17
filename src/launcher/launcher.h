@@ -88,11 +88,6 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
 // Rewrites `fallout.cfg` and `f1_res.ini` for an existing installation.
 int launcher_write_options(const char* install_dir, const LauncherOptions* options);
 
-// Decodes the game's main menu music (07desert.acm) into a WAV at
-// `output_path`. Returns LAUNCHER_ERROR when the music file is not present or
-// cannot be decoded.
-int launcher_prepare_music(const char* install_dir, const char* output_path);
-
 // iOS game controls (implemented in Swift, input helpers in Objective-C++).
 void fallout_ios_install_game_controls(void);
 void fallout_ios_camera_pan(double x, double y);

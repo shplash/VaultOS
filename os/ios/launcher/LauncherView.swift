@@ -5,23 +5,23 @@ import UniformTypeIdentifiers
 struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     let onPlay: () -> Void
+    @State private var showControlEditor = false
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 header
 
-                HStack(alignment: .top, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
                     installPane
-                        .frame(width: max(250, min(geometry.size.width * 0.35, 330)), alignment: .top)
+                        .frame(width: max(240, min(geometry.size.width * 0.34, 320)), alignment: .top)
 
                     Rectangle()
                         .fill(Theme.line)
                         .frame(width: 1)
 
-                    ScrollView(.vertical, showsIndicators: false) {
-                        optionsPane
-                    }
+                    optionsPane
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
@@ -30,12 +30,15 @@ struct LauncherView: View {
                     .foregroundColor(Theme.dim)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .background(Theme.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .fullScreenCover(isPresented: $showControlEditor) {
+            TouchControlEditor()
+        }
         .onAppear {
             model.refreshInstall()
             LauncherMusic.shared.playIfAvailable()
@@ -183,38 +186,15 @@ struct LauncherView: View {
     // MARK: - Options
 
     private var optionsPane: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
                 displaySection
                 audioSection
             }
 
-            controlsSection
-
-            section("GAMEPLAY") {
-                HStack(spacing: 8) {
-                    Text("LANGUAGE")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundColor(Theme.dim)
-
-                    Spacer(minLength: 4)
-
-                    Picker(selection: $model.language, label: EmptyView()) {
-                        ForEach(0..<model.languageNames.count, id: \.self) { index in
-                            Text(model.languageNames[index]).tag(index)
-                        }
-                    }
-                    .pickerStyle(MenuPickerStyle())
-                    .accentColor(Theme.green)
-                }
-
-                Toggle(isOn: $model.alwaysRun) {
-                    Text("ALWAYS RUN")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundColor(Theme.dim)
-                }
-                .toggleStyle(SwitchToggleStyle())
-                .accentColor(Theme.green)
+            HStack(alignment: .top, spacing: 6) {
+                controlsSection
+                gameplaySection
             }
 
             Spacer(minLength: 0)
@@ -222,16 +202,45 @@ struct LauncherView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
+    private var gameplaySection: some View {
+        section("GAMEPLAY") {
+            HStack(spacing: 8) {
+                Text("LANGUAGE")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+
+                Spacer(minLength: 4)
+
+                Picker(selection: $model.language, label: EmptyView()) {
+                    ForEach(0..<model.languageNames.count, id: \.self) { index in
+                        Text(model.languageNames[index]).tag(index)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+                .accentColor(Theme.green)
+            }
+
+            Toggle(isOn: $model.alwaysRun) {
+                Text("ALWAYS RUN")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+            }
+            .toggleStyle(SwitchToggleStyle())
+            .accentColor(Theme.green)
+        }
+    }
+
     private var controlsSection: some View {
         section("CONTROL LAYOUT") {
             controlScaleRow("JOYSTICK", value: $model.joystickScale)
             controlScaleRow("BUTTONS", value: $model.buttonScale)
 
-            Toggle(isOn: $model.leftHanded) {
-                settingLabel("LEFT-HANDED")
+            Button(action: {
+                showControlEditor = true
+            }) {
+                Text("EDIT TOUCH CONTROLS")
             }
-            .toggleStyle(SwitchToggleStyle())
-            .accentColor(Theme.green)
+            .buttonStyle(LauncherButtonStyle(filled: false))
         }
     }
 
@@ -307,7 +316,7 @@ struct LauncherView: View {
             sectionLabel(title)
             content()
         }
-        .padding(10)
+        .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.panel)
         .overlay(
@@ -432,5 +441,178 @@ private struct ChipButtonStyle: ButtonStyle {
                     .stroke(selected ? Theme.green : Theme.line, lineWidth: 1)
             )
             .opacity(configuration.isPressed ? 0.62 : 1)
+    }
+}
+
+// MARK: - Touchscreen control editor
+
+private struct TouchControlEditor: View {
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var centers = ControlLayout.allCenters()
+    @State private var dragOrigins: [TouchControl: CGPoint] = [:]
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Theme.background.ignoresSafeArea()
+
+                mockPlayfield(geometry.size)
+
+                ForEach(TouchControl.allCases) { control in
+                    let controlSize = editorSize(for: control, in: geometry.size)
+                    editorControl(control, size: controlSize)
+                        .position(editorCenter(for: control, in: geometry.size))
+                        .gesture(dragGesture(for: control, in: geometry.size))
+                }
+
+                VStack(spacing: 0) {
+                    editorBar
+                    Text("Drag any control to move it. Changes apply the next time you play.")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 8)
+                        .allowsHitTesting(false)
+                    Spacer(minLength: 0)
+                }
+            }
+            .statusBar(hidden: true)
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var editorBar: some View {
+        HStack(spacing: 10) {
+            Text("TOUCH CONTROLS")
+                .font(.system(size: 14, weight: .heavy, design: .monospaced))
+                .foregroundColor(Theme.green)
+
+            Button("RESET") {
+                ControlLayout.reset()
+                centers = ControlLayout.allCenters()
+                dragOrigins.removeAll()
+            }
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .foregroundColor(Theme.amber)
+
+            Button("DONE") {
+                presentationMode.wrappedValue.dismiss()
+            }
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .foregroundColor(Theme.background)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Theme.green)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Theme.panel.opacity(0.92))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func mockPlayfield(_ size: CGSize) -> some View {
+        ZStack {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Rectangle()
+                        .fill(Color.black.opacity(0.55))
+                        .frame(width: min(size.width * 0.56, 520), height: min(58, size.height * 0.16))
+                        .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
+                    Spacer()
+                }
+                .padding(.bottom, 6)
+            }
+
+            // The camera cutout, so the editor shows the same left-edge
+            // obstacle as the phone.
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.black)
+                .frame(width: 16, height: min(90, size.height * 0.24))
+                .position(x: 16, y: size.height * 0.45)
+        }
+    }
+
+    private func editorSize(for control: TouchControl, in size: CGSize) -> CGFloat {
+        switch control {
+        case .joystick:
+            return max(58, min(110, size.height * 0.28))
+        case .action:
+            return max(52, min(92, size.height * 0.20))
+        case .skip:
+            return max(42, min(76, size.height * 0.16))
+        case .back:
+            return max(38, min(66, size.height * 0.14))
+        case .skill, .end:
+            return max(38, min(78, size.height * 0.19))
+        default:
+            return max(38, min(78, size.height * 0.19))
+        }
+    }
+
+    private func editorCenter(for control: TouchControl, in size: CGSize) -> CGPoint {
+        let point = centers[control] ?? control.defaultCenter
+        let half = editorSize(for: control, in: size) / 2
+        return CGPoint(
+            x: min(max(point.x * size.width, half + 8), size.width - half - 8),
+            y: min(max(point.y * size.height, half + 8), size.height - half - 8)
+        )
+    }
+
+    private func editorControl(_ control: TouchControl, size: CGFloat) -> some View {
+        VStack(spacing: max(1, size * 0.045)) {
+            Image(systemName: control.symbol)
+                .font(.system(size: size * 0.34, weight: .semibold))
+
+            Text(control.label)
+                .font(.system(size: max(7, size * 0.18), weight: .bold, design: .monospaced))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .foregroundColor(control == .skip ? Theme.amber : Theme.green)
+        .frame(width: size, height: size)
+        .background(
+            Group {
+                if control == .joystick {
+                    Circle().fill(Theme.panel.opacity(0.85))
+                } else {
+                    Rectangle().fill(Theme.panel.opacity(0.85))
+                }
+            }
+        )
+        .overlay(
+            Group {
+                if control == .joystick {
+                    Circle().stroke(Theme.green.opacity(0.45), lineWidth: 1.5)
+                } else {
+                    Rectangle().stroke((control == .skip ? Theme.amber : Theme.green).opacity(0.55), lineWidth: 1.5)
+                }
+            }
+        )
+        .contentShape(Rectangle())
+    }
+
+    private func dragGesture(for control: TouchControl, in size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if dragOrigins[control] == nil {
+                    dragOrigins[control] = centers[control] ?? control.defaultCenter
+                }
+                guard let origin = dragOrigins[control] else {
+                    return
+                }
+
+                let half = editorSize(for: control, in: size) / 2
+                let x = min(max((origin.x * size.width + value.translation.width) / max(size.width, 1), (half + 8) / max(size.width, 1)), (size.width - half - 8) / max(size.width, 1))
+                let y = min(max((origin.y * size.height + value.translation.height) / max(size.height, 1), (half + 8) / max(size.height, 1)), (size.height - half - 8) / max(size.height, 1))
+
+                centers[control] = CGPoint(x: x, y: y)
+                ControlLayout.setCenter(CGPoint(x: x, y: y), for: control)
+            }
+            .onEnded { _ in
+                dragOrigins[control] = nil
+            }
     }
 }

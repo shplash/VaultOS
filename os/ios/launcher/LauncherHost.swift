@@ -77,8 +77,112 @@ final class LauncherHost {
 private enum ControlTheme {
     static let green = UIColor(red: 0.55, green: 0.96, blue: 0.45, alpha: 0.95)
     static let amber = UIColor(red: 0.95, green: 0.72, blue: 0.32, alpha: 0.95)
-    static let panel = UIColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.62)
+    static let panel = UIColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.55)
+    static let highlight = UIColor.white.withAlphaComponent(0.18)
     static let dim = UIColor(red: 0.45, green: 0.60, blue: 0.45, alpha: 0.9)
+}
+
+enum TouchControl: String, CaseIterable, Identifiable, Hashable {
+    case joystick
+    case back
+    case action
+    case skip
+    case inv
+    case map
+    case cha
+    case pip
+    case skill
+    case end
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .joystick: return "LOOK"
+        case .back: return "BACK"
+        case .action: return "MOVE"
+        case .skip: return "SKIP"
+        case .inv: return "INV"
+        case .map: return "MAP"
+        case .cha: return "CHA"
+        case .pip: return "PIP"
+        case .skill: return "SKILL"
+        case .end: return "END"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .joystick: return "circle.dashed"
+        case .back: return "chevron.backward"
+        case .action: return "arrow.up.and.down.and.arrow.left.and.right"
+        case .skip: return "forward.end"
+        case .inv: return "bag"
+        case .map: return "map"
+        case .cha: return "person"
+        case .pip: return "book.closed"
+        case .skill: return "star"
+        case .end: return "xmark"
+        }
+    }
+
+    /// Normalized center of the control on the game view. The editor stores
+    /// the same coordinates, so layouts survive resolution and orientation
+    /// changes.
+    var defaultCenter: CGPoint {
+        switch self {
+        case .joystick: return CGPoint(x: 0.14, y: 0.74)
+        case .back: return CGPoint(x: 0.10, y: 0.50)
+        case .action: return CGPoint(x: 0.72, y: 0.59)
+        case .skip: return CGPoint(x: 0.72, y: 0.39)
+        case .inv: return CGPoint(x: 0.82, y: 0.63)
+        case .map: return CGPoint(x: 0.96, y: 0.63)
+        case .cha: return CGPoint(x: 0.82, y: 0.84)
+        case .pip: return CGPoint(x: 0.96, y: 0.84)
+        case .skill: return CGPoint(x: 0.93, y: 0.30)
+        case .end: return CGPoint(x: 0.93, y: 0.10)
+        }
+    }
+}
+
+enum ControlLayout {
+    private static let xSuffix = ".x"
+    private static let ySuffix = ".y"
+
+    private static func key(_ control: TouchControl, _ suffix: String) -> String {
+        return "launcher.control.\(control.rawValue)\(suffix)"
+    }
+
+    static func center(for control: TouchControl) -> CGPoint {
+        let defaults = UserDefaults.standard
+        guard let x = defaults.object(forKey: key(control, xSuffix)) as? Double,
+              let y = defaults.object(forKey: key(control, ySuffix)) as? Double else {
+            return control.defaultCenter
+        }
+        return CGPoint(x: min(max(x, 0), 1), y: min(max(y, 0), 1))
+    }
+
+    static func setCenter(_ point: CGPoint, for control: TouchControl) {
+        let defaults = UserDefaults.standard
+        defaults.set(Double(min(max(point.x, 0), 1)), forKey: key(control, xSuffix))
+        defaults.set(Double(min(max(point.y, 0), 1)), forKey: key(control, ySuffix))
+    }
+
+    static func reset() {
+        let defaults = UserDefaults.standard
+        for control in TouchControl.allCases {
+            defaults.removeObject(forKey: key(control, xSuffix))
+            defaults.removeObject(forKey: key(control, ySuffix))
+        }
+    }
+
+    static func allCenters() -> [TouchControl: CGPoint] {
+        var centers: [TouchControl: CGPoint] = [:]
+        for control in TouchControl.allCases {
+            centers[control] = center(for: control)
+        }
+        return centers
+    }
 }
 
 final class GameControlsOverlay: UIView {
@@ -98,8 +202,18 @@ final class GameControlsOverlay: UIView {
     private let skipButton = LabeledControlButton(
         title: "SKIP",
         symbol: "forward.end",
-        iconPointSize: 20,
+        iconPointSize: 22,
         accent: true
+    )
+    private let skillButton = LabeledControlButton(
+        title: "SKILL",
+        symbol: "star",
+        iconPointSize: 22
+    )
+    private let endButton = LabeledControlButton(
+        title: "END",
+        symbol: "xmark",
+        iconPointSize: 22
     )
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
@@ -148,20 +262,26 @@ final class GameControlsOverlay: UIView {
             ("MAP", "map"),
             ("CHA", "person"),
             ("PIP", "book.closed"),
-            ("SKILL", "star"),
-            ("END", "xmark"),
         ]
         for (index, item) in sideActions.enumerated() {
             let button = LabeledControlButton(
                 title: item.0,
                 symbol: item.1,
-                iconPointSize: 15
+                iconPointSize: 18
             )
             button.tag = index
             button.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
             sideButtons.append(button)
             addSubview(button)
         }
+
+        skillButton.tag = 4
+        skillButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(skillButton)
+
+        endButton.tag = 5
+        endButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(endButton)
 
         skipButton.tag = 6
         skipButton.isHidden = true
@@ -196,76 +316,36 @@ final class GameControlsOverlay: UIView {
         let defaults = UserDefaults.standard
         let joystickScale = CGFloat(defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0)
         let buttonScale = CGFloat(defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0)
-        let leftHanded = defaults.bool(forKey: "launcher.leftHanded")
 
-        var gameWidthValue: Int32 = 0
-        var gameHeightValue: Int32 = 0
-        fallout_ios_screen_size(&gameWidthValue, &gameHeightValue)
-        let gameWidth = CGFloat(max(Int(gameWidthValue), 640))
-        let gameHeight = CGFloat(max(Int(gameHeightValue), 480))
-        let hudWidth = min(bounds.width, bounds.width * 640.0 / gameWidth)
-        let hudHeight = min(bounds.height, bounds.height * 100.0 / gameHeight)
-        let hudLeft = (bounds.width - hudWidth) / 2
-        let hudRight = hudLeft + hudWidth
-        let hudTop = bounds.height - hudHeight
+        let joystickSize = max(80, min(160, bounds.height * 0.30 * joystickScale))
+        let actionSize = max(64, min(120, bounds.height * 0.22 * buttonScale))
+        let skipSize = max(52, min(100, actionSize * 0.76))
+        let backSize = max(42, min(76, joystickSize * 0.46))
+        let sideSize = max(42, min(86, bounds.height * 0.19 * buttonScale))
+        let topSize = max(44, min(88, bounds.height * 0.19 * buttonScale))
 
-        let insets = safeAreaInsets
-        let margin: CGFloat = 14
-        let bottomY = bounds.height - insets.bottom - margin
-        let joystickSize = max(80, min(132, max(92, min(112, bounds.height * 0.26)) * joystickScale))
-        joystick.frame = CGRect(
-            x: leftHanded ? bounds.width - insets.right - joystickSize - margin : insets.left + margin,
-            y: bottomY - joystickSize,
-            width: joystickSize,
-            height: joystickSize
-        )
+        place(joystick, at: .joystick, size: CGSize(width: joystickSize, height: joystickSize))
+        place(backButton, at: .back, size: CGSize(width: backSize, height: backSize))
+        place(actionButton, at: .action, size: CGSize(width: actionSize, height: actionSize))
+        place(skipButton, at: .skip, size: CGSize(width: skipSize, height: skipSize))
 
-        let backSize = max(44, min(56, joystickSize * 0.48))
-        backButton.frame = CGRect(
-            x: leftHanded ? joystick.frame.minX - 8 - backSize : joystick.frame.maxX + 8,
-            y: joystick.frame.midY - backSize / 2,
-            width: backSize,
-            height: backSize
-        )
-
-        let actionSize = max(66, min(92, 76 * buttonScale))
-        let actionX = leftHanded ? hudLeft + 10 : hudRight - actionSize - 10
-        actionButton.frame = CGRect(
-            x: actionX,
-            y: max(insets.top + 8, hudTop - actionSize - 10),
-            width: actionSize,
-            height: actionSize
-        )
-
-        let skipSize = max(54, min(72, 62 * buttonScale))
-        skipButton.frame = CGRect(
-            x: leftHanded ? actionButton.frame.maxX + 8 : actionButton.frame.minX - 8 - skipSize,
-            y: actionButton.frame.midY - skipSize / 2,
-            width: skipSize,
-            height: skipSize
-        )
-
-        let gap: CGFloat = 3
-        let sideSpace = leftHanded ? hudLeft - insets.left - 8 : bounds.width - insets.right - hudRight - 8
-        let sideSize = max(24, min(44,
-            (sideSpace - gap * 5) / 6,
-            hudHeight - 6
-        ))
-        let rowWidth = sideSize * 6 + gap * 5
-        let rowX = leftHanded ? insets.left + 4 : bounds.width - insets.right - 4 - rowWidth
-        let rowY = min(
-            hudTop + max(2, (hudHeight - sideSize) / 2),
-            bounds.height - insets.bottom - sideSize - 2
-        )
-
-        for (index, button) in sideButtons.enumerated() {
-            button.frame = CGRect(
-                x: rowX + CGFloat(index) * (sideSize + gap),
-                y: rowY,
-                width: sideSize,
-                height: sideSize
-            )
+        let sideControls: [TouchControl] = [.inv, .map, .cha, .pip]
+        for (index, button) in sideButtons.enumerated() where index < sideControls.count {
+            place(button, at: sideControls[index], size: CGSize(width: sideSize, height: sideSize))
         }
+
+        place(skillButton, at: .skill, size: CGSize(width: topSize, height: topSize))
+        place(endButton, at: .end, size: CGSize(width: topSize, height: topSize))
+    }
+
+    private func place(_ view: UIView, at control: TouchControl, size: CGSize) {
+        let normalized = ControlLayout.center(for: control)
+        let halfWidth = size.width / 2
+        let halfHeight = size.height / 2
+        let insets = safeAreaInsets
+        let x = min(max(normalized.x * bounds.width, insets.left + halfWidth + 4), bounds.width - insets.right - halfWidth - 4)
+        let y = min(max(normalized.y * bounds.height, insets.top + halfHeight + 4), bounds.height - insets.bottom - halfHeight - 4)
+        view.frame = CGRect(x: x - halfWidth, y: y - halfHeight, width: size.width, height: size.height)
     }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
@@ -280,12 +360,7 @@ final class GameControlsOverlay: UIView {
 
     @objc private func primaryAction() {
         fallout_ios_right_click()
-        actionButton.setActive(true)
         UISelectionFeedbackGenerator().selectionChanged()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-            self?.actionButton.setActive(false)
-        }
     }
 
     @objc private func goBack() {
@@ -328,6 +403,8 @@ final class GameControlsOverlay: UIView {
         for (index, button) in sideButtons.enumerated() {
             button.isEnabled = fallout_ios_action_available(Int32(index)) != 0
         }
+        skillButton.isEnabled = fallout_ios_action_available(4) != 0
+        endButton.isEnabled = fallout_ios_action_available(5) != 0
         skipButton.isHidden = fallout_ios_action_available(6) == 0
     }
 }
@@ -380,16 +457,6 @@ private final class LabeledControlButton: UIControl {
         accessibilityLabel = title
     }
 
-    func setActive(_ active: Bool) {
-        let color = active ? ControlTheme.amber : (accent ? ControlTheme.amber : ControlTheme.green)
-        backgroundColor = active
-            ? ControlTheme.amber.withAlphaComponent(0.22)
-            : ControlTheme.panel
-        layer.borderColor = color.withAlphaComponent(active ? 1.0 : 0.6).cgColor
-        tintColor = color
-        label.textColor = color
-    }
-
     override var isEnabled: Bool {
         didSet {
             alpha = isEnabled ? 1.0 : 0.35
@@ -398,9 +465,12 @@ private final class LabeledControlButton: UIControl {
 
     override var isHighlighted: Bool {
         didSet {
-            backgroundColor = isHighlighted
-                ? (accent ? ControlTheme.amber : ControlTheme.green).withAlphaComponent(0.16)
-                : ControlTheme.panel
+            let normal = accent ? ControlTheme.amber : ControlTheme.green
+            backgroundColor = isHighlighted ? ControlTheme.highlight : ControlTheme.panel
+            layer.borderColor = (isHighlighted ? UIColor.white : normal)
+                .withAlphaComponent(isHighlighted ? 0.75 : 0.6).cgColor
+            tintColor = isHighlighted ? .white : normal
+            label.textColor = isHighlighted ? .white : normal
         }
     }
 
@@ -440,28 +510,25 @@ private final class CameraJoystickControl: UIControl {
         isMultipleTouchEnabled = false
         isExclusiveTouch = true
 
-        ring.fillColor = ControlTheme.panel.withAlphaComponent(0.40).cgColor
-        ring.strokeColor = ControlTheme.green.withAlphaComponent(0.55).cgColor
-        ring.lineWidth = 1.5
-        ring.shadowColor = ControlTheme.green.cgColor
-        ring.shadowOpacity = 0.20
-        ring.shadowRadius = 8
-        ring.shadowOffset = .zero
+        ring.fillColor = ControlTheme.panel.withAlphaComponent(0.30).cgColor
+        ring.strokeColor = ControlTheme.green.withAlphaComponent(0.40).cgColor
+        ring.lineWidth = 1.2
+        ring.shadowOpacity = 0
         layer.addSublayer(ring)
 
         crosshair.fillColor = UIColor.clear.cgColor
-        crosshair.strokeColor = ControlTheme.green.withAlphaComponent(0.24).cgColor
-        crosshair.lineWidth = 1.2
+        crosshair.strokeColor = ControlTheme.green.withAlphaComponent(0.16).cgColor
+        crosshair.lineWidth = 1
         crosshair.lineCap = .round
         layer.addSublayer(crosshair)
 
         knob.isUserInteractionEnabled = false
-        knob.backgroundColor = ControlTheme.green.withAlphaComponent(0.14)
-        knob.layer.borderWidth = 1.5
-        knob.layer.borderColor = ControlTheme.green.withAlphaComponent(0.85).cgColor
+        knob.backgroundColor = ControlTheme.green.withAlphaComponent(0.10)
+        knob.layer.borderWidth = 1.2
+        knob.layer.borderColor = ControlTheme.green.withAlphaComponent(0.65).cgColor
         knob.layer.shadowColor = ControlTheme.green.cgColor
-        knob.layer.shadowOpacity = 0.35
-        knob.layer.shadowRadius = 6
+        knob.layer.shadowOpacity = 0.10
+        knob.layer.shadowRadius = 4
         knob.layer.shadowOffset = .zero
         addSubview(knob)
 
@@ -548,7 +615,7 @@ private final class CameraJoystickControl: UIControl {
                        delay: 0,
                        options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut]) {
             self.knob.center = target
-            self.knob.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
+            self.knob.transform = CGAffineTransform(scaleX: 1.03, y: 1.03)
         }
         fallout_ios_camera_pan(Double(dx / maxRadius), Double(dy / maxRadius))
     }
