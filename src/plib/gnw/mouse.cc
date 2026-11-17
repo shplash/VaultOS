@@ -431,6 +431,17 @@ void mouse_info()
         return;
     }
 
+    // Taps are reported when the finger lifts, so send the press now and the
+    // matching release on the next frame. Without this the button can remain
+    // held down while the camera joystick moves the cursor, making the player
+    // walk toward it on their own.
+    static int pendingTapRelease;
+    if (pendingTapRelease != 0) {
+        pendingTapRelease = 0;
+        mouse_simulate_input(0, 0, 0);
+        return;
+    }
+
     Gesture gesture;
     if (touch_get_gesture(&gesture)) {
         static int prevx;
@@ -442,14 +453,27 @@ void mouse_info()
 
         switch (gesture.type) {
         case kTap:
+            // Touch input clicks where the finger actually is. The camera
+            // stick leaves the game cursor at an edge or in the center, so
+            // without this a tap would act on that stale position instead.
+            mouse_set_position(gesture.x, gesture.y);
             if (gesture.numberOfTouches == 1) {
                 mouse_simulate_input(0, 0, primaryButton);
+                pendingTapRelease = primaryButton;
             } else if (gesture.numberOfTouches == 2) {
                 mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
+                pendingTapRelease = MOUSE_STATE_RIGHT_BUTTON_DOWN;
             }
             break;
         case kLongPress:
         case kPan:
+            if (gesture.state == kEnded) {
+                // A long press holds the button down; always release it when
+                // the finger lifts, otherwise Fallout keeps walking.
+                mouse_simulate_input(0, 0, 0);
+                break;
+            }
+
             if (gesture.state == kBegan) {
                 prevx = gesture.x;
                 prevy = gesture.y;
@@ -687,11 +711,27 @@ void mouse_get_position(int* x, int* y)
 // 0x4B528C
 void mouse_set_position(int x, int y)
 {
+    Rect previousRect;
+    mouse_get_rect(&previousRect);
+
+    const int previousX = mouse_x;
+    const int previousY = mouse_y;
+
     mouse_x = x - mouse_hotx;
     mouse_y = y - mouse_hoty;
-    raw_y = y - mouse_hoty;
-    raw_x = x - mouse_hotx;
     mouse_clip();
+
+    raw_x = mouse_x;
+    raw_y = mouse_y;
+
+    // Moving the cursor from outside the normal input path has to restore the
+    // old cursor area and draw the cursor at its new position, or the sprite
+    // stays behind while the engine acts on the new coordinates.
+    if (have_mouse && !mouse_is_hidden
+        && (mouse_x != previousX || mouse_y != previousY)) {
+        win_refresh_all(&previousRect);
+        mouse_show();
+    }
 }
 
 // 0x4B52C0
