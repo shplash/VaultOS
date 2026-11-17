@@ -93,10 +93,28 @@ void send_mouse_button(Uint8 button, bool down)
 
 // Reload and fire mode only make sense with a weapon in hand; reloading also
 // needs a weapon that takes ammunition (melee weapons have no ammo capacity).
-int has_weapon_in_hand()
+// The interface seeds both hands with (Object*)-1 until its first
+// interfaceUpdateItems call. That sentinel is not a valid object, so it must
+// never be dereferenced by the touch controls (which poll while the HUD is
+// still initializing).
+fallout::Object* active_item()
 {
     fallout::Object* item = nullptr;
-    if (fallout::interfaceGetActiveItem(&item) != 0 || item == nullptr) {
+    if (fallout::interfaceGetActiveItem(&item) != 0) {
+        return nullptr;
+    }
+
+    if (item == nullptr || item == reinterpret_cast<fallout::Object*>(-1)) {
+        return nullptr;
+    }
+
+    return item;
+}
+
+int has_weapon_in_hand()
+{
+    fallout::Object* item = active_item();
+    if (item == nullptr) {
         return 0;
     }
 
@@ -105,8 +123,8 @@ int has_weapon_in_hand()
 
 int has_firearm_in_hand()
 {
-    fallout::Object* item = nullptr;
-    if (fallout::interfaceGetActiveItem(&item) != 0 || item == nullptr) {
+    fallout::Object* item = active_item();
+    if (item == nullptr) {
         return 0;
     }
 
@@ -138,8 +156,8 @@ int fire_mode()
 // animation and sound.
 void reload_active_weapon()
 {
-    fallout::Object* item = nullptr;
-    if (fallout::interfaceGetActiveItem(&item) != 0 || item == nullptr) {
+    fallout::Object* item = active_item();
+    if (item == nullptr) {
         return;
     }
 
