@@ -150,8 +150,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .joystick: return CGPoint(x: 0.18125, y: 0.8110)
         case .back: return CGPoint(x: 0.1160, y: 0.5725)
-        case .action: return CGPoint(x: 0.9415, y: 0.6230)
-        case .skip: return CGPoint(x: 0.9444, y: 0.4755)
+        case .action: return CGPoint(x: 0.9415, y: 0.6900)
+        case .skip: return CGPoint(x: 0.9444, y: 0.5320)
         // Four equal cells filling the strip to the right of the HUD.
         case .map: return CGPoint(x: 0.7795, y: 0.9215)
         case .cha: return CGPoint(x: 0.8386, y: 0.9215)
@@ -176,7 +176,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let side = min(bounds.width * 0.0670, bounds.height * 0.149)
             return CGSize(width: side, height: side)
         case .action:
-            return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.150)
+            return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.171)
         case .skip:
             return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
         case .inv, .map, .cha, .pip:
@@ -190,7 +190,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 8
+    private static let layoutVersion = 9
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
