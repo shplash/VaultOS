@@ -86,7 +86,7 @@ $ mv app /Applications/Fallout
 
   On Windows, right-click the game folder and choose **Send to > Compressed (zipped) folder**; on macOS, right-click it and choose **Compress**.
 
-- Run the app. The launcher starts instead of the game. It is split into pages, reached from the bar along the top; nothing in it scrolls:
+- Run the app. The launcher starts instead of the game. The left rail switches game and page, and Play sits at its foot; nothing in the launcher scrolls:
     - **HOME**: the selected game, its artwork, the installation state and **IMPORT GAME ZIP**. **PLAY** stays in the bottom right corner on every page.
     - **DISPLAY**: the FULL/HALF resolution presets, or a custom width and height.
     - **AUDIO**: sound, music and speech switches, plus the four volumes.

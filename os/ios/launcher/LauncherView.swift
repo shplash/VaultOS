@@ -24,10 +24,7 @@ struct LauncherView: View {
 
                 HStack(spacing: 0) {
                     rail
-                    VStack(spacing: 0) {
-                        gameBar
-                        content
-                    }
+                    content
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
             }
@@ -83,20 +80,45 @@ struct LauncherView: View {
     // MARK: - Rail
 
     private var rail: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(FalloutGame.allCases) { game in
+                    gameTab(game)
+                }
+            }
+            .padding(.bottom, 8)
+
+            Rectangle()
+                .fill(Theme.line)
+                .frame(height: 1)
+                .padding(.bottom, 7)
+
             ForEach(LauncherPage.allCases) { item in
                 railItem(item)
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(model.install.installed == 1 ? accent : Theme.warning)
+                    .frame(width: 5, height: 5)
+
+                Text(statusText)
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .kerning(1)
+                    .foregroundColor(Theme.faint)
+            }
+            .padding(.leading, 3)
+            .padding(.bottom, 7)
 
             playButton
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 18)
-        .padding(.bottom, 16)
-        .frame(width: 178, alignment: .leading)
-        .background(Color.white.opacity(0.025))
+        .padding(.horizontal, 10)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+        .frame(width: 168, alignment: .leading)
+        .background(Color.white.opacity(0.03))
         .overlay(
             Rectangle()
                 .fill(Theme.line)
@@ -117,21 +139,21 @@ struct LauncherView: View {
                     .frame(width: 16, alignment: .leading)
 
                 Text(item.title)
-                    .font(.system(size: 12, weight: selected ? .semibold : .regular, design: .serif))
+                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
                     .kerning(0.6)
 
                 Spacer(minLength: 0)
             }
             .foregroundColor(selected ? Theme.text : Theme.faint)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(selected ? Color.white.opacity(0.06) : Color.clear)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(selected ? accent.opacity(0.45) : Color.clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(selected ? accent.opacity(0.40) : Color.clear, lineWidth: 1)
             )
             .contentShape(Rectangle())
         }
@@ -157,39 +179,7 @@ struct LauncherView: View {
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
 
-    // MARK: - Game bar
-
-    private var gameBar: some View {
-        HStack(alignment: .bottom, spacing: 18) {
-            ForEach(FalloutGame.allCases) { game in
-                gameTab(game)
-            }
-
-            Spacer(minLength: 12)
-
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(model.install.installed == 1 ? accent : Theme.warning)
-                    .frame(width: 6, height: 6)
-
-                Text(statusText)
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .kerning(1.2)
-                    .foregroundColor(model.install.installed == 1 ? Theme.faint : Theme.warning)
-            }
-            .padding(.bottom, 10)
-        }
-        .padding(.horizontal, 22)
-        .padding(.top, 16)
-        .padding(.bottom, 0)
-        .overlay(
-            Rectangle()
-                .fill(Theme.line)
-                .frame(height: 1),
-            alignment: .bottom
-        )
-    }
-
+    /// The game switcher used at the top of the rail.
     private func gameTab(_ game: FalloutGame) -> some View {
         let selected = model.selectedGame == game
 
@@ -205,7 +195,7 @@ struct LauncherView: View {
                         .frame(width: 5, height: 5)
 
                     Text(game.title)
-                        .font(.system(size: 13, weight: selected ? .bold : .medium, design: .serif))
+                        .font(.system(size: 13, weight: selected ? .bold : .medium))
                         .kerning(1.4)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
@@ -254,14 +244,14 @@ struct LauncherView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(model.selectedGame.title)
-                        .font(.system(size: 46, weight: .heavy, design: .serif))
+                        .font(.system(size: 42, weight: .heavy))
                         .kerning(1.5)
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
                     Text(model.selectedGame.tagline)
-                        .font(.system(size: 13, weight: .regular, design: .serif))
+                        .font(.system(size: 13, weight: .regular))
                         .foregroundColor(Theme.dim)
 
                     Text("COMMUNITY EDITION")
@@ -358,7 +348,7 @@ struct LauncherView: View {
                 HStack(spacing: 10) {
                     DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
                     Text("×")
-                        .font(.system(size: 12, weight: .medium, design: .serif))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Theme.faint)
                     DimensionField(title: "H", value: $model.height, range: 480...4096, accent: accent)
                 }
@@ -383,7 +373,7 @@ struct LauncherView: View {
                         .foregroundColor(selected ? accent : Theme.faint)
 
                     Text(verbatim: "\(preset.width) × \(preset.height)")
-                        .font(.system(size: 17, weight: .semibold, design: .serif))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(selected ? Theme.text : Theme.dim)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -583,11 +573,11 @@ struct LauncherView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 25, weight: .bold, design: .serif))
+                    .font(.system(size: 25, weight: .bold))
                     .foregroundColor(Theme.text)
 
                 Text(detail)
-                    .font(.system(size: 11, weight: .regular, design: .serif))
+                    .font(.system(size: 11, weight: .regular))
                     .foregroundColor(Theme.faint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -625,15 +615,15 @@ struct LauncherView: View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium, design: .serif))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Theme.text)
 
                 if let detail = detail {
                     Text(detail)
-                        .font(.system(size: 10, weight: .regular, design: .serif))
+                        .font(.system(size: 10, weight: .regular))
                         .foregroundColor(Theme.faint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -652,7 +642,7 @@ struct LauncherView: View {
 
     private func footnote(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .regular, design: .serif))
+            .font(.system(size: 10, weight: .regular))
             .foregroundColor(Theme.faint)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 12)
@@ -723,7 +713,7 @@ private struct DimensionField: View {
 
             TextField("", text: $text)
                 .keyboardType(.numberPad)
-                .font(.system(size: 15, weight: .medium, design: .serif))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundColor(Theme.text)
                 .accentColor(accent)
                 .padding(.horizontal, 10)
@@ -764,24 +754,24 @@ private extension FalloutGame {
     var accent: Color {
         switch self {
         case .fallout1:
-            return Color(red: 0.92, green: 0.71, blue: 0.42)
+            return Color(red: 0.89, green: 0.64, blue: 0.29)
         case .fallout2:
-            return Color(red: 0.58, green: 0.77, blue: 0.82)
+            return Color(red: 0.42, green: 0.70, blue: 0.62)
         }
     }
 }
 
 private enum Theme {
-    static let background = Color(red: 0.051, green: 0.052, blue: 0.058)
-    static let sheet = Color(red: 0.086, green: 0.087, blue: 0.095)
-    static let panel = Color.white.opacity(0.05)
-    static let line = Color.white.opacity(0.10)
-    static let hairline = Color.white.opacity(0.055)
-    static let text = Color(red: 0.93, green: 0.91, blue: 0.87)
-    static let dim = Color(red: 0.67, green: 0.65, blue: 0.61)
-    static let faint = Color(red: 0.47, green: 0.46, blue: 0.43)
-    static let warning = Color(red: 0.90, green: 0.67, blue: 0.36)
-    static let amber = Color(red: 0.90, green: 0.67, blue: 0.36)
+    static let background = Color(red: 0.047, green: 0.043, blue: 0.039)
+    static let sheet = Color(red: 0.102, green: 0.094, blue: 0.086)
+    static let panel = Color.white.opacity(0.06)
+    static let line = Color.white.opacity(0.11)
+    static let hairline = Color.white.opacity(0.07)
+    static let text = Color(red: 0.95, green: 0.91, blue: 0.85)
+    static let dim = Color(red: 0.71, green: 0.66, blue: 0.58)
+    static let faint = Color(red: 0.50, green: 0.46, blue: 0.40)
+    static let warning = Color(red: 0.85, green: 0.42, blue: 0.28)
+    static let amber = Color(red: 0.89, green: 0.64, blue: 0.29)
 }
 
 private struct LauncherBackdrop: View {
@@ -964,7 +954,7 @@ private struct TouchControlEditor: View {
     private var editorBar: some View {
         HStack(spacing: 10) {
             Text("Touch controls")
-                .font(.system(size: 17, weight: .bold, design: .serif))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundColor(Theme.text)
 
             presetButton("FULL LAYOUT", profile: .full)
