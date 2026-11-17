@@ -2,9 +2,10 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-// The launcher is a single fixed window: one page at a time, switched from the
-// bar at the top. Nothing in it scrolls, because a scroll view inside the
-// engine's nested run loop was what kept hanging the launcher.
+// The launcher is one fixed window: a rail of pages down the left, the selected
+// page as a single sheet of rows to its right, and Play always at the bottom of
+// the rail. Nothing scrolls, because a scroll view inside the engine's nested
+// run loop was what kept hanging the launcher.
 struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     let onPlay: () -> Void
@@ -21,15 +22,14 @@ struct LauncherView: View {
             ZStack {
                 LauncherBackdrop(accent: accent)
 
-                VStack(spacing: 16) {
-                    topBar
-                    pageContent
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    bottomBar
+                HStack(spacing: 0) {
+                    rail
+                    VStack(spacing: 0) {
+                        gameBar
+                        content
+                    }
                 }
-                .padding(.horizontal, 22)
-                .padding(.vertical, 16)
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
         .preferredColorScheme(.dark)
@@ -80,34 +80,117 @@ struct LauncherView: View {
         }
     }
 
-    // MARK: - Top bar
+    // MARK: - Rail
 
-    private var topBar: some View {
-        HStack(alignment: .center, spacing: 14) {
-            HStack(spacing: 8) {
-                ForEach(FalloutGame.allCases) { game in
-                    gameButton(game)
-                }
+    private var rail: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(LauncherPage.allCases) { item in
+                railItem(item)
             }
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 2) {
-                ForEach(LauncherPage.allCases) { item in
-                    Button(item.title) {
-                        page = item
-                    }
-                    .buttonStyle(TabButtonStyle(selected: page == item, accent: accent))
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            statusPill
+            playButton
         }
+        .padding(.horizontal, 12)
+        .padding(.top, 18)
+        .padding(.bottom, 16)
+        .frame(width: 178, alignment: .leading)
+        .background(Color.white.opacity(0.025))
+        .overlay(
+            Rectangle()
+                .fill(Theme.line)
+                .frame(width: 1),
+            alignment: .trailing
+        )
     }
 
-    private func gameButton(_ game: FalloutGame) -> some View {
+    private func railItem(_ item: LauncherPage) -> some View {
+        let selected = page == item
+
+        return Button {
+            page = item
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 16, alignment: .leading)
+
+                Text(item.title)
+                    .font(.system(size: 12, weight: selected ? .semibold : .regular, design: .serif))
+                    .kerning(0.6)
+
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(selected ? Theme.text : Theme.faint)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(selected ? Color.white.opacity(0.06) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(selected ? accent.opacity(0.45) : Color.clear, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var playButton: some View {
+        Button {
+            LauncherMusic.shared.stop()
+            model.play(onPlay: onPlay)
+        } label: {
+            VStack(spacing: 3) {
+                Text("PLAY")
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+
+                Text(model.install.installed == 1 ? "START \(model.selectedGame.title)" : "NEEDS GAME DATA")
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Color.black.opacity(0.5))
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle(accent: accent))
+        .disabled(model.install.installed == 0 || model.isInstalling)
+        .opacity(model.install.installed == 1 ? 1 : 0.35)
+    }
+
+    // MARK: - Game bar
+
+    private var gameBar: some View {
+        HStack(alignment: .bottom, spacing: 18) {
+            ForEach(FalloutGame.allCases) { game in
+                gameTab(game)
+            }
+
+            Spacer(minLength: 12)
+
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(model.install.installed == 1 ? accent : Theme.warning)
+                    .frame(width: 6, height: 6)
+
+                Text(statusText)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .kerning(1.2)
+                    .foregroundColor(model.install.installed == 1 ? Theme.faint : Theme.warning)
+            }
+            .padding(.bottom, 10)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 16)
+        .padding(.bottom, 0)
+        .overlay(
+            Rectangle()
+                .fill(Theme.line)
+                .frame(height: 1),
+            alignment: .bottom
+        )
+    }
+
+    private func gameTab(_ game: FalloutGame) -> some View {
         let selected = model.selectedGame == game
 
         return Button {
@@ -115,52 +198,25 @@ struct LauncherView: View {
                 model.selectedGame = game
             }
         } label: {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(installed(game) ? game.accent : Theme.faint)
-                    .frame(width: 6, height: 6)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(installed(game) ? game.accent : Theme.faint)
+                        .frame(width: 5, height: 5)
 
-                Text(game.title)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(selected ? Theme.text : Theme.dim)
+                    Text(game.title)
+                        .font(.system(size: 13, weight: selected ? .bold : .medium, design: .serif))
+                        .kerning(1.4)
+                        .foregroundColor(selected ? Theme.text : Theme.faint)
+                }
+
+                Rectangle()
+                    .fill(selected ? game.accent : Color.clear)
+                    .frame(height: 2)
             }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(selected ? game.accent.opacity(0.14) : Color.white.opacity(0.03))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(selected ? game.accent.opacity(0.45) : Theme.line, lineWidth: 1)
-            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var statusPill: some View {
-        let ready = model.install.installed == 1
-
-        return HStack(spacing: 7) {
-            Circle()
-                .fill(ready ? accent : Theme.warning)
-                .frame(width: 6, height: 6)
-
-            Text(statusText)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(ready ? Theme.dim : Theme.warning)
-        }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(Color.white.opacity(0.03))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .stroke(Theme.line, lineWidth: 1)
-        )
     }
 
     private var statusText: String {
@@ -173,157 +229,143 @@ struct LauncherView: View {
     // MARK: - Pages
 
     @ViewBuilder
-    private var pageContent: some View {
+    private var content: some View {
         switch page {
         case .home:
-            HStack(alignment: .top, spacing: 18) {
-                hero
-                installCard
-                    .frame(width: 300)
-            }
+            homeSheet
         case .display:
-            HStack(alignment: .top, spacing: 18) {
-                displayCard
-                resolutionCard
-                    .frame(width: 330)
-            }
+            displaySheet
         case .audio:
-            HStack(alignment: .top, spacing: 18) {
-                audioTogglesCard
-                volumeCard
-            }
+            audioSheet
         case .game:
-            HStack(alignment: .top, spacing: 18) {
-                gameplayCard
-                savesCard
-            }
+            gameSheet
         case .touch:
-            HStack(alignment: .top, spacing: 18) {
-                touchCard
-                opacityCard
-            }
+            controlsSheet
         }
     }
 
-    private var hero: some View {
-        ZStack(alignment: .topLeading) {
-            VaultRing(accent: accent)
-                .frame(width: 220, height: 220)
-                .offset(x: -26, y: -34)
-                .opacity(0.5)
+    private var homeSheet: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                VaultRing(accent: accent)
+                    .frame(width: 230, height: 230)
+                    .offset(x: 40, y: -46)
+                    .opacity(0.75)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.selectedGame.title)
+                        .font(.system(size: 46, weight: .heavy, design: .serif))
+                        .kerning(1.5)
+                        .foregroundColor(Theme.text)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
 
-                Text(model.selectedGame.title)
-                    .font(.system(size: 46, weight: .semibold, design: .rounded))
-                    .foregroundColor(Theme.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    Text(model.selectedGame.tagline)
+                        .font(.system(size: 13, weight: .regular, design: .serif))
+                        .foregroundColor(Theme.dim)
 
-                Text(model.selectedGame.tagline)
-                    .font(.system(size: 14, weight: .regular, design: .rounded))
-                    .foregroundColor(Theme.dim)
-                    .lineLimit(1)
-
-                Text("COMMUNITY EDITION")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .kerning(2.4)
-                    .foregroundColor(accent.opacity(0.85))
-
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            .padding(.leading, 4)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
-    }
-
-    private var installCard: some View {
-        card(title: "INSTALLATION") {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(model.install.installed == 1 ? "Ready to play" : "Game files required")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundColor(model.install.installed == 1 ? Theme.text : Theme.warning)
-
-                Text(installNote)
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundColor(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(model.installRows.indices, id: \.self) { index in
-                    fileRow(model.installRows[index].0, present: model.installRows[index].1)
+                    Text("COMMUNITY EDITION")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .kerning(2.2)
+                        .foregroundColor(accent.opacity(0.8))
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+            .clipped()
 
-            if model.isInstalling {
-                ProgressView(value: min(max(model.progress, 0), 1))
-                    .accentColor(accent)
+            Rectangle()
+                .fill(Theme.line)
+                .frame(height: 1)
 
-                Text(model.statusText)
-                    .font(.system(size: 10, weight: .regular, design: .monospaced))
-                    .foregroundColor(Theme.dim)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 0) {
+                row("Game data",
+                    detail: model.install.installed == 1 ? "Ready to play" : "Not installed yet") {
+                    Button {
+                        model.showImporter = true
+                    } label: {
+                        Text(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP")
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.isInstalling)
+                }
+
+                HStack(spacing: 16) {
+                    ForEach(model.installRows.indices, id: \.self) { index in
+                        fileChip(model.installRows[index].0, present: model.installRows[index].1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 12)
+                .overlay(
+                    Rectangle()
+                        .fill(Theme.hairline)
+                        .frame(height: 1),
+                    alignment: .bottom
+                )
+
+                if model.isInstalling {
+                    ProgressView(value: min(max(model.progress, 0), 1))
+                        .accentColor(accent)
+                        .padding(.vertical, 10)
+
+                    Text(model.statusText)
+                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .foregroundColor(Theme.faint)
+                        .lineLimit(1)
+                }
+
+                footnote(model.install.has_saves == 1
+                    ? "Your existing saves are kept. Re-importing replaces the game files only."
+                    : "Each game keeps its own data, configuration and savegames.")
             }
-
-            Spacer(minLength: 4)
-
-            Button {
-                model.showImporter = true
-            } label: {
-                Text(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP")
-            }
-            .buttonStyle(SecondaryButtonStyle(accent: accent))
-            .disabled(model.isInstalling)
-        }
-    }
-
-    private var installNote: String {
-        if model.install.installed == 1 {
-            return model.install.has_saves == 1
-                ? "Your data and existing saves are in place."
-                : "Your game data is in place."
-        }
-
-        switch model.selectedGame {
-        case .fallout1:
-            return "Import a ZIP with master.dat, critter.dat and the data folder."
-        case .fallout2:
-            return "Import a ZIP with master.dat, critter.dat, patch000.dat and the data folder."
-        }
-    }
-
-    private func fileRow(_ name: String, present: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: present ? "checkmark.circle.fill" : "circle.dashed")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(present ? accent : Theme.faint)
-
-            Text(name)
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                .foregroundColor(present ? Theme.dim : Theme.faint)
+            .padding(.horizontal, 22)
+            .padding(.top, 4)
 
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Theme.sheet)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Theme.line, lineWidth: 1)
+        )
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
     }
 
-    private var displayCard: some View {
-        card(title: "RESOLUTION") {
+    private var displaySheet: some View {
+        sheet(title: "Display", detail: "How large the game world and its interface are drawn") {
             HStack(spacing: 12) {
                 ForEach(model.presets) { preset in
                     presetTile(preset)
                 }
             }
+            .padding(.vertical, 12)
+            .overlay(
+                Rectangle()
+                    .fill(Theme.hairline)
+                    .frame(height: 1),
+                alignment: .bottom
+            )
 
-            Text("FULL renders at two screen pixels per game pixel, HALF at about one and a half, which keeps the interface readable on a phone.")
-                .font(.system(size: 11, weight: .regular, design: .rounded))
-                .foregroundColor(Theme.faint)
-                .fixedSize(horizontal: false, vertical: true)
+            row("Custom size", detail: "Written to the game's resolution file on Play") {
+                HStack(spacing: 10) {
+                    DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
+                    Text("×")
+                        .font(.system(size: 12, weight: .medium, design: .serif))
+                        .foregroundColor(Theme.faint)
+                    DimensionField(title: "H", value: $model.height, range: 480...4096, accent: accent)
+                }
+                .frame(width: 240)
+            }
 
-            Spacer(minLength: 0)
+            footnote("FULL draws two screen pixels per game pixel, HALF about one and a half. HALF keeps the interface readable on a phone.")
         }
     }
 
@@ -333,90 +375,104 @@ struct LauncherView: View {
         return Button {
             model.apply(preset: preset)
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(preset.id.uppercased())
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .kerning(1.6)
-                    .foregroundColor(selected ? accent : Theme.dim)
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(preset.id.uppercased())
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .kerning(1.6)
+                        .foregroundColor(selected ? accent : Theme.faint)
 
-                Text("\(preset.width) × \(preset.height)")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundColor(selected ? Theme.text : Theme.dim)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    Text(verbatim: "\(preset.width) × \(preset.height)")
+                        .font(.system(size: 17, weight: .semibold, design: .serif))
+                        .foregroundColor(selected ? Theme.text : Theme.dim)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
 
-                Text(selected ? "IN USE" : "TAP TO USE")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(selected ? accent.opacity(0.85) : Theme.faint)
+                Spacer(minLength: 0)
+
+                Text(selected ? "IN USE" : "USE")
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .foregroundColor(selected ? accent : Theme.faint)
             }
-            .padding(14)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(selected ? accent.opacity(0.12) : Color.white.opacity(0.03))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(selected ? accent.opacity(0.10) : Color.white.opacity(0.03))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(selected ? accent.opacity(0.5) : Theme.line, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(selected ? accent.opacity(0.45) : Theme.hairline, lineWidth: 1)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private var resolutionCard: some View {
-        card(title: "CUSTOM") {
-            HStack(spacing: 14) {
-                DimensionField(title: "WIDTH", value: $model.width, range: 640...4096, accent: accent)
-                DimensionField(title: "HEIGHT", value: $model.height, range: 480...4096, accent: accent)
+    private var audioSheet: some View {
+        sheet(title: "Audio", detail: "Sound, music and speech, kept per game") {
+            row("Channels", detail: "Tap to switch a channel off") {
+                HStack(spacing: 8) {
+                    channelPill("SFX", isOn: $model.sound)
+                    channelPill("MUSIC", isOn: $model.music)
+                    channelPill("SPEECH", isOn: $model.speech)
+                }
             }
 
-            Text("Written to the game's own resolution file when you press Play.")
-                .font(.system(size: 11, weight: .regular, design: .rounded))
-                .foregroundColor(Theme.faint)
-                .fixedSize(horizontal: false, vertical: true)
+            volumeRow("Master", value: $model.masterVolume)
+            volumeRow("Music", value: $model.musicVolume)
+            volumeRow("Effects", value: $model.sfxVolume)
+            volumeRow("Speech", value: $model.speechVolume)
 
-            Spacer(minLength: 0)
+            footnote("Launcher theme: \(LauncherMusic.themeLabel(for: model.selectedGame)).")
         }
     }
 
-    private var audioTogglesCard: some View {
-        card(title: "SOUND") {
-            toggleRow("SOUND EFFECTS", isOn: $model.sound)
-            toggleRow("MUSIC", isOn: $model.music)
-            toggleRow("SPEECH", isOn: $model.speech)
-
-            Spacer(minLength: 4)
-
-            Text("THEME: \(LauncherMusic.themeLabel(for: model.selectedGame))")
+    private func channelPill(_ title: String, isOn: Binding<Bool>) -> some View {
+        Button {
+            isOn.wrappedValue.toggle()
+        } label: {
+            Text(title)
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundColor(Theme.faint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-
-            Spacer(minLength: 0)
+                .kerning(0.8)
+                .foregroundColor(isOn.wrappedValue ? Color.black.opacity(0.75) : Theme.faint)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isOn.wrappedValue ? accent : Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(isOn.wrappedValue ? Color.clear : Theme.hairline, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
     }
 
-    private var volumeCard: some View {
-        card(title: "VOLUME") {
-            sliderRow("MASTER", value: $model.masterVolume, range: 0...100, unit: "%")
-            sliderRow("MUSIC", value: $model.musicVolume, range: 0...100, unit: "%")
-            sliderRow("EFFECTS", value: $model.sfxVolume, range: 0...100, unit: "%")
-            sliderRow("SPEECH", value: $model.speechVolume, range: 0...100, unit: "%")
-            Spacer(minLength: 0)
-        }
-    }
+    private func volumeRow(_ title: String, value: Binding<Double>) -> some View {
+        row(title, detail: nil) {
+            HStack(spacing: 12) {
+                Slider(value: value, in: 0...100)
+                    .accentColor(accent)
+                    .frame(width: 220)
 
-    private var gameplayCard: some View {
-        card(title: "GAMEPLAY") {
-            HStack(spacing: 10) {
-                Text("LANGUAGE")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                Text(verbatim: "\(Int(value.wrappedValue.rounded()))%")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundColor(Theme.dim)
+                    .frame(width: 38, alignment: .trailing)
+            }
+        }
+    }
 
-                Spacer(minLength: 6)
-
+    private var gameSheet: some View {
+        sheet(title: "Game", detail: "Language, subtitles and how the character moves") {
+            row("Language", detail: "Text and voice") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
@@ -424,7 +480,7 @@ struct LauncherView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text(model.languageNames.indices.contains(model.language)
                             ? model.languageNames[model.language]
                             : "ENGLISH")
@@ -432,193 +488,174 @@ struct LauncherView: View {
                             .minimumScaleFactor(0.7)
 
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 8, weight: .bold))
                     }
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundColor(accent)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .frame(minWidth: 110, alignment: .leading)
+                    .padding(.vertical, 8)
                     .background(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(Theme.line, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Theme.hairline, lineWidth: 1)
                     )
                 }
             }
 
-            toggleRow("SUBTITLES", isOn: $model.subtitles)
-            toggleRow("RUN, DON'T WALK", isOn: $model.alwaysRun)
+            toggleRow("Subtitles", detail: "Spoken lines appear as text", isOn: $model.subtitles)
+            toggleRow("Run, don't walk",
+                      detail: "Moves at a run; hold Shift to walk",
+                      isOn: $model.alwaysRun)
 
-            Text("Running moves faster and Shift walks instead. Subtitles and running are written to the game's configuration.")
-                .font(.system(size: 11, weight: .regular, design: .rounded))
-                .foregroundColor(Theme.faint)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
+            footnote("Both are written into the game's own configuration on Play.")
         }
     }
 
-    private var savesCard: some View {
-        card(title: "SAVES AND FILES") {
-            Text(model.selectedGame == .fallout2
-                ? "Fallout 2 keeps its data, configuration and SAVEGAME folder in Documents/Fallout2, apart from the first game."
-                : "Fallout keeps its data, configuration and SAVEGAME folder in the app's Documents folder.")
-                .font(.system(size: 12, weight: .regular, design: .rounded))
-                .foregroundColor(Theme.dim)
-                .fixedSize(horizontal: false, vertical: true)
+    private var controlsSheet: some View {
+        sheet(title: "Controls", detail: "Size and opacity of the on-screen controls") {
+            scaleRow("Joystick", detail: "Camera pad in the lower left", value: $model.joystickScale)
+            scaleRow("Buttons", detail: "All on-screen buttons", value: $model.buttonScale)
+            scaleRow("Opacity", detail: "Unusable buttons hold their dimming until the slider goes below it",
+                     value: $model.controlsOpacity)
 
-            Text("Importing a ZIP again replaces the game data and leaves your saves alone. File Sharing is on, so Finder can copy files in and out.")
-                .font(.system(size: 12, weight: .regular, design: .rounded))
-                .foregroundColor(Theme.faint)
-                .fixedSize(horizontal: false, vertical: true)
+            toggleRow("White buttons", detail: "Neutral colour instead of the game accent", isOn: $model.whiteButtons)
 
-            Spacer(minLength: 0)
+            HStack {
+                Spacer(minLength: 0)
+
+                Button {
+                    showControlEditor = true
+                } label: {
+                    Text("EDIT CONTROL LAYOUT")
+                }
+                .buttonStyle(SmallButtonStyle(accent: accent))
+            }
+            .padding(.top, 12)
         }
     }
 
-    private var touchCard: some View {
-        card(title: "TOUCH LAYOUT") {
-            sliderRow("JOYSTICK SIZE", value: $model.joystickScale, range: 0.75...1.35, unit: "%")
-            sliderRow("BUTTON SIZE", value: $model.buttonScale, range: 0.75...1.35, unit: "%")
+    private func scaleRow(_ title: String, detail: String, value: Binding<Double>) -> some View {
+        row(title, detail: detail) {
+            HStack(spacing: 12) {
+                Slider(value: value, in: 0.15...1.35)
+                    .accentColor(accent)
+                    .frame(width: 200)
 
-            toggleRow("WHITE BUTTONS", isOn: $model.whiteButtons)
+                Text(verbatim: "\(Int((value.wrappedValue * 100).rounded()))%")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .frame(width: 38, alignment: .trailing)
+            }
+        }
+    }
 
-            Spacer(minLength: 0)
-
+    private func toggleRow(_ title: String, detail: String, isOn: Binding<Bool>) -> some View {
+        row(title, detail: detail) {
             Button {
-                showControlEditor = true
+                isOn.wrappedValue.toggle()
             } label: {
-                Text("EDIT CONTROL LAYOUT")
+                PillToggle(isOn: isOn.wrappedValue, accent: accent)
             }
-            .buttonStyle(SecondaryButtonStyle(accent: accent))
+            .buttonStyle(.plain)
+            .accessibilityLabel(title)
+            .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
         }
     }
 
-    private var opacityCard: some View {
-        card(title: "CONTROLS OPACITY") {
-            sliderRow("OPACITY", value: $model.controlsOpacity, range: 0.15...1, unit: "%")
+    private func fileChip(_ name: String, present: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: present ? "checkmark" : "minus")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(present ? accent : Theme.faint)
 
-            HStack(spacing: 10) {
-                opacitySample("ACTION", enabled: true, strong: true)
-                opacitySample("PIP", enabled: true, strong: false)
-                opacitySample("MODE", enabled: false, strong: false)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text("Unusable buttons keep their own dimming until this slider goes below it; only then do they fade with the rest.")
-                .font(.system(size: 11, weight: .regular, design: .rounded))
-                .foregroundColor(Theme.faint)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
+            Text(name)
+                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                .foregroundColor(present ? Theme.dim : Theme.faint)
         }
     }
 
-    private func opacitySample(_ title: String, enabled: Bool, strong: Bool) -> some View {
-        let base = CGFloat(model.controlsOpacity)
-        let value = enabled ? base : min(0.35, base)
+    // MARK: - Sheet pieces
 
-        return Text(title)
-            .font(.system(size: 9, weight: .bold, design: .monospaced))
-            .foregroundColor(accent)
-            .frame(width: strong ? 62 : 46, height: strong ? 44 : 34)
-            .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Theme.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(accent.opacity(0.45), lineWidth: 1)
-            )
-            .opacity(Double(value))
-    }
-
-    // MARK: - Bottom bar
-
-    private var bottomBar: some View {
-        HStack(alignment: .center, spacing: 16) {
+    private func sheet<C: View>(title: String, detail: String, @ViewBuilder rows: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(page.hint)
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundColor(Theme.faint)
-                    .lineLimit(2)
+                Text(title)
+                    .font(.system(size: 25, weight: .bold, design: .serif))
+                    .foregroundColor(Theme.text)
 
-                Text("SETTINGS ARE STORED FOR EACH GAME")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.faint.opacity(0.7))
+                Text(detail)
+                    .font(.system(size: 11, weight: .regular, design: .serif))
+                    .foregroundColor(Theme.faint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+            .padding(.horizontal, 22)
+            .padding(.top, 16)
+            .padding(.bottom, 10)
+
+            Rectangle()
+                .fill(Theme.line)
+                .frame(height: 1)
+
+            VStack(alignment: .leading, spacing: 0) {
+                rows()
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 2)
 
             Spacer(minLength: 0)
-
-            Button {
-                LauncherMusic.shared.stop()
-                model.play(onPlay: onPlay)
-            } label: {
-                Text("PLAY")
-            }
-            .buttonStyle(PrimaryButtonStyle(accent: accent))
-            .frame(width: 210)
-            .disabled(model.install.installed == 0 || model.isInstalling)
-            .opacity(model.install.installed == 1 ? 1 : 0.35)
         }
-    }
-
-    // MARK: - Shared pieces
-
-    private func card<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title.uppercased())
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .kerning(1.8)
-                .foregroundColor(Theme.faint)
-
-            content()
-        }
-        .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Theme.surface)
+                .fill(Theme.sheet)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Theme.line, lineWidth: 1)
         )
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
     }
 
-    private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(Theme.dim)
+    private func row<C: View>(_ title: String, detail: String?, @ViewBuilder control: () -> C) -> some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium, design: .serif))
+                    .foregroundColor(Theme.text)
+
+                if let detail = detail {
+                    Text(detail)
+                        .font(.system(size: 10, weight: .regular, design: .serif))
+                        .foregroundColor(Theme.faint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            control()
         }
-        .toggleStyle(SwitchToggleStyle())
-        .accentColor(accent)
-        .padding(.vertical, 2)
+        .padding(.vertical, 10)
+        .overlay(
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
 
-    private func sliderRow(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String) -> some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundColor(Theme.dim)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(width: 92, alignment: .leading)
-
-            Slider(value: value, in: range)
-                .accentColor(accent)
-
-            Text("\(Int((value.wrappedValue * 100).rounded()))%")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(Theme.text)
-                .frame(width: 38, alignment: .trailing)
-        }
-        .frame(height: 34)
+    private func footnote(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .regular, design: .serif))
+            .foregroundColor(Theme.faint)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 12)
     }
 
     private func installed(_ game: FalloutGame) -> Bool {
@@ -641,26 +678,21 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .home: return "HOME"
-        case .display: return "DISPLAY"
-        case .audio: return "AUDIO"
-        case .game: return "GAME"
-        case .touch: return "CONTROLS"
+        case .home: return "Home"
+        case .display: return "Display"
+        case .audio: return "Audio"
+        case .game: return "Game"
+        case .touch: return "Controls"
         }
     }
 
-    var hint: String {
+    var symbol: String {
         switch self {
-        case .home:
-            return "Import your game data once, then press Play."
-        case .display:
-            return "Pick the resolution the game renders at."
-        case .audio:
-            return "Sound, music and speech can be switched off separately."
-        case .game:
-            return "Language, subtitles and how the character moves."
-        case .touch:
-            return "Size and opacity of the on-screen controls."
+        case .home: return "house"
+        case .display: return "display"
+        case .audio: return "speaker.wave.2"
+        case .game: return "person"
+        case .touch: return "hand.tap"
         }
     }
 }
@@ -684,26 +716,25 @@ private struct DimensionField: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        HStack(spacing: 6) {
             Text(title)
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .kerning(1.6)
                 .foregroundColor(Theme.faint)
 
             TextField("", text: $text)
                 .keyboardType(.numberPad)
-                .font(.system(size: 18, weight: .medium, design: .rounded))
+                .font(.system(size: 15, weight: .medium, design: .serif))
                 .foregroundColor(Theme.text)
                 .accentColor(accent)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 11)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(Color.white.opacity(0.05))
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .stroke(Theme.line, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Theme.hairline, lineWidth: 1)
                 )
                 .onChange(of: text) { newValue in
                     let digits = newValue.filter { $0.isNumber }
@@ -733,23 +764,24 @@ private extension FalloutGame {
     var accent: Color {
         switch self {
         case .fallout1:
-            return Color(red: 0.93, green: 0.72, blue: 0.42)
+            return Color(red: 0.92, green: 0.71, blue: 0.42)
         case .fallout2:
-            return Color(red: 0.56, green: 0.77, blue: 0.84)
+            return Color(red: 0.58, green: 0.77, blue: 0.82)
         }
     }
 }
 
 private enum Theme {
-    static let background = Color(red: 0.047, green: 0.050, blue: 0.058)
-    static let surface = Color.white.opacity(0.045)
-    static let line = Color.white.opacity(0.09)
-    static let text = Color(red: 0.93, green: 0.925, blue: 0.912)
-    static let dim = Color(red: 0.63, green: 0.63, blue: 0.61)
-    static let faint = Color(red: 0.43, green: 0.43, blue: 0.42)
-    static let warning = Color(red: 0.93, green: 0.70, blue: 0.36)
-    static let amber = Color(red: 0.93, green: 0.70, blue: 0.36)
+    static let background = Color(red: 0.051, green: 0.052, blue: 0.058)
+    static let sheet = Color(red: 0.086, green: 0.087, blue: 0.095)
     static let panel = Color.white.opacity(0.05)
+    static let line = Color.white.opacity(0.10)
+    static let hairline = Color.white.opacity(0.055)
+    static let text = Color(red: 0.93, green: 0.91, blue: 0.87)
+    static let dim = Color(red: 0.67, green: 0.65, blue: 0.61)
+    static let faint = Color(red: 0.47, green: 0.46, blue: 0.43)
+    static let warning = Color(red: 0.90, green: 0.67, blue: 0.36)
+    static let amber = Color(red: 0.90, green: 0.67, blue: 0.36)
 }
 
 private struct LauncherBackdrop: View {
@@ -759,23 +791,23 @@ private struct LauncherBackdrop: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.086, green: 0.090, blue: 0.101),
+                    Color(red: 0.093, green: 0.094, blue: 0.103),
                     Theme.background,
-                    Color.black.opacity(0.94)
+                    Color.black.opacity(0.95)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
             RadialGradient(
-                colors: [accent.opacity(0.16), accent.opacity(0)],
-                center: UnitPoint(x: 0.16, y: 0.08),
-                startRadius: 6,
-                endRadius: 640
+                colors: [accent.opacity(0.13), accent.opacity(0)],
+                center: UnitPoint(x: 0.30, y: 0.04),
+                startRadius: 8,
+                endRadius: 700
             )
 
             LinearGradient(
-                colors: [Color.black.opacity(0), Color.black.opacity(0.34)],
+                colors: [Color.black.opacity(0), Color.black.opacity(0.30)],
                 startPoint: .center,
                 endPoint: .bottom
             )
@@ -792,24 +824,45 @@ private struct VaultRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(accent.opacity(0.18), lineWidth: 1.5)
+                .stroke(accent.opacity(0.20), lineWidth: 1.5)
 
             Circle()
-                .stroke(accent.opacity(0.10), lineWidth: 1)
-                .padding(28)
+                .stroke(accent.opacity(0.11), lineWidth: 1)
+                .padding(30)
 
             Circle()
                 .fill(accent.opacity(0.05))
-                .padding(48)
+                .padding(52)
 
             ForEach(0..<36) { index in
                 Rectangle()
-                    .fill(accent.opacity(0.15))
+                    .fill(accent.opacity(0.16))
                     .frame(width: 1, height: 8)
-                    .offset(y: -100)
+                    .offset(y: -104)
                     .rotationEffect(.degrees(Double(index) * 10))
             }
         }
+    }
+}
+
+private struct PillToggle: View {
+    let isOn: Bool
+    let accent: Color
+
+    var body: some View {
+        Capsule()
+            .fill(isOn ? accent.opacity(0.9) : Color.white.opacity(0.09))
+            .frame(width: 46, height: 25)
+            .overlay(
+                Circle()
+                    .fill(isOn ? Color.black.opacity(0.78) : Color.white.opacity(0.55))
+                    .frame(width: 19, height: 19)
+                    .offset(x: isOn ? 10.5 : -10.5)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(isOn ? 0 : 0.06), lineWidth: 1)
+            )
     }
 }
 
@@ -818,59 +871,35 @@ private struct PrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .bold, design: .monospaced))
-            .foregroundColor(Color.black.opacity(0.82))
-            .padding(.vertical, 13)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(accent)
-            )
-            .opacity(configuration.isPressed ? 0.8 : 1)
-    }
-}
-
-private struct SecondaryButtonStyle: ButtonStyle {
-    let accent: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-            .foregroundColor(accent)
+            .foregroundColor(Color.black.opacity(0.85))
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.05))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(accent)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .stroke(Theme.line, lineWidth: 1)
-            )
-            .opacity(configuration.isPressed ? 0.85 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
     }
 }
 
-private struct TabButtonStyle: ButtonStyle {
-    let selected: Bool
+private struct SmallButtonStyle: ButtonStyle {
     let accent: Color
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-            .foregroundColor(selected ? Theme.text : Theme.faint)
-            .padding(.horizontal, 12)
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundColor(accent)
+            .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(selected ? Color.white.opacity(0.07) : Color.clear)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.09 : 0.04))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(selected ? accent.opacity(0.35) : Color.clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Theme.hairline, lineWidth: 1)
             )
-            .contentShape(Rectangle())
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
     }
 }
 
@@ -934,8 +963,8 @@ private struct TouchControlEditor: View {
 
     private var editorBar: some View {
         HStack(spacing: 10) {
-            Text("TOUCH CONTROLS")
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+            Text("Touch controls")
+                .font(.system(size: 17, weight: .bold, design: .serif))
                 .foregroundColor(Theme.text)
 
             presetButton("FULL LAYOUT", profile: .full)
@@ -961,11 +990,11 @@ private struct TouchControlEditor: View {
                 presentationMode.wrappedValue.dismiss()
             }
             .font(.system(size: 11, weight: .bold, design: .monospaced))
-            .foregroundColor(Color.black.opacity(0.82))
+            .foregroundColor(Color.black.opacity(0.85))
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(accent)
+                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(accent)
             )
         }
         .padding(.horizontal, 18)
@@ -976,14 +1005,15 @@ private struct TouchControlEditor: View {
     private var opacityBar: some View {
         HStack(spacing: 12) {
             Text("OPACITY")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .kerning(1.2)
                 .foregroundColor(Theme.faint)
 
             Slider(value: $model.controlsOpacity, in: 0.15...1)
                 .accentColor(accent)
                 .frame(maxWidth: 260)
 
-            Text("\(Int((model.controlsOpacity * 100).rounded()))%")
+            Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundColor(Theme.dim)
 
@@ -1006,11 +1036,11 @@ private struct TouchControlEditor: View {
             selected = nil
         }
         .font(.system(size: 9, weight: .semibold, design: .monospaced))
-        .foregroundColor(profile == target ? Color.black.opacity(0.82) : Theme.dim)
+        .foregroundColor(profile == target ? Color.black.opacity(0.85) : Theme.dim)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(profile == target ? accent : Color.white.opacity(0.05))
         )
     }
@@ -1019,8 +1049,8 @@ private struct TouchControlEditor: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.055, green: 0.058, blue: 0.066),
-                    Color(red: 0.075, green: 0.078, blue: 0.086),
+                    Color(red: 0.055, green: 0.056, blue: 0.062),
+                    Color(red: 0.075, green: 0.076, blue: 0.083),
                     Theme.background
                 ],
                 startPoint: .top,
@@ -1115,7 +1145,7 @@ private struct TouchControlEditor: View {
             Slider(value: scaleBinding(for: control), in: 0.55...1.8)
                 .accentColor(accent)
 
-            Text("\(Int(((scales[control] ?? 1) * 100).rounded()))%")
+            Text(verbatim: "\(Int(((scales[control] ?? 1) * 100).rounded()))%")
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Theme.text)
                 .frame(width: 38, alignment: .trailing)
