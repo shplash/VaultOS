@@ -1,0 +1,31 @@
+name: Apply iOS controls patch
+
+on:
+  workflow_dispatch:
+    inputs:
+      patch:
+        description: Base64-encoded patch
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply patch
+        env:
+          PATCH_B64: ${{ inputs.patch }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PATCH_B64" | base64 -d > /tmp/controls.patch
+          git apply --check /tmp/controls.patch
+          git apply /tmp/controls.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add os/ios/launcher/LauncherBridge.mm os/ios/launcher/LauncherHost.swift os/ios/launcher/LauncherModel.swift os/ios/launcher/LauncherView.swift src/int/movie.cc src/launcher/launcher.h src/plib/gnw/mouse.cc src/plib/gnw/mouse.h
+          git commit -m "Fix cutscene scaling and add iOS control tools"
+          git push
