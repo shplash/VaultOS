@@ -51,31 +51,43 @@ struct DisplayPreset: Identifiable, Hashable {
 }
 
 /// Owns the launcher state and talks to the C++ install core.
+///
+/// Both games keep their own installation and configuration, so every option
+/// is stored per game as well. The published properties always describe the
+/// selected game: switching games saves the outgoing values and loads the
+/// incoming ones, which lets Fallout 1 and Fallout 2 run at different
+/// resolutions with their own audio, gameplay and touch settings.
 final class LauncherModel: ObservableObject {
-    @Published var width: Int
-    @Published var height: Int
-    @Published var sound: Bool
-    @Published var music: Bool
-    @Published var speech: Bool
-    @Published var masterVolume: Double
-    @Published var musicVolume: Double
-    @Published var sfxVolume: Double
-    @Published var speechVolume: Double
-    @Published var language: Int
-    @Published var subtitles: Bool
-    @Published var alwaysRun: Bool
-    @Published var joystickScale: Double
-    @Published var buttonScale: Double
-    @Published var leftHanded: Bool
-    @Published var whiteButtons: Bool {
+    @Published var width = 1280
+    @Published var height = 720
+    @Published var sound = true
+    @Published var music = true
+    @Published var speech = true
+    @Published var masterVolume: Double = 70
+    @Published var musicVolume: Double = 70
+    @Published var sfxVolume: Double = 70
+    @Published var speechVolume: Double = 70
+    @Published var language = 0
+    @Published var subtitles = false
+    @Published var alwaysRun = false
+    @Published var joystickScale: Double = 1
+    @Published var buttonScale: Double = 1
+    @Published var leftHanded = false
+    @Published var whiteButtons = false {
         didSet {
-            UserDefaults.standard.set(whiteButtons, forKey: "launcher.whiteButtons")
+            defaults.set(whiteButtons, forKey: LauncherModel.optionKey("whiteButtons", for: selectedGame))
         }
     }
 
-    @Published var selectedGame: FalloutGame {
+    @Published var selectedGame = FalloutGame.fallout1 {
         didSet {
+            guard oldValue != selectedGame else {
+                return
+            }
+
             defaults.set(selectedGame.rawValue, forKey: "launcher.game")
+            saveSettings(for: oldValue)
+            loadSettings(for: selectedGame)
             refreshInstall()
         }
     }
@@ -108,44 +120,10 @@ final class LauncherModel: ObservableObject {
 
     init() {
         ControlLayout.migrateIfNeeded()
+        LauncherModel.migrateSettings()
         documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        selectedGame = FalloutGame(rawValue: defaults.string(forKey: "launcher.game") ?? "") ?? .fallout1
-
-        let native = LauncherModel.nativeResolution()
-        // Version 4 defaults to HALF, which scales the interface up. Version 3
-        // and earlier defaulted to FULL; migrate those once so the new default
-        // is visible without requiring a fresh install.
-        let selected: (Int, Int)
-        if defaults.integer(forKey: "launcher.resolutionVersion") < 4 {
-            selected = LauncherModel.displayResolution(divisor: 3, native: native)
-            defaults.set(4, forKey: "launcher.resolutionVersion")
-        } else {
-            let fallback = LauncherModel.displayResolution(divisor: 3, native: native)
-            selected = (
-                defaults.object(forKey: "launcher.width") as? Int ?? fallback.0,
-                defaults.object(forKey: "launcher.height") as? Int ?? fallback.1
-            )
-        }
-        width = selected.0
-        height = selected.1
-        defaults.set(selected.0, forKey: "launcher.width")
-        defaults.set(selected.1, forKey: "launcher.height")
-
-        sound = defaults.object(forKey: "launcher.sound") as? Bool ?? true
-        music = defaults.object(forKey: "launcher.music") as? Bool ?? true
-        speech = defaults.object(forKey: "launcher.speech") as? Bool ?? true
-        masterVolume = defaults.object(forKey: "launcher.masterVolume") as? Double ?? 70
-        musicVolume = defaults.object(forKey: "launcher.musicVolume") as? Double ?? 70
-        sfxVolume = defaults.object(forKey: "launcher.sfxVolume") as? Double ?? 70
-        speechVolume = defaults.object(forKey: "launcher.speechVolume") as? Double ?? 70
-        language = defaults.object(forKey: "launcher.language") as? Int ?? 0
-        subtitles = defaults.bool(forKey: "launcher.subtitles")
-        alwaysRun = defaults.bool(forKey: "launcher.alwaysRun")
-        joystickScale = defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0
-        buttonScale = defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0
-        leftHanded = defaults.bool(forKey: "launcher.leftHanded")
-        whiteButtons = defaults.bool(forKey: "launcher.whiteButtons")
-
+        selectedGame = FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
+        loadSettings(for: selectedGame)
         refreshInstall()
     }
 
@@ -204,12 +182,119 @@ final class LauncherModel: ObservableObject {
         height = preset.height
         // Persist immediately so the control overlay can choose the matching
         // FULL/HALF layout even if the editor is closed without tapping Play.
-        defaults.set(width, forKey: "launcher.width")
-        defaults.set(height, forKey: "launcher.height")
+        defaults.set(width, forKey: LauncherModel.optionKey("width", for: selectedGame))
+        defaults.set(height, forKey: LauncherModel.optionKey("height", for: selectedGame))
     }
 
     var languageNames: [String] {
         return LauncherModel.languageNames
+    }
+
+    // MARK: - Per-game settings
+
+    private static let settingsVersionKey = "launcher.settingsVersion"
+    private static let settingsVersion = 1
+
+    /// Every option the launcher stores for one game.
+    private static let optionNames = [
+        "width",
+        "height",
+        "sound",
+        "music",
+        "speech",
+        "masterVolume",
+        "musicVolume",
+        "sfxVolume",
+        "speechVolume",
+        "language",
+        "subtitles",
+        "alwaysRun",
+        "joystickScale",
+        "buttonScale",
+        "leftHanded",
+        "whiteButtons",
+    ]
+
+    /// The defaults key that holds one option of one game. The in-game overlay
+    /// reads the same keys, so it always sees the settings of the game it runs.
+    static func optionKey(_ name: String, for game: FalloutGame) -> String {
+        return "launcher.\(game.rawValue).\(name)"
+    }
+
+    /// Earlier builds stored a single set of options for the only game the app
+    /// had. Those values belong to Fallout 1; Fallout 2 starts from defaults.
+    private static func migrateSettings() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: settingsVersionKey) < settingsVersion else {
+            return
+        }
+
+        for name in optionNames {
+            let legacyKey = "launcher.\(name)"
+            guard let value = defaults.object(forKey: legacyKey) else {
+                continue
+            }
+
+            let target = optionKey(name, for: .fallout1)
+            if defaults.object(forKey: target) == nil {
+                defaults.set(value, forKey: target)
+            }
+            defaults.removeObject(forKey: legacyKey)
+        }
+
+        defaults.removeObject(forKey: "launcher.resolutionVersion")
+        defaults.set(settingsVersion, forKey: settingsVersionKey)
+    }
+
+    private func loadSettings(for game: FalloutGame) {
+        let resolution = LauncherModel.displayResolution(divisor: 3)
+        width = storedInt("width", for: game, fallback: resolution.0)
+        height = storedInt("height", for: game, fallback: resolution.1)
+        sound = storedBool("sound", for: game, fallback: true)
+        music = storedBool("music", for: game, fallback: true)
+        speech = storedBool("speech", for: game, fallback: true)
+        masterVolume = storedDouble("masterVolume", for: game, fallback: 70)
+        musicVolume = storedDouble("musicVolume", for: game, fallback: 70)
+        sfxVolume = storedDouble("sfxVolume", for: game, fallback: 70)
+        speechVolume = storedDouble("speechVolume", for: game, fallback: 70)
+        language = storedInt("language", for: game, fallback: 0)
+        subtitles = storedBool("subtitles", for: game, fallback: false)
+        alwaysRun = storedBool("alwaysRun", for: game, fallback: false)
+        joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
+        buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
+        leftHanded = storedBool("leftHanded", for: game, fallback: false)
+        whiteButtons = storedBool("whiteButtons", for: game, fallback: false)
+    }
+
+    private func saveSettings(for game: FalloutGame) {
+        defaults.set(width, forKey: LauncherModel.optionKey("width", for: game))
+        defaults.set(height, forKey: LauncherModel.optionKey("height", for: game))
+        defaults.set(sound, forKey: LauncherModel.optionKey("sound", for: game))
+        defaults.set(music, forKey: LauncherModel.optionKey("music", for: game))
+        defaults.set(speech, forKey: LauncherModel.optionKey("speech", for: game))
+        defaults.set(masterVolume, forKey: LauncherModel.optionKey("masterVolume", for: game))
+        defaults.set(musicVolume, forKey: LauncherModel.optionKey("musicVolume", for: game))
+        defaults.set(sfxVolume, forKey: LauncherModel.optionKey("sfxVolume", for: game))
+        defaults.set(speechVolume, forKey: LauncherModel.optionKey("speechVolume", for: game))
+        defaults.set(language, forKey: LauncherModel.optionKey("language", for: game))
+        defaults.set(subtitles, forKey: LauncherModel.optionKey("subtitles", for: game))
+        defaults.set(alwaysRun, forKey: LauncherModel.optionKey("alwaysRun", for: game))
+        defaults.set(joystickScale, forKey: LauncherModel.optionKey("joystickScale", for: game))
+        defaults.set(buttonScale, forKey: LauncherModel.optionKey("buttonScale", for: game))
+        defaults.set(leftHanded, forKey: LauncherModel.optionKey("leftHanded", for: game))
+        defaults.set(whiteButtons, forKey: LauncherModel.optionKey("whiteButtons", for: game))
+    }
+
+    private func storedInt(_ name: String, for game: FalloutGame, fallback: Int) -> Int {
+        return defaults.object(forKey: LauncherModel.optionKey(name, for: game)) as? Int ?? fallback
+    }
+
+    private func storedBool(_ name: String, for game: FalloutGame, fallback: Bool) -> Bool {
+        return defaults.object(forKey: LauncherModel.optionKey(name, for: game)) as? Bool ?? fallback
+    }
+
+    private func storedDouble(_ name: String, for game: FalloutGame, fallback: Double) -> Double {
+        return defaults.object(forKey: LauncherModel.optionKey(name, for: game)) as? Double ?? fallback
     }
 
     // MARK: - Installation
@@ -336,23 +421,7 @@ final class LauncherModel: ObservableObject {
     }
 
     private func persist() {
-        defaults.set(width, forKey: "launcher.width")
-        defaults.set(height, forKey: "launcher.height")
-        defaults.set(3, forKey: "launcher.resolutionVersion")
-        defaults.set(sound, forKey: "launcher.sound")
-        defaults.set(music, forKey: "launcher.music")
-        defaults.set(speech, forKey: "launcher.speech")
-        defaults.set(masterVolume, forKey: "launcher.masterVolume")
-        defaults.set(musicVolume, forKey: "launcher.musicVolume")
-        defaults.set(sfxVolume, forKey: "launcher.sfxVolume")
-        defaults.set(speechVolume, forKey: "launcher.speechVolume")
-        defaults.set(language, forKey: "launcher.language")
-        defaults.set(subtitles, forKey: "launcher.subtitles")
-        defaults.set(alwaysRun, forKey: "launcher.alwaysRun")
-        defaults.set(joystickScale, forKey: "launcher.joystickScale")
-        defaults.set(buttonScale, forKey: "launcher.buttonScale")
-        defaults.set(leftHanded, forKey: "launcher.leftHanded")
-        defaults.set(whiteButtons, forKey: "launcher.whiteButtons")
+        saveSettings(for: selectedGame)
         defaults.set(selectedGame.rawValue, forKey: "launcher.game")
     }
 

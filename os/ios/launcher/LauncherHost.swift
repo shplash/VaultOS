@@ -113,7 +113,7 @@ final class LauncherHost {
 
 private enum ControlTheme {
     static var whiteButtons: Bool {
-        UserDefaults.standard.bool(forKey: "launcher.whiteButtons")
+        UserDefaults.standard.bool(forKey: LauncherModel.optionKey("whiteButtons", for: ControlLayout.activeGame()))
     }
 
     static var game: FalloutGame {
@@ -377,10 +377,11 @@ enum ControlLayout {
     /// pick the matching layout without a separate switch.
     static func profileForCurrentResolution() -> LayoutProfile {
         let defaults = UserDefaults.standard
+        let game = activeGame()
         let native = LauncherModel.nativeResolution()
         let half = LauncherModel.displayResolution(divisor: 3, native: native)
-        let width = defaults.object(forKey: "launcher.width") as? Int ?? 0
-        let height = defaults.object(forKey: "launcher.height") as? Int ?? 0
+        let width = defaults.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0
+        let height = defaults.object(forKey: LauncherModel.optionKey("height", for: game)) as? Int ?? 0
         return (width == half.0 && height == half.1) ? .half : .full
     }
 
@@ -730,8 +731,8 @@ final class GameControlsOverlay: UIView {
         super.layoutSubviews()
 
         let defaults = UserDefaults.standard
-        let joystickScale = CGFloat(defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0)
-        let buttonScale = CGFloat(defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0)
+        let joystickScale = CGFloat(defaults.object(forKey: LauncherModel.optionKey("joystickScale", for: game)) as? Double ?? 1.0)
+        let buttonScale = CGFloat(defaults.object(forKey: LauncherModel.optionKey("buttonScale", for: game)) as? Double ?? 1.0)
         let profile = ControlLayout.profileForCurrentResolution()
 
         place(joystick, at: .joystick, profile: profile, size: scaledSize(for: .joystick, in: bounds.size, globalScale: joystickScale, profile: profile))

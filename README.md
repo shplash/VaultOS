@@ -90,8 +90,8 @@ $ mv app /Applications/Fallout
     - **IMPORT GAME ZIP** opens the Files picker and installs the game data into the selected game's folder. Re-importing replaces the game files and keeps your savegames.
     - The file list shows which of that game's data files were found, and incomplete installations are rejected with the missing file names.
     - **DISPLAY** sets the internal resolution (including a preset matching your device's logical screen size), pixel doubling, and is where the `f1_res.ini`/`f2_res.ini` options live.
-    - **AUDIO** controls sound, music, speech and their volumes. **GAMEPLAY** sets language, subtitles and always-run.
-    - **SAVE OPTIONS** writes `fallout.cfg`/`f1_res.ini` or `fallout2.cfg`/`f2_res.ini` without starting the game; **PLAY** saves and starts the selected engine.
+    - **AUDIO** controls sound, music, speech and their volumes. **GAMEPLAY** sets language, subtitles and running (run by default instead of walking).
+    - **PLAY** writes `fallout.cfg`/`f1_res.ini` or `fallout2.cfg`/`f2_res.ini` and starts the selected engine. Display, audio, gameplay and touch settings are stored separately for each game.
 
 - Imported Fallout 1 data lives in the app's Documents folder, together with `fallout.cfg`, `f1_res.ini` and `SAVEGAME`. Imported Fallout 2 data lives in `Documents/Fallout2` with its own `fallout2.cfg`, `f2_res.ini` and `SAVEGAME`. File Sharing remains enabled, so you can still copy the files manually with Finder or iTunes ([how-to](https://support.apple.com/HT210598)) - the launcher detects them.
 

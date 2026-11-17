@@ -341,7 +341,7 @@ struct LauncherView: View {
             }
 
             Toggle(isOn: $model.alwaysRun) {
-                settingLabel("ALWAYS RUN")
+                settingLabel("RUN, DON'T WALK")
             }
             .toggleStyle(SwitchToggleStyle())
             .accentColor(Theme.green)
@@ -734,7 +734,7 @@ private struct TouchControlEditor: View {
     @State private var game: FalloutGame
     @State private var dragOrigins: [TouchControl: CGPoint] = [:]
     @State private var selected: TouchControl?
-    @State private var whiteButtons = UserDefaults.standard.bool(forKey: "launcher.whiteButtons")
+    @State private var whiteButtons: Bool
 
     init(model: LauncherModel) {
         self.model = model
@@ -744,6 +744,8 @@ private struct TouchControlEditor: View {
         _game = State(initialValue: game)
         _centers = State(initialValue: ControlLayout.allCenters(profile: profile, game: game))
         _scales = State(initialValue: ControlLayout.allScales(profile: profile, game: game))
+        _whiteButtons = State(initialValue: UserDefaults.standard.bool(
+            forKey: LauncherModel.optionKey("whiteButtons", for: game)))
     }
 
     var body: some View {
