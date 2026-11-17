@@ -2,6 +2,9 @@ name: Build feature IPA
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/dual-engine
 
 permissions:
   contents: read
