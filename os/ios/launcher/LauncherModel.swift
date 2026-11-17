@@ -72,6 +72,12 @@ final class LauncherModel: ObservableObject {
     @Published var alwaysRun = false
     @Published var joystickScale: Double = 1
     @Published var buttonScale: Double = 1
+    /// Opacity of the in-game touch controls, 0.15 (barely there) to 1.
+    @Published var controlsOpacity: Double = 1 {
+        didSet {
+            defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: selectedGame))
+        }
+    }
     @Published var leftHanded = false
     @Published var whiteButtons = false {
         didSet {
@@ -211,6 +217,7 @@ final class LauncherModel: ObservableObject {
         "alwaysRun",
         "joystickScale",
         "buttonScale",
+        "controlsOpacity",
         "leftHanded",
         "whiteButtons",
     ]
@@ -262,6 +269,7 @@ final class LauncherModel: ObservableObject {
         alwaysRun = storedBool("alwaysRun", for: game, fallback: false)
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
+        controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.15), 1)
         leftHanded = storedBool("leftHanded", for: game, fallback: false)
         whiteButtons = storedBool("whiteButtons", for: game, fallback: false)
     }
@@ -281,6 +289,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(alwaysRun, forKey: LauncherModel.optionKey("alwaysRun", for: game))
         defaults.set(joystickScale, forKey: LauncherModel.optionKey("joystickScale", for: game))
         defaults.set(buttonScale, forKey: LauncherModel.optionKey("buttonScale", for: game))
+        defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: game))
         defaults.set(leftHanded, forKey: LauncherModel.optionKey("leftHanded", for: game))
         defaults.set(whiteButtons, forKey: LauncherModel.optionKey("whiteButtons", for: game))
     }

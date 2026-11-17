@@ -371,6 +371,13 @@ enum ControlLayout {
         return (width == half.0 && height == half.1) ? .half : .full
     }
 
+    /// The player's opacity setting for the in-game controls.
+    static func controlsOpacity() -> CGFloat {
+        let value = UserDefaults.standard.object(
+            forKey: LauncherModel.optionKey("controlsOpacity", for: activeGame())) as? Double ?? 1
+        return CGFloat(min(max(value, 0.15), 1))
+    }
+
     /// The first build with the reference layout used saved drag positions
     /// from the older oversized layout. This migration copies the existing
     /// single layout into the FULL profile, then starts a separate HALF
@@ -804,6 +811,23 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
+    /// Pushes the player's opacity setting into every control. Buttons combine
+    /// it with their enabled state themselves.
+    private func applyControlOpacity(_ value: CGFloat) {
+        joystick.controlOpacity = value
+        actionButton.controlOpacity = value
+        backButton.controlOpacity = value
+        skipButton.controlOpacity = value
+        skillButton.controlOpacity = value
+        swapButton.controlOpacity = value
+        endButton.controlOpacity = value
+        reloadButton.controlOpacity = value
+        fireModeButton.controlOpacity = value
+        for button in sideButtons {
+            button.controlOpacity = value
+        }
+    }
+
     private func refreshControls() {
         // The overlay is attached while SDL is still creating its window, and
         // SDL's own view may be inserted after it. Keep the controls sized to
@@ -818,6 +842,8 @@ final class GameControlsOverlay: UIView {
                 Self.attach(to: window)
             }
         }
+
+        applyControlOpacity(ControlLayout.controlsOpacity())
 
         let mode = fallout_ios_cursor_mode()
         let symbol: String
@@ -1024,10 +1050,30 @@ private final class LabeledControlButton: UIControl {
         setNeedsLayout()
     }
 
+    /// A control that cannot be used right now is dimmed, but never below the
+    /// player's own opacity setting: the two only move together once the
+    /// slider goes under the dimming, so the unusable ones do not fade first.
+    private static let disabledOpacity: CGFloat = 0.35
+    private var baseOpacity: CGFloat = 1
+
+    var controlOpacity: CGFloat {
+        get {
+            return baseOpacity
+        }
+        set {
+            baseOpacity = min(max(newValue, 0.1), 1)
+            updateAlpha()
+        }
+    }
+
     override var isEnabled: Bool {
         didSet {
-            alpha = isEnabled ? 1.0 : 0.35
+            updateAlpha()
         }
+    }
+
+    private func updateAlpha() {
+        alpha = isEnabled ? baseOpacity : min(Self.disabledOpacity, baseOpacity)
     }
 
     override var isHighlighted: Bool {
@@ -1076,6 +1122,12 @@ private final class CameraJoystickControl: UIControl {
     private let knob = UIView()
     private let crosshair = CAShapeLayer()
     private let caption = UILabel()
+
+    var controlOpacity: CGFloat = 1 {
+        didSet {
+            alpha = min(max(controlOpacity, 0.1), 1)
+        }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -1218,25 +1270,42 @@ public func falloutIOSInstallGameControls() {
 
 // MARK: - Launcher music
 
-/// Plays `intro music.mp3`, bundled with the app, as soon as the launcher
-/// appears. Loading a small MP3 directly avoids the delay of decoding an ACM
-/// track from the game data first.
+/// Background music for the launcher, reused by the game's main menu.
+///
+/// Each game can have a track of its own and switching games crossfades between
+/// them. A game with no track of its own keeps the bundled one playing rather
+/// than restarting it, so the shared app still has music everywhere. Loading a
+/// small MP3 directly avoids the delay of decoding an ACM track from the game
+/// data first.
 final class LauncherMusic {
     static let shared = LauncherMusic()
 
+    private static let volume: Float = 0.32
+    private static let fade: TimeInterval = 0.9
+    /// The track bundled with the app, used by any game without its own.
+    private static let sharedTrack = "intro music"
+    private static let trackNames: [FalloutGame: String] = [
+        .fallout1: "intro music",
+        .fallout2: "fallout2 music",
+    ]
+
     private var player: AVAudioPlayer?
+    private var trackName: String?
 
     private init() {}
 
-    func playIfAvailable() {
-        if let player = player {
-            if !player.isPlaying {
-                player.play()
+    private static func trackName(for game: FalloutGame) -> String? {
+        let names = [trackNames[game] ?? sharedTrack, sharedTrack]
+        for name in names where !name.isEmpty {
+            if Bundle.main.url(forResource: name, withExtension: "mp3") != nil {
+                return name
             }
-            return
         }
+        return nil
+    }
 
-        guard let url = Bundle.main.url(forResource: "intro music", withExtension: "mp3") else {
+    private func play(track: String, crossfade: Bool) {
+        guard let url = Bundle.main.url(forResource: track, withExtension: "mp3") else {
             return
         }
 
@@ -1245,14 +1314,62 @@ final class LauncherMusic {
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try session.setActive(true)
 
-            let player = try AVAudioPlayer(contentsOf: url)
-            player.numberOfLoops = -1
-            player.volume = 0.32
-            player.play()
-            self.player = player
+            let next = try AVAudioPlayer(contentsOf: url)
+            next.numberOfLoops = -1
+            next.volume = crossfade ? 0 : LauncherMusic.volume
+            next.play()
+
+            let outgoing = player
+            player = next
+            trackName = track
+
+            guard let outgoing = outgoing else {
+                return
+            }
+
+            guard crossfade else {
+                outgoing.stop()
+                return
+            }
+
+            // Both tracks keep playing while they swap volumes, so the change
+            // of game is a fade rather than a cut. The old player is released
+            // by its own stop, which is all it needs to disappear.
+            next.setVolume(LauncherMusic.volume, fadeDuration: LauncherMusic.fade)
+            outgoing.setVolume(0, fadeDuration: LauncherMusic.fade)
+            DispatchQueue.main.asyncAfter(deadline: .now() + LauncherMusic.fade) {
+                outgoing.stop()
+            }
         } catch {
             // The launcher still works without music.
         }
+    }
+
+    func playIfAvailable() {
+        guard let track = LauncherMusic.trackName(for: ControlLayout.activeGame()) else {
+            return
+        }
+
+        if let player = player, trackName == track {
+            if !player.isPlaying {
+                player.play()
+            }
+            return
+        }
+
+        play(track: track, crossfade: false)
+    }
+
+    /// Called when the player picks the other game in the launcher.
+    func crossfade(to game: FalloutGame) {
+        guard let track = LauncherMusic.trackName(for: game) else {
+            return
+        }
+        guard track != trackName else {
+            return
+        }
+
+        play(track: track, crossfade: player != nil)
     }
 
     func pause() {
@@ -1266,6 +1383,7 @@ final class LauncherMusic {
     func stop() {
         player?.stop()
         player = nil
+        trackName = nil
 
         try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
     }
