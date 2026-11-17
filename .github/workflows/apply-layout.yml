@@ -15,7 +15,7 @@ jobs:
       - name: Apply patch
         run: |
           set -euo pipefail
-          curl -fsSL https://paste.rs/E37OC -o /tmp/layout.patch
+          curl -fsSL https://paste.rs/P7b2J -o /tmp/layout.patch
           git apply --index /tmp/layout.patch
 
       - name: Commit and push
@@ -23,5 +23,5 @@ jobs:
           set -euo pipefail
           git config user.name "shplash"
           git config user.email "192976206+shplash@users.noreply.github.com"
-          git commit -m "Match touch layout to the proposed HUD strip and tidy launcher"
+          git commit -m "Fix control size helper call after layout update"
           git push origin HEAD:main
