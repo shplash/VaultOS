@@ -117,12 +117,12 @@ final class GameControlsOverlay: UIView {
         addSubview(joystick)
 
         rightClickButton.backgroundColor = ControlTheme.panel
-        rightClickButton.layer.cornerRadius = 8
-        rightClickButton.layer.borderWidth = 1
+        rightClickButton.layer.cornerRadius = 10
+        rightClickButton.layer.borderWidth = 1.5
         rightClickButton.layer.borderColor = ControlTheme.green.withAlphaComponent(0.6).cgColor
         rightClickButton.setTitle("RMB", for: .normal)
         rightClickButton.setTitleColor(ControlTheme.green, for: .normal)
-        rightClickButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .bold)
+        rightClickButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .bold)
         rightClickButton.accessibilityLabel = "Right mouse button mode"
         rightClickButton.addTarget(self, action: #selector(toggleRightClick), for: .touchUpInside)
         addSubview(rightClickButton)
@@ -136,8 +136,8 @@ final class GameControlsOverlay: UIView {
         super.layoutSubviews()
 
         let insets = safeAreaInsets
-        let baseSize = max(96, min(132, bounds.height * 0.34))
-        let margin: CGFloat = 10
+        let baseSize = max(92, min(112, bounds.height * 0.26))
+        let margin: CGFloat = 16
 
         joystick.frame = CGRect(
             x: insets.left + margin,
@@ -146,7 +146,7 @@ final class GameControlsOverlay: UIView {
             height: baseSize
         )
 
-        let buttonSize: CGFloat = 62
+        let buttonSize: CGFloat = 84
         rightClickButton.frame = CGRect(
             x: bounds.width - insets.right - buttonSize - margin,
             y: bounds.height - insets.bottom - buttonSize - margin,
@@ -192,29 +192,21 @@ private final class CameraJoystickControl: UIControl {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        backgroundColor = ControlTheme.panel
+        backgroundColor = ControlTheme.panel.withAlphaComponent(0.45)
         isMultipleTouchEnabled = false
         isExclusiveTouch = true
-        layer.borderWidth = 1.5
-        layer.borderColor = ControlTheme.green.withAlphaComponent(0.65).cgColor
-        layer.shadowColor = ControlTheme.green.cgColor
-        layer.shadowOpacity = 0.22
-        layer.shadowRadius = 8
-        layer.shadowOffset = .zero
+        layer.borderWidth = 1
+        layer.borderColor = ControlTheme.green.withAlphaComponent(0.5).cgColor
 
         crosshair.fillColor = UIColor.clear.cgColor
-        crosshair.strokeColor = ControlTheme.green.withAlphaComponent(0.28).cgColor
+        crosshair.strokeColor = ControlTheme.green.withAlphaComponent(0.22).cgColor
         crosshair.lineWidth = 1
         layer.addSublayer(crosshair)
 
         knob.isUserInteractionEnabled = false
-        knob.backgroundColor = ControlTheme.green.withAlphaComponent(0.16)
+        knob.backgroundColor = ControlTheme.green.withAlphaComponent(0.12)
         knob.layer.borderWidth = 1.5
-        knob.layer.borderColor = ControlTheme.green.cgColor
-        knob.layer.shadowColor = ControlTheme.green.cgColor
-        knob.layer.shadowOpacity = 0.35
-        knob.layer.shadowRadius = 6
-        knob.layer.shadowOffset = .zero
+        knob.layer.borderColor = ControlTheme.green.withAlphaComponent(0.8).cgColor
         addSubview(knob)
 
         caption.text = "LOOK"
@@ -314,66 +306,44 @@ public func falloutIOSInstallGameControls() {
 
 // MARK: - Launcher music
 
-/// Plays the game's main menu theme while the launcher is open. The ACM file
-/// lives in the game data, so it is decoded once into the app cache and then
-/// looped with AVAudioPlayer.
+/// Plays `intro music.mp3`, bundled with the app, as soon as the launcher
+/// appears. Loading a small MP3 directly avoids the delay of decoding an ACM
+/// track from the game data first.
 final class LauncherMusic {
     static let shared = LauncherMusic()
 
     private var player: AVAudioPlayer?
-    private var preparing = false
-    private var generation = 0
 
     private init() {}
 
-    func playIfAvailable(installDirectory: URL) {
-        if player?.isPlaying == true || preparing {
+    func playIfAvailable() {
+        if let player = player {
+            if !player.isPlaying {
+                player.play()
+            }
             return
         }
 
-        let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let wavURL = cacheDirectory.appendingPathComponent("fallout-launcher-music.wav")
-        let source = installDirectory
-        let token = generation
-        preparing = true
+        guard let url = Bundle.main.url(forResource: "intro music", withExtension: "mp3") else {
+            return
+        }
 
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            let result = source.path.withCString { installPath in
-                wavURL.path.withCString { outputPath in
-                    launcher_prepare_music(installPath, outputPath)
-                }
-            }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
 
-            DispatchQueue.main.async {
-                guard let self = self else {
-                    return
-                }
-                self.preparing = false
-
-                guard result == 0, token == self.generation else {
-                    return
-                }
-
-                do {
-                    let session = AVAudioSession.sharedInstance()
-                    try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-                    try session.setActive(true)
-
-                    let player = try AVAudioPlayer(contentsOf: wavURL)
-                    player.numberOfLoops = -1
-                    player.volume = 0.32
-                    player.play()
-                    self.player = player
-                } catch {
-                    // The launcher still works without music.
-                }
-            }
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.numberOfLoops = -1
+            player.volume = 0.32
+            player.play()
+            self.player = player
+        } catch {
+            // The launcher still works without music.
         }
     }
 
     func stop() {
-        generation += 1
-        preparing = false
         player?.stop()
         player = nil
 
