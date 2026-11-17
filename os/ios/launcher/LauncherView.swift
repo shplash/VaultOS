@@ -488,7 +488,7 @@ struct LauncherView: View {
                 return [
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
-                    ("Combat", "END ends your turn, SKIP holds it. The attack mode only appears with a weapon in hand, and RELOAD is Fallout 2 only."),
+                    ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
                     ("Layout", "Every control can be moved and resized from Controls, and its opacity set there too."),
                 ]
             case .survival:
