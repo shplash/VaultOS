@@ -3,8 +3,8 @@ name: Apply iOS controls patch
 on:
   workflow_dispatch:
     inputs:
-      patch:
-        description: Base64-encoded patch
+      patch_url:
+        description: URL of the plain-text patch
         required: true
 
 permissions:
@@ -18,10 +18,10 @@ jobs:
 
       - name: Apply patch
         env:
-          PATCH_B64: ${{ inputs.patch }}
+          PATCH_URL: ${{ inputs.patch_url }}
         run: |
           set -euo pipefail
-          printf '%s' "$PATCH_B64" | base64 -d > /tmp/controls.patch
+          curl -fsS --max-time 60 "$PATCH_URL" -o /tmp/controls.patch
           git apply --check /tmp/controls.patch
           git apply /tmp/controls.patch
           git config user.name "github-actions[bot]"
