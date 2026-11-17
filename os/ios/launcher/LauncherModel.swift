@@ -58,31 +58,29 @@ struct DisplayPreset: Identifiable, Hashable {
 /// incoming ones, which lets Fallout 1 and Fallout 2 run at different
 /// resolutions with their own audio, gameplay and touch settings.
 final class LauncherModel: ObservableObject {
-    @Published var width = 1280
-    @Published var height = 720
-    @Published var sound = true
-    @Published var music = true
-    @Published var speech = true
-    @Published var masterVolume: Double = 70
-    @Published var musicVolume: Double = 70
-    @Published var sfxVolume: Double = 70
-    @Published var speechVolume: Double = 70
-    @Published var language = 0
-    @Published var subtitles = false
-    @Published var alwaysRun = false
-    @Published var joystickScale: Double = 1
-    @Published var buttonScale: Double = 1
+    @Published var width = 1280 { didSet { store(width, "width") } }
+    @Published var height = 720 { didSet { store(height, "height") } }
+    @Published var sound = true { didSet { store(sound, "sound") } }
+    @Published var music = true { didSet { store(music, "music") } }
+    @Published var speech = true { didSet { store(speech, "speech") } }
+    @Published var masterVolume: Double = 70 { didSet { store(masterVolume, "masterVolume") } }
+    @Published var musicVolume: Double = 70 { didSet { store(musicVolume, "musicVolume") } }
+    @Published var sfxVolume: Double = 70 { didSet { store(sfxVolume, "sfxVolume") } }
+    @Published var speechVolume: Double = 70 { didSet { store(speechVolume, "speechVolume") } }
+    @Published var language = 0 { didSet { store(language, "language") } }
+    @Published var subtitles = false { didSet { store(subtitles, "subtitles") } }
+    @Published var alwaysRun = false { didSet { store(alwaysRun, "alwaysRun") } }
+    @Published var joystickScale: Double = 1 { didSet { store(joystickScale, "joystickScale") } }
+    @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
     /// Opacity of the in-game touch controls, 0.15 (barely there) to 1.
-    @Published var controlsOpacity: Double = 1 {
-        didSet {
-            defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: selectedGame))
-        }
-    }
-    @Published var leftHanded = false
-    @Published var whiteButtons = false {
-        didSet {
-            defaults.set(whiteButtons, forKey: LauncherModel.optionKey("whiteButtons", for: selectedGame))
-        }
+    @Published var controlsOpacity: Double = 1 { didSet { store(controlsOpacity, "controlsOpacity") } }
+    @Published var leftHanded = false { didSet { store(leftHanded, "leftHanded") } }
+    @Published var whiteButtons = false { didSet { store(whiteButtons, "whiteButtons") } }
+
+    /// Every option is written the moment it changes, so settings survive
+    /// closing the app from the launcher, not only pressing Play.
+    private func store<T>(_ value: T, _ name: String) {
+        defaults.set(value, forKey: LauncherModel.optionKey(name, for: selectedGame))
     }
 
     @Published var selectedGame = FalloutGame.fallout1 {

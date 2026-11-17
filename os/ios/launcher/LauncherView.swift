@@ -13,6 +13,7 @@ struct LauncherView: View {
 
     @State private var page: LauncherPage = .home
     @State private var showControlEditor = false
+    @State private var tipGroup: TipGroup = .touch
 
     private var accent: Color {
         return model.selectedGame.accent
@@ -401,22 +402,110 @@ struct LauncherView: View {
     }
 
     private var tipsSheet: some View {
-        sheet(title: "Tips", detail: "Getting around on a touch screen") {
-            tip("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target.")
-            tip("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand.")
-            tip("Combat", "END ends your turn and SKIP holds it. RELOAD and the attack mode only appear with a weapon in hand.")
-            tip("Display", "HALF keeps the interface readable on a phone; FULL is sharpest on a tablet.")
-            tip("Saves", "Importing a ZIP again replaces the game data and keeps your savegames.")
+        sheet(title: "Tips", detail: tipGroup.detail) {
+            HStack(spacing: 8) {
+                ForEach(TipGroup.allCases) { group in
+                    tipPill(group, selected: tipGroup == group)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 9)
+            .overlay(
+                Rectangle()
+                    .fill(Theme.hairline)
+                    .frame(height: 1),
+                alignment: .bottom
+            )
+
+            ForEach(tipGroup.items.indices, id: \.self) { index in
+                tip(tipGroup.items[index].title, tipGroup.items[index].text)
+            }
         }
+    }
+
+    private func tipPill(_ group: TipGroup, selected: Bool) -> some View {
+        Button {
+            tipGroup = group
+        } label: {
+            Text(group.title)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .kerning(0.8)
+                .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(selected ? accent : Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(group.title)
     }
 
     private var creditsSheet: some View {
         sheet(title: "Credits", detail: "Who made this, and what it is built on") {
-            tip("Launcher", "shplash: the launcher, its interface, the touch controls and the artwork treatment, and the packaging that runs both engines from one app.")
+            tip("shplash", "Launcher interface, touch controls, iOS port, build workflows and artwork treatment.")
             tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
             tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
-            tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games.")
-            footnote("The app contains no game data; the screenshots are taken from the games themselves.")
+            tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
+            footnote("The app contains no game data; bring your own installation.")
+        }
+    }
+
+    private enum TipGroup: String, CaseIterable, Identifiable {
+        case touch
+        case survival
+        case launcher
+
+        var id: String {
+            return rawValue
+        }
+
+        var title: String {
+            switch self {
+            case .touch: return "TOUCH"
+            case .survival: return "SURVIVAL"
+            case .launcher: return "LAUNCHER"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .touch: return "Getting around on a touch screen"
+            case .survival: return "A few things worth knowing before you wander"
+            case .launcher: return "How the launcher and your data fit together"
+            }
+        }
+
+        var items: [(title: String, text: String)] {
+            switch self {
+            case .touch:
+                return [
+                    ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
+                    ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
+                    ("Combat", "END ends your turn, SKIP holds it. The attack mode only appears with a weapon in hand, and RELOAD is Fallout 2 only."),
+                    ("Layout", "Every control can be moved and resized from Controls, and its opacity set there too."),
+                ]
+            case .survival:
+                return [
+                    ("Save often", "There is no autosave. Keep a save before a new area and before a fight you are unsure of."),
+                    ("Skills pay", "The skilldex covers Doctor, First Aid and Lockpick. Using them beats guessing at a door or a wound."),
+                    ("Talk first", "Many fights can be talked past, and quests tend to pay better than what you can loot."),
+                    ("Aim", "An aimed shot costs one more action point and can cripple a limb, which often ends a fight faster than damage."),
+                ]
+            case .launcher:
+                return [
+                    ("Import once", "Import a ZIP per game. Importing again replaces the game data and keeps your savegames."),
+                    ("HALF or FULL", "HALF keeps the interface readable on a phone; FULL is sharpest on a tablet."),
+                    ("Per game", "Resolution, audio, language and controls are stored separately for each game."),
+                    ("Own folders", "Fallout keeps its files in Documents, Fallout 2 in Documents/Fallout2, so the two never mix."),
+                ]
+            }
         }
     }
 
