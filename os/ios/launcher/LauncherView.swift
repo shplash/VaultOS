@@ -14,6 +14,7 @@ struct LauncherView: View {
     @State private var page: LauncherPage = .home
     @State private var showControlEditor = false
     @State private var tipGroup: TipGroup = .touch
+    @State private var musicMuted = false
 
     private var accent: Color {
         return model.selectedGame.accent
@@ -86,10 +87,31 @@ struct LauncherView: View {
 
     private var rail: some View {
         VStack(alignment: .leading, spacing: 3) {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(FalloutGame.allCases) { game in
-                    gameTab(game)
+            HStack(alignment: .top, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(FalloutGame.allCases) { game in
+                        gameTab(game)
+                    }
                 }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    musicMuted.toggle()
+                    if musicMuted {
+                        LauncherMusic.shared.stop()
+                    } else {
+                        LauncherMusic.shared.playIfAvailable()
+                    }
+                } label: {
+                    Image(systemName: musicMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(musicMuted ? Theme.faint : accent)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(musicMuted ? "Unmute music" : "Mute music")
             }
             .padding(.bottom, 8)
 
@@ -390,12 +412,13 @@ struct LauncherView: View {
     /// The selected game's still, bundle first. It follows `selectedGame`
     /// directly, so the two can never disagree.
     private var heroImage: UIImage? {
-        let name = model.selectedGame == .fallout2 ? "IMG_3571" : "IMG_3570"
+        let isFallout2 = model.selectedGame == .fallout2
+        let name = isFallout2 ? "IMG_3579" : "IMG_3570"
         if let image = UIImage(named: name) {
             return image
         }
 
-        guard let url = Bundle.main.url(forResource: name, withExtension: "webp") else {
+        guard let url = Bundle.main.url(forResource: name, withExtension: isFallout2 ? "jpeg" : "webp") else {
             return nil
         }
         return UIImage(contentsOfFile: url.path)
@@ -408,6 +431,31 @@ struct LauncherView: View {
                     tipPill(group, selected: tipGroup == group)
                 }
                 Spacer(minLength: 0)
+
+                Button {
+                    if let url = URL(string: "https://fallout.fandom.com") {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("WIKI")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .kerning(0.8)
+
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 8, weight: .bold))
+                    }
+                    .foregroundColor(accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Theme.hairline, lineWidth: 1)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open the Fallout wiki")
             }
             .padding(.vertical, 9)
             .overlay(

@@ -371,7 +371,7 @@ if(APPLE)
             # The home screen artwork for each game, bundled from the repository
             # root so the launcher needs no network to show it.
             "${CMAKE_SOURCE_DIR}/IMG_3570.webp"
-            "${CMAKE_SOURCE_DIR}/IMG_3571.webp"
+            "${CMAKE_SOURCE_DIR}/IMG_3579.jpeg"
             ${MUSIC_RESOURCES}
         )
 

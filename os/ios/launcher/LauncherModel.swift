@@ -68,7 +68,7 @@ final class LauncherModel: ObservableObject {
     @Published var sfxVolume: Double = 70 { didSet { store(sfxVolume, "sfxVolume") } }
     @Published var speechVolume: Double = 70 { didSet { store(speechVolume, "speechVolume") } }
     @Published var language = 0 { didSet { store(language, "language") } }
-    @Published var subtitles = false { didSet { store(subtitles, "subtitles") } }
+    @Published var subtitles = true { didSet { store(subtitles, "subtitles") } }
     @Published var alwaysRun = false { didSet { store(alwaysRun, "alwaysRun") } }
     @Published var joystickScale: Double = 1 { didSet { store(joystickScale, "joystickScale") } }
     @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
@@ -126,6 +126,7 @@ final class LauncherModel: ObservableObject {
         ControlLayout.migrateIfNeeded()
         LauncherModel.migrateSettings()
         LauncherModel.applyDefaultResolution()
+        LauncherModel.applyDefaultSubtitles()
         documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         selectedGame = FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
         loadSettings(for: selectedGame)
@@ -249,6 +250,23 @@ final class LauncherModel: ObservableObject {
         defaults.set(displayVersion, forKey: displayVersionKey)
     }
 
+    /// Subtitles ship on. Builds before this stored them off, so they are
+    /// switched on once here for both games.
+    private static let subtitlesVersionKey = "launcher.subtitlesVersion"
+    private static let subtitlesVersion = 1
+
+    private static func applyDefaultSubtitles() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: subtitlesVersionKey) < subtitlesVersion else {
+            return
+        }
+
+        for game in FalloutGame.allCases {
+            defaults.set(true, forKey: optionKey("subtitles", for: game))
+        }
+        defaults.set(subtitlesVersion, forKey: subtitlesVersionKey)
+    }
+
     /// Earlier builds stored a single set of options for the only game the app
     /// had. Those values belong to Fallout 1; Fallout 2 starts from defaults.
     private static func migrateSettings() {
@@ -286,7 +304,7 @@ final class LauncherModel: ObservableObject {
         sfxVolume = storedDouble("sfxVolume", for: game, fallback: 70)
         speechVolume = storedDouble("speechVolume", for: game, fallback: 70)
         language = storedInt("language", for: game, fallback: 0)
-        subtitles = storedBool("subtitles", for: game, fallback: false)
+        subtitles = storedBool("subtitles", for: game, fallback: true)
         alwaysRun = storedBool("alwaysRun", for: game, fallback: false)
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
