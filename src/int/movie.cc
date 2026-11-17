@@ -353,11 +353,12 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
         && gSdlSurface->format->BitsPerPixel == 8
         && gSdlSurface->format->palette != NULL;
 
-    if (scaleToWindow && indexedFrames) {
+    const bool needsScale = destRect.w != srcRect.w || destRect.h != srcRect.h;
+
+    if (scaleToWindow && indexedFrames && needsScale) {
         // Scale indexed pixels ourselves. SDL_BlitScaled leaves some 8-bit
         // movie frames blank, and the engine's drawScaled helper has a broken
         // upscaling path (it can repeat the first source pixel across a row).
-        SDL_SetSurfacePalette(surface, gSdlSurface->format->palette);
         if (SDL_LockSurface(gSdlSurface) == 0) {
             movieScaleFrame(static_cast<unsigned char*>(gSdlSurface->pixels) + gSdlSurface->pitch * destRect.y + destRect.x,
                 destRect.w,
@@ -372,16 +373,9 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
             SDL_BlitScaled(surface, &srcRect, gSdlSurface, &destRect);
         }
     } else if (scaleToWindow) {
-        // Keep non-indexed movies visible at their native size rather than
-        // asking SDL to convert them to the game's 8-bit palette.
-        SDL_Rect nativeDest;
-        nativeDest.x = (winWidth - srcWidth) / 2;
-        nativeDest.y = (winHeight - srcHeight) / 2;
-        nativeDest.w = srcWidth;
-        nativeDest.h = srcHeight;
-        nativeDest.x += winRect.ulx;
-        nativeDest.y += winRect.uly;
-        SDL_BlitSurface(surface, &srcRect, gSdlSurface, &nativeDest);
+        // At native size, retain the original direct blit. Only use the local
+        // scaler when the frame actually needs to grow or shrink.
+        SDL_BlitSurface(surface, &srcRect, gSdlSurface, &destRect);
     } else {
         SDL_BlitSurface(surface, &srcRect, gSdlSurface, &destRect);
     }
