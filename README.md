@@ -86,12 +86,14 @@ $ mv app /Applications/Fallout
 
   On Windows, right-click the game folder and choose **Send to > Compressed (zipped) folder**; on macOS, right-click it and choose **Compress**.
 
-- Run the app. The launcher starts instead of the game:
-    - **IMPORT GAME ZIP** opens the Files picker and installs the game data into the selected game's folder. Re-importing replaces the game files and keeps your savegames.
-    - The file list shows which of that game's data files were found, and incomplete installations are rejected with the missing file names.
-    - **DISPLAY** sets the internal resolution (including a preset matching your device's logical screen size), pixel doubling, and is where the `f1_res.ini`/`f2_res.ini` options live.
-    - **AUDIO** controls sound, music, speech and their volumes. **GAMEPLAY** sets language, subtitles and running (run by default instead of walking).
-    - **PLAY** writes `fallout.cfg`/`f1_res.ini` or `fallout2.cfg`/`f2_res.ini` and starts the selected engine. Display, audio, gameplay and touch settings are stored separately for each game.
+- Run the app. The launcher starts instead of the game. It is split into pages, reached from the bar along the top; nothing in it scrolls:
+    - **HOME**: the selected game, its artwork, the installation state and **IMPORT GAME ZIP**. **PLAY** stays in the bottom right corner on every page.
+    - **DISPLAY**: the FULL/HALF resolution presets, or a custom width and height.
+    - **AUDIO**: sound, music and speech switches, plus the four volumes.
+    - **GAME**: language, subtitles and running (the character runs instead of walking, unless Shift is held).
+    - **CONTROLS**: joystick and button size, control opacity, white buttons and **EDIT CONTROL LAYOUT**.
+    - Every option is stored per game. Importing a ZIP again replaces the game data and keeps your savegames.
+    - `intro music.mp3` is the launcher's music. A second track, `fallout2 music.mp3`, can be dropped into `os/ios` and added to the app's resources in `CMakeLists.txt`; switching games then crossfades between the two.
 
 - Imported Fallout 1 data lives in the app's Documents folder, together with `fallout.cfg`, `f1_res.ini` and `SAVEGAME`. Imported Fallout 2 data lives in `Documents/Fallout2` with its own `fallout2.cfg`, `f2_res.ini` and `SAVEGAME`. File Sharing remains enabled, so you can still copy the files manually with Finder or iTunes ([how-to](https://support.apple.com/HT210598)) - the launcher detects them.
 
