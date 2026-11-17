@@ -14,8 +14,10 @@
 #include "engine_glue.h"
 #include "fallout_engine.h"
 #include "game/combat.h"
+#include "game/game_vars.h"
 #include "game/gmouse.h"
 #include "game/intface.h"
+#include "game/item.h"
 #include "game/main.h"
 #include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
@@ -73,6 +75,31 @@ int has_item_in_hand()
     return item != nullptr ? 1 : 0;
 }
 
+// Reloading in Fallout 1 lives in the interface, not on its own key: the
+// interface loops item_w_try_reload on the active weapon when its slot is used.
+// The same two calls are made here, so the on-screen button does exactly what
+// the weapon slot does.
+int has_reloadable_weapon()
+{
+    fallout::Object* item = nullptr;
+    if (fallout::intface_get_current_item(&item) != 0 || item == nullptr) {
+        return 0;
+    }
+
+    return fallout::item_w_max_ammo(item) > 0 ? 1 : 0;
+}
+
+void reload_active_weapon()
+{
+    fallout::Object* item = nullptr;
+    if (fallout::intface_get_current_item(&item) != 0 || item == nullptr) {
+        return;
+    }
+
+    while (fallout::item_w_try_reload(fallout::obj_dude, item) != -1) {
+    }
+}
+
 int action_available(int action)
 {
     if (!fallout::intface_is_enabled()) {
@@ -87,8 +114,8 @@ int action_available(int action)
     case 6:
         return fallout::combat_can_skip_turn() ? 1 : 0;
     case 8:
-        // Fallout 1 reloads through the weapon itself, not a separate button.
-        return 0;
+        // Reload: a weapon that takes ammunition is in hand.
+        return has_reloadable_weapon();
     case 9:
         // Any item in hand can be switched between its attack modes.
         return has_item_in_hand();
@@ -124,6 +151,9 @@ void press_action(int action)
     case 7:
         // B is the game's change-active-hand binding.
         ios_send_scan_code(SDL_SCANCODE_B);
+        break;
+    case 8:
+        reload_active_weapon();
         break;
     case 9:
         // N toggles the attack mode, the key the engine binds for it.
