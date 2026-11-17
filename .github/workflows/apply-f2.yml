@@ -1,9 +1,7 @@
 name: Apply Fallout 2 launcher changes
 
 on:
-  push:
-    branches:
-      - feature/fallout2-support
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,11 +21,11 @@ jobs:
       - name: Apply patch
         run: |
           set -euo pipefail
-          base64 -d f2.patch.gz.b64 > f2.patch.gz
+          cat f2.patch.gz.b64.*.part | base64 -d > f2.patch.gz
           gzip -d f2.patch.gz
           git apply --check f2-changes.patch
           git apply f2-changes.patch
-          rm f2-changes.patch f2.patch.gz.b64 .github/workflows/apply-f2.yml
+          rm f2-changes.patch f2.patch.gz.b64.*.part .github/workflows/apply-f2.yml
 
           git config user.name "Freebuff"
           git config user.email "noreply@codebuff.com"
