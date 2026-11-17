@@ -324,6 +324,7 @@ if(APPLE)
         set(RESOURCES
             "os/ios/AppIcon.xcassets"
             "os/ios/LaunchScreen.storyboard"
+            "${CMAKE_SOURCE_DIR}/intro music.mp3"
         )
 
         target_sources(${EXECUTABLE_NAME} PUBLIC ${RESOURCES})
