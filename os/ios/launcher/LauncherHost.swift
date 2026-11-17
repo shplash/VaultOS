@@ -126,21 +126,46 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    static let bottomRow: [TouchControl] = [.inv, .map, .cha, .pip]
+
     /// Normalized center of the control on the game view. The editor stores
     /// the same coordinates, so layouts survive resolution and orientation
     /// changes.
     var defaultCenter: CGPoint {
         switch self {
-        case .joystick: return CGPoint(x: 0.14, y: 0.74)
-        case .back: return CGPoint(x: 0.10, y: 0.50)
-        case .action: return CGPoint(x: 0.72, y: 0.59)
-        case .skip: return CGPoint(x: 0.72, y: 0.39)
-        case .inv: return CGPoint(x: 0.82, y: 0.63)
-        case .map: return CGPoint(x: 0.96, y: 0.63)
-        case .cha: return CGPoint(x: 0.82, y: 0.84)
-        case .pip: return CGPoint(x: 0.96, y: 0.84)
-        case .skill: return CGPoint(x: 0.93, y: 0.30)
-        case .end: return CGPoint(x: 0.93, y: 0.10)
+        case .joystick: return CGPoint(x: 0.14, y: 0.825)
+        case .back: return CGPoint(x: 0.08, y: 0.50)
+        case .action: return CGPoint(x: 0.958, y: 0.598)
+        case .skip: return CGPoint(x: 0.958, y: 0.478)
+        // Four equal cells filling the black strip to the right of the HUD.
+        case .inv: return CGPoint(x: 0.8415, y: 0.9175)
+        case .map: return CGPoint(x: 0.8845, y: 0.9175)
+        case .cha: return CGPoint(x: 0.9275, y: 0.9175)
+        case .pip: return CGPoint(x: 0.9705, y: 0.9175)
+        // END above SKILL, tight against the top-right corner.
+        case .skill: return CGPoint(x: 0.958, y: 0.255)
+        case .end: return CGPoint(x: 0.958, y: 0.078)
+        }
+    }
+
+    /// Base size in points before the global and per-control scale settings.
+    /// The HUD-row buttons are intentionally rectangles so they fill the side
+    /// strip in the same way as the proposed layout.
+    func defaultSize(in bounds: CGSize) -> CGSize {
+        switch self {
+        case .joystick:
+            let side = bounds.height * 0.33
+            return CGSize(width: side, height: side)
+        case .back:
+            let side = bounds.height * 0.13
+            return CGSize(width: side, height: side)
+        case .action, .skip:
+            let side = bounds.height * 0.12
+            return CGSize(width: side, height: side)
+        case .inv, .map, .cha, .pip:
+            return CGSize(width: bounds.width * 0.172 / 4, height: bounds.height * 0.155)
+        case .skill, .end:
+            return CGSize(width: bounds.width * 0.056, height: bounds.height * 0.155)
         }
     }
 }
@@ -148,6 +173,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 enum ControlLayout {
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
+    private static let scaleSuffix = ".scale"
 
     private static func key(_ control: TouchControl, _ suffix: String) -> String {
         return "launcher.control.\(control.rawValue)\(suffix)"
@@ -168,11 +194,21 @@ enum ControlLayout {
         defaults.set(Double(min(max(point.y, 0), 1)), forKey: key(control, ySuffix))
     }
 
+    static func scale(for control: TouchControl) -> CGFloat {
+        let value = UserDefaults.standard.object(forKey: key(control, scaleSuffix)) as? Double ?? 1.0
+        return CGFloat(min(max(value, 0.55), 2.0))
+    }
+
+    static func setScale(_ scale: CGFloat, for control: TouchControl) {
+        UserDefaults.standard.set(Double(min(max(scale, 0.55), 2.0)), forKey: key(control, scaleSuffix))
+    }
+
     static func reset() {
         let defaults = UserDefaults.standard
         for control in TouchControl.allCases {
             defaults.removeObject(forKey: key(control, xSuffix))
             defaults.removeObject(forKey: key(control, ySuffix))
+            defaults.removeObject(forKey: key(control, scaleSuffix))
         }
     }
 
@@ -183,6 +219,14 @@ enum ControlLayout {
         }
         return centers
     }
+
+    static func allScales() -> [TouchControl: CGFloat] {
+        var scales: [TouchControl: CGFloat] = [:]
+        for control in TouchControl.allCases {
+            scales[control] = scale(for: control)
+        }
+        return scales
+    }
 }
 
 final class GameControlsOverlay: UIView {
@@ -192,7 +236,7 @@ final class GameControlsOverlay: UIView {
     private let actionButton = LabeledControlButton(
         title: "MOVE",
         symbol: "arrow.up.and.down.and.arrow.left.and.right",
-        iconPointSize: 27
+        iconPointSize: 20
     )
     private let backButton = LabeledControlButton(
         title: "BACK",
@@ -202,18 +246,18 @@ final class GameControlsOverlay: UIView {
     private let skipButton = LabeledControlButton(
         title: "SKIP",
         symbol: "forward.end",
-        iconPointSize: 22,
+        iconPointSize: 18,
         accent: true
     )
     private let skillButton = LabeledControlButton(
         title: "SKILL",
         symbol: "star",
-        iconPointSize: 22
+        iconPointSize: 18
     )
     private let endButton = LabeledControlButton(
         title: "END",
         symbol: "xmark",
-        iconPointSize: 22
+        iconPointSize: 18
     )
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
@@ -267,7 +311,7 @@ final class GameControlsOverlay: UIView {
             let button = LabeledControlButton(
                 title: item.0,
                 symbol: item.1,
-                iconPointSize: 18
+                iconPointSize: 14
             )
             button.tag = index
             button.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
@@ -317,25 +361,27 @@ final class GameControlsOverlay: UIView {
         let joystickScale = CGFloat(defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0)
         let buttonScale = CGFloat(defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0)
 
-        let joystickSize = max(80, min(160, bounds.height * 0.30 * joystickScale))
-        let actionSize = max(64, min(120, bounds.height * 0.22 * buttonScale))
-        let skipSize = max(52, min(100, actionSize * 0.76))
-        let backSize = max(42, min(76, joystickSize * 0.46))
-        let sideSize = max(42, min(86, bounds.height * 0.19 * buttonScale))
-        let topSize = max(44, min(88, bounds.height * 0.19 * buttonScale))
+        place(joystick, at: .joystick, size: scaledSize(for: .joystick, in: bounds, globalScale: joystickScale))
+        place(backButton, at: .back, size: scaledSize(for: .back, in: bounds, globalScale: buttonScale))
+        place(actionButton, at: .action, size: scaledSize(for: .action, in: bounds, globalScale: buttonScale))
+        place(skipButton, at: .skip, size: scaledSize(for: .skip, in: bounds, globalScale: buttonScale))
 
-        place(joystick, at: .joystick, size: CGSize(width: joystickSize, height: joystickSize))
-        place(backButton, at: .back, size: CGSize(width: backSize, height: backSize))
-        place(actionButton, at: .action, size: CGSize(width: actionSize, height: actionSize))
-        place(skipButton, at: .skip, size: CGSize(width: skipSize, height: skipSize))
-
-        let sideControls: [TouchControl] = [.inv, .map, .cha, .pip]
-        for (index, button) in sideButtons.enumerated() where index < sideControls.count {
-            place(button, at: sideControls[index], size: CGSize(width: sideSize, height: sideSize))
+        for (index, button) in sideButtons.enumerated() where index < TouchControl.bottomRow.count {
+            let control = TouchControl.bottomRow[index]
+            place(button, at: control, size: scaledSize(for: control, in: bounds, globalScale: buttonScale))
         }
 
-        place(skillButton, at: .skill, size: CGSize(width: topSize, height: topSize))
-        place(endButton, at: .end, size: CGSize(width: topSize, height: topSize))
+        place(skillButton, at: .skill, size: scaledSize(for: .skill, in: bounds, globalScale: buttonScale))
+        place(endButton, at: .end, size: scaledSize(for: .end, in: bounds, globalScale: buttonScale))
+    }
+
+    private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat) -> CGSize {
+        let base = control.defaultSize(in: bounds)
+        let factor = max(0.55, globalScale) * ControlLayout.scale(for: control)
+        return CGSize(
+            width: max(22, min(bounds.width * 0.45, base.width * factor)),
+            height: max(22, min(bounds.height * 0.45, base.height * factor))
+        )
     }
 
     private func place(_ view: UIView, at control: TouchControl, size: CGSize) {
