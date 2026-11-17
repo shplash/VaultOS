@@ -26,6 +26,11 @@ final class LauncherModel: ObservableObject {
     @Published var joystickScale: Double
     @Published var buttonScale: Double
     @Published var leftHanded: Bool
+    @Published var whiteButtons: Bool {
+        didSet {
+            UserDefaults.standard.set(whiteButtons, forKey: "launcher.whiteButtons")
+        }
+    }
 
     @Published var install = LauncherInstallInfo()
     @Published var isInstalling = false
@@ -72,6 +77,7 @@ final class LauncherModel: ObservableObject {
         joystickScale = defaults.object(forKey: "launcher.joystickScale") as? Double ?? 1.0
         buttonScale = defaults.object(forKey: "launcher.buttonScale") as? Double ?? 1.0
         leftHanded = defaults.bool(forKey: "launcher.leftHanded")
+        whiteButtons = defaults.bool(forKey: "launcher.whiteButtons")
 
         refreshInstall()
     }
@@ -244,6 +250,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(joystickScale, forKey: "launcher.joystickScale")
         defaults.set(buttonScale, forKey: "launcher.buttonScale")
         defaults.set(leftHanded, forKey: "launcher.leftHanded")
+        defaults.set(whiteButtons, forKey: "launcher.whiteButtons")
     }
 
     @discardableResult

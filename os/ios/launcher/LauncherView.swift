@@ -264,7 +264,13 @@ struct LauncherView: View {
     }
 
     private var controlsSection: some View {
-        section("CONTROL LAYOUT") {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                sectionLabel("CONTROL LAYOUT")
+                Spacer(minLength: 2)
+                whiteButtonsToggle
+            }
+
             controlScaleRow("JOYSTICK", value: $model.joystickScale)
             controlScaleRow("BUTTONS", value: $model.buttonScale)
 
@@ -275,6 +281,37 @@ struct LauncherView: View {
             }
             .buttonStyle(CompactButtonStyle())
         }
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Theme.panel)
+        .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
+    }
+
+    private var whiteButtonsToggle: some View {
+        Button {
+            model.whiteButtons.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Text("WHITE")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundColor(model.whiteButtons ? Theme.green : Theme.dim)
+
+                Capsule()
+                    .fill(model.whiteButtons ? Theme.green : Theme.line)
+                    .frame(width: 27, height: 15)
+                    .overlay(
+                        Circle()
+                            .fill(model.whiteButtons ? Theme.background : Theme.dim)
+                            .frame(width: 11, height: 11)
+                            .padding(2),
+                        alignment: model.whiteButtons ? .trailing : .leading
+                    )
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("White buttons")
+        .accessibilityValue(model.whiteButtons ? "On" : "Off")
     }
 
     private func controlScaleRow(_ title: String, value: Binding<Double>) -> some View {
@@ -502,6 +539,7 @@ private struct TouchControlEditor: View {
     @State private var scales = ControlLayout.allScales()
     @State private var dragOrigins: [TouchControl: CGPoint] = [:]
     @State private var selected: TouchControl?
+    @State private var whiteButtons = UserDefaults.standard.bool(forKey: "launcher.whiteButtons")
 
     var body: some View {
         GeometryReader { geometry in
@@ -682,7 +720,7 @@ private struct TouchControlEditor: View {
 
     private func editorControl(_ control: TouchControl, size: CGSize, selected: Bool) -> some View {
         let shortSide = min(size.width, size.height)
-        let accent = control == .skip ? Theme.amber : Theme.green
+        let accent = whiteButtons ? Color.white : (control == .skip ? Theme.amber : Theme.green)
 
         return VStack(spacing: max(1, shortSide * 0.035)) {
             Image(systemName: control.symbol)
@@ -717,7 +755,7 @@ private struct TouchControlEditor: View {
                 }
             }
         )
-        .shadow(color: selected ? Theme.green.opacity(0.45) : .clear, radius: 4)
+        .shadow(color: selected ? Color.white.opacity(0.40) : .clear, radius: 4)
         .contentShape(Rectangle())
     }
 
@@ -728,7 +766,7 @@ private struct TouchControlEditor: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(control.label)
                     .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                    .foregroundColor(Theme.green)
+                    .foregroundColor(whiteButtons ? Color.white : Theme.green)
                 Text("SIZE")
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundColor(Theme.dim)

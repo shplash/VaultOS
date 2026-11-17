@@ -75,11 +75,23 @@ final class LauncherHost {
 // the rest of the screen keeps working exactly as before.
 
 private enum ControlTheme {
-    static let green = UIColor(red: 0.55, green: 0.96, blue: 0.45, alpha: 0.95)
-    static let amber = UIColor(red: 0.95, green: 0.72, blue: 0.32, alpha: 0.95)
+    static var whiteButtons: Bool {
+        UserDefaults.standard.bool(forKey: "launcher.whiteButtons")
+    }
+
+    static var green: UIColor {
+        whiteButtons ? .white : UIColor(red: 0.55, green: 0.96, blue: 0.45, alpha: 0.95)
+    }
+
+    static var amber: UIColor {
+        whiteButtons ? .white : UIColor(red: 0.95, green: 0.72, blue: 0.32, alpha: 0.95)
+    }
+
     static let panel = UIColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.55)
     static let highlight = UIColor.white.withAlphaComponent(0.18)
-    static let dim = UIColor(red: 0.45, green: 0.60, blue: 0.45, alpha: 0.9)
+    static var dim: UIColor {
+        whiteButtons ? UIColor.white.withAlphaComponent(0.68) : UIColor(red: 0.45, green: 0.60, blue: 0.45, alpha: 0.9)
+    }
 }
 
 enum TouchControl: String, CaseIterable, Identifiable, Hashable {
