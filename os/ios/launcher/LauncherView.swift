@@ -19,7 +19,9 @@ struct LauncherView: View {
                         .fill(Theme.line)
                         .frame(width: 1)
 
-                    optionsPane
+                    ScrollView(.vertical, showsIndicators: false) {
+                        optionsPane
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
@@ -221,7 +223,7 @@ struct LauncherView: View {
     }
 
     private var controlsSection: some View {
-        section("CONTROLS") {
+        section("CONTROL LAYOUT") {
             controlScaleRow("JOYSTICK", value: $model.joystickScale)
             controlScaleRow("BUTTONS", value: $model.buttonScale)
 
