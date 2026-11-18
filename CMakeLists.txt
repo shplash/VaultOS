@@ -2,29 +2,26 @@ cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
-set(EXECUTABLE_NAME fallout-ce)
+set(EXECUTABLE_NAME vaultos)
 
-if (APPLE)
-    if(IOS)
-        # SwiftUI launcher requires iOS 14 (SwiftUI is 13, file importers are 14).
-        # The ios-cmake toolchain reads DEPLOYMENT_TARGET and otherwise defaults
-        # to iOS 11, so set both that and CMake's own deployment target.
-        set(DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum iOS deployment target")
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "")
-        set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
-    else()
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "")
-        set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "")
-    endif()
+# VaultOS is an iOS application: the launcher and both engines ship in one app.
+# Configure it with the iOS toolchain; there is no desktop or Android target.
+if(NOT IOS)
+    message(FATAL_ERROR "VaultOS is built for iOS only: pass -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/ios.toolchain.cmake -D PLATFORM=OS64.")
 endif()
+
+# SwiftUI requires iOS 14 (SwiftUI is 13, file importers are 14). The ios-cmake
+# toolchain reads DEPLOYMENT_TARGET and otherwise defaults to iOS 11, so set
+# both that and CMake's own deployment target.
+set(DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum iOS deployment target")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "")
+set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
 
 project(${EXECUTABLE_NAME})
 
-if(APPLE AND IOS)
-    # The launcher UI is written in Swift.
-    set(CMAKE_Swift_LANGUAGE_VERSION 5.0)
-    enable_language(Swift)
-endif()
+# The launcher UI is written in Swift.
+set(CMAKE_Swift_LANGUAGE_VERSION 5.0)
+enable_language(Swift)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -33,11 +30,7 @@ set(CMAKE_CXX_EXTENSIONS NO)
 option(ASAN "Enable address sanitizer" OFF)
 option(UBSAN "Enable undefined behaviour sanitizer" OFF)
 
-if (ANDROID)
-    add_library(${EXECUTABLE_NAME} SHARED)
-else()
-    add_executable(${EXECUTABLE_NAME} WIN32 MACOSX_BUNDLE)
-endif()
+add_executable(${EXECUTABLE_NAME} MACOSX_BUNDLE)
 
 if(ASAN)
     target_compile_options(${EXECUTABLE_NAME} PUBLIC "-fsanitize=address;-fsanitize-recover=address")
@@ -53,12 +46,9 @@ target_include_directories(${EXECUTABLE_NAME} PUBLIC src)
 # ---------------------------------------------------------------------------
 # Fallout 1 CE engine
 #
-# On iOS the launcher is the executable and the Fallout 1 engine is linked into
-# it, entered through os/ios/engine/engine_fallout1.cc. The standalone entry
-# point in winmain.cc (which also owns the host application's `main`/`SDL_main`
-# and the launcher presentation) is therefore only compiled when this repository
-# is built as a standalone game. Every other platform keeps the original
-# single-executable layout untouched.
+# The launcher is the executable and the Fallout 1 engine is linked into it,
+# entered through os/ios/engine/engine_fallout1.cc. SDL_main lives in
+# os/ios/host/HostMain.mm: the launcher runs first, then the chosen engine.
 # ---------------------------------------------------------------------------
 
 set(FALLOUT1_ENGINE_SOURCES
@@ -297,13 +287,6 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     ${FALLOUT1_RUNTIME_SOURCES}
 )
 
-if(NOT IOS)
-    # Standalone builds keep the engine's own process entry point.
-    target_sources(${EXECUTABLE_NAME} PUBLIC
-        "src/plib/gnw/winmain.cc"
-    )
-endif()
-
 if(IOS)
     # The launcher application owns the process entry point (os/ios/host) and
     # links the Fallout 1 engine through its adapter. src/platform/ios/paths.mm
@@ -336,28 +319,6 @@ if(IOS)
     target_link_libraries(${EXECUTABLE_NAME} z)
 endif()
 
-if(WIN32)
-    target_compile_definitions(${EXECUTABLE_NAME} PUBLIC
-        _CRT_SECURE_NO_WARNINGS
-        _CRT_NONSTDC_NO_WARNINGS
-        NOMINMAX
-        WIN32_LEAN_AND_MEAN
-    )
-endif()
-
-if(WIN32)
-    target_link_libraries(${EXECUTABLE_NAME}
-        winmm
-    )
-endif()
-
-if (WIN32)
-    target_sources(${EXECUTABLE_NAME} PUBLIC
-        "os/windows/fallout-ce.ico"
-        "os/windows/fallout-ce.rc"
-    )
-endif()
-
 if(APPLE)
     if(IOS)
         # Any MP3 in assets/audio is bundled as a theme track, so a song can be
@@ -383,49 +344,30 @@ if(APPLE)
         set_target_properties(${EXECUTABLE_NAME} PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/os/ios/Info.plist"
             XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
-            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.alexbatalov.fallout-ce"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.shplash.vaultos"
             XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
             # The Fallout 2 framework resolves SDL through the executable's
             # exported symbols, so those symbols must survive into the IPA.
             XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "NO"
-            Swift_MODULE_NAME "FalloutCE"
-            XCODE_ATTRIBUTE_PRODUCT_MODULE_NAME "FalloutCE"
+            Swift_MODULE_NAME "VaultOS"
+            XCODE_ATTRIBUTE_PRODUCT_MODULE_NAME "VaultOS"
             XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
             XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_SOURCE_DIR}/src/launcher/launcher.h"
+            # Shown in Settings and under the home screen icon.
+            XCODE_ATTRIBUTE_MARKETING_VERSION "1.0"
+            XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "109"
         )
 
-        set(MACOSX_BUNDLE_BUNDLE_NAME "${EXECUTABLE_NAME}")
-        set(MACOSX_BUNDLE_DISPLAY_NAME "Fallout")
-    else()
-        set(RESOURCES
-            "os/macos/fallout-ce.icns"
-        )
-
-        target_sources(${EXECUTABLE_NAME} PUBLIC ${RESOURCES})
-        set_source_files_properties(${RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-
-        set_target_properties(${EXECUTABLE_NAME} PROPERTIES
-            OUTPUT_NAME "Fallout Community Edition"
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/os/macos/Info.plist"
-            XCODE_ATTRIBUTE_EXECUTABLE_NAME "${EXECUTABLE_NAME}"
-            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.alexbatalov.fallout-ce"
-        )
-
-        set(MACOSX_BUNDLE_ICON_FILE "fallout-ce.icns")
-        set(MACOSX_BUNDLE_BUNDLE_NAME "Fallout: Community Edition")
-        set(MACOSX_BUNDLE_DISPLAY_NAME "Fallout")
+        set(MACOSX_BUNDLE_BUNDLE_NAME "VaultOS")
+        set(MACOSX_BUNDLE_DISPLAY_NAME "VaultOS")
     endif()
 
-    set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.alexbatalov.fallout-ce")
-    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0")
-    set(MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0")
+    set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.shplash.vaultos")
+    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0")
+    set(MACOSX_BUNDLE_BUNDLE_VERSION "109")
 endif()
 
-if((NOT ${CMAKE_SYSTEM_NAME} MATCHES "Linux") AND (NOT ${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD") AND (NOT ${CMAKE_SYSTEM_NAME} MATCHES "OpenBSD"))
-    add_subdirectory("third_party/sdl2")
-else()
-    find_package(SDL2)
-endif()
+add_subdirectory("third_party/sdl2")
 
 add_subdirectory("third_party/adecode")
 target_link_libraries(${EXECUTABLE_NAME} adecode::adecode)
@@ -523,10 +465,10 @@ if(IOS)
 
     set_target_properties(Fallout2Engine PROPERTIES
         FRAMEWORK TRUE
-        MACOSX_FRAMEWORK_IDENTIFIER "com.alexbatalov.fallout-ce.Fallout2Engine"
+        MACOSX_FRAMEWORK_IDENTIFIER "com.shplash.vaultos.Fallout2Engine"
         MACOSX_FRAMEWORK_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine/FrameworkInfo.plist.in"
         INSTALL_NAME_DIR "@rpath"
-        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.alexbatalov.fallout-ce.Fallout2Engine"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.shplash.vaultos.Fallout2Engine"
         XCODE_ATTRIBUTE_SKIP_INSTALL YES
         XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
         XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
@@ -551,14 +493,8 @@ if(APPLE)
 
         set(CPACK_GENERATOR "ZIP")
         set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
-        set(CPACK_PACKAGE_FILE_NAME "fallout-ce")
+        set(CPACK_PACKAGE_FILE_NAME "vaultos")
         set(CPACK_ARCHIVE_FILE_EXTENSION "ipa")
-    else()
-        install(TARGETS ${EXECUTABLE_NAME} DESTINATION .)
-
-        set(CPACK_GENERATOR "DragNDrop")
-        set(CPACK_DMG_DISABLE_APPLICATIONS_SYMLINK ON)
-        set(CPACK_PACKAGE_FILE_NAME "Fallout Community Edition")
     endif()
 
     include(CPack)

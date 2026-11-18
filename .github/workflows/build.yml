@@ -87,20 +87,20 @@ jobs:
           set -euo pipefail
           cd build
           cpack -C RelWithDebInfo
-          test -f fallout-ce.ipa
+          test -f vaultos.ipa
           cd ..
-          cp build/fallout-ce.ipa fallout-ce-ios-unsigned.ipa
-          unzip -l fallout-ce-ios-unsigned.ipa > ipa-contents.txt
+          cp build/vaultos.ipa vaultos-ios-unsigned.ipa
+          unzip -l vaultos-ios-unsigned.ipa > ipa-contents.txt
           sed -n '1,20p' ipa-contents.txt
 
       - name: Verify IPA contents
-        run: bash .github/scripts/verify-ipa.sh fallout-ce-ios-unsigned.ipa
+        run: bash .github/scripts/verify-ipa.sh vaultos-ios-unsigned.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: fallout-ce-ios-unsigned
-          path: fallout-ce-ios-unsigned.ipa
+          name: vaultos-ios-unsigned
+          path: vaultos-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
 
@@ -111,9 +111,9 @@ jobs:
           set -euo pipefail
           TAG="private-builds"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" fallout-ce-ios-unsigned.ipa --clobber
+            gh release upload "$TAG" vaultos-ios-unsigned.ipa --clobber
           else
-            gh release create "$TAG" fallout-ce-ios-unsigned.ipa \
+            gh release create "$TAG" vaultos-ios-unsigned.ipa \
               --draft \
               --title "Private Builds" \
               --notes "Unsigned development build. Not for public distribution." \
@@ -123,7 +123,7 @@ jobs:
       - name: Summary
         run: |
           {
-            echo "### Fallout iOS IPA"
+            echo "### VaultOS iOS IPA"
             echo ""
             echo "Unsigned IPA built from ${{ github.sha }} on the macos-15-intel runner."
             echo "Install it with AltStore or Sideloadly, which sign it with your own Apple ID."

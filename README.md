@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/appicon.png" width="187" alt="Fallout Icon">
+  <img src="assets/appicon.png" width="187" alt="VaultOS Icon">
 </p>
 
-<h1 align="center">Fallout: Community Edition</h1>
+<h1 align="center">VaultOS</h1>
 
 <p align="center">
-  Fallout 1 and Fallout 2, with a launcher built for touch, on iOS
+  Fallout and Fallout 2 in one iOS app, with a launcher built for touch
 </p>
 
 <p align="center">
@@ -35,12 +35,12 @@
 </p>
 
 <p align="center">
-If you found this useful, a GitHub star is always appreciated.
+If you found VaultOS useful, a GitHub star is always appreciated.
 </p>
 
 ## Features
 
-- Fallout 1 and Fallout 2 in one app: pick the game in the launcher and only that engine starts
+- Fallout and Fallout 2 in one app: pick the game in the launcher and only that engine starts
 - A launcher built for a phone: fixed pages that never scroll, with PLAY always at the foot of the rail
 - Your own game ZIP imported per game, with separate installations, configuration and savegames
 - Touch controls with an editable layout, size, opacity, and white or tinted buttons
@@ -49,7 +49,7 @@ If you found this useful, a GitHub star is always appreciated.
 
 ## Install
 
-1. Download the IPA from the [latest build](https://github.com/shplash/fallout1-ce-iosimproved/actions/workflows/build.yml) (`fallout-ce-ios-unsigned`) or from a [release](https://github.com/shplash/fallout1-ce-iosimproved/releases/latest).
+1. Download the IPA from the [latest build](https://github.com/shplash/fallout1-ce-iosimproved/actions/workflows/build.yml) (`vaultos-ios-unsigned`) or from a [release](https://github.com/shplash/fallout1-ce-iosimproved/releases/latest).
 2. Install it with a sideloading tool that signs for your device.
 
 Use:
@@ -105,8 +105,8 @@ Fallout is a trademark of Bethesda Softworks. This is an unofficial fan project,
 
 The engines are [Fallout Community Edition](https://github.com/alexbatalov/fallout1-ce) and [Fallout 2 Community Edition](https://github.com/alexbatalov/fallout2-ce) by Alexander Batalov, under the Sustainable Use License. The app also bundles SDL 2.0 (zlib licence), zlib and fpattern.
 
-This repository is licensed under the [Sustainable Use License](LICENSE.md). Pushing to `main`, or running **Actions > Build iOS IPA > Run workflow**, builds an unsigned IPA, verifies both engines, their entry points and the bundled artwork, and uploads it as `fallout-ce-ios-unsigned`.
+VaultOS installs as `VaultOS`, bundle identifier `com.shplash.vaultos`, version `1.0` (build `109`), for iOS 14 and newer. This repository is licensed under the [Sustainable Use License](LICENSE.md). Pushing to `main`, or running **Actions > Build iOS IPA > Run workflow**, builds an unsigned IPA, verifies both engines, their entry points and the bundled artwork, and uploads it as `vaultos-ios-unsigned`.
 
 ## <a href="https://ko-fi.com/shplash"><img src="https://img.shields.io/badge/Support-ko--fi-FF5E5B?style=for-the-badge" alt="Support"></a>
 
-If this has been useful to you, you can support its development as well as future projects.
+If VaultOS has been useful to you, you can support its development as well as future projects.
