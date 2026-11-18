@@ -853,7 +853,7 @@ struct LauncherView: View {
 
     private var gameSheet: some View {
         sheet(title: "Game", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
-            row("Language", detail: "Game text, voice, the launcher and the controls. A game ZIP is not a language pack: add one from HOME.") {
+            row("Language", detail: "Game text, voice, the launcher and the controls. Add more languages with LANGUAGE FILES on HOME.") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
