@@ -40,13 +40,12 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 
 ## Features
 
-- Fallout and Fallout 2 in one app, one engine at a time
-- Runs natively: no JIT, no entitlements, no tweak injection
-- Launcher made for touch: fixed pages that never scroll, PLAY at the foot
+- Fallout and Fallout 2 in one app
+- Runs natively: no JIT or entitlements.
+- Launcher with everything you'd need
 - Your own game ZIP per game, with separate installs and saves
-- Touch controls you can move, resize, fade and tint
-- One language setting for the game, the launcher and the controls
-- Language packs and savegame backups handled in the launcher
+- Touch controls you can move, resize and tweak opacity to your liking
+- Language pack imports and savegame backups handled in the launcher
 
 ## Install
 
@@ -73,11 +72,8 @@ Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fa
 
 ## In the launcher
 
-- **HOME** imports the game, **LANGUAGE FILES** adds a translation you supply
-- **GAME** has language, subtitles, running and save backups, **CONTROLS** sizes and fades the buttons
-- Every settings page has **RESET**; every option is stored per game
-- A language your game files do not have stays English
-- **BACK UP** writes `fo1-save-backup-….zip` beside the game data, **IMPORT** puts it back after a five second warning
+- **HOME** installs the game, **LANGUAGE FILES** adds a translation you supply
+- **BACK UP** writes `fo(1/2)-save-backup-(date).zip` into the game's folder. **IMPORT** replaces the saves
 
 ## Notes & Licensing
 
