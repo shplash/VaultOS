@@ -113,9 +113,11 @@ int launcher_write_options(const char* install_dir, const LauncherOptions* optio
 int launcher_install_language_pack(const char* zip_path, const char* install_dir, int32_t* out_languages);
 
 // Zips the installation's SAVEGAME folder into a new archive beside the game
-// data and writes its full path into `out_path`, NUL terminated. Returns
-// LAUNCHER_ERROR when there is nothing to back up or the file cannot be written.
-int launcher_backup_saves(const char* install_dir, char* out_path, int32_t out_size);
+// data and writes its full path into `out_path`, NUL terminated. `game` is one
+// of LAUNCHER_GAME_* and only names the archive (fo1-/fo2-save-backup-...).
+// Returns LAUNCHER_ERROR when there is nothing to back up or the file cannot be
+// written.
+int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path, int32_t out_size);
 
 // Replaces the installation's SAVEGAME folder with the one in an archive made by
 // launcher_backup_saves. Everything in the archive outside that folder is

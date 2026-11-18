@@ -369,9 +369,10 @@ int main()
         write_file(fallout1 / "SAVEGAME" / "SLOT02" / "SAVE.DAT", "slot-two");
 
         char backup[1024] = { 0 };
-        CHECK(launcher_backup_saves(fallout1.string().c_str(), backup,
+        CHECK(launcher_backup_saves(fallout1.string().c_str(), LAUNCHER_GAME_FALLOUT1, backup,
                   static_cast<int32_t>(sizeof(backup))) == LAUNCHER_OK);
         CHECK(backup[0] != '\0');
+        CHECK(fs::path(backup).filename().string().find("fo1-save-backup-") == 0);
         CHECK(fs::exists(fs::path(backup)));
 
         // The newer saves are replaced by the ones in the backup, so a slot that

@@ -541,6 +541,9 @@ final class LauncherModel: ObservableObject {
         }
 
         let destination = installDirectory.path
+        // The archive is named after the game, so a Fallout and a Fallout 2
+        // backup are told apart at a glance in the Files app.
+        let game = Int32(selectedGame == .fallout2 ? LAUNCHER_GAME_FALLOUT2 : LAUNCHER_GAME_FALLOUT1)
 
         isInstalling = true
         errorMessage = nil
@@ -549,7 +552,7 @@ final class LauncherModel: ObservableObject {
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             var path = [CChar](repeating: 0, count: 1024)
-            let result = launcher_backup_saves(destination, &path, Int32(path.count))
+            let result = launcher_backup_saves(destination, game, &path, Int32(path.count))
             let failure = String(cString: launcher_last_error())
 
             DispatchQueue.main.async {

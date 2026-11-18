@@ -1306,7 +1306,7 @@ static std::vector<std::string> savegame_files(const fs::path& install_dir)
     return names;
 }
 
-int launcher_backup_saves(const char* install_dir, char* out_path, int32_t out_size)
+int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path, int32_t out_size)
 {
     clear_messages();
     set_status("Backing up saves...");
@@ -1423,7 +1423,9 @@ int launcher_backup_saves(const char* install_dir, char* out_path, int32_t out_s
     write_u32(archive, directory_offset);
     write_u16(archive, 0);          // comment length
 
-    const fs::path target = root / ("saves-" + backup_stamp() + ".zip");
+    const fs::path target = root
+        / (std::string(game == LAUNCHER_GAME_FALLOUT2 ? "fo2-save-backup-" : "fo1-save-backup-")
+            + backup_stamp() + ".zip");
     FILE* file = std::fopen(target.string().c_str(), "wb");
     if (file == NULL) {
         fail("Cannot write " + target.string() + ". The device may be out of storage.");
