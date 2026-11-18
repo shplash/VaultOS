@@ -250,6 +250,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     case end
     case reload
     case fireMode
+    case quickLoad
+    case quickSave
 
     var id: String { rawValue }
 
@@ -269,6 +271,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .end: english = "END"
         case .reload: english = "RELOAD"
         case .fireMode: english = "MODE"
+        case .quickLoad: english = "LOAD"
+        case .quickSave: english = "SAVE"
         }
         return L.t(english)
     }
@@ -288,6 +292,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .end: return "xmark"
         case .reload: return "arrow.clockwise"
         case .fireMode: return "scope"
+        case .quickLoad: return "tray.and.arrow.down"
+        case .quickSave: return "tray.and.arrow.up"
         }
     }
 
@@ -309,6 +315,13 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// the same coordinates, so layouts survive resolution and orientation
     /// changes.
     func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds.size) -> CGPoint {
+        if self == .quickLoad || self == .quickSave {
+            // Mirrors the END column onto the top left: load on top, save under
+            // it, one END-height apart. Same place in both layouts.
+            let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
+            return CGPoint(x: 1 - end.x, y: self == .quickLoad ? 0.0750 : 0.2000)
+        }
+
         switch profile {
         case .full:
             switch self {
@@ -379,7 +392,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
             case .inv, .map, .cha, .pip:
                 return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
-            case .skill, .swap, .end, .fireMode:
+            case .skill, .swap, .end, .fireMode, .quickLoad, .quickSave:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
@@ -403,7 +416,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .pip:
                 let side = min(bounds.width * 0.0644, bounds.height * 0.143)
                 return CGSize(width: side, height: side)
-            case .skill, .swap, .end, .fireMode:
+            case .skill, .swap, .end, .fireMode, .quickLoad, .quickSave:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
@@ -626,6 +639,16 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16,
         labelLines: 2
     )
+    private let quickLoadButton = LabeledControlButton(
+        title: "LOAD",
+        symbol: "tray.and.arrow.down",
+        iconPointSize: 16
+    )
+    private let quickSaveButton = LabeledControlButton(
+        title: "SAVE",
+        symbol: "tray.and.arrow.up",
+        iconPointSize: 16
+    )
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
@@ -793,6 +816,16 @@ final class GameControlsOverlay: UIView {
         fireModeButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(fireModeButton)
 
+        quickLoadButton.tag = 10
+        quickLoadButton.accessibilityLabel = "Quick load"
+        quickLoadButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(quickLoadButton)
+
+        quickSaveButton.tag = 11
+        quickSaveButton.accessibilityLabel = "Quick save"
+        quickSaveButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(quickSaveButton)
+
         refreshControls()
         let timer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
             self?.refreshControls()
@@ -846,6 +879,9 @@ final class GameControlsOverlay: UIView {
 
         place(reloadButton, at: .reload, profile: profile, size: scaledSize(for: .reload, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, globalScale: buttonScale, profile: profile))
+
+        place(quickLoadButton, at: .quickLoad, profile: profile, size: scaledSize(for: .quickLoad, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(quickSaveButton, at: .quickSave, profile: profile, size: scaledSize(for: .quickSave, in: bounds.size, globalScale: buttonScale, profile: profile))
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
@@ -905,6 +941,8 @@ final class GameControlsOverlay: UIView {
         endButton.controlOpacity = value
         reloadButton.controlOpacity = value
         fireModeButton.controlOpacity = value
+        quickLoadButton.controlOpacity = value
+        quickSaveButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }

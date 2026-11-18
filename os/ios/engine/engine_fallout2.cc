@@ -233,6 +233,14 @@ void press_action(int action)
         // N cycles the attack/fire mode in Fallout 2.
         send_key(SDL_SCANCODE_N);
         break;
+    case 10:
+        // F7 is the engine's quick load.
+        send_key(SDL_SCANCODE_F7);
+        break;
+    case 11:
+        // F6 is the engine's quick save.
+        send_key(SDL_SCANCODE_F6);
+        break;
     default:
         break;
     }
