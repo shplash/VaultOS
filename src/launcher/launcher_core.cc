@@ -1069,6 +1069,121 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
     return LAUNCHER_OK;
 }
 
+// ---------------------------------------------------------------------------
+// Language packs
+// ---------------------------------------------------------------------------
+
+// A translation is the game's own `text` tree. A pack may carry it at the root,
+// inside one wrapper folder or inside a `data` folder, and may hold other files
+// beside it; the shallowest text tree wins.
+static std::string find_text_prefix(const std::vector<ZipEntry>& entries, bool& found)
+{
+    std::string best;
+    found = false;
+
+    for (const ZipEntry& entry : entries) {
+        const std::string lower = lower_ascii(entry.name);
+        size_t position = lower.find("text/");
+        while (position != std::string::npos) {
+            // Only a `text` folder at the start of a path counts, not `art/text/`.
+            if (position == 0 || lower[position - 1] == '/') {
+                std::string prefix = entry.name.substr(0, position);
+                if (!found || prefix.size() < best.size()) {
+                    best = prefix;
+                    found = true;
+                }
+                break;
+            }
+            position = lower.find("text/", position + 1);
+        }
+    }
+
+    return best;
+}
+
+int launcher_install_language_pack(const char* zip_path, const char* install_dir)
+{
+    clear_messages();
+    g_progress_done.store(0);
+    g_progress_total.store(0);
+    set_status("Opening language pack...");
+
+    if (zip_path == NULL || zip_path[0] == '\0') {
+        fail("No language pack was selected.");
+        return LAUNCHER_ERROR;
+    }
+
+    if (install_dir == NULL || install_dir[0] == '\0') {
+        fail("No install folder was provided.");
+        return LAUNCHER_ERROR;
+    }
+
+    std::ifstream archive;
+    std::vector<ZipEntry> entries;
+    if (!load_archive(zip_path, archive, entries)) {
+        return LAUNCHER_ERROR;
+    }
+
+    bool found = false;
+    const std::string prefix = find_text_prefix(entries, found);
+    if (!found) {
+        fail("This ZIP has no text folder. A language pack is the game's own data/text folder, zipped.");
+        return LAUNCHER_ERROR;
+    }
+
+    struct PackFile {
+        const ZipEntry* entry;
+        std::string relative; // starts with "text/"
+    };
+
+    std::vector<PackFile> files;
+    uint64_t total_bytes = 0;
+
+    for (const ZipEntry& entry : entries) {
+        if (lower_ascii(entry.name).compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
+            continue;
+        }
+
+        const std::string relative = entry.name.substr(prefix.size());
+        if (lower_ascii(relative).rfind("text/", 0) != 0) {
+            continue;
+        }
+
+        files.push_back({ &entry, relative });
+        total_bytes += entry.uncompressed_size;
+    }
+
+    if (files.empty()) {
+        fail("This ZIP has no text folder. A language pack is the game's own data/text folder, zipped.");
+        return LAUNCHER_ERROR;
+    }
+
+    // The engine reads `data` before master.dat, so a language the installation
+    // does not carry has to land here to be seen.
+    const fs::path destination = fs::path(install_dir) / "data";
+    std::error_code ec;
+    fs::create_directories(destination, ec);
+    if (ec) {
+        fail("Cannot create " + destination.string() + ": " + ec.message());
+        return LAUNCHER_ERROR;
+    }
+
+    g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
+    set_status("Adding language files...");
+
+    for (const PackFile& file : files) {
+        if (!extract_entry(archive, *file.entry, destination / fs::path(file.relative))) {
+            return LAUNCHER_ERROR;
+        }
+    }
+
+    archive.close();
+
+    g_progress_done.store(g_progress_total.load());
+    set_status("Language files added.");
+    return LAUNCHER_OK;
+}
+
 int launcher_write_options(const char* install_dir, const LauncherOptions* options)
 {
     LauncherOptions defaults;

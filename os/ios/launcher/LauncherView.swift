@@ -15,6 +15,8 @@ struct LauncherView: View {
     @State private var showControlEditor = false
     @State private var tipGroup: TipGroup = .touch
     @State private var musicMuted = LauncherMusic.isMuted
+    /// What the ZIP picker is being opened for.
+    @State private var pendingImport: LauncherImport = .game
 
     private var accent: Color {
         return model.selectedGame.accent
@@ -84,16 +86,26 @@ struct LauncherView: View {
             allowedContentTypes: [UTType.zip],
             allowsMultipleSelection: false
         ) { result in
+            // What the picker was opened for, read after it closes: one picker
+            // serves both, because two of them in the same view fight over the
+            // presentation.
+            let kind = pendingImport
+
             switch result {
             case .success(let urls):
-                // The picker is single-selection, because one game is one ZIP.
-                // Should it ever hand back more than one file, only the first
-                // is installed: two installs must never run over the same
+                // The picker is single-selection, because one file is one
+                // archive. Should it ever hand back more than one, only the
+                // first is used: two imports must never run over the same
                 // folder at once, and the extra file is simply ignored.
                 guard let url = urls.first else {
                     return
                 }
-                model.importZip(from: url)
+                switch kind {
+                case .game:
+                    model.importZip(from: url)
+                case .language:
+                    model.importLanguagePack(from: url)
+                }
             case .failure(let error):
                 model.errorMessage = error.localizedDescription
             }
@@ -282,13 +294,27 @@ struct LauncherView: View {
             VStack(alignment: .leading, spacing: 0) {
                 row("Game data",
                     detail: model.install.installed == 1 ? "Ready to play" : "Not installed yet") {
-                    Button {
-                        model.showImporter = true
-                    } label: {
-                        Text(L.t(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
+                    HStack(spacing: 8) {
+                        // A translation pack is the game's own text tree, which
+                        // the player supplies: the app ships no game data.
+                        Button {
+                            pendingImport = .language
+                            model.showImporter = true
+                        } label: {
+                            Text(L.t("LANGUAGE FILES"))
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: accent))
+                        .disabled(model.isInstalling)
+
+                        Button {
+                            pendingImport = .game
+                            model.showImporter = true
+                        } label: {
+                            Text(L.t(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: accent))
+                        .disabled(model.isInstalling)
                     }
-                    .buttonStyle(SmallButtonStyle(accent: accent))
-                    .disabled(model.isInstalling)
                 }
 
                 HStack(spacing: 16) {

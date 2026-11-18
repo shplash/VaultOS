@@ -312,6 +312,47 @@ int main()
         CHECK(file_contains(fallout1 / "master.dat", "test"));
     }
 
+    // A language pack carries only the game's own text tree, and it lands where
+    // the engine looks for it before the archive.
+    {
+        const fs::path pack = root / "fallout french.zip";
+        write_zip(pack, {
+            { "text/french/game/misc.msg", "bonjour" },
+            { "readme.txt", "unofficial translation" },
+        });
+
+        CHECK(launcher_install_language_pack(pack.string().c_str(), fallout1.string().c_str())
+            == LAUNCHER_OK);
+        CHECK(file_contains(fallout1 / "data" / "text" / "french" / "game" / "misc.msg",
+            "bonjour"));
+        CHECK(!fs::exists(fallout1 / "readme.txt"));
+
+        // The game data itself is untouched by a pack.
+        CHECK(file_contains(fallout1 / "master.dat", "test"));
+    }
+
+    // A pack wrapped in a folder, or holding a whole data folder, is found too.
+    {
+        const fs::path wrapped = root / "wrapped pack.zip";
+        write_zip(wrapped, { { "Fallout/data/text/german/game/misc.msg", "hallo" } });
+
+        CHECK(launcher_install_language_pack(wrapped.string().c_str(), fallout1.string().c_str())
+            == LAUNCHER_OK);
+        CHECK(file_contains(fallout1 / "data" / "text" / "german" / "game" / "misc.msg", "hallo"));
+    }
+
+    // Anything that is not a text tree is refused rather than scattered over the
+    // installation.
+    {
+        const fs::path wrong = root / "no text.zip";
+        write_zip(wrong, { { "art/tiles.trx", "not a translation" } });
+
+        CHECK(launcher_install_language_pack(wrong.string().c_str(), fallout1.string().c_str())
+            == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("text") != std::string::npos);
+        CHECK(!fs::exists(fallout1 / "data" / "art" / "tiles.trx"));
+    }
+
     // Uppercase installations (CD-era copies) are detected as well.
     const fs::path uppercase = root / "FALLOUT2";
     write_file(uppercase / "MASTER.DAT");

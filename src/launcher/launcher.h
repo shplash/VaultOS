@@ -101,6 +101,13 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
 // Rewrites `fallout.cfg` and `f1_res.ini` for an existing installation.
 int launcher_write_options(const char* install_dir, const LauncherOptions* options);
 
+// Adds a language pack to `install_dir/data`, where the engine looks for
+// `text/<language>/...` before the archive, so a player can add a language the
+// installation does not carry. The pack is the game's own `text` tree, zipped -
+// at the root, inside one wrapper folder or inside a `data` folder - and
+// anything else it holds is ignored. Returns LAUNCHER_OK on success.
+int launcher_install_language_pack(const char* zip_path, const char* install_dir);
+
 // iOS game controls (implemented in Swift, input helpers in Objective-C++).
 void fallout_ios_install_game_controls(void);
 void fallout_ios_camera_pan(double x, double y);

@@ -43,6 +43,12 @@ enum FalloutGame: String, CaseIterable, Identifiable {
     }
 }
 
+/// What the file picker was opened for.
+enum LauncherImport {
+    case game
+    case language
+}
+
 struct DisplayPreset: Identifiable, Hashable {
     let id: String
     let label: String
@@ -102,6 +108,9 @@ final class LauncherModel: ObservableObject {
     @Published var progress: Double = 0
     @Published var statusText = ""
     @Published var errorMessage: String?
+    /// Whether the ZIP picker is open. What it was opened for lives in the
+    /// launcher view, so the picker's own dismissal cannot clear the intent
+    /// before the chosen file arrives.
     @Published var showImporter = false
     @Published var savedNotice = false
 
@@ -437,6 +446,51 @@ final class LauncherModel: ObservableObject {
                 if result == 0 {
                     self.progress = 1
                     self.statusText = "Game data installed."
+                } else {
+                    self.errorMessage = failure.isEmpty ? "Installation failed." : failure
+                    self.statusText = ""
+                }
+            }
+        }
+    }
+
+    /// Adds a translation pack to the selected game's installation: the game's
+    /// own text tree, which the engine reads from `data` before the archive.
+    func importLanguagePack(from url: URL) {
+        guard !isInstalling else {
+            return
+        }
+
+        let destination = installDirectory.path
+        let accessed = url.startAccessingSecurityScopedResource()
+
+        isInstalling = true
+        progress = 0
+        statusText = "Opening language pack..."
+        errorMessage = nil
+
+        startProgressUpdates()
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = launcher_install_language_pack(url.path, destination)
+            let failure = String(cString: launcher_last_error())
+
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
+            }
+
+            DispatchQueue.main.async {
+                guard let self = self else {
+                    return
+                }
+
+                self.stopProgressUpdates()
+                self.isInstalling = false
+                self.refreshInstall()
+
+                if result == 0 {
+                    self.progress = 1
+                    self.statusText = "Language files added."
                 } else {
                     self.errorMessage = failure.isEmpty ? "Installation failed." : failure
                     self.statusText = ""
