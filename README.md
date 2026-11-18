@@ -66,16 +66,14 @@ Fallout 2    master.dat, critter.dat, patch000.dat, data/
 
 ## In the launcher
 
-- **HOME** installs the game, **LANGUAGE FILES** adds a translation you supply, **GAME** has language, subtitles, running and save backups, **CONTROLS** sizes and fades the on-screen buttons
-- Every settings page has **RESET**, and every option is stored per game
-- A language your installation does not have stays English
+- **HOME** installs the game, **LANGUAGE FILES** adds a translation you supply
 - **BACK UP** writes `fo(1/2)-save-backup-(date).zip` inside the games “data” folder ; **IMPORT** replaces the saves
 
 ## Notes & Licensing
 
 Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay; you must own the games to play.
 
-Engines: [Fallout CE](https://github.com/alexbatalov/fallout1-ce) and [Fallout 2 CE](https://github.com/alexbatalov/fallout2-ce) by Alexander Batalov, under the Sustainable Use License, plus SDL 2.0 (zlib), zlib and fpattern. This repository is under the [Sustainable Use License](LICENSE.md).
+Engines: [Fallout CE](https://github.com/alexbatalov/fallout1-ce) and [Fallout 2 CE](https://github.com/alexbatalov/fallout2-ce) by Alexander Batalov, under the SU License, plus SDL 2.0 (zlib), zlib and fpattern. This repository is under the [Sustainable Use License](LICENSE.md).
 
 ## <a href="https://ko-fi.com/shplash"><img src="https://img.shields.io/badge/Support-ko--fi-FF5E5B?style=for-the-badge" alt="Support"></a>
 
