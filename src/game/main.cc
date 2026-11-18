@@ -118,7 +118,10 @@ int gnw_main(int argc, char** argv)
     gmovie_play(MOVIE_INTRO, 0);
 #endif
 
-    if (main_menu_create() == 0) {
+    int menuResult = main_menu_create();
+    debug_printf("[vaultos] main menu create returned %d\n", menuResult);
+
+    if (menuResult == 0) {
         int language_filter = 1;
         bool done = false;
 

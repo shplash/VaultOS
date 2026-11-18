@@ -12,6 +12,7 @@
 #include "game/version.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
+#include "plib/gnw/debug.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/input.h"
@@ -114,9 +115,18 @@ int main_menu_create()
         0,
         WINDOW_HIDDEN | WINDOW_MOVE_ON_TOP);
     if (main_window == -1) {
+        // The only way this fails with a window slot free is a screen smaller
+        // than the menu, which is worth naming in the log.
+        debug_printf("[menu] window %dx%d does not fit a %dx%d screen\n",
+            MAIN_MENU_WINDOW_WIDTH,
+            MAIN_MENU_WINDOW_HEIGHT,
+            screenGetWidth(),
+            screenGetHeight());
         // NOTE: Uninline.
         return main_menu_fatal_error();
     }
+
+    debug_printf("[menu] window ready\n");
 
     main_window_buf = win_get_buf(main_window);
 
@@ -124,9 +134,12 @@ int main_menu_create()
     int backgroundFid = art_id(OBJ_TYPE_INTERFACE, 140, 0, 0, 0);
     background_data = art_ptr_lock_data(backgroundFid, 0, 0, &background_key);
     if (background_data == NULL) {
+        debug_printf("[menu] mainmenu.frm is missing\n");
         // NOTE: Uninline.
         return main_menu_fatal_error();
     }
+
+    debug_printf("[menu] background ready\n");
 
     buf_to_buf(background_data, MAIN_MENU_WINDOW_WIDTH,
         MAIN_MENU_WINDOW_HEIGHT,
@@ -192,6 +205,8 @@ int main_menu_create()
         win_register_button_mask(buttons[index], button_up_data);
     }
 
+    debug_printf("[menu] buttons ready\n");
+
     text_font(104);
 
     for (int index = 0; index < MAIN_MENU_BUTTON_COUNT; index++) {
@@ -210,6 +225,8 @@ int main_menu_create()
 
     main_menu_created = true;
     main_menu_is_hidden = true;
+
+    debug_printf("[menu] created\n");
 
     return 0;
 }
@@ -332,6 +349,14 @@ int main_menu_loop()
         sharedFpsLimiter.mark();
 
         int keyCode = get_input();
+
+        // The first few frames of the menu, so a log that stops says whether
+        // the menu was ever reached or only created.
+        static int loggedFrames = 0;
+        if (loggedFrames < 3) {
+            loggedFrames++;
+            debug_printf("[menu] input %d\n", keyCode);
+        }
 
         for (int buttonIndex = 0; buttonIndex < MAIN_MENU_BUTTON_COUNT; buttonIndex++) {
             if (keyCode == button_values[buttonIndex] || keyCode == toupper(button_values[buttonIndex])) {
