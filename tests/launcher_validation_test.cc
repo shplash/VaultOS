@@ -7,12 +7,14 @@
 // differently, that the configuration goes to the right files, and that
 // savegames are never touched.
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <vector>
 
 #include "launcher/launcher.h"
 
@@ -59,6 +61,116 @@ static LauncherOptions options_for(int game)
     options.width = 1280;
     options.height = 720;
     return options;
+}
+
+// A minimal stored (uncompressed) ZIP, so the tests can hand the installer real
+// archives without a compression library or a fixture file.
+struct ZipItem {
+    std::string name;
+    std::string contents;
+};
+
+static void put_u16(std::string& out, uint16_t value)
+{
+    out.push_back(static_cast<char>(value & 0xff));
+    out.push_back(static_cast<char>((value >> 8) & 0xff));
+}
+
+static void put_u32(std::string& out, uint32_t value)
+{
+    out.push_back(static_cast<char>(value & 0xff));
+    out.push_back(static_cast<char>((value >> 8) & 0xff));
+    out.push_back(static_cast<char>((value >> 16) & 0xff));
+    out.push_back(static_cast<char>((value >> 24) & 0xff));
+}
+
+static uint32_t crc32_of(const std::string& contents)
+{
+    uint32_t crc = 0xffffffffu;
+    for (char character : contents) {
+        crc ^= static_cast<unsigned char>(character);
+        for (int bit = 0; bit < 8; bit++) {
+            crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
+        }
+    }
+    return crc ^ 0xffffffffu;
+}
+
+static void write_zip(const fs::path& path, const std::vector<ZipItem>& items)
+{
+    struct Placed {
+        uint32_t offset;
+        const ZipItem* item;
+    };
+
+    std::string archive;
+    std::vector<Placed> placed;
+
+    for (const ZipItem& item : items) {
+        placed.push_back({ static_cast<uint32_t>(archive.size()), &item });
+
+        const uint32_t crc = crc32_of(item.contents);
+        const uint32_t size = static_cast<uint32_t>(item.contents.size());
+
+        put_u32(archive, 0x04034b50); // local file header
+        put_u16(archive, 20);         // version needed
+        put_u16(archive, 0);          // flags
+        put_u16(archive, 0);          // method: stored
+        put_u16(archive, 0);          // time
+        put_u16(archive, 0);          // date
+        put_u32(archive, crc);
+        put_u32(archive, size);       // compressed size
+        put_u32(archive, size);       // uncompressed size
+        put_u16(archive, static_cast<uint16_t>(item.name.size()));
+        put_u16(archive, 0);          // extra field length
+        archive += item.name;
+        archive += item.contents;
+    }
+
+    const uint32_t directory_offset = static_cast<uint32_t>(archive.size());
+
+    for (const Placed& entry : placed) {
+        const ZipItem& item = *entry.item;
+        const uint32_t crc = crc32_of(item.contents);
+        const uint32_t size = static_cast<uint32_t>(item.contents.size());
+
+        put_u32(archive, 0x02014b50); // central directory entry
+        put_u16(archive, 20);         // version made by
+        put_u16(archive, 20);         // version needed
+        put_u16(archive, 0);          // flags
+        put_u16(archive, 0);          // method: stored
+        put_u16(archive, 0);          // time
+        put_u16(archive, 0);          // date
+        put_u32(archive, crc);
+        put_u32(archive, size);
+        put_u32(archive, size);
+        put_u16(archive, static_cast<uint16_t>(item.name.size()));
+        put_u16(archive, 0);          // extra field length
+        put_u16(archive, 0);          // comment length
+        put_u16(archive, 0);          // disk number
+        put_u16(archive, 0);          // internal attributes
+        put_u32(archive, 0);          // external attributes
+        put_u32(archive, entry.offset);
+        archive += item.name;
+    }
+
+    const uint32_t directory_size = static_cast<uint32_t>(archive.size()) - directory_offset;
+    const uint16_t count = static_cast<uint16_t>(placed.size());
+
+    put_u32(archive, 0x06054b50); // end of central directory
+    put_u16(archive, 0);          // disk number
+    put_u16(archive, 0);          // disk with the directory
+    put_u16(archive, count);      // entries on this disk
+    put_u16(archive, count);      // entries in total
+    put_u32(archive, directory_size);
+    put_u32(archive, directory_offset);
+    put_u16(archive, 0);          // comment length
+
+    std::error_code ec;
+    fs::create_directories(path.parent_path(), ec);
+
+    std::ofstream stream(path.string(), std::ios::binary);
+    stream.write(archive.data(), static_cast<std::streamsize>(archive.size()));
 }
 
 int main()
@@ -157,6 +269,47 @@ int main()
         // Neither game's settings appear in the other installation.
         CHECK(!fs::exists(fallout1 / "fallout2.cfg"));
         CHECK(!fs::exists(fallout2 / "fallout.cfg"));
+    }
+
+    // An archive that is not one of the games is refused before anything is
+    // extracted. This is the path a stray archive takes when it is picked
+    // alongside the game's own ZIP: the installation and the savegames stay as
+    // they were, so no game file the engine reads can be replaced by it.
+    {
+        const fs::path junk = root / "holiday photos.zip";
+        write_zip(junk, { { "readme.txt", "these are not game files" } });
+
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(junk.string().c_str(), fallout1.string().c_str(), &options)
+            == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("master.dat") != std::string::npos);
+        CHECK(!fs::exists(fallout1 / "readme.txt"));
+        CHECK(file_contains(fallout1 / "master.dat", "test"));
+        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+
+        scan(fallout1, LAUNCHER_GAME_FALLOUT1, &info);
+        CHECK(info.installed == 1);
+    }
+
+    // A Fallout 2 archive offered to Fallout 1 is refused too, so its
+    // patch000.dat can never land in a Fallout 1 folder, and the files already
+    // installed are left alone.
+    {
+        const fs::path fallout2Zip = root / "Fallout2 install.zip";
+        write_zip(fallout2Zip, {
+            { "master.dat", "fallout2-master" },
+            { "critter.dat", "fallout2-critter" },
+            { "patch000.dat", "fallout2-patch" },
+            { "data/art/tiles.trx", "fallout2-tiles" },
+        });
+
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(fallout2Zip.string().c_str(), fallout1.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("patch000.dat") != std::string::npos);
+        CHECK(!fs::exists(fallout1 / "patch000.dat"));
+        CHECK(!fs::exists(fallout1 / "data" / "art" / "tiles.trx"));
+        CHECK(file_contains(fallout1 / "master.dat", "test"));
     }
 
     // Uppercase installations (CD-era copies) are detected as well.

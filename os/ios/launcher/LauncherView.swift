@@ -57,9 +57,14 @@ struct LauncherView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                if let url = urls.first {
-                    model.importZip(from: url)
+                // The picker is single-selection, because one game is one ZIP.
+                // Should it ever hand back more than one file, only the first
+                // is installed: two installs must never run over the same
+                // folder at once, and the extra file is simply ignored.
+                guard let url = urls.first else {
+                    return
                 }
+                model.importZip(from: url)
             case .failure(let error):
                 model.errorMessage = error.localizedDescription
             }
