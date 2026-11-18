@@ -234,11 +234,8 @@ void press_action(int action)
         send_key(SDL_SCANCODE_N);
         break;
     case 10:
-        // F7 is the engine's quick load.
-        send_key(SDL_SCANCODE_F7);
-        break;
-    case 11:
-        // F6 is the engine's quick save.
+        // SAVES opens the game's own save/load screen: F6 is its save key, and
+        // the screen it brings up loads as well as saves.
         send_key(SDL_SCANCODE_F6);
         break;
     default:

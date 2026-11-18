@@ -897,11 +897,28 @@ struct LauncherView: View {
     }
 
     private var controlsSheet: some View {
-        sheet(title: "Controls", detail: "Size, colour and opacity of the on-screen controls", onReset: resetControls) {
-            scaleRow("Joystick", detail: "Camera pad in the lower left", value: $model.joystickScale)
-            scaleRow("Buttons", detail: "All on-screen buttons", value: $model.buttonScale)
-            scaleRow("Opacity", detail: "Unusable buttons hold their dimming until the slider goes below it",
-                     value: $model.controlsOpacity)
+        sheet(title: "Controls", detail: "Colour and opacity of the on-screen controls", onReset: resetControls) {
+            row("Control scheme", detail: "Where the buttons sit and how big they are. Best judged over the game screen itself.") {
+                Button {
+                    showControlEditor = true
+                } label: {
+                    Text(L.t("EDIT LAYOUT"))
+                }
+                .buttonStyle(SmallButtonStyle(accent: accent))
+            }
+
+            row("Opacity", detail: "How solid the on-screen controls are") {
+                HStack(spacing: 12) {
+                    Slider(value: $model.controlsOpacity, in: 0...1)
+                        .accentColor(accent)
+                        .frame(width: 200)
+
+                    Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+                        .frame(width: 38, alignment: .trailing)
+                }
+            }
 
             row("Button colour", detail: "White, orange, green or blue") {
                 Menu {
@@ -937,18 +954,6 @@ struct LauncherView: View {
                     )
                 }
             }
-
-            HStack {
-                Spacer(minLength: 0)
-
-                Button {
-                    showControlEditor = true
-                } label: {
-                    Text(L.t("EDIT CONTROL LAYOUT"))
-                }
-                .buttonStyle(SmallButtonStyle(accent: accent))
-            }
-            .padding(.top, 12)
         }
     }
 
@@ -1037,21 +1042,6 @@ struct LauncherView: View {
                     .stroke(Theme.line, lineWidth: 1)
             )
             .padding(24)
-        }
-    }
-
-    private func scaleRow(_ title: String, detail: String, value: Binding<Double>) -> some View {
-        row(title, detail: detail) {
-            HStack(spacing: 12) {
-                Slider(value: value, in: 0.15...1.35)
-                    .accentColor(accent)
-                    .frame(width: 200)
-
-                Text(verbatim: "\(Int((value.wrappedValue * 100).rounded()))%")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.dim)
-                    .frame(width: 38, alignment: .trailing)
-            }
         }
     }
 
@@ -1499,11 +1489,11 @@ private struct TouchControlEditor: View {
                     Spacer(minLength: 0)
                 }
 
-                // While the bars are hidden the toggle leaves the panel's side
-                // and slides to the top middle of the screen, where no control
-                // is drawn, and it slides back under the panel when they come
-                // back. Both its places are set from the screen's edges, so the
-                // move is one smooth animation rather than a jump.
+                // The toggle lives in the panel's bottom trailing corner while
+                // the bars are there. Hiding them takes the panel away and the
+                // toggle jumps to the middle of the top edge, where nothing is
+                // laid out, so the whole screen is free. No animation: it just
+                // goes, and comes back to the same corner.
                 barsToggle
                     .padding(.leading, toggleLeading(in: geometry.size))
                     .padding(.top, (barsHidden ? TouchControlEditor.hiddenToggleTop
@@ -1522,29 +1512,29 @@ private struct TouchControlEditor: View {
     /// monospaced face it is drawn in, and the label shrinks rather than
     /// spilling out if that ever stops being true.
     private static let toggleWidth: CGFloat = 116
-    /// Under the panel, clear of its bottom edge.
-    private static let shownToggleTop: CGFloat = 107
+    /// Inside the panel's bottom trailing corner, 12 from the side and 10 from
+    /// the bottom.
+    private static let shownToggleTop: CGFloat = 49
     /// Clear of the top edge while the panel is away.
     private static let hiddenToggleTop: CGFloat = 8
 
     private func toggleLeading(in size: CGSize) -> CGFloat {
         let insets = LauncherHost.safeInsets
-        if !barsHidden {
-            return 16 + insets.left
+        if barsHidden {
+            return max(insets.left + 8,
+                       (size.width - TouchControlEditor.toggleWidth) / 2)
         }
-        let centred = (size.width - TouchControlEditor.toggleWidth) / 2
-        return max(insets.left + 8, centred)
+        let panel = min(620, max(320, size.width * 0.60))
+        return 16 + insets.left + panel - 12 - TouchControlEditor.toggleWidth
     }
 
     /// Hides the editor's own bars to give the whole screen to the layout. It is
     /// a filled capsule with a word on it, deliberately unlike the controls it
-    /// sits among, and it can always be found: under the panel while that is
-    /// there, and in the middle of the top edge once it is gone.
+    /// sits among, and it can always be found: in the panel's corner while that
+    /// is there, and in the middle of the top edge once it is gone.
     private var barsToggle: some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.24)) {
-                barsHidden.toggle()
-            }
+            barsHidden.toggle()
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: barsHidden ? "chevron.down" : "chevron.up")
@@ -1572,20 +1562,14 @@ private struct TouchControlEditor: View {
     /// instead of two bars across the whole screen: the controls it edits live
     /// on the right and along the bottom, and a full-width bar used to sit on
     /// top of them and push its own buttons off the edge. Two short lines fit
-    /// in half the width.
+    /// in half the width, and the bars toggle holds the panel's corner.
     ///
     /// Hiding the bars takes the panel away and nothing else: only the toggle
-    /// is left, and it moves up to the top middle, so the whole screen is free
-    /// to lay controls out on. The size slider is one of the panel's own rows
-    /// and therefore goes with it, and it only exists while a control is
-    /// pressed.
+    /// is left, up in the top middle, so the whole screen is free to lay the
+    /// controls out on.
     private func chrome(in size: CGSize) -> some View {
-        let width = min(620, max(320, size.width * 0.66))
+        let width = min(620, max(320, size.width * 0.60))
         let insets = LauncherHost.safeInsets
-        // The hint goes beside the title only when the panel is wide enough to
-        // hold it at a readable size: on a small screen's panel it would shrink
-        // to nothing, so there it stays away and the row keeps its buttons.
-        let showsHint = width >= 520
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -1594,17 +1578,6 @@ private struct TouchControlEditor: View {
                     .foregroundColor(Theme.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-
-                // The hint belongs beside the title, not out on its own
-                // in the row below, where it crowded the sliders: the
-                // size slider only appears once a control is pressed.
-                if showsHint {
-                    Text(L.t("DRAG TO MOVE, TAP TO SIZE"))
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
 
                 Spacer(minLength: 6)
 
@@ -1640,40 +1613,29 @@ private struct TouchControlEditor: View {
                     .kerning(1.1)
                     .foregroundColor(Theme.faint)
 
-                Slider(value: $model.controlsOpacity, in: 0.15...1)
+                Slider(value: $model.controlsOpacity, in: 0...1)
                     .accentColor(accent)
-                    .frame(minWidth: 64, maxWidth: 96)
+                    .frame(width: 96)
 
                 Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundColor(Theme.dim)
                     .frame(width: 30, alignment: .leading)
 
-                // The size of the button that was pressed, right beside the
-                // opacity and only while one is pressed: there is nothing to
-                // size otherwise, and the floating box it used to live in sat
-                // on top of the layout it edits.
-                if let selected = selected {
-                    Text(L.t("SIZE"))
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .kerning(1.1)
-                        .foregroundColor(Theme.faint)
-
-                    Slider(value: scaleBinding(for: selected), in: 0.55...1.8)
-                        .accentColor(accent)
-                        .frame(minWidth: 64, maxWidth: 96)
-
-                    Text(verbatim: "\(Int(((scales[selected] ?? 1) * 100).rounded()))%")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Theme.dim)
-                        .frame(width: 30, alignment: .leading)
-                }
+                Text(L.t("DRAG TO MOVE"))
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.faint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
 
                 Spacer(minLength: 0)
             }
+            // The toggle sits in this row's trailing corner.
+            .padding(.trailing, 148)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        .frame(width: width, height: 80, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.background.opacity(0.94))
@@ -1682,7 +1644,6 @@ private struct TouchControlEditor: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Theme.line, lineWidth: 1)
         )
-        .frame(width: width, alignment: .leading)
         .padding(.leading, 16 + insets.left)
         .padding(.top, 10 + insets.top)
     }
@@ -1830,17 +1791,6 @@ private struct TouchControlEditor: View {
             }
         )
         .contentShape(Rectangle())
-    }
-
-    private func scaleBinding(for control: TouchControl) -> Binding<Double> {
-        Binding(
-            get: { Double(scales[control] ?? 1) },
-            set: { newValue in
-                let value = CGFloat(newValue)
-                scales[control] = value
-                ControlLayout.setScale(value, for: control, profile: profile, game: game)
-            }
-        )
     }
 
     private func dragGesture(for control: TouchControl, in size: CGSize) -> some Gesture {

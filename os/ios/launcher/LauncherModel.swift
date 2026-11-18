@@ -368,7 +368,7 @@ final class LauncherModel: ObservableObject {
         alwaysRun = storedBool("alwaysRun", for: game, fallback: true)
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
-        controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.15), 1)
+        controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0), 1)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 

@@ -193,11 +193,8 @@ void press_action(int action)
         ios_send_scan_code(SDL_SCANCODE_N);
         break;
     case 10:
-        // F7 is the engine's quick load.
-        ios_send_scan_code(SDL_SCANCODE_F7);
-        break;
-    case 11:
-        // F6 is the engine's quick save.
+        // SAVES opens the game's own save/load screen: F6 is its save key, and
+        // the screen it brings up loads as well as saves.
         ios_send_scan_code(SDL_SCANCODE_F6);
         break;
     default:
