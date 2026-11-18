@@ -38,12 +38,12 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 - Runs natively: no JIT or entitlements.
 - Launcher with everything you’d need
 - Your own game ZIP per game, with separate installs and saves
-- Touch controls you can move, resize and change opacity
+- Touch controls you can; move, resize and tweak opacity to your liking
 - Language pack imports and savegame backups handled in the launcher
 
 ## Install
 
-1. Grab `vaultos` from the latest [release](https://github.com/shplash/fallout1-ce-iosimproved/releases).
+1. Grab `VaultOS.ipa` from the latest [release](https://github.com/shplash/fallout1-ce-iosimproved/releases).
 2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
 Installed through **LiveContainer**, turn on **Fix File Picker** in the app's settings, or the ZIP picker will not open.
