@@ -96,9 +96,12 @@ struct LauncherView: View {
             }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            if showSaveImportWarning && saveImportCountdown > 0 {
-                saveImportCountdown -= 1
+            // Only the save-import countdown needs a tick. Without it this ran a
+            // full redraw of the launcher every second for as long as it was open.
+            guard showSaveImportWarning && saveImportCountdown > 0 else {
+                return
             }
+            saveImportCountdown -= 1
         }
         .fileImporter(
             isPresented: $model.showImporter,
@@ -144,6 +147,24 @@ struct LauncherView: View {
             Alert(
                 title: Text(model.selectedGame.title),
                 message: Text(L.t(model.errorMessage ?? "")),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .alert(isPresented: updateOutcomeAlert) { () -> Alert in
+            let outcome = updateOutcome ?? UpdateOutcome(message: "", address: nil)
+            if let address = outcome.address, let url = URL(string: address) {
+                return Alert(
+                    title: Text(L.t("UPDATES")),
+                    message: Text(outcome.message),
+                    primaryButton: .default(Text(L.t("GET"))) {
+                        UIApplication.shared.open(url)
+                    },
+                    secondaryButton: .cancel(Text("OK"))
+                )
+            }
+            return Alert(
+                title: Text(L.t("UPDATES")),
+                message: Text(outcome.message),
                 dismissButton: .default(Text("OK"))
             )
         }
@@ -616,8 +637,6 @@ struct LauncherView: View {
             .padding(.horizontal, 22)
             .padding(.bottom, 10)
 
-            updateOutcomeLine
-
             Rectangle()
                 .fill(Theme.line)
                 .frame(height: 1)
@@ -702,31 +721,18 @@ struct LauncherView: View {
         .accessibilityLabel(L.t("Check for updates"))
     }
 
-    /// The check's answer, under the links. It only exists once there has been a
-    /// check, so the header keeps its height until then.
-    @ViewBuilder private var updateOutcomeLine: some View {
-        if let outcome = updateOutcome {
-            HStack(spacing: 8) {
-                Text(outcome.message)
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundColor(Theme.dim)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                if let address = outcome.address, let url = URL(string: address) {
-                    Button(L.t("GET")) {
-                        UIApplication.shared.open(url)
-                    }
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(Theme.text)
-                    .buttonStyle(.plain)
+    /// The check's answer, shown as a small popup over the launcher rather than a
+    /// row on the page: a row would make the About page taller and bring in a
+    /// slider's worth of layout shift.
+    private var updateOutcomeAlert: Binding<Bool> {
+        Binding(
+            get: { updateOutcome != nil },
+            set: { shown in
+                if !shown {
+                    updateOutcome = nil
                 }
-
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 10)
-        }
+        )
     }
 
     /// Asks GitHub for the newest release and compares it with the version this
@@ -1062,19 +1068,6 @@ struct LauncherView: View {
                       detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
                       isOn: $model.touchControls)
 
-            row("Opacity", detail: "How solid the on-screen controls are") {
-                HStack(spacing: 12) {
-                    Slider(value: $model.controlsOpacity, in: 0.10...1)
-                        .accentColor(accent)
-                        .frame(width: 200)
-
-                    Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Theme.dim)
-                        .frame(width: 38, alignment: .trailing)
-                }
-            }
-
             row("Button colour", detail: "White, orange, green or blue") {
                 Menu {
                     ForEach(ControlColour.allCases) { colour in
@@ -1109,6 +1102,23 @@ struct LauncherView: View {
                     )
                 }
             }
+
+            row("Opacity", detail: "How solid the on-screen controls are") {
+                HStack(spacing: 12) {
+                    Slider(value: $model.controlsOpacity, in: 0.10...1)
+                        .accentColor(accent)
+                        .frame(width: 200)
+
+                    Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+                        .frame(width: 38, alignment: .trailing)
+                }
+            }
+            // Greyed out, not hidden, while the on-screen controls are off: the
+            // scheme cannot be seen then, so there is nothing to edit.
+            .disabled(!model.touchControls)
+            .opacity(model.touchControls ? 1 : 0.4)
         }
     }
 
@@ -1638,24 +1648,21 @@ private struct TouchControlEditor: View {
                         .opacity(model.controlsOpacity)
                 }
 
-                VStack(alignment: .leading, spacing: 0) {
+                // One centred bar across the top holds the editor's controls and
+                // its own HIDE/SHOW toggle. The toggle sits at the same place in
+                // both states - the middle of the top edge - so it never moves
+                // when the bar is hidden or shown. Hiding removes the bar and
+                // leaves only the toggle.
+                VStack(spacing: 0) {
                     if !barsHidden {
                         chrome(in: geometry.size)
                     }
+                    barsToggle
+                        .padding(.top, barsHidden ? 0 : 6)
                     Spacer(minLength: 0)
                 }
-
-                // The toggle lives in the panel's bottom trailing corner while
-                // the bars are there. Hiding them takes the panel away and the
-                // toggle jumps to the middle of the top edge, where nothing is
-                // laid out, so the whole screen is free. No animation: it just
-                // goes, and comes back to the same corner.
-                barsToggle
-                    .padding(.leading, toggleLeading(in: geometry.size))
-                    .padding(.top, (barsHidden ? TouchControlEditor.hiddenToggleTop
-                                               : TouchControlEditor.shownToggleTop)
-                             + LauncherHost.safeInsets.top)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.top, 8 + LauncherHost.safeInsets.top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .statusBar(hidden: true)
         }
@@ -1663,38 +1670,21 @@ private struct TouchControlEditor: View {
         .preferredColorScheme(.dark)
     }
 
-    /// The capsule's width is fixed so both of its places can be worked out in
-    /// advance: HIDE BARS and SHOW BARS are the same nine characters in the
-    /// monospaced face it is drawn in, and the label shrinks rather than
-    /// spilling out if that ever stops being true.
+    /// The capsule's width is fixed so its label never moves the bar: HIDE BARS
+    /// and SHOW BARS are the same nine characters in the monospaced face it is
+    /// drawn in, and the label shrinks rather than spilling out if that changes.
     private static let toggleWidth: CGFloat = 116
-    /// The panel's box, measured from the top of the screen: 10 down, 84 tall,
-    /// which is the two rows and their padding with room to spare.
-    private static let panelTop: CGFloat = 10
-    private static let panelHeight: CGFloat = 84
-    /// Right under the panel's trailing corner, clear of its sliders. It used to
-    /// sit inside that corner, where the size slider now reaches.
-    private static let shownToggleTop: CGFloat = panelTop + panelHeight + 8
-    /// Clear of the top edge while the panel is away.
-    private static let hiddenToggleTop: CGFloat = 8
 
-    private func panelWidth(in size: CGSize) -> CGFloat {
-        return min(620, max(320, size.width * 0.60))
-    }
-
-    private func toggleLeading(in size: CGSize) -> CGFloat {
-        let insets = LauncherHost.safeInsets
-        if barsHidden {
-            return max(insets.left + 8,
-                       (size.width - TouchControlEditor.toggleWidth) / 2)
-        }
-        return 16 + insets.left + panelWidth(in: size) - 12 - TouchControlEditor.toggleWidth
+    /// The bar is centred across the top, as wide as its two rows need and never
+    /// wider than the screen allows.
+    private func barWidth(in size: CGSize) -> CGFloat {
+        return min(max(size.width - 32, 320), 720)
     }
 
     /// Hides the editor's own bars to give the whole screen to the layout. It is
     /// a filled capsule with a word on it, deliberately unlike the controls it
-    /// sits among, and it can always be found: in the panel's corner while that
-    /// is there, and in the middle of the top edge once it is gone.
+    /// sits among. It stays in the middle of the top edge in both states, so
+    /// the player never has to look for it.
     private var barsToggle: some View {
         Button {
             barsHidden.toggle()
@@ -1721,18 +1711,14 @@ private struct TouchControlEditor: View {
         .accessibilityLabel(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
     }
 
-    /// The editor's own controls, in one compact panel in the top-left corner
-    /// instead of two bars across the whole screen: the controls it edits live
-    /// on the right and along the bottom, and a full-width bar used to sit on
-    /// top of them and push its own buttons off the edge. Two short lines fit
-    /// in half the width: one for the buttons, one for opacity and size.
+    /// The editor's own controls, in one centred bar across the top. The
+    /// controls it edits sit on the right and along the bottom, so the bar keeps
+    /// to the middle of the top edge and leaves the corners free.
     ///
-    /// Hiding the bars takes the panel away and nothing else: only the toggle
-    /// is left, up in the top middle, so the whole screen is free to lay the
-    /// controls out on.
+    /// Hiding the bars takes this bar away and nothing else: only the toggle is
+    /// left, in the same place, so the whole screen is free to lay out.
     private func chrome(in size: CGSize) -> some View {
-        let width = panelWidth(in: size)
-        let insets = LauncherHost.safeInsets
+        let width = barWidth(in: size)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -1809,7 +1795,7 @@ private struct TouchControlEditor: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(width: width, height: TouchControlEditor.panelHeight, alignment: .leading)
+        .frame(width: width, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.background.opacity(0.94))
@@ -1818,8 +1804,6 @@ private struct TouchControlEditor: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Theme.line, lineWidth: 1)
         )
-        .padding(.leading, 16 + insets.left)
-        .padding(.top, 10 + insets.top)
     }
 
     private func presetButton(_ title: String, profile target: LayoutProfile) -> some View {

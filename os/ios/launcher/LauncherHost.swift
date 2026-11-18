@@ -828,7 +828,11 @@ final class GameControlsOverlay: UIView {
         addSubview(savesButton)
 
         refreshControls()
-        let timer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
+        // The overlay polls the engine for what it can do right now (attack
+        // mode, reload, skip). Those change with the player's own taps, so a
+        // half-second poll is quick enough and reads the settings far less
+        // often on the main thread than the old 0.15 s did.
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.refreshControls()
         }
         RunLoop.main.add(timer, forMode: .common)

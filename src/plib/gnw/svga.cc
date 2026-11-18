@@ -134,6 +134,10 @@ bool svga_init(VideoOptions* video_options)
 
         SDL_DestroyWindow(gSdlWindow);
         gSdlWindow = NULL;
+
+        // Without a surface there is nothing to set the palette on, so stop
+        // here rather than dereference the NULL surface below.
+        return false;
     }
 
     SDL_Color colors[256];
