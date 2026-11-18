@@ -132,7 +132,10 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
         return -1;
     }
 
+    debug_printf("[init] memory\n");
+
     gconfig_init(isMapper, argc, argv);
+    debug_printf("[init] config\n");
 
     game_in_mapper = isMapper;
 
@@ -140,6 +143,8 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
         gconfig_exit(false);
         return -1;
     }
+
+    debug_printf("[init] databases\n");
 
     win_set_minimized_title(windowTitle);
 
@@ -177,14 +182,22 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
         config_exit(&resolutionConfig);
     }
 
+    debug_printf("[init] resolution %dx%d\n", video_options.width, video_options.height);
+
     initWindow(&video_options, flags);
+    debug_printf("[init] window\n");
+
     palette_init();
+    debug_printf("[init] palette\n");
 
     if (!game_in_mapper) {
         game_splash_screen();
+        debug_printf("[init] splash\n");
     }
 
     FMInit();
+    debug_printf("[init] font manager\n");
+
     text_add_manager(&alias_mgr);
     text_font(font);
 

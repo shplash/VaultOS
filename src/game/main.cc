@@ -98,6 +98,8 @@ static bool main_death_voiceover_done;
 // 0x4725E8
 int gnw_main(int argc, char** argv)
 {
+    debug_printf("[vaultos] engine main\n");
+
     if (!autorun_mutex_create()) {
         return 1;
     }
@@ -105,6 +107,8 @@ int gnw_main(int argc, char** argv)
     if (!main_init_system(argc, argv)) {
         return 1;
     }
+
+    debug_printf("[vaultos] engine initialised\n");
 
 #if defined(__APPLE__) && TARGET_OS_IPHONE
     // The two startup movies are the first thing Fallout 1 decodes, and its

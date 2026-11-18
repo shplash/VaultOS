@@ -224,11 +224,15 @@ int fallout_ios_launch_selected_engine(int argc, char** argv)
     engine->set_host(&g_host);
     engine->set_install_dir([installDirectory fileSystemRepresentation]);
 
-    // The overlay lives in its own window above the engine's SDL window, so it
-    // can be created before the engine starts and does not depend on the
-    // engine's window hierarchy. Installing it again from the engine (as the
-    // Fallout 1 adapter does) is a no-op.
-    host_install_controls();
+    // Fallout 1 installs the overlay itself, from svga_init, once its window
+    // exists. Installing it before the engine starts attached UIKit views to
+    // SDL's window while SDL was still creating it, which is the sort of
+    // re-entrancy that ends in a crash whose log stops wherever it happened to
+    // be. Fallout 2 never calls back after creating its window, so it keeps
+    // being set up from here.
+    if (![identifier isEqualToString:@"fallout1"]) {
+        host_install_controls();
+    }
 
     return engine->run(argc, argv);
 }
