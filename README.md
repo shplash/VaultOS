@@ -77,9 +77,9 @@ Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fa
 
 ## Notes & Licensing
 
-Fallout is a trademark of Bethesda Softworks. Unofficial, not affiliated with Bethesda or Interplay, and you must own the games.
+Unofficial. Fallout is a trademark of Bethesda Softworks, not affiliated with Bethesda or Interplay.
 
-Built on [Fallout CE](https://github.com/alexbatalov/fallout1-ce) and [Fallout 2 CE](https://github.com/alexbatalov/fallout2-ce) by Alexander Batalov, with SDL 2.0, zlib and fpattern. Everything here is under the [Sustainable Use License](LICENSE.md).
+Engines by Alexander Batalov ([Fallout CE](https://github.com/alexbatalov/fallout1-ce), [Fallout 2 CE](https://github.com/alexbatalov/fallout2-ce)); everything here is under the [Sustainable Use License](LICENSE.md).
 
 ## <a href="https://ko-fi.com/shplash"><img src="https://img.shields.io/badge/Support-ko--fi-FF5E5B?style=for-the-badge" alt="Support"></a>
 
