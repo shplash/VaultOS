@@ -1884,6 +1884,13 @@ static void _nfPkDecomp(unsigned char* a1, unsigned char* a2, int a3, int a4, in
     unsigned int* dest_ptr;
     unsigned int nibbles[2];
 
+    // Motion vectors are signed offsets into the previous frame, so a block on
+    // that frame's top or left edge can point outside it. Reading there is a
+    // crash - it is the first thing the intro decodes - so the frame and its
+    // end are kept here and every copy is clamped inside them.
+    const unsigned char* frameStart = gMovieDirectDrawSurfaceBuffer2;
+    const unsigned char* frameEnd = frameStart + static_cast<ptrdiff_t>(_mveBW) * _mveBH;
+
     dword_6B401B = 8 * a3;
     dword_6B4017 = 8 * a5;
     dword_6B401F = 8 * a4 * byte_6B4016;
@@ -1949,14 +1956,6 @@ static void _nfPkDecomp(unsigned char* a1, unsigned char* a2, int a3, int a4, in
                     }
 
                     value2 = _mveBW;
-
-                    // Motion vectors are signed offsets into the previous
-                    // frame, so a block on the frame's top or left edge can
-                    // point outside it. Reading there is a crash - it is the
-                    // first thing the intro decodes - so every copy is kept
-                    // inside the frame it is taken from.
-                    const unsigned char* frameStart = gMovieDirectDrawSurfaceBuffer2;
-                    const unsigned char* frameEnd = frameStart + static_cast<ptrdiff_t>(_mveBW) * _mveBH;
 
                     for (i = 0; i < 8; ++i) {
                         const unsigned char* src = dest + v10;
