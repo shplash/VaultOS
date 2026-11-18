@@ -52,7 +52,7 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 1. Grab `VaultOS.ipa` from the latest [release](https://github.com/shplash/fallout1-ce-iosimproved/releases).
 2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
-If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings, or the ZIP picker will not open.
+If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings or **”Files”** will not let you select the zip
 
 ## Requirements
 
@@ -68,7 +68,7 @@ Zip the game once, then import that ZIP in the launcher. Either the game folder 
 | **Fallout** | `master.dat` `critter.dat` `data/` |
 | **Fallout 2** | `master.dat` `critter.dat` `patch000.dat` `data/` |
 
-Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fallout2/` for Fallout 2. Both show up in the Files app. Switching game restarts the app.
+Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fallout2/` for Fallout 2, both show up in the Files app.
 
 ## In the launcher
 
