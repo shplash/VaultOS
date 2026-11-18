@@ -129,7 +129,16 @@ final class LauncherModel: ObservableObject {
 
     /// Every option is written the moment it changes, so settings survive
     /// closing the app from the launcher, not only pressing Play.
+    ///
+    /// Nothing is written before the starting game's own settings have been
+    /// read: until then every property holds its default, and storing those
+    /// would put 1280x720 and white controls over a resolution and a control
+    /// colour the player had chosen.
     private func store<T>(_ value: T, _ name: String) {
+        guard settingsLoaded else {
+            return
+        }
+
         defaults.set(value, forKey: LauncherModel.optionKey(name, for: selectedGame))
     }
 
@@ -140,9 +149,18 @@ final class LauncherModel: ObservableObject {
             }
 
             defaults.set(selectedGame.rawValue, forKey: "launcher.game")
-            saveSettings(for: oldValue)
+
+            // Only a switch the player made has an outgoing game whose options
+            // are in memory. At start-up they are not, and saving them there
+            // would overwrite the remembered game's settings with this
+            // model's defaults - the resolution that read as FULL and the
+            // control colour that went back to white.
+            if settingsLoaded {
+                saveSettings(for: oldValue)
+                refreshInstall()
+            }
+
             loadSettings(for: selectedGame)
-            refreshInstall()
         }
     }
 
@@ -160,6 +178,10 @@ final class LauncherModel: ObservableObject {
     private let documentsDirectory: URL
     private var progressTimer: Timer?
     private let defaults = UserDefaults.standard
+    /// False until the settings of the game the launcher starts in have been
+    /// read. Everything the properties are set to before that is a default,
+    /// not a choice, and must never be stored.
+    private var settingsLoaded = false
 
     var installDirectory: URL {
         return installDirectory(for: selectedGame)
@@ -200,6 +222,8 @@ final class LauncherModel: ObservableObject {
         LauncherModel.prepareInstallFolders(documents: documentsDirectory)
         selectedGame = FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
         loadSettings(for: selectedGame)
+        // Everything from here on is the player's choice rather than a default.
+        settingsLoaded = true
         refreshInstall()
     }
 
@@ -505,6 +529,8 @@ final class LauncherModel: ObservableObject {
                 url.stopAccessingSecurityScopedResource()
             }
 
+            LauncherModel.discardTemporaryCopy(of: url)
+
             DispatchQueue.main.async {
                 guard let self = self else {
                     return
@@ -551,6 +577,8 @@ final class LauncherModel: ObservableObject {
             if accessed {
                 url.stopAccessingSecurityScopedResource()
             }
+
+            LauncherModel.discardTemporaryCopy(of: url)
 
             DispatchQueue.main.async {
                 guard let self = self else {
@@ -664,6 +692,8 @@ final class LauncherModel: ObservableObject {
                 url.stopAccessingSecurityScopedResource()
             }
 
+            LauncherModel.discardTemporaryCopy(of: url)
+
             DispatchQueue.main.async {
                 guard let self = self else {
                     return
@@ -679,6 +709,29 @@ final class LauncherModel: ObservableObject {
                     self.errorMessage = failure.isEmpty ? "Installation failed." : failure
                 }
             }
+        }
+    }
+
+    /// Deletes the copy the document picker made for an import.
+    ///
+    /// The picker runs in copy mode, so what it hands over is a copy in the
+    /// app's temporary directory, not the player's own file. iOS empties that
+    /// directory on its own schedule and a game ZIP is over a gigabyte, so the
+    /// copy goes as soon as the import is done with it. Anything outside the
+    /// temporary directory is left alone.
+    private static func discardTemporaryCopy(of url: URL) {
+        let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+
+        guard path != temporary, path.hasPrefix(temporary + "/") else {
+            return
+        }
+
+        do {
+            try FileManager.default.removeItem(at: url)
+            LauncherLog.write("removed the picker's copy of \(url.lastPathComponent)")
+        } catch {
+            LauncherLog.write("could not remove the picker's copy of \(url.lastPathComponent): \(error.localizedDescription)")
         }
     }
 

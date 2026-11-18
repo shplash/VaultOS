@@ -28,6 +28,7 @@
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/svga.h"
 #include "plib/gnw/winmain.h"
+#include "vaultos_build_sha.h"
 
 namespace {
 
@@ -62,14 +63,14 @@ int run(int argc, char** argv)
     // number to the About page. The commit is the reliable half: a restored
     // build tree compiles incrementally, so __DATE__ and __TIME__ can be older
     // than the source the IPA was made from.
-#ifdef VAULTOS_BUILD_SHA
-    fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s, commit %s\n",
-        __DATE__,
-        __TIME__,
-        VAULTOS_BUILD_SHA);
-#else
-    fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s\n", __DATE__, __TIME__);
-#endif
+    if (VAULTOS_BUILD_SHA[0] != '\0') {
+        fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s, commit %s\n",
+            __DATE__,
+            __TIME__,
+            VAULTOS_BUILD_SHA);
+    } else {
+        fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s\n", __DATE__, __TIME__);
+    }
 
     SDL_ShowCursor(SDL_DISABLE);
 

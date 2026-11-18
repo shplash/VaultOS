@@ -603,8 +603,11 @@ final class GameControlsOverlay: UIView {
     private static let overlayTag = 0xF0110
     private static var windowObserver: NSObjectProtocol?
     private static var windowRetryTimer: Timer?
-    /// Keeps the overlay alive across SDL window changes so its timer can put
-    /// it back if the window is recreated.
+    /// The overlay's own slow clock. It puts the overlay back on top when SDL
+    /// replaces its view, and it is the only thing that asks the game what the
+    /// controls can do while Fallout 2 runs - see |startOverlayClock|.
+    private static var overlayClock: Timer?
+    /// Keeps the overlay alive across SDL window changes.
     private static var installedOverlay: GameControlsOverlay?
 
     private let joystick = CameraJoystickControl()
@@ -676,14 +679,15 @@ final class GameControlsOverlay: UIView {
         // svga_init does), in which case the overlay can attach immediately.
         if let window = sdlWindow() {
             attach(to: window)
-            return
+        } else {
+            // Fallout 2's engine does not call back after creating its window,
+            // so wait for that window to appear instead of covering it with a
+            // window of our own.
+            observeEngineWindow()
+            watchForEngineWindow()
         }
 
-        // Fallout 2's engine does not call back after creating its window, so
-        // wait for that window to appear instead of covering it with a window
-        // of our own.
-        observeEngineWindow()
-        watchForEngineWindow()
+        startOverlayClock()
     }
 
     /// Second way of noticing SDL's window, for the case where the visibility
@@ -758,9 +762,60 @@ final class GameControlsOverlay: UIView {
         installedOverlay = overlay
         overlay.tag = overlayTag
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        if overlay.frame != window.bounds {
+            overlay.frame = window.bounds
+        }
         window.addSubview(overlay)
         window.bringSubviewToFront(overlay)
         overlay.setNeedsLayout()
+    }
+
+    /// Puts the overlay back above SDL's own view, if it is not there.
+    ///
+    /// SDL creates its window before the view it draws into, so an overlay
+    /// installed in between ends up underneath everything the game draws
+    /// afterwards. Fallout 2 is set up exactly like that - it never calls back
+    /// once its window exists - which is why it had no controls at all after
+    /// the timer that used to reorder the views was taken out. This changes
+    /// nothing unless the overlay is not already on top.
+    private static func ensureFrontmost() {
+        guard let overlay = installedOverlay else {
+            return
+        }
+
+        guard let window = overlay.window ?? sdlWindow() else {
+            return
+        }
+
+        if overlay.superview !== window {
+            attach(to: window)
+        } else if window.subviews.last !== overlay {
+            window.bringSubviewToFront(overlay)
+        }
+    }
+
+    /// The overlay's slow clock, started once the engine is about to run.
+    ///
+    /// Fallout 1 refreshes the controls from its own input loop (see
+    /// |refreshInstalled|), which is the only place it is safe to ask the game
+    /// anything. Fallout 2 never calls back, so here the game is asked twice a
+    /// second instead - a few pointer reads and no view work - and both games
+    /// get the overlay put back on top if SDL replaced its view. Nothing in
+    /// this tick lays out or resizes a control.
+    private static func startOverlayClock() {
+        guard overlayClock == nil else {
+            return
+        }
+
+        let timer = Timer(timeInterval: 0.5, repeats: true) { _ in
+            ensureFrontmost()
+
+            if ControlLayout.activeGame() == .fallout2 {
+                installedOverlay?.refreshControls()
+            }
+        }
+        overlayClock = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     override init(frame: CGRect) {

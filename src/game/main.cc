@@ -110,17 +110,13 @@ int gnw_main(int argc, char** argv)
 
     debug_printf("[vaultos] engine initialised\n");
 
-#if defined(__APPLE__) && TARGET_OS_IPHONE
-    // The two startup movies are the first thing Fallout 1 decodes, and its
-    // movie path is what stops this app on iOS: the game dies before a single
-    // frame reaches the screen, so it never gets to its own menu. They are
-    // skipped here so the game can run; the movies it plays from scripts are
-    // untouched.
-    debug_printf("[vaultos] startup movies skipped\n");
-#else
+    // Both startup movies play on iOS again. They were skipped while this app
+    // was dying here; the two causes are fixed in this build - the interface's
+    // -1 hand slot that the on-screen controls read, and the decoder's motion
+    // copies that read outside the previous frame.
+    debug_printf("[vaultos] startup movies\n");
     gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
     gmovie_play(MOVIE_INTRO, 0);
-#endif
 
     int menuResult = main_menu_create();
     debug_printf("[vaultos] main menu create returned %d\n", menuResult);
