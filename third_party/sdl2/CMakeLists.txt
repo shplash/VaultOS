@@ -12,14 +12,19 @@ endif()
 
 include(FetchContent)
 
+# CMake 4's external-project step looks up a git version before it will decide
+# what to do about submodules. Finding git here fills that in, and the two
+# options below stop the step from asking at all - SDL has no submodules, so
+# there is nothing to recurse into. This is the configure failure the arm64
+# image hit: "git version 1.6.5 or later required for --recursive flag with
+# 'git submodule ...': Git_VERSION=''".
+find_package(Git QUIET)
+
 FetchContent_Declare(sdl2
     GIT_REPOSITORY "https://github.com/libsdl-org/SDL"
     GIT_TAG "release-2.26.1"
-    # SDL has no submodules to fetch, and asking for none skips the step that
-    # fails when CMake's ExternalProject cannot find a git version. CMake 4 on
-    # the arm64 macOS image hits exactly that, with "git version 1.6.5 or later
-    # required for --recursive flag" and an empty Git_VERSION.
     GIT_SUBMODULES ""
+    GIT_SUBMODULES_RECURSE FALSE
 )
 
 FetchContent_GetProperties(sdl2)
