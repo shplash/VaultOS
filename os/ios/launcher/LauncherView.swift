@@ -1493,9 +1493,23 @@ private struct TouchControlEditor: View {
                 }
 
                 VStack(alignment: .leading, spacing: 0) {
-                    chrome(in: geometry.size)
+                    if !barsHidden {
+                        chrome(in: geometry.size)
+                    }
                     Spacer(minLength: 0)
                 }
+
+                // While the bars are hidden the toggle leaves the panel's side
+                // and slides to the top middle of the screen, where no control
+                // is drawn, and it slides back under the panel when they come
+                // back. Both its places are set from the screen's edges, so the
+                // move is one smooth animation rather than a jump.
+                barsToggle
+                    .padding(.leading, toggleLeading(in: geometry.size))
+                    .padding(.top, (barsHidden ? TouchControlEditor.hiddenToggleTop
+                                               : TouchControlEditor.shownToggleTop)
+                             + LauncherHost.safeInsets.top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .statusBar(hidden: true)
         }
@@ -1503,13 +1517,34 @@ private struct TouchControlEditor: View {
         .preferredColorScheme(.dark)
     }
 
+    /// The capsule's width is fixed so both of its places can be worked out in
+    /// advance: HIDE BARS and SHOW BARS are the same nine characters in the
+    /// monospaced face it is drawn in, and the label shrinks rather than
+    /// spilling out if that ever stops being true.
+    private static let toggleWidth: CGFloat = 116
+    /// Under the panel, clear of its bottom edge.
+    private static let shownToggleTop: CGFloat = 107
+    /// Clear of the top edge while the panel is away.
+    private static let hiddenToggleTop: CGFloat = 8
+
+    private func toggleLeading(in size: CGSize) -> CGFloat {
+        let insets = LauncherHost.safeInsets
+        if !barsHidden {
+            return 16 + insets.left
+        }
+        let centred = (size.width - TouchControlEditor.toggleWidth) / 2
+        return max(insets.left + 8, centred)
+    }
+
     /// Hides the editor's own bars to give the whole screen to the layout. It is
     /// a filled capsule with a word on it, deliberately unlike the controls it
-    /// sits among, and it keeps one fixed place under the panel so it can always
-    /// be found again, whether the bars are there or not.
+    /// sits among, and it can always be found: under the panel while that is
+    /// there, and in the middle of the top edge once it is gone.
     private var barsToggle: some View {
         Button {
-            barsHidden.toggle()
+            withAnimation(.easeInOut(duration: 0.24)) {
+                barsHidden.toggle()
+            }
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: barsHidden ? "chevron.down" : "chevron.up")
@@ -1518,10 +1553,13 @@ private struct TouchControlEditor: View {
                 Text(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .kerning(1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundColor(Color.black.opacity(0.85))
             .padding(.horizontal, 13)
             .padding(.vertical, 9)
+            .frame(width: TouchControlEditor.toggleWidth)
             .background(Capsule().fill(accent))
             .overlay(Capsule().stroke(Color.white.opacity(0.28), lineWidth: 1))
             .contentShape(Capsule())
@@ -1537,9 +1575,10 @@ private struct TouchControlEditor: View {
     /// in half the width.
     ///
     /// Hiding the bars takes the panel away and nothing else: only the toggle
-    /// under it is left, so the whole screen is free to lay controls out on.
-    /// The size slider is one of the panel's own rows and therefore goes with
-    /// it, and it only exists while a control is pressed.
+    /// is left, and it moves up to the top middle, so the whole screen is free
+    /// to lay controls out on. The size slider is one of the panel's own rows
+    /// and therefore goes with it, and it only exists while a control is
+    /// pressed.
     private func chrome(in size: CGSize) -> some View {
         let width = min(620, max(320, size.width * 0.66))
         let insets = LauncherHost.safeInsets
@@ -1548,115 +1587,102 @@ private struct TouchControlEditor: View {
         // to nothing, so there it stays away and the row keeps its buttons.
         let showsHint = width >= 520
 
-        return ZStack(alignment: .topLeading) {
-            if !barsHidden {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Text(L.t("Touch controls"))
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(Theme.text)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(L.t("Touch controls"))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(Theme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
 
-                        // The hint belongs beside the title, not out on its own
-                        // in the row below, where it crowded the sliders: the
-                        // size slider only appears once a control is pressed.
-                        if showsHint {
-                            Text(L.t("DRAG TO MOVE, TAP TO SIZE"))
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                                .foregroundColor(Theme.faint)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                        }
-
-                        Spacer(minLength: 6)
-
-                        presetButton("FULL LAYOUT", profile: .full)
-                        presetButton("HALF LAYOUT", profile: .half)
-
-                        Button(L.t("RESET")) {
-                            ControlLayout.reset(profile: profile, game: game)
-                            model.controlsOpacity = 1
-                            centers = ControlLayout.allCenters(profile: profile, game: game)
-                            scales = ControlLayout.allScales(profile: profile, game: game)
-                            dragOrigins.removeAll()
-                            selected = nil
-                        }
+                // The hint belongs beside the title, not out on its own
+                // in the row below, where it crowded the sliders: the
+                // size slider only appears once a control is pressed.
+                if showsHint {
+                    Text(L.t("DRAG TO MOVE, TAP TO SIZE"))
                         .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(Theme.dim)
-
-                        Button(L.t("DONE")) {
-                            presentationMode.wrappedValue.dismiss()
-                        }
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color.black.opacity(0.85))
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 7)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(accent)
-                        )
-                    }
-
-                    HStack(spacing: 9) {
-                        Text(L.t("OPACITY"))
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .kerning(1.1)
-                            .foregroundColor(Theme.faint)
-
-                        Slider(value: $model.controlsOpacity, in: 0.15...1)
-                            .accentColor(accent)
-                            .frame(minWidth: 64, maxWidth: 96)
-
-                        Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundColor(Theme.dim)
-                            .frame(width: 30, alignment: .leading)
-
-                        // The size of the button that was pressed, right beside
-                        // the opacity and only while one is pressed: there is
-                        // nothing to size otherwise, and the floating box it
-                        // used to live in sat on top of the layout it edits.
-                        if let selected = selected {
-                            Text(L.t("SIZE"))
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                                .kerning(1.1)
-                                .foregroundColor(Theme.faint)
-
-                            Slider(value: scaleBinding(for: selected), in: 0.55...1.8)
-                                .accentColor(accent)
-                                .frame(minWidth: 64, maxWidth: 96)
-
-                            Text(verbatim: "\(Int(((scales[selected] ?? 1) * 100).rounded()))%")
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                                .foregroundColor(Theme.dim)
-                                .frame(width: 30, alignment: .leading)
-                        }
-
-                        Spacer(minLength: 0)
-                    }
+                        .foregroundColor(Theme.faint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+
+                Spacer(minLength: 6)
+
+                presetButton("FULL LAYOUT", profile: .full)
+                presetButton("HALF LAYOUT", profile: .half)
+
+                Button(L.t("RESET")) {
+                    ControlLayout.reset(profile: profile, game: game)
+                    model.controlsOpacity = 1
+                    centers = ControlLayout.allCenters(profile: profile, game: game)
+                    scales = ControlLayout.allScales(profile: profile, game: game)
+                    dragOrigins.removeAll()
+                    selected = nil
+                }
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundColor(Theme.dim)
+
+                Button(L.t("DONE")) {
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundColor(Color.black.opacity(0.85))
+                .padding(.horizontal, 13)
+                .padding(.vertical, 7)
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Theme.background.opacity(0.94))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Theme.line, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(accent)
                 )
             }
+
+            HStack(spacing: 9) {
+                Text(L.t("OPACITY"))
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .kerning(1.1)
+                    .foregroundColor(Theme.faint)
+
+                Slider(value: $model.controlsOpacity, in: 0.15...1)
+                    .accentColor(accent)
+                    .frame(minWidth: 64, maxWidth: 96)
+
+                Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .frame(width: 30, alignment: .leading)
+
+                // The size of the button that was pressed, right beside the
+                // opacity and only while one is pressed: there is nothing to
+                // size otherwise, and the floating box it used to live in sat
+                // on top of the layout it edits.
+                if let selected = selected {
+                    Text(L.t("SIZE"))
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .kerning(1.1)
+                        .foregroundColor(Theme.faint)
+
+                    Slider(value: scaleBinding(for: selected), in: 0.55...1.8)
+                        .accentColor(accent)
+                        .frame(minWidth: 64, maxWidth: 96)
+
+                    Text(verbatim: "\(Int(((scales[selected] ?? 1) * 100).rounded()))%")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+                        .frame(width: 30, alignment: .leading)
+                }
+
+                Spacer(minLength: 0)
+            }
         }
-        .frame(width: width, height: 88, alignment: .topLeading)
-        // The toggle has a line of its own under the panel rather than a corner
-        // of it: in the corner it sat on top of the sliders as soon as the size
-        // one appeared. Its place does not depend on the bars, so collapsing
-        // and expanding always finds it in the same spot.
-        .overlay(
-            barsToggle
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                .offset(y: 40)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.background.opacity(0.94))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Theme.line, lineWidth: 1)
+        )
+        .frame(width: width, alignment: .leading)
         .padding(.leading, 16 + insets.left)
         .padding(.top, 10 + insets.top)
     }
