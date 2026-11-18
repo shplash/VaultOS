@@ -148,12 +148,6 @@ int fire_mode()
     return active_item_action();
 }
 
-// Whether there is a game to control right now.
-//
-// The dude is only created when a map loads, and the interface bar is only
-// enabled outside menus and videos, so the two together with the movie check
-// keep the touch controls off the screen for the startup movies and the main
-// menu - and turn them back on once the player is on a map.
 int in_game()
 {
     if (fallout::_moviePlaying()) {

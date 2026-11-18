@@ -354,12 +354,6 @@ int fire_mode()
     return aiming ? mode + 1 : mode;
 }
 
-// Whether there is a game to control right now.
-//
-// The dude only exists once a map is loaded, and the main menu is only shown
-// outside a game, so the two together with the movie check keep the touch
-// controls off the screen for the startup movies, the main menu and character
-// creation - and turn them back on the moment the player is on a map.
 int in_game()
 {
     if (fallout::moviePlaying()) {

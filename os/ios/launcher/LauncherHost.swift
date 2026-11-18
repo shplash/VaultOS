@@ -603,9 +603,6 @@ final class GameControlsOverlay: UIView {
     private static let overlayTag = 0xF0110
     private static var windowObserver: NSObjectProtocol?
     private static var windowRetryTimer: Timer?
-    /// The overlay's own slow clock. It puts the overlay back on top when SDL
-    /// replaces its view, and it is the only thing that asks the game what the
-    /// controls can do while Fallout 2 runs - see |startOverlayClock|.
     private static var overlayClock: Timer?
     /// Keeps the overlay alive across SDL window changes.
     private static var installedOverlay: GameControlsOverlay?
@@ -770,14 +767,6 @@ final class GameControlsOverlay: UIView {
         overlay.setNeedsLayout()
     }
 
-    /// Puts the overlay back above SDL's own view, if it is not there.
-    ///
-    /// SDL creates its window before the view it draws into, so an overlay
-    /// installed in between ends up underneath everything the game draws
-    /// afterwards. Fallout 2 is set up exactly like that - it never calls back
-    /// once its window exists - which is why it had no controls at all after
-    /// the timer that used to reorder the views was taken out. This changes
-    /// nothing unless the overlay is not already on top.
     private static func ensureFrontmost() {
         guard let overlay = installedOverlay else {
             return
@@ -794,14 +783,6 @@ final class GameControlsOverlay: UIView {
         }
     }
 
-    /// The overlay's slow clock, started once the engine is about to run.
-    ///
-    /// Fallout 1 refreshes the controls from its own input loop (see
-    /// |refreshInstalled|), which is the only place it is safe to ask the game
-    /// anything. Fallout 2 never calls back, so here the game is asked twice a
-    /// second instead - a few pointer reads and no view work - and both games
-    /// get the overlay put back on top if SDL replaced its view. Nothing in
-    /// this tick lays out or resizes a control.
     private static func startOverlayClock() {
         guard overlayClock == nil else {
             return
@@ -1017,10 +998,9 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        // The controls belong to a game that is actually running: nothing is
-        // drawn over the startup movies, the main menu or character creation,
-        // where there is nothing to control and the buttons would sit on top of
-        // the picture. Switched off entirely, they never appear at all.
+        // With the touch controls switched off the overlay leaves the screen
+        // entirely, so the game gets every touch, not only the ones that miss a
+        // control.
         let shown = ControlLayout.touchControls() && fallout_ios_in_game() != 0
         if isHidden == shown {
             isHidden = !shown

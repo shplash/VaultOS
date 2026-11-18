@@ -45,11 +45,6 @@ target_include_directories(${EXECUTABLE_NAME} PUBLIC src)
 
 # The commit this build came from, so the engine log can name the source it was
 # made from. Passed by CI as -D VAULTOS_BUILD_SHA=<sha>; empty in a local build.
-#
-# It goes into a generated header rather than a definition on the target: the
-# line that prints it lives in engine_fallout1.cc, and a target-wide definition
-# recompiles every engine file whenever the commit changes. Only the one file
-# that includes this header is rebuilt.
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine/vaultos_build_sha.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/vaultos_build_sha.h"

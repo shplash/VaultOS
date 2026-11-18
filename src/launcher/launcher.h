@@ -136,8 +136,6 @@ void fallout_ios_screen_size(int* width, int* height);
 int fallout_ios_action_available(int action);
 void fallout_ios_press_action(int action);
 int fallout_ios_fire_mode(void);
-// Whether the game is on a map right now, rather than in a movie, the main menu
-// or character creation. The overlay hides the controls until it is.
 int fallout_ios_in_game(void);
 void fallout_ios_menu_music_start(void);
 void fallout_ios_menu_music_stop(void);

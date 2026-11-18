@@ -327,8 +327,6 @@ extern "C" int fallout_ios_fire_mode(void)
         : -1;
 }
 
-// Whether the game is on a map right now rather than in a movie or a menu. The
-// overlay keeps the touch controls hidden until this says otherwise.
 extern "C" int fallout_ios_in_game(void)
 {
     return g_engine != NULL && g_engine->in_game != NULL

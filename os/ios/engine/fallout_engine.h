@@ -86,9 +86,6 @@ typedef struct FalloutEngineAPI {
     // -1 when the game has no weapon mode to report. Fallout 1 returns -1.
     int (*fire_mode)(void);
 
-    // Whether there is a game to control right now, as opposed to a movie, the
-    // main menu or character creation. The overlay keeps the touch controls off
-    // the screen until this says there is something to control.
     int (*in_game)(void);
 } FalloutEngineAPI;
 
