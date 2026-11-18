@@ -661,6 +661,14 @@ final class GameControlsOverlay: UIView {
     private var cursorModeTitle: String?
     private var fireModeValue: Int32 = -2
 
+    /// Refreshes the overlay that is on screen, if there is one. The engine
+    /// calls this from its own input loop, on the main thread between frames,
+    /// which is why nothing here may change the view hierarchy: it only asks
+    /// the game what the controls can do and updates them.
+    static func refreshInstalled() {
+        installedOverlay?.refreshControls()
+    }
+
     static func install() {
         ControlLayout.migrateIfNeeded()
 
@@ -949,15 +957,9 @@ final class GameControlsOverlay: UIView {
     }
 
     private func refreshControls() {
-        // Re-attach only when SDL has replaced its window. This used to resize
-        // the overlay and push it to the front of SDL's window every tick,
-        // which is UIKit layout and compositing from a timer running inside the
-        // engine's own loop - the app is locked to one full-screen window, so
-        // none of that was needed.
-        if superview == nil, let window = Self.sdlWindow() {
-            Self.attach(to: window)
-        }
-
+        // No view hierarchy work here, deliberately. This runs from the engine's
+        // own loop; attaching, resizing or reordering views there is what used
+        // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
         // With the touch controls switched off the overlay leaves the screen
@@ -1504,4 +1506,12 @@ public func fallout_ios_menu_music_start() {
 @_cdecl("fallout_ios_menu_music_stop")
 public func fallout_ios_menu_music_stop() {
     LauncherMusic.shared.stop()
+}
+
+// The engine asks for this from its own input loop, a few times a second, on
+// the main thread and between frames. It is how the on-screen controls know
+// what the game can do right now without a timer of ours interrupting it.
+@_cdecl("fallout_ios_refresh_game_controls")
+public func fallout_ios_refresh_game_controls() {
+    GameControlsOverlay.refreshInstalled()
 }

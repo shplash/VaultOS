@@ -3,6 +3,10 @@
 #include <limits.h>
 #include <stdio.h>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include "audio_engine.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
@@ -17,6 +21,13 @@
 #include "plib/gnw/touch.h"
 #include "plib/gnw/vcr.h"
 #include "plib/gnw/winmain.h"
+
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+// The touch overlay's state is refreshed from here rather than from a timer of
+// its own: this is the engine's own input loop, on the main thread, between
+// frames.
+#include "engine_glue.h"
+#endif
 
 namespace fallout {
 
@@ -183,6 +194,13 @@ void GNW_input_exit()
 int get_input()
 {
     int v3;
+
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+    // Keep the on-screen controls honest - which are available, whether reload
+    // and attack mode exist, what the action button says - from the engine's
+    // own loop. Anything else interrupts the engine mid-frame.
+    fallout_engine_refresh_controls();
+#endif
 
     GNW95_process_message();
 

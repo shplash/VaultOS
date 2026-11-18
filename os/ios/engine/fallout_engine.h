@@ -41,6 +41,13 @@ typedef struct FalloutEngineHost {
     void (*install_controls)(void);
     void (*menu_music_start)(void);
     void (*menu_music_stop)(void);
+
+    // Lets the touch overlay refresh what it offers - which controls are
+    // available, whether reload and attack mode exist, what the action button
+    // says. Called from the engine's own loop, on the main thread between
+    // frames, which is the only place it is safe: the overlay must never be
+    // asked to do this from a timer of its own interrupting the engine.
+    void (*refresh_controls)(void);
 } FalloutEngineHost;
 
 typedef struct FalloutEngineAPI {

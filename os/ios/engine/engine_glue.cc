@@ -1,5 +1,7 @@
 #include "engine_glue.h"
 
+#include <SDL.h>
+
 #include <cstdio>
 #include <cstring>
 
@@ -57,4 +59,23 @@ void fallout_engine_menu_music_stop()
     if (g_host != nullptr && g_host->menu_music_stop != nullptr) {
         g_host->menu_music_stop();
     }
+}
+
+void fallout_engine_refresh_controls(void)
+{
+    if (g_host == nullptr || g_host->refresh_controls == nullptr) {
+        return;
+    }
+
+    // The engine reaches this from its input loop, which runs many times a
+    // frame in some screens. The overlay only needs a handful of updates a
+    // second, and each one is UIKit work, so most calls do nothing.
+    static Uint32 lastRefresh = 0;
+    Uint32 now = SDL_GetTicks();
+    if (lastRefresh != 0 && now - lastRefresh < 250) {
+        return;
+    }
+
+    lastRefresh = now;
+    g_host->refresh_controls();
 }

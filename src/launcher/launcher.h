@@ -138,6 +138,9 @@ void fallout_ios_press_action(int action);
 int fallout_ios_fire_mode(void);
 void fallout_ios_menu_music_start(void);
 void fallout_ios_menu_music_stop(void);
+// Called from the engine's input loop, through the host callbacks, to refresh
+// the on-screen controls.
+void fallout_ios_refresh_game_controls(void);
 void fallout_ios_pause_game_audio(void);
 void fallout_ios_resume_game_audio(void);
 

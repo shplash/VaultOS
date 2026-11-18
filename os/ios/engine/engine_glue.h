@@ -22,4 +22,9 @@ void fallout_engine_install_controls();
 void fallout_engine_menu_music_start();
 void fallout_engine_menu_music_stop();
 
+// Asks the host to refresh the touch controls, at most a few times a second.
+// The engine calls it from its own input loop, which is the only safe place:
+// the main thread, between frames, never from a timer interrupting the engine.
+void fallout_engine_refresh_controls(void);
+
 #endif /* FALLOUT_IOS_ENGINE_GLUE_H_ */

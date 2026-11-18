@@ -68,11 +68,17 @@ static void host_menu_music_stop(void)
     fallout_ios_menu_music_stop();
 }
 
+static void host_refresh_controls(void)
+{
+    fallout_ios_refresh_game_controls();
+}
+
 static const FalloutEngineHost g_host = {
     FALLOUT_ENGINE_ABI_VERSION,
     host_install_controls,
     host_menu_music_start,
     host_menu_music_stop,
+    host_refresh_controls,
 };
 
 // MARK: - Engine loading
