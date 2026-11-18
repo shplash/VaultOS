@@ -15,6 +15,11 @@ include(FetchContent)
 FetchContent_Declare(sdl2
     GIT_REPOSITORY "https://github.com/libsdl-org/SDL"
     GIT_TAG "release-2.26.1"
+    # SDL has no submodules to fetch, and asking for none skips the step that
+    # fails when CMake's ExternalProject cannot find a git version. CMake 4 on
+    # the arm64 macOS image hits exactly that, with "git version 1.6.5 or later
+    # required for --recursive flag" and an empty Git_VERSION.
+    GIT_SUBMODULES ""
 )
 
 FetchContent_GetProperties(sdl2)
