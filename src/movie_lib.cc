@@ -1527,7 +1527,7 @@ static int _nfConfig(int a1, int a2, int a3, int a4)
         return 0;
     }
 
-    gMovieSdlSurface1 = SDL_CreateRGBSurfaceFrom(gMovieFrameMemory1 + gMovieFramePadding, _mveBW, _mveBH, depth, pitch, rmask, gmask, bmask);
+    gMovieSdlSurface1 = SDL_CreateRGBSurfaceFrom(gMovieFrameMemory1 + gMovieFramePadding, _mveBW, _mveBH, depth, pitch, rmask, gmask, bmask, 0);
     if (gMovieSdlSurface1 == NULL) {
         return 0;
     }
@@ -1537,7 +1537,7 @@ static int _nfConfig(int a1, int a2, int a3, int a4)
         return 0;
     }
 
-    gMovieSdlSurface2 = SDL_CreateRGBSurfaceFrom(gMovieFrameMemory2 + gMovieFramePadding, _mveBW, _mveBH, depth, pitch, rmask, gmask, bmask);
+    gMovieSdlSurface2 = SDL_CreateRGBSurfaceFrom(gMovieFrameMemory2 + gMovieFramePadding, _mveBW, _mveBH, depth, pitch, rmask, gmask, bmask, 0);
     if (gMovieSdlSurface2 == NULL) {
         return 0;
     }
