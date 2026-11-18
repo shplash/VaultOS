@@ -9,8 +9,9 @@ enum LauncherLanguage: String, CaseIterable {
     case italian
     case spanish
 
-    /// The device's preferred language, when the launcher speaks it.
-    static var current: LauncherLanguage {
+    /// The device's preferred language, when the launcher speaks it. Resolved
+    /// once: the launcher looks up every string it shows on every redraw.
+    static let current: LauncherLanguage = {
         for tag in Locale.preferredLanguages {
             let code = String(tag.prefix(2)).lowercased()
             if let match = LauncherLanguage(rawValue: code) {
@@ -18,7 +19,7 @@ enum LauncherLanguage: String, CaseIterable {
             }
         }
         return .english
-    }
+    }()
 }
 
 /// One lookup for every piece of launcher text. Keys are the English strings,

@@ -18,6 +18,7 @@ final class LauncherHost {
     private var finished = false
     private var resignObserver: NSObjectProtocol?
     private var activeObserver: NSObjectProtocol?
+    private var sizeObservers: [NSObjectProtocol] = []
 
     private init() {
         let center = NotificationCenter.default
@@ -50,6 +51,9 @@ final class LauncherHost {
             fallout_ios_resume_game_audio()
             LauncherMusic.shared.resume()
         } else if window != nil {
+            // Launching the app rotates the interface to landscape, which lands
+            // after the launcher's window exists.
+            fitToAvailableSpace()
             LauncherMusic.shared.playIfAvailable()
         }
     }
@@ -73,25 +77,94 @@ final class LauncherHost {
 
         let controller = UIHostingController(rootView: root)
         controller.view.backgroundColor = UIColor.black
+        controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
 
-        // The app is landscape only, but the screen metrics can still arrive
-        // with the portrait dimensions on the first frame, which laid the
-        // launcher out in a shape it can never be shown in.
-        let screen = UIScreen.main.bounds
-        let landscape = screen.width < screen.height
-            ? CGRect(x: 0, y: 0, width: screen.height, height: screen.width)
-            : screen
-
-        let window = UIWindow(frame: landscape)
+        // The window takes the space the app is actually given, never a shape
+        // guessed from the screen. main() runs this during launch, before the
+        // landscape-only rotation has landed, so the screen can still report the
+        // portrait metrics; and on an iPad the app can be given a window smaller
+        // than the screen. A window built from the wrong bounds leaves the
+        // launcher laid out for a shape it is never shown in, which reads as a
+        // squeezed rail with the rest of the page off screen.
+        let window = launcherWindow()
         // Above SDL's launch screen window (UIWindowLevelNormal + 1).
         window.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.normal.rawValue + 2)
         window.rootViewController = controller
         window.makeKeyAndVisible()
         self.window = window
 
+        fitToAvailableSpace()
+        followAvailableSpace()
+
         // main() has to keep control until the game is ready to boot, so run a
         // nested run loop. finish(launchGame:) stops it.
         fallout_ios_run_launcher_loop()
+    }
+
+    /// A window owned by the app's scene when it has one, so UIKit keeps it the
+    /// size of the space the app was given; a screen-sized window otherwise.
+    private func launcherWindow() -> UIWindow {
+        if let windowScene = scene() {
+            return UIWindow(windowScene: windowScene)
+        }
+        return UIWindow(frame: UIScreen.main.bounds)
+    }
+
+    /// The scene the launcher belongs to, preferring the one in front.
+    private func scene() -> UIWindowScene? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+    }
+
+    /// The space the launcher may use: its own scene when UIKit gave it one,
+    /// the screen otherwise.
+    private func availableBounds() -> CGRect {
+        if let windowScene = window?.windowScene {
+            return windowScene.coordinateSpace.bounds
+        }
+        if let windowScene = scene() {
+            return windowScene.coordinateSpace.bounds
+        }
+        return UIScreen.main.bounds
+    }
+
+    private func fitToAvailableSpace() {
+        guard let window = window else {
+            return
+        }
+
+        let bounds = availableBounds()
+        guard bounds.width > 0 && bounds.height > 0 else {
+            return
+        }
+
+        if window.frame != bounds {
+            window.frame = bounds
+        }
+        if let view = window.rootViewController?.view, view.bounds.size != bounds.size {
+            view.frame = CGRect(origin: .zero, size: bounds.size)
+        }
+    }
+
+    /// The interface rotation that follows launch is not a device rotation, and
+    /// a resized window on an iPad can change at any time, so the launcher's
+    /// window is fitted again on every change and once more once UIKit has
+    /// settled the launch-time rotation.
+    private func followAvailableSpace() {
+        sizeObservers.append(NotificationCenter.default.addObserver(
+            forName: UIDevice.orientationDidChangeNotification,
+            object: nil,
+            queue: .main) { [weak self] _ in
+            self?.fitToAvailableSpace()
+        })
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+
+        DispatchQueue.main.async { [weak self] in
+            self?.fitToAvailableSpace()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.fitToAvailableSpace()
+        }
     }
 
     private func finish(launchGame: Bool) {
@@ -99,6 +172,12 @@ final class LauncherHost {
             return
         }
         finished = true
+
+        for observer in sizeObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        sizeObservers.removeAll()
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
 
         window?.isHidden = true
         let closingWindow = window

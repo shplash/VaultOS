@@ -20,8 +20,20 @@ struct LauncherView: View {
         return model.selectedGame.accent
     }
 
+    /// The launcher is drawn for the space it is given and never scrolls, so
+    /// below this size it would have to clip a page to fit. Scaling the whole
+    /// launcher instead keeps every control reachable on a window this small,
+    /// and leaves it untouched at the size of a phone or tablet.
+    private static let smallestLayout = CGSize(width: 560, height: 320)
+
     var body: some View {
         GeometryReader { geometry in
+            let fits = geometry.size.width > 1 && geometry.size.height > 1
+            let scale = fits
+                ? min(1, min(geometry.size.width / LauncherView.smallestLayout.width,
+                             geometry.size.height / LauncherView.smallestLayout.height))
+                : 1
+
             ZStack {
                 LauncherBackdrop(accent: accent)
 
@@ -29,7 +41,8 @@ struct LauncherView: View {
                     rail
                     content
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height)
+                .frame(width: geometry.size.width / scale, height: geometry.size.height / scale)
+                .scaleEffect(scale)
             }
         }
         .preferredColorScheme(.dark)
