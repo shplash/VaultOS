@@ -91,6 +91,13 @@ void ios_send_scan_code(SDL_Scancode scanCode)
     fallout::kb_simulate_key(&key);
 }
 
+// The interface initialises both hand slots to (Object*)-1 (an upstream quirk
+// in intface_reset), so "no item" is either nullptr or that sentinel.
+static bool is_real_item(fallout::Object* item)
+{
+    return item != nullptr && item != reinterpret_cast<fallout::Object*>(-1);
+}
+
 // Fallout 1 has the same attack modes as its sequel; the engine binds N to
 // intface_toggle_item_state and reports the current mode through
 // intface_get_attack, so the on-screen button reads and cycles it the same way.
@@ -101,7 +108,7 @@ int has_item_in_hand()
         return 0;
     }
 
-    return item != nullptr ? 1 : 0;
+    return is_real_item(item) ? 1 : 0;
 }
 
 // Reloading in Fallout 1 lives in the interface, not on its own key: the
@@ -111,7 +118,7 @@ int has_item_in_hand()
 int has_reloadable_weapon()
 {
     fallout::Object* item = nullptr;
-    if (fallout::intface_get_current_item(&item) != 0 || item == nullptr) {
+    if (fallout::intface_get_current_item(&item) != 0 || !is_real_item(item)) {
         return 0;
     }
 
@@ -125,7 +132,9 @@ int has_reloadable_weapon()
 void reload_active_weapon()
 {
     fallout::Object* item = nullptr;
-    if (fallout::intface_get_current_item(&item) != 0 || item == nullptr) {
+    if (fallout::obj_dude == nullptr
+        || fallout::intface_get_current_item(&item) != 0
+        || !is_real_item(item)) {
         return;
     }
 
@@ -152,10 +161,16 @@ int action_available(int action)
     case 6:
         return fallout::combat_can_skip_turn() ? 1 : 0;
     case 8:
-        // Reload: a weapon that takes ammunition is in hand.
+        // Reload: needs a loaded world and a weapon that takes ammunition.
+        if (fallout::obj_dude == nullptr) {
+            return 0;
+        }
         return has_reloadable_weapon();
     case 9:
-        // Any item in hand can be switched between its attack modes.
+        // Attack-mode switch: needs a loaded world and an item in hand.
+        if (fallout::obj_dude == nullptr) {
+            return 0;
+        }
         return has_item_in_hand();
     default:
         return 1;
