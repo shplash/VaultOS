@@ -44,7 +44,7 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 - Runs natively: no JIT or entitlements.
 - Launcher with everything you'd need
 - Your own game ZIP per game, with separate installs and saves
-- Touch controls you can move, resize and tweak opacity to your liking
+- Touch controls with move, resize and opacity editing
 - Language pack imports and savegame backups handled in the launcher
 
 ## Install
