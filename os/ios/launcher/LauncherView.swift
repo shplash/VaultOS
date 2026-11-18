@@ -571,7 +571,7 @@ struct LauncherView: View {
     /// scroll view, and it holds static rows only.
     private var aboutSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(L.t("About"))
                         .font(.system(size: 25, weight: .bold))
@@ -586,9 +586,15 @@ struct LauncherView: View {
 
                 Spacer(minLength: 8)
 
-                Text(verbatim: "v\(appVersion)")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.faint)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(verbatim: "v\(appVersionShort)")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+
+                    Text(verbatim: "build \(appBuild)")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Theme.faint)
+                }
             }
             .padding(.horizontal, 22)
             .padding(.top, 16)
@@ -596,12 +602,11 @@ struct LauncherView: View {
 
             HStack(spacing: 8) {
                 aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
-                aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=feature_request.yml", primary: false)
-                aboutLink(L.t("BUG"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=bug_report.yml", primary: false)
+                aboutLink(L.t("SUPPORT"), address: "https://ko-fi.com/shplash", primary: true)
+                aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=feature_request.yml", primary: true)
+                aboutLink(L.t("BUG"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=bug_report.yml", primary: true)
 
                 Spacer(minLength: 0)
-
-                aboutLink(L.t("SUPPORT"), address: "https://ko-fi.com/shplash", primary: false)
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 10)
@@ -637,15 +642,13 @@ struct LauncherView: View {
         .padding(.bottom, 16 + screenInsets.bottom)
     }
 
-    /// "1.0 (109)" as built, so a bug report can name the exact version.
-    private var appVersion: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? ""
-        let build = info?["CFBundleVersion"] as? String ?? ""
-        if short.isEmpty {
-            return build
-        }
-        return build.isEmpty ? short : "\(short) (\(build))"
+    /// The version as built, so a bug report can name it.
+    private var appVersionShort: String {
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+    }
+
+    private var appBuild: String {
+        return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
     }
 
     private func aboutLink(_ title: String, address: String, primary: Bool) -> some View {
@@ -684,7 +687,7 @@ struct LauncherView: View {
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
-                    ("Layout", "Every control can be moved and resized from Controls, and its opacity set there too."),
+                    ("Layout", "Every control can be moved, resized, faded and coloured from Controls."),
                 ]
             case .survival:
                 return [
@@ -850,7 +853,7 @@ struct LauncherView: View {
 
     private var gameSheet: some View {
         sheet(title: "Game", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
-            row("Language", detail: "Game text, voice, the launcher and the controls") {
+            row("Language", detail: "Game text, voice, the launcher and the controls. A game ZIP is not a language pack: add one from HOME.") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
@@ -884,8 +887,8 @@ struct LauncherView: View {
             }
 
             toggleRow("Subtitles", detail: "Spoken lines appear as text", isOn: $model.subtitles)
-            toggleRow("Run, don't walk",
-                      detail: "Moves at a run; hold Shift to walk",
+            toggleRow("Always sprint",
+                      detail: "Moves at a run everywhere",
                       isOn: $model.alwaysRun)
 
             savegamesRow
@@ -895,13 +898,46 @@ struct LauncherView: View {
     }
 
     private var controlsSheet: some View {
-        sheet(title: "Controls", detail: "Size and opacity of the on-screen controls", onReset: resetControls) {
+        sheet(title: "Controls", detail: "Size, colour and opacity of the on-screen controls", onReset: resetControls) {
             scaleRow("Joystick", detail: "Camera pad in the lower left", value: $model.joystickScale)
             scaleRow("Buttons", detail: "All on-screen buttons", value: $model.buttonScale)
             scaleRow("Opacity", detail: "Unusable buttons hold their dimming until the slider goes below it",
                      value: $model.controlsOpacity)
 
-            toggleRow("White buttons", detail: "Neutral colour instead of the game accent", isOn: $model.whiteButtons)
+            row("Button colour", detail: "White, orange, green or blue") {
+                Menu {
+                    ForEach(ControlColour.allCases) { colour in
+                        Button(L.t(colour.title)) {
+                            model.buttonColour = colour.rawValue
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(model.controlColour.color)
+                            .frame(width: 10, height: 10)
+
+                        Text(L.t(model.controlColour.title))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                    }
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundColor(accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Theme.hairline, lineWidth: 1)
+                    )
+                }
+            }
 
             HStack {
                 Spacer(minLength: 0)
@@ -920,7 +956,7 @@ struct LauncherView: View {
     /// Backing the saves up is harmless; putting a backup back replaces them, so
     /// that one waits out a countdown with the warning on screen.
     private var savegamesRow: some View {
-        row("Savegames", detail: model.savesNotice) {
+        row("Saved games", detail: model.savesNotice) {
             HStack(spacing: 8) {
                 Button {
                     model.backupSaves()
@@ -1073,7 +1109,7 @@ struct LauncherView: View {
         model.joystickScale = 1
         model.buttonScale = 1
         model.controlsOpacity = 1
-        model.whiteButtons = false
+        model.buttonColour = ControlColour.white.rawValue
     }
 
     // MARK: - Sheet pieces
@@ -1456,18 +1492,19 @@ private struct TouchControlEditor: View {
                         .opacity(model.controlsOpacity)
                 }
 
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(spacing: 0) {
                     if !barsHidden {
                         editorBar
                         opacityBar
                     }
+                    Spacer(minLength: 0)
+                }
 
-                    // The toggle sits outside the bars, so it keeps the same
-                    // place whether they are shown or hidden, and it is a
-                    // labelled capsule rather than a bare chevron, so it can
-                    // never be mistaken for one of the game controls.
+                // Pinned to the top middle, over the gap between the bar's pills
+                // on the left and its hint on the right, so it holds still whether
+                // the bars are shown or hidden and never lands near a control.
+                VStack(spacing: 0) {
                     barsToggle
-
                     Spacer(minLength: 0)
                 }
 
@@ -1505,8 +1542,7 @@ private struct TouchControlEditor: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
-        .padding(.leading, 18)
-        .padding(.top, 10)
+        .padding(.top, 8)
     }
 
     private var editorBar: some View {
@@ -1639,7 +1675,7 @@ private struct TouchControlEditor: View {
 
     private func editorControl(_ control: TouchControl, size: CGSize, selected: Bool) -> some View {
         let shortSide = min(size.width, size.height)
-        let tint = model.whiteButtons ? Color.white : accent
+        let tint = model.controlColour.color
 
         return VStack(spacing: max(1, shortSide * 0.035)) {
             Image(systemName: control.symbol)
@@ -1684,7 +1720,7 @@ private struct TouchControlEditor: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(control.label)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(model.whiteButtons ? .white : accent)
+                    .foregroundColor(model.controlColour.color)
                 Text(L.t("SIZE"))
                     .font(.system(size: 8, weight: .semibold, design: .monospaced))
                     .foregroundColor(Theme.faint)

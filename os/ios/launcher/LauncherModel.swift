@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Combine
+import SwiftUI
 
 enum FalloutGame: String, CaseIterable, Identifiable {
     case fallout1
@@ -50,6 +51,42 @@ enum LauncherImport {
     case saves
 }
 
+/// The colours the on-screen controls can be drawn in. White is the default for
+/// both games, so the controls look the same as the interface they sit on.
+enum ControlColour: Int, CaseIterable, Identifiable {
+    case white
+    case orange
+    case green
+    case blue
+
+    var id: Int {
+        return rawValue
+    }
+
+    /// English; the launcher translates it when it shows the menu.
+    var title: String {
+        switch self {
+        case .white: return "White"
+        case .orange: return "Orange"
+        case .green: return "Green"
+        case .blue: return "Blue"
+        }
+    }
+
+    var uiColor: UIColor {
+        switch self {
+        case .white: return .white
+        case .orange: return UIColor(red: 0.89, green: 0.64, blue: 0.29, alpha: 0.95)
+        case .green: return UIColor(red: 0.55, green: 0.96, blue: 0.45, alpha: 0.95)
+        case .blue: return UIColor(red: 0.42, green: 0.75, blue: 1.0, alpha: 0.95)
+        }
+    }
+
+    var color: Color {
+        return Color(uiColor)
+    }
+}
+
 struct DisplayPreset: Identifiable, Hashable {
     let id: String
     let label: String
@@ -83,7 +120,15 @@ final class LauncherModel: ObservableObject {
     @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
     /// Opacity of the in-game touch controls, 0.15 (barely there) to 1.
     @Published var controlsOpacity: Double = 1 { didSet { store(controlsOpacity, "controlsOpacity") } }
-    @Published var whiteButtons = false { didSet { store(whiteButtons, "whiteButtons") } }
+    /// The colour of the on-screen controls. White unless the player picks one
+    /// of the others; stored per game like every other option.
+    @Published var buttonColour = ControlColour.white.rawValue {
+        didSet { store(buttonColour, "buttonColour") }
+    }
+
+    var controlColour: ControlColour {
+        return ControlColour(rawValue: buttonColour) ?? .white
+    }
 
     /// Every option is written the moment it changes, so settings survive
     /// closing the app from the launcher, not only pressing Play.
@@ -247,7 +292,7 @@ final class LauncherModel: ObservableObject {
         "joystickScale",
         "buttonScale",
         "controlsOpacity",
-        "whiteButtons",
+        "buttonColour",
     ]
 
     /// The defaults key that holds one option of one game. The in-game overlay
@@ -335,7 +380,7 @@ final class LauncherModel: ObservableObject {
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
         controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.15), 1)
-        whiteButtons = storedBool("whiteButtons", for: game, fallback: false)
+        buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 
     private func saveSettings(for game: FalloutGame) {
@@ -354,7 +399,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(joystickScale, forKey: LauncherModel.optionKey("joystickScale", for: game))
         defaults.set(buttonScale, forKey: LauncherModel.optionKey("buttonScale", for: game))
         defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: game))
-        defaults.set(whiteButtons, forKey: LauncherModel.optionKey("whiteButtons", for: game))
+        defaults.set(buttonColour, forKey: LauncherModel.optionKey("buttonColour", for: game))
     }
 
     private func storedInt(_ name: String, for game: FalloutGame, fallback: Int) -> Int {

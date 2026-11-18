@@ -1174,6 +1174,17 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
         return LAUNCHER_ERROR;
     }
 
+    // A game ZIP is not a translation, and picking one here used to write its
+    // text tree over the other game's data. Refuse it before extracting.
+    for (const ZipEntry& entry : entries) {
+        const std::string name = lower_ascii(entry.name);
+        const std::string base = name.substr(name.find_last_of('/') + 1);
+        if (base == "master.dat" || base == "critter.dat" || base == "patch000.dat") {
+            fail("That is a game ZIP, not a language pack. Use IMPORT GAME ZIP on HOME for it.");
+            return LAUNCHER_ERROR;
+        }
+    }
+
     bool found = false;
     const std::string prefix = find_tree_prefix(entries, "text/", found);
     if (!found) {

@@ -206,25 +206,15 @@ final class LauncherHost {
 // the rest of the screen keeps working exactly as before.
 
 private enum ControlTheme {
-    static var whiteButtons: Bool {
-        UserDefaults.standard.bool(forKey: LauncherModel.optionKey("whiteButtons", for: ControlLayout.activeGame()))
+    /// The colour the player picked for the on-screen controls.
+    static var control: UIColor {
+        let key = LauncherModel.optionKey("buttonColour", for: ControlLayout.activeGame())
+        let index = UserDefaults.standard.integer(forKey: key)
+        return ControlColour(rawValue: index)?.uiColor ?? .white
     }
 
     static var game: FalloutGame {
         ControlLayout.activeGame()
-    }
-
-    static var green: UIColor {
-        if whiteButtons {
-            return .white
-        }
-        return game == .fallout2
-            ? UIColor(red: 0.42, green: 0.75, blue: 1.0, alpha: 0.95)
-            : UIColor(red: 0.55, green: 0.96, blue: 0.45, alpha: 0.95)
-    }
-
-    static var amber: UIColor {
-        whiteButtons ? .white : UIColor(red: 0.95, green: 0.72, blue: 0.32, alpha: 0.95)
     }
 
     static var panel: UIColor {
@@ -236,7 +226,8 @@ private enum ControlTheme {
     static let highlight = UIColor.white.withAlphaComponent(0.18)
 
     static var dim: UIColor {
-        if whiteButtons {
+        let key = LauncherModel.optionKey("buttonColour", for: ControlLayout.activeGame())
+        if UserDefaults.standard.integer(forKey: key) == ControlColour.white.rawValue {
             return UIColor.white.withAlphaComponent(0.68)
         }
         return game == .fallout2
@@ -1021,7 +1012,7 @@ final class GameControlsOverlay: UIView {
     /// group is centred in the canvas so all four modes line up in the button.
     private func fireModeImage(_ mode: Int32) -> UIImage {
         let size = CGSize(width: 42, height: 20)
-        let color = ControlTheme.green
+        let color = ControlTheme.control
 
         return UIGraphicsImageRenderer(size: size).image { context in
             let cg = context.cgContext
@@ -1093,9 +1084,9 @@ private final class LabeledControlButton: UIControl {
         backgroundColor = ControlTheme.panel
         layer.cornerRadius = 10
         layer.borderWidth = 1.5
-        layer.borderColor = (accent ? ControlTheme.amber : ControlTheme.green)
+        layer.borderColor = (accent ? ControlTheme.control : ControlTheme.control)
             .withAlphaComponent(0.6).cgColor
-        tintColor = accent ? ControlTheme.amber : ControlTheme.green
+        tintColor = accent ? ControlTheme.control : ControlTheme.control
 
         iconView.contentMode = .scaleAspectFit
         iconView.isUserInteractionEnabled = false
@@ -1106,7 +1097,7 @@ private final class LabeledControlButton: UIControl {
         label.numberOfLines = self.labelLines
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.6
-        label.textColor = accent ? ControlTheme.amber : ControlTheme.green
+        label.textColor = accent ? ControlTheme.control : ControlTheme.control
         label.isUserInteractionEnabled = false
         addSubview(label)
 
@@ -1164,7 +1155,7 @@ private final class LabeledControlButton: UIControl {
 
     override var isHighlighted: Bool {
         didSet {
-            let normal = accent ? ControlTheme.amber : ControlTheme.green
+            let normal = accent ? ControlTheme.control : ControlTheme.control
             backgroundColor = isHighlighted ? ControlTheme.highlight : ControlTheme.panel
             layer.borderColor = (isHighlighted ? UIColor.white : normal)
                 .withAlphaComponent(isHighlighted ? 0.75 : 0.6).cgColor
@@ -1223,22 +1214,22 @@ private final class CameraJoystickControl: UIControl {
         isExclusiveTouch = true
 
         ring.fillColor = ControlTheme.panel.withAlphaComponent(0.30).cgColor
-        ring.strokeColor = ControlTheme.green.withAlphaComponent(0.40).cgColor
+        ring.strokeColor = ControlTheme.control.withAlphaComponent(0.40).cgColor
         ring.lineWidth = 1.2
         ring.shadowOpacity = 0
         layer.addSublayer(ring)
 
         crosshair.fillColor = UIColor.clear.cgColor
-        crosshair.strokeColor = ControlTheme.green.withAlphaComponent(0.16).cgColor
+        crosshair.strokeColor = ControlTheme.control.withAlphaComponent(0.16).cgColor
         crosshair.lineWidth = 1
         crosshair.lineCap = .round
         layer.addSublayer(crosshair)
 
         knob.isUserInteractionEnabled = false
-        knob.backgroundColor = ControlTheme.green.withAlphaComponent(0.10)
+        knob.backgroundColor = ControlTheme.control.withAlphaComponent(0.10)
         knob.layer.borderWidth = 1.2
-        knob.layer.borderColor = ControlTheme.green.withAlphaComponent(0.65).cgColor
-        knob.layer.shadowColor = ControlTheme.green.cgColor
+        knob.layer.borderColor = ControlTheme.control.withAlphaComponent(0.65).cgColor
+        knob.layer.shadowColor = ControlTheme.control.cgColor
         knob.layer.shadowOpacity = 0.10
         knob.layer.shadowRadius = 4
         knob.layer.shadowOffset = .zero

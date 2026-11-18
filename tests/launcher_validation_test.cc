@@ -396,6 +396,24 @@ int main()
         CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
     }
 
+    // A game ZIP offered as a language pack is refused before anything is
+    // written, so its text tree can never land over the game's own data.
+    {
+        const fs::path game = root / "fallout game.zip";
+        write_zip(game, {
+            { "master.dat", "game" },
+            { "critter.dat", "game" },
+            { "data/text/english/game/misc.msg", "hello" },
+        });
+
+        int32_t languages = 0;
+        CHECK(launcher_install_language_pack(game.string().c_str(), fallout1.string().c_str(),
+                  &languages) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("game ZIP") != std::string::npos);
+        CHECK(languages == 0);
+        CHECK(!fs::exists(fallout1 / "data" / "text" / "english"));
+    }
+
     // Uppercase installations (CD-era copies) are detected as well.
     const fs::path uppercase = root / "FALLOUT2";
     write_file(uppercase / "MASTER.DAT");
