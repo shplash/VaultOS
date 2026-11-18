@@ -1063,6 +1063,11 @@ struct LauncherView: View {
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
             }
+            // The three rows below the switch are greyed, not hidden, while the
+            // controls are off: there is nothing on the screen to edit, colour
+            // or dim then.
+            .disabled(!model.touchControls)
+            .opacity(model.touchControls ? 1 : 0.4)
 
             toggleRow("On-screen controls",
                       detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
@@ -1102,6 +1107,8 @@ struct LauncherView: View {
                     )
                 }
             }
+            .disabled(!model.touchControls)
+            .opacity(model.touchControls ? 1 : 0.4)
 
             row("Opacity", detail: "How solid the on-screen controls are") {
                 HStack(spacing: 12) {
@@ -1115,8 +1122,7 @@ struct LauncherView: View {
                         .frame(width: 38, alignment: .trailing)
                 }
             }
-            // Greyed out, not hidden, while the on-screen controls are off: the
-            // scheme cannot be seen then, so there is nothing to edit.
+            // Greyed out, not hidden, while the on-screen controls are off.
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
         }
@@ -1675,12 +1681,6 @@ private struct TouchControlEditor: View {
     /// drawn in, and the label shrinks rather than spilling out if that changes.
     private static let toggleWidth: CGFloat = 116
 
-    /// The bar is centred across the top, as wide as its two rows need and never
-    /// wider than the screen allows.
-    private func barWidth(in size: CGSize) -> CGFloat {
-        return min(max(size.width - 32, 320), 720)
-    }
-
     /// Hides the editor's own bars to give the whole screen to the layout. It is
     /// a filled capsule with a word on it, deliberately unlike the controls it
     /// sits among. It stays in the middle of the top edge in both states, so
@@ -1711,15 +1711,16 @@ private struct TouchControlEditor: View {
         .accessibilityLabel(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
     }
 
-    /// The editor's own controls, in one centred bar across the top. The
-    /// controls it edits sit on the right and along the bottom, so the bar keeps
-    /// to the middle of the top edge and leaves the corners free.
+    /// The editor's own controls, in one bar across the top. The controls it
+    /// edits sit on the right and along the bottom, so the bar keeps to the
+    /// middle of the top edge and leaves the corners free.
+    ///
+    /// The bar is only as wide as its two rows are: a fixed share of the screen
+    /// left most of it empty, which made a small tool look like a wide toolbar.
     ///
     /// Hiding the bars takes this bar away and nothing else: only the toggle is
     /// left, in the same place, so the whole screen is free to lay out.
     private func chrome(in size: CGSize) -> some View {
-        let width = barWidth(in: size)
-
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(L.t("Touch controls"))
@@ -1728,7 +1729,7 @@ private struct TouchControlEditor: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 14)
 
                 presetButton("FULL LAYOUT", profile: .full)
                 presetButton("HALF LAYOUT", profile: .half)
@@ -1764,7 +1765,7 @@ private struct TouchControlEditor: View {
 
                 Slider(value: $model.controlsOpacity, in: 0.10...1)
                     .accentColor(accent)
-                    .frame(minWidth: 64, maxWidth: 76)
+                    .frame(width: 76)
 
                 Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
@@ -1781,7 +1782,7 @@ private struct TouchControlEditor: View {
 
                 Slider(value: scaleBinding(for: selected), in: 0.55...1.8)
                     .accentColor(accent)
-                    .frame(minWidth: 64, maxWidth: 76)
+                    .frame(width: 76)
                     .disabled(selected == nil)
                     .opacity(selected == nil ? 0.4 : 1)
 
@@ -1795,7 +1796,9 @@ private struct TouchControlEditor: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(width: width, alignment: .leading)
+        // Its own two rows decide the width, so nothing is left over at the
+        // sides. The toggle below it follows the same width in both states.
+        .fixedSize(horizontal: true, vertical: false)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.background.opacity(0.94))
