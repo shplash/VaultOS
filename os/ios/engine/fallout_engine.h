@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 2
+#define FALLOUT_ENGINE_ABI_VERSION 3
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -85,6 +85,11 @@ typedef struct FalloutEngineAPI {
     // Fallout 2: the selected attack/fire mode (INTERFACE_ITEM_ACTION_*), or
     // -1 when the game has no weapon mode to report. Fallout 1 returns -1.
     int (*fire_mode)(void);
+
+    // Whether there is a game to control right now, as opposed to a movie, the
+    // main menu or character creation. The overlay keeps the touch controls off
+    // the screen until this says there is something to control.
+    int (*in_game)(void);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

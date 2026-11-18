@@ -20,8 +20,10 @@
 #include "game/intface.h"
 #include "game/item.h"
 #include "game/main.h"
+#include "game/mainmenu.h"
 #include "game/object.h"
 #include "game/object_types.h"
+#include "int/movie.h"
 #include "launcher/launcher.h"
 #include "plib/gnw/debug.h"
 #include "plib/gnw/kb.h"
@@ -352,6 +354,25 @@ int fire_mode()
     return aiming ? mode + 1 : mode;
 }
 
+// Whether there is a game to control right now.
+//
+// The dude only exists once a map is loaded, and the main menu is only shown
+// outside a game, so the two together with the movie check keep the touch
+// controls off the screen for the startup movies, the main menu and character
+// creation - and turn them back on the moment the player is on a map.
+int in_game()
+{
+    if (fallout::moviePlaying()) {
+        return 0;
+    }
+
+    if (fallout::obj_dude == nullptr) {
+        return 0;
+    }
+
+    return fallout::main_menu_is_shown() ? 0 : 1;
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout1",
@@ -370,6 +391,7 @@ const FalloutEngineAPI g_api = {
     pause_audio,
     resume_audio,
     fire_mode,
+    in_game,
 };
 
 } // namespace

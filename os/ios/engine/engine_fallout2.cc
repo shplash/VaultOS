@@ -18,6 +18,8 @@
 #include "item.h"
 #include "main.h"
 #include "mouse.h"
+#include "movie.h"
+#include "object.h"
 #include "proto_types.h"
 #include "svga.h"
 #include "win32.h"
@@ -144,6 +146,25 @@ int active_item_action()
 int fire_mode()
 {
     return active_item_action();
+}
+
+// Whether there is a game to control right now.
+//
+// The dude is only created when a map loads, and the interface bar is only
+// enabled outside menus and videos, so the two together with the movie check
+// keep the touch controls off the screen for the startup movies and the main
+// menu - and turn them back on once the player is on a map.
+int in_game()
+{
+    if (fallout::_moviePlaying()) {
+        return 0;
+    }
+
+    if (fallout::gDude == nullptr) {
+        return 0;
+    }
+
+    return fallout::interfaceBarEnabled() ? 1 : 0;
 }
 
 // In Fallout 2 reloading is one of the attack modes cycled with N. Walk to the
@@ -350,6 +371,7 @@ const FalloutEngineAPI g_api = {
     pause_audio,
     resume_audio,
     fire_mode,
+    in_game,
 };
 
 } // namespace

@@ -1017,10 +1017,11 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        // With the touch controls switched off the overlay leaves the screen
-        // entirely, so the game gets every touch, not only the ones that miss a
-        // control.
-        let shown = ControlLayout.touchControls()
+        // The controls belong to a game that is actually running: nothing is
+        // drawn over the startup movies, the main menu or character creation,
+        // where there is nothing to control and the buttons would sit on top of
+        // the picture. Switched off entirely, they never appear at all.
+        let shown = ControlLayout.touchControls() && fallout_ios_in_game() != 0
         if isHidden == shown {
             isHidden = !shown
         }
