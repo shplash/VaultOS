@@ -197,9 +197,41 @@ final class LauncherModel: ObservableObject {
         LauncherModel.applyDefaultResolution()
         LauncherModel.applyDefaultSubtitles()
         documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        LauncherModel.prepareInstallFolders(documents: documentsDirectory)
         selectedGame = FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
         loadSettings(for: selectedGame)
         refreshInstall()
+    }
+
+    /// Creates both installation folders and leaves a note in each. iOS only
+    /// lists an app in the Files app once its Documents folder holds something,
+    /// and a fresh installation holds nothing at all until a game has run - so
+    /// the folder that should have been used for copying game files in by hand
+    /// was not there to use. The notes say what belongs in each.
+    private static func prepareInstallFolders(documents: URL) {
+        let manager = FileManager.default
+        let folders = [
+            documents,
+            documents.appendingPathComponent("Fallout2", isDirectory: true),
+        ]
+        let games = ["Fallout", "Fallout 2"]
+        let files = [
+            "master.dat, critter.dat and the data folder",
+            "master.dat, critter.dat, patch000.dat and the data folder",
+        ]
+
+        for (index, folder) in folders.enumerated() {
+            try? manager.createDirectory(at: folder, withIntermediateDirectories: true)
+
+            let note = folder.appendingPathComponent("PUT GAME FILES HERE.txt")
+            guard !manager.fileExists(atPath: note.path) else {
+                continue
+            }
+
+            let text = "VaultOS - \(games[index])\n\n"
+                + "Copy \(files[index]) into this folder, or import a game ZIP from the launcher's HOME page.\n"
+            try? text.write(to: note, atomically: true, encoding: .utf8)
+        }
     }
 
     // MARK: - Screen size
