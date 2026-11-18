@@ -68,7 +68,7 @@ Zip the game once, then import that ZIP in the launcher. Either the game folder 
 | **Fallout** | `master.dat` `critter.dat` `data/` |
 | **Fallout 2** | `master.dat` `critter.dat` `patch000.dat` `data/` |
 
-Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fallout2/` for Fallout 2. Both show up in the Files app. Switching game restarts the app.
+Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fallout2/` for Fallout 2, both show up in the Files app.
 
 ## In the launcher
 
