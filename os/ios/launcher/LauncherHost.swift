@@ -475,7 +475,15 @@ enum ControlLayout {
     static func controlsOpacity() -> CGFloat {
         let value = UserDefaults.standard.object(
             forKey: LauncherModel.optionKey("controlsOpacity", for: activeGame())) as? Double ?? 1
-        return CGFloat(min(max(value, 0.15), 1))
+        return CGFloat(min(max(value, 0.10), 1))
+    }
+
+    /// Whether the in-game touch controls are drawn at all. On unless the player
+    /// has switched them off for this game.
+    static func touchControls() -> Bool {
+        let value = UserDefaults.standard.object(
+            forKey: LauncherModel.optionKey("touchControls", for: activeGame())) as? Bool
+        return value ?? true
     }
 
     /// The first build with the reference layout used saved drag positions
@@ -955,6 +963,14 @@ final class GameControlsOverlay: UIView {
         }
 
         applyControlOpacity(ControlLayout.controlsOpacity())
+
+        // With the touch controls switched off the overlay leaves the screen
+        // entirely, so the game gets every touch, not only the ones that miss a
+        // control.
+        let shown = ControlLayout.touchControls()
+        if isHidden == shown {
+            isHidden = !shown
+        }
 
         let mode = fallout_ios_cursor_mode()
         let symbol: String

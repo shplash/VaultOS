@@ -20,6 +20,10 @@ struct LauncherView: View {
     @State private var pendingImport: LauncherImport = .game
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
+    /// The update check runs only while the player waits for it, and its answer
+    /// is shown once in a note over the About page.
+    @State private var isCheckingForUpdates = false
+    @State private var updateOutcome: UpdateOutcome?
 
     private var accent: Color {
         return model.selectedGame.accent
@@ -606,9 +610,13 @@ struct LauncherView: View {
                 aboutLink(L.t("BUG"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=bug_report.yml", primary: true)
 
                 Spacer(minLength: 0)
+
+                checkForUpdatesButton
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 10)
+
+            updateOutcomeLine
 
             Rectangle()
                 .fill(Theme.line)
@@ -652,6 +660,149 @@ struct LauncherView: View {
 
     private func aboutLink(_ title: String, address: String, primary: Bool) -> some View {
         wikiLink(title, address: address, primary: primary)
+    }
+
+    /// What the update check came back with: one line, and the release page when
+    /// there is something newer to get.
+    private struct UpdateOutcome: Equatable {
+        let message: String
+        let address: String?
+    }
+
+    /// Asks GitHub for the newest release. It is drawn in the launcher's neutral
+    /// colours rather than the game's accent, because it reports on the app and
+    /// not on the game.
+    private var checkForUpdatesButton: some View {
+        Button {
+            checkForUpdates()
+        } label: {
+            HStack(spacing: 4) {
+                Text(isCheckingForUpdates ? L.t("CHECKING") : L.t("UPDATES"))
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .kerning(0.6)
+
+                Image(systemName: isCheckingForUpdates ? "hourglass" : "arrow.triangle.2.circlepath")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundColor(Theme.dim)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Theme.hairline, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isCheckingForUpdates)
+        .accessibilityLabel(L.t("Check for updates"))
+    }
+
+    /// The check's answer, under the links. It only exists once there has been a
+    /// check, so the header keeps its height until then.
+    @ViewBuilder private var updateOutcomeLine: some View {
+        if let outcome = updateOutcome {
+            HStack(spacing: 8) {
+                Text(outcome.message)
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundColor(Theme.dim)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                if let address = outcome.address, let url = URL(string: address) {
+                    Button(L.t("GET")) {
+                        UIApplication.shared.open(url)
+                    }
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(Theme.text)
+                    .buttonStyle(.plain)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 10)
+        }
+    }
+
+    /// Asks GitHub for the newest release and compares it with the version this
+    /// build reports. A check that could not be made says so instead of looking
+    /// like a build that is up to date.
+    private func checkForUpdates() {
+        guard !isCheckingForUpdates else {
+            return
+        }
+        guard let url = URL(string: "https://api.github.com/repos/shplash/fallout1-ce-iosimproved/releases/latest") else {
+            return
+        }
+
+        isCheckingForUpdates = true
+        updateOutcome = nil
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 20
+
+        let current = appVersionShort
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            let outcome = LauncherView.outcomeFromGitHub(data: data,
+                                                         error: error,
+                                                         current: current)
+            DispatchQueue.main.async {
+                self.isCheckingForUpdates = false
+                self.updateOutcome = outcome
+            }
+        }.resume()
+    }
+
+    /// Reads `tag_name` out of the release JSON and compares it with this build.
+    /// Anything unexpected - no network, a rate limit, a shape that changed -
+    /// ends as a plain failure rather than a wrong answer.
+    private static func outcomeFromGitHub(data: Data?,
+                                          error: Error?,
+                                          current: String) -> UpdateOutcome {
+        guard error == nil,
+              let data = data,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tag = json["tag_name"] as? String else {
+            return UpdateOutcome(message: L.t("Could not check for updates. Try again later."),
+                                 address: nil)
+        }
+
+        // Tags are written v1.0.1 as often as 1.0.1.
+        let latest = tag.hasPrefix("v") || tag.hasPrefix("V") ? String(tag.dropFirst()) : tag
+        let address = json["html_url"] as? String
+
+        if compareVersions(latest, current) > 0 {
+            return UpdateOutcome(message: "\(L.t("Update available")) \(latest) · \(L.t("you have")) \(current)",
+                                 address: address)
+        }
+        return UpdateOutcome(message: "\(L.t("Up to date")) · \(current)", address: address)
+    }
+
+    /// Compares version strings number by number, so 1.10 comes after 1.9, and a
+    /// missing part counts as zero: 1.0 and 1.0.0 are the same release.
+    private static func compareVersions(_ lhs: String, _ rhs: String) -> Int {
+        let left = versionNumbers(lhs)
+        let right = versionNumbers(rhs)
+        for index in 0..<max(left.count, right.count) {
+            let a = index < left.count ? left[index] : 0
+            let b = index < right.count ? right[index] : 0
+            if a != b {
+                return a < b ? -1 : 1
+            }
+        }
+        return 0
+    }
+
+    private static func versionNumbers(_ version: String) -> [Int] {
+        return version
+            .split(whereSeparator: { $0 == "." || $0 == "-" || $0 == "+" })
+            .map { Int($0.prefix(while: { $0.isNumber })) ?? 0 }
     }
 
     private enum TipGroup: String, CaseIterable, Identifiable {
@@ -907,9 +1058,13 @@ struct LauncherView: View {
                 .buttonStyle(SmallButtonStyle(accent: accent))
             }
 
+            toggleRow("On-screen controls",
+                      detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
+                      isOn: $model.touchControls)
+
             row("Opacity", detail: "How solid the on-screen controls are") {
                 HStack(spacing: 12) {
-                    Slider(value: $model.controlsOpacity, in: 0...1)
+                    Slider(value: $model.controlsOpacity, in: 0.10...1)
                         .accentColor(accent)
                         .frame(width: 200)
 
@@ -1098,6 +1253,7 @@ struct LauncherView: View {
         model.joystickScale = 1
         model.buttonScale = 1
         model.controlsOpacity = 1
+        model.touchControls = true
         model.buttonColour = ControlColour.white.rawValue
     }
 
@@ -1512,11 +1668,19 @@ private struct TouchControlEditor: View {
     /// monospaced face it is drawn in, and the label shrinks rather than
     /// spilling out if that ever stops being true.
     private static let toggleWidth: CGFloat = 116
-    /// Inside the panel's bottom trailing corner, 12 from the side and 10 from
-    /// the bottom.
-    private static let shownToggleTop: CGFloat = 49
+    /// The panel's box, measured from the top of the screen: 10 down, 84 tall,
+    /// which is the two rows and their padding with room to spare.
+    private static let panelTop: CGFloat = 10
+    private static let panelHeight: CGFloat = 84
+    /// Right under the panel's trailing corner, clear of its sliders. It used to
+    /// sit inside that corner, where the size slider now reaches.
+    private static let shownToggleTop: CGFloat = panelTop + panelHeight + 8
     /// Clear of the top edge while the panel is away.
     private static let hiddenToggleTop: CGFloat = 8
+
+    private func panelWidth(in size: CGSize) -> CGFloat {
+        return min(620, max(320, size.width * 0.60))
+    }
 
     private func toggleLeading(in size: CGSize) -> CGFloat {
         let insets = LauncherHost.safeInsets
@@ -1524,8 +1688,7 @@ private struct TouchControlEditor: View {
             return max(insets.left + 8,
                        (size.width - TouchControlEditor.toggleWidth) / 2)
         }
-        let panel = min(620, max(320, size.width * 0.60))
-        return 16 + insets.left + panel - 12 - TouchControlEditor.toggleWidth
+        return 16 + insets.left + panelWidth(in: size) - 12 - TouchControlEditor.toggleWidth
     }
 
     /// Hides the editor's own bars to give the whole screen to the layout. It is
@@ -1562,13 +1725,13 @@ private struct TouchControlEditor: View {
     /// instead of two bars across the whole screen: the controls it edits live
     /// on the right and along the bottom, and a full-width bar used to sit on
     /// top of them and push its own buttons off the edge. Two short lines fit
-    /// in half the width, and the bars toggle holds the panel's corner.
+    /// in half the width: one for the buttons, one for opacity and size.
     ///
     /// Hiding the bars takes the panel away and nothing else: only the toggle
     /// is left, up in the top middle, so the whole screen is free to lay the
     /// controls out on.
     private func chrome(in size: CGSize) -> some View {
-        let width = min(620, max(320, size.width * 0.60))
+        let width = panelWidth(in: size)
         let insets = LauncherHost.safeInsets
 
         return VStack(alignment: .leading, spacing: 8) {
@@ -1607,35 +1770,46 @@ private struct TouchControlEditor: View {
                 )
             }
 
-            HStack(spacing: 9) {
+            HStack(spacing: 8) {
                 Text(L.t("OPACITY"))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(1.1)
                     .foregroundColor(Theme.faint)
 
-                Slider(value: $model.controlsOpacity, in: 0...1)
+                Slider(value: $model.controlsOpacity, in: 0.10...1)
                     .accentColor(accent)
-                    .frame(width: 96)
+                    .frame(minWidth: 64, maxWidth: 76)
 
                 Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundColor(Theme.dim)
                     .frame(width: 30, alignment: .leading)
 
-                Text(L.t("DRAG TO MOVE"))
+                // SIZE belongs to the control that was pressed, and it keeps its
+                // place in the row either way: the panel never changes shape
+                // under the player's finger, it only lights up.
+                Text(L.t("SIZE"))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.faint)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .kerning(1.1)
+                    .foregroundColor(selected == nil ? Theme.faint : accent)
+
+                Slider(value: scaleBinding(for: selected), in: 0.55...1.8)
+                    .accentColor(accent)
+                    .frame(minWidth: 64, maxWidth: 76)
+                    .disabled(selected == nil)
+                    .opacity(selected == nil ? 0.4 : 1)
+
+                Text(verbatim: sizePercent)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(selected == nil ? Theme.faint : Theme.dim)
+                    .frame(width: 30, alignment: .leading)
 
                 Spacer(minLength: 0)
             }
-            // The toggle sits in this row's trailing corner.
-            .padding(.trailing, 148)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(width: width, height: 80, alignment: .leading)
+        .frame(width: width, height: TouchControlEditor.panelHeight, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Theme.background.opacity(0.94))
@@ -1791,6 +1965,35 @@ private struct TouchControlEditor: View {
             }
         )
         .contentShape(Rectangle())
+    }
+
+    /// The size of whichever control is selected, as a readout for the panel.
+    private var sizePercent: String {
+        guard let selected = selected, let scale = scales[selected] else {
+            return "—"
+        }
+        return "\(Int((scale * 100).rounded()))%"
+    }
+
+    /// Drives the panel's size slider. With nothing selected it has nothing to
+    /// move, so the slider is disabled and this binding holds its thumb still.
+    private func scaleBinding(for control: TouchControl?) -> Binding<Double> {
+        Binding(
+            get: {
+                guard let control = control else {
+                    return 1
+                }
+                return Double(scales[control] ?? 1)
+            },
+            set: { newValue in
+                guard let control = control else {
+                    return
+                }
+                let value = CGFloat(newValue)
+                scales[control] = value
+                ControlLayout.setScale(value, for: control, profile: profile, game: game)
+            }
+        )
     }
 
     private func dragGesture(for control: TouchControl, in size: CGSize) -> some Gesture {

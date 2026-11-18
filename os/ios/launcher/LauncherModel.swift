@@ -112,8 +112,11 @@ final class LauncherModel: ObservableObject {
     @Published var alwaysRun = true { didSet { store(alwaysRun, "alwaysRun") } }
     @Published var joystickScale: Double = 1 { didSet { store(joystickScale, "joystickScale") } }
     @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
-    /// Opacity of the in-game touch controls, 0.15 (barely there) to 1.
+    /// Opacity of the in-game touch controls, 0.10 (barely there) to 1.
     @Published var controlsOpacity: Double = 1 { didSet { store(controlsOpacity, "controlsOpacity") } }
+    /// Whether the touch controls are drawn over the game at all. Off leaves the
+    /// whole screen to the game, for a session with a controller in hand.
+    @Published var touchControls = true { didSet { store(touchControls, "touchControls") } }
     /// The colour of the on-screen controls. White unless the player picks one
     /// of the others; stored per game like every other option.
     @Published var buttonColour = ControlColour.white.rawValue {
@@ -281,6 +284,7 @@ final class LauncherModel: ObservableObject {
         "joystickScale",
         "buttonScale",
         "controlsOpacity",
+        "touchControls",
         "buttonColour",
     ]
 
@@ -368,7 +372,8 @@ final class LauncherModel: ObservableObject {
         alwaysRun = storedBool("alwaysRun", for: game, fallback: true)
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
-        controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0), 1)
+        controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.10), 1)
+        touchControls = storedBool("touchControls", for: game, fallback: true)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 
@@ -388,6 +393,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(joystickScale, forKey: LauncherModel.optionKey("joystickScale", for: game))
         defaults.set(buttonScale, forKey: LauncherModel.optionKey("buttonScale", for: game))
         defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: game))
+        defaults.set(touchControls, forKey: LauncherModel.optionKey("touchControls", for: game))
         defaults.set(buttonColour, forKey: LauncherModel.optionKey("buttonColour", for: game))
     }
 
