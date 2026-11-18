@@ -295,8 +295,8 @@ struct LauncherView: View {
             controlsSheet
         case .tips:
             tipsSheet
-        case .credits:
-            creditsSheet
+        case .about:
+            aboutSheet
         }
     }
 
@@ -560,17 +560,96 @@ struct LauncherView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open the \(title) wiki")
+        .accessibilityLabel("Open \(title)")
     }
 
-    private var creditsSheet: some View {
-        sheet(title: "Credits", detail: "Who made this, and what it is built on") {
-            tip("shplash", "Launcher interface and touch controls.")
-            tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
-            tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
-            tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
-            footnote("The app contains no game data; bring your own installation.")
+    /// Where to report things, and who to credit for the rest.
+    ///
+    /// The links sit in the header, outside the scroll view: the way to GitHub
+    /// or to a bug report can never scroll out of reach, and only the credits -
+    /// text nobody taps, in a fixed order - move. This is the launcher's only
+    /// scroll view, and it holds static rows only.
+    private var aboutSheet: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L.t("About"))
+                        .font(.system(size: 25, weight: .bold))
+                        .foregroundColor(Theme.text)
+
+                    Text(L.t("Who made this, and what it is built on"))
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(Theme.faint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(verbatim: "v\(appVersion)")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.faint)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 16)
+            .padding(.bottom, 10)
+
+            HStack(spacing: 8) {
+                aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
+                aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=feature_request.yml", primary: false)
+                aboutLink(L.t("BUG"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=bug_report.yml", primary: false)
+
+                Spacer(minLength: 0)
+
+                aboutLink(L.t("SUPPORT"), address: "https://ko-fi.com/shplash", primary: false)
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 10)
+
+            Rectangle()
+                .fill(Theme.line)
+                .frame(height: 1)
+
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 0) {
+                    tip("shplash", "Launcher interface and touch controls.")
+                    tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
+                    tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
+                    tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
+                    footnote("The app contains no game data; bring your own installation.")
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 2)
+                .padding(.bottom, 14)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Theme.sheet)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Theme.line, lineWidth: 1)
+        )
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 16 + screenInsets.bottom)
+    }
+
+    /// "1.0 (109)" as built, so a bug report can name the exact version.
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? ""
+        let build = info?["CFBundleVersion"] as? String ?? ""
+        if short.isEmpty {
+            return build
+        }
+        return build.isEmpty ? short : "\(short) (\(build))"
+    }
+
+    private func aboutLink(_ title: String, address: String, primary: Bool) -> some View {
+        wikiLink(title, address: address, primary: primary)
     }
 
     private enum TipGroup: String, CaseIterable, Identifiable {
@@ -1123,7 +1202,7 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
     case game
     case touch
     case tips
-    case credits
+    case about
 
     var id: String {
         return rawValue
@@ -1137,7 +1216,7 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
         case .game: return L.t("Game")
         case .touch: return L.t("Controls")
         case .tips: return L.t("Tips")
-        case .credits: return L.t("Credits")
+        case .about: return L.t("About")
         }
     }
 
@@ -1149,7 +1228,7 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
         case .game: return "person"
         case .touch: return "hand.tap"
         case .tips: return "lightbulb"
-        case .credits: return "info.circle"
+        case .about: return "info.circle"
         }
     }
 }
