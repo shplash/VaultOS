@@ -1950,8 +1950,23 @@ static void _nfPkDecomp(unsigned char* a1, unsigned char* a2, int a3, int a4, in
 
                     value2 = _mveBW;
 
+                    // Motion vectors are signed offsets into the previous
+                    // frame, so a block on the frame's top or left edge can
+                    // point outside it. Reading there is a crash - it is the
+                    // first thing the intro decodes - so every copy is kept
+                    // inside the frame it is taken from.
+                    const unsigned char* frameStart = gMovieDirectDrawSurfaceBuffer2;
+                    const unsigned char* frameEnd = frameStart + static_cast<ptrdiff_t>(_mveBW) * _mveBH;
+
                     for (i = 0; i < 8; ++i) {
-                        memcpy(dest, dest + v10, 8);
+                        const unsigned char* src = dest + v10;
+                        if (src < frameStart) {
+                            src = frameStart;
+                        } else if (src + 8 > frameEnd) {
+                            src = frameEnd - 8;
+                        }
+
+                        memcpy(dest, src, 8);
                         dest += value2;
                     }
 
