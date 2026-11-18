@@ -97,6 +97,7 @@ $ mv app /Applications/Fallout
     - Each page with settings has **RESET**, which puts that page back to its defaults.
     - Every option is stored per game. Importing a ZIP again replaces the game data and keeps your savegames.
     - The GAME page's language applies to the whole app: the launcher's text and the on-screen control labels switch at once, and the game's own text and voice switch the next time you tap Play. A language your installation does not contain stays English, so an English copy set to French still plays in English.
+    - The game's text and voice always come from your own installation, which carries the languages it shipped with in `master.dat`. A language pack placed as loose files in `data/text/<language>/` (`Documents/data/text/<language>/` for Fallout, `Documents/Fallout2/data/text/<language>/` for Fallout 2) is used as well, because the game reads the `data` folder before the archive.
     - Music: the launcher looks for `maybe.mp3` for Fallout and `blue moon.mp3` for Fallout 2, and falls back to `intro music.mp3` for any game without a theme of its own. Any MP3 in the repository root is bundled automatically, so a track is added by dropping the file in; the AUDIO page shows which theme is in use.
     - Home shows the selected game's own still: `IMG_3570.webp` for Fallout, `IMG_3579.jpeg` for Fallout 2. Both are bundled from the repository root, so the launcher needs no network.
 

@@ -195,7 +195,7 @@ enum L {
             "HIDE BARS": "MASQUER LES BARRES",
             "SHOW BARS": "MONTRER LES BARRES",
             "Game text, voice, the launcher and the controls": "Textes et voix du jeu, le lanceur et les commandes",
-            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Sous-titres, course et langue sont écrits dans la configuration du jeu au lancement. Le lanceur et les commandes à l'écran suivent la langue immédiatement ; les textes et voix absents de votre installation restent en anglais.",
+            "Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.": "Langue, sous-titres et course sont écrits dans la configuration du jeu au lancement. Les textes absents de votre installation restent en anglais.",
         ],
 
         .german: [
@@ -333,7 +333,7 @@ enum L {
             "HIDE BARS": "LEISTEN AUSBLENDEN",
             "SHOW BARS": "LEISTEN EINBLENDEN",
             "Game text, voice, the launcher and the controls": "Spieltext und Stimmen, Starter und Steuerung",
-            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Untertitel, Rennen und Sprache werden beim Start in die Spielkonfiguration geschrieben. Starter und Bildschirmsteuerung folgen der Sprache sofort; Texte und Stimmen, die deine Installation nicht enthält, bleiben Englisch.",
+            "Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.": "Sprache, Untertitel und Rennen werden beim Start in die Spielkonfiguration geschrieben. Texte, die deine Installation nicht enthält, bleiben Englisch.",
         ],
 
         .italian: [
@@ -471,7 +471,7 @@ enum L {
             "HIDE BARS": "NASCONDI BARRE",
             "SHOW BARS": "MOSTRA BARRE",
             "Game text, voice, the launcher and the controls": "Testi e voci del gioco, il launcher e i comandi",
-            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Sottotitoli, corsa e lingua vengono scritti nella configurazione del gioco all'avvio. Il launcher e i comandi a schermo seguono la lingua subito; testi e voci assenti dalla tua installazione restano in inglese.",
+            "Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.": "Lingua, sottotitoli e corsa vengono scritti nella configurazione del gioco all'avvio. I testi assenti dalla tua installazione restano in inglese.",
         ],
 
         .spanish: [
@@ -609,7 +609,7 @@ enum L {
             "HIDE BARS": "OCULTAR BARRAS",
             "SHOW BARS": "MOSTRAR BARRAS",
             "Game text, voice, the launcher and the controls": "Textos y voces del juego, el lanzador y los controles",
-            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Los subtítulos, el correr y el idioma se escriben en la configuración del juego al iniciar. El lanzador y los controles en pantalla siguen el idioma al instante; los textos y voces que tu instalación no incluye permanecen en inglés.",
+            "Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.": "Idioma, subtítulos y correr se escriben en la configuración del juego al iniciar. Los textos que tu instalación no incluye permanecen en inglés.",
         ],
     ]
 }

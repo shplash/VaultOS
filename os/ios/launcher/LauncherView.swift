@@ -766,7 +766,7 @@ struct LauncherView: View {
                       detail: "Moves at a run; hold Shift to walk",
                       isOn: $model.alwaysRun)
 
-            footnote("Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.")
+            footnote("Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.")
         }
     }
 
