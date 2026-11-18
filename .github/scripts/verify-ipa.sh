@@ -116,6 +116,15 @@ fi
 
 exe_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist")"
 [ -n "$exe_name" ] || fail "the application Info.plist has no CFBundleExecutable"
+
+# The two keys that put the app's Documents folder in the Files app and let a
+# document picker hand over a file: without them the folder never appears and
+# the picker delivers nothing outside LiveContainer.
+[ "$(/usr/libexec/PlistBuddy -c 'Print :UIFileSharingEnabled' "$app/Info.plist")" = "true" ] \
+    || fail "the application does not expose its Documents folder (UIFileSharingEnabled missing)"
+[ "$(/usr/libexec/PlistBuddy -c 'Print :LSSupportsOpeningDocumentsInPlace' "$app/Info.plist")" = "true" ] \
+    || fail "the application cannot open picked files (LSSupportsOpeningDocumentsInPlace missing)"
+
 binary="$app/$exe_name"
 [ -f "$binary" ] || fail "the application executable is missing"
 note "application: $(basename "$app") ($exe_name)"
