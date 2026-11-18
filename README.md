@@ -14,7 +14,7 @@
   </a>
 
   <a href="https://github.com/shplash/fallout1-ce-iosimproved/actions/workflows/build.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/shplash/fallout1-ce-iosimproved/build.yml?style=for-the-badge&label=build&color=729864">
+    <img src="https://img.shields.io/github/actions/workflow/status/shplash/fallout1-ce-iosimproved/build.yml?branch=main&style=for-the-badge&label=build&color=729864">
   </a>
 
   <br>
@@ -23,7 +23,7 @@
     <img src="https://img.shields.io/badge/Releases-View-0A84FF?style=for-the-badge">
   </a>
 
-  <a href="https://github.com/shplash/fallout1-ce-iosimproved/actions/workflows/build.yml">
+  <a href="https://github.com/shplash/fallout1-ce-iosimproved/releases/latest/download/VaultOS.ipa">
     <img src="https://img.shields.io/badge/Download-IPA-0A84FF?style=for-the-badge">
   </a>
 
@@ -50,10 +50,10 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 
 ## Install
 
-1. Grab `vaultos-ios-unsigned` from the latest [Build iOS IPA](https://github.com/shplash/fallout1-ce-iosimproved/actions/workflows/build.yml) run, or from [Releases](https://github.com/shplash/fallout1-ce-iosimproved/releases).
-2. Sideload it with SideStore, AltStore, Feather, LiveContainer or TrollStore.
+1. Grab `VaultOS.ipa` from the latest [release](https://github.com/shplash/fallout1-ce-iosimproved/releases).
+2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
-Through **LiveContainer**, turn on **Fix File Picker** in that app's settings, or the ZIP picker will not open.
+If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings, or the ZIP picker will not open.
 
 ## Requirements
 

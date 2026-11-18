@@ -59,8 +59,8 @@ jobs:
       - name: Upload
         run: |
           set -euo pipefail
-          cp build/vaultos.ipa vaultos-ios.ipa
-          gh release upload "${{ github.event.release.tag_name }}" vaultos-ios.ipa
-          rm vaultos-ios.ipa
+          cp build/vaultos.ipa VaultOS.ipa
+          gh release upload "${{ github.event.release.tag_name }}" VaultOS.ipa
+          rm VaultOS.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
