@@ -315,13 +315,6 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// the same coordinates, so layouts survive resolution and orientation
     /// changes.
     func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds.size) -> CGPoint {
-        if self == .quickLoad || self == .quickSave {
-            // Mirrors the END column onto the top left: load on top, save under
-            // it, one END-height apart. Same place in both layouts.
-            let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-            return CGPoint(x: 1 - end.x, y: self == .quickLoad ? 0.0750 : 0.2000)
-        }
-
         switch profile {
         case .full:
             switch self {
@@ -346,6 +339,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
                 let gap = max(3.0, side * 0.12)
                 return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
+            case .quickLoad, .quickSave:
+                return quickKeyCenter(for: profile, in: bounds)
             }
         case .half:
             switch self {
@@ -369,8 +364,19 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
                 let gap = max(3.0, side * 0.12)
                 return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
+            case .quickLoad, .quickSave:
+                return quickKeyCenter(for: profile, in: bounds)
             }
         }
+    }
+
+    /// The two quick keys, mirrored from the END column onto the top left: LOAD
+    /// on top, SAVE one END-height under it. They sit in the same place in both
+    /// layouts, and each layout's switch still names them because every control
+    /// has to be covered.
+    private func quickKeyCenter(for profile: LayoutProfile, in bounds: CGSize) -> CGPoint {
+        let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
+        return CGPoint(x: 1 - end.x, y: self == .quickLoad ? 0.0750 : 0.2000)
     }
 
     /// Base size in points before the global and per-control scale settings.
