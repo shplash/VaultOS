@@ -962,7 +962,17 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
     }
 
     const bool requires_patch = is_fallout2(*options);
-    if (!has_master || !has_critter || (requires_patch && !has_patch)) {
+    if (requires_patch && !has_patch) {
+        fail("This ZIP doesn't look like a Fallout 2 installation: patch000.dat not found. If this is the first game, choose Fallout in the launcher.");
+        return LAUNCHER_ERROR;
+    }
+    if (!requires_patch && has_patch) {
+        // patch000.dat only exists in Fallout 2. Extracting it over Fallout 1
+        // mixes the two data sets and the engine crashes on the first map.
+        fail("This ZIP is a Fallout 2 installation: it contains patch000.dat. Choose Fallout 2 in the launcher first.");
+        return LAUNCHER_ERROR;
+    }
+    if (!has_master || !has_critter) {
         std::string missing;
         if (!has_master) {
             missing = "master.dat";
@@ -1045,6 +1055,13 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
     set_status("Writing configuration...");
     if (!write_configs(destination, layout, *options)) {
         return LAUNCHER_ERROR;
+    }
+
+    // A Fallout 1 folder must not keep Fallout 2's patch archive from an
+    // earlier import: the engine reads it as game data and crashes.
+    if (!is_fallout2(*options)) {
+        std::error_code remove_ec;
+        fs::remove(destination / "patch000.dat", remove_ec);
     }
 
     g_progress_done.store(g_progress_total.load());

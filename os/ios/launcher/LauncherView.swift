@@ -92,26 +92,6 @@ struct LauncherView: View {
                         gameTab(game)
                     }
                 }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    musicMuted.toggle()
-                    LauncherMusic.isMuted = musicMuted
-                    if musicMuted {
-                        LauncherMusic.shared.stop()
-                    } else {
-                        LauncherMusic.shared.playIfAvailable()
-                    }
-                } label: {
-                    Image(systemName: musicMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(musicMuted ? Theme.faint : accent)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(musicMuted ? "Unmute music" : "Mute music")
             }
             .padding(.bottom, 8)
 
@@ -432,30 +412,8 @@ struct LauncherView: View {
                 }
                 Spacer(minLength: 0)
 
-                Button {
-                    if let url = URL(string: "https://fallout.fandom.com") {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("WIKI")
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .kerning(0.8)
-
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 8, weight: .bold))
-                    }
-                    .foregroundColor(accent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Theme.hairline, lineWidth: 1)
-                    )
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open the Fallout wiki")
+                wikiLink("FALLOUT", address: "https://fallout.fandom.com/wiki/Fallout", primary: model.selectedGame == .fallout1)
+                wikiLink("FALLOUT 2", address: "https://fallout.fandom.com/wiki/Fallout_2", primary: model.selectedGame == .fallout2)
             }
             .padding(.vertical, 9)
             .overlay(
@@ -493,6 +451,37 @@ struct LauncherView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(group.title)
+    }
+
+    private func wikiLink(_ title: String, address: String, primary: Bool) -> some View {
+        Button {
+            if let url = URL(string: address) {
+                UIApplication.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .kerning(0.6)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundColor(primary ? Color.black.opacity(0.8) : Theme.faint)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(primary ? accent : Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(primary ? Color.clear : Theme.hairline, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open the \(title) wiki")
     }
 
     private var creditsSheet: some View {
@@ -666,6 +655,21 @@ struct LauncherView: View {
             volumeRow("Speech", value: $model.speechVolume)
 
             footnote("0% mutes that channel. The same volumes are in each game's own Options screen.")
+
+            toggleRow("Launcher music",
+                      detail: "The track this launcher plays",
+                      isOn: Binding(
+                        get: { !musicMuted },
+                        set: { playing in
+                            musicMuted = !playing
+                            LauncherMusic.isMuted = musicMuted
+                            if musicMuted {
+                                LauncherMusic.shared.stop()
+                            } else {
+                                LauncherMusic.shared.playIfAvailable()
+                            }
+                        }
+                      ))
         }
     }
 

@@ -74,7 +74,15 @@ final class LauncherHost {
         let controller = UIHostingController(rootView: root)
         controller.view.backgroundColor = UIColor.black
 
-        let window = UIWindow(frame: UIScreen.main.bounds)
+        // The app is landscape only, but the screen metrics can still arrive
+        // with the portrait dimensions on the first frame, which laid the
+        // launcher out in a shape it can never be shown in.
+        let screen = UIScreen.main.bounds
+        let landscape = screen.width < screen.height
+            ? CGRect(x: 0, y: 0, width: screen.height, height: screen.width)
+            : screen
+
+        let window = UIWindow(frame: landscape)
         // Above SDL's launch screen window (UIWindowLevelNormal + 1).
         window.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.normal.rawValue + 2)
         window.rootViewController = controller
