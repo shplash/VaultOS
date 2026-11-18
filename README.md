@@ -83,4 +83,4 @@ Engines by Alexander Batalov ([Fallout CE](https://github.com/alexbatalov/fallou
 
 ## <a href="https://ko-fi.com/shplash"><img src="https://img.shields.io/badge/Support-ko--fi-FF5E5B?style=for-the-badge" alt="Support"></a>
 
-If VaultOS has been useful, you can support its development too.
+If VaultOS has been useful to you, you can support its development as well as future projects.
