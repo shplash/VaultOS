@@ -125,6 +125,14 @@ exe_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.pl
 [ "$(/usr/libexec/PlistBuddy -c 'Print :LSSupportsOpeningDocumentsInPlace' "$app/Info.plist")" = "true" ] \
     || fail "the application cannot open picked files (LSSupportsOpeningDocumentsInPlace missing)"
 
+# Both engine adapters have to reject the (Object*)-1 the interface parks in the
+# hand slots. The Fallout 1 one was missed once and it cost a crash on the main
+# menu; this keeps it from being removed again by accident.
+grep -q 'reinterpret_cast<fallout::Object\*>(-1)' os/ios/engine/engine_fallout1.cc \
+    || fail "the Fallout 1 adapter does not guard the interface's -1 hand slot"
+grep -q 'reinterpret_cast<fallout::Object\*>(-1)' os/ios/engine/engine_fallout2.cc \
+    || fail "the Fallout 2 adapter does not guard the interface's -1 hand slot"
+
 binary="$app/$exe_name"
 [ -f "$binary" ] || fail "the application executable is missing"
 note "application: $(basename "$app") ($exe_name)"

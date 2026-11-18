@@ -748,7 +748,10 @@ struct LauncherView: View {
         guard !isCheckingForUpdates else {
             return
         }
-        guard let url = URL(string: "https://api.github.com/repos/shplash/fallout1-ce-iosimproved/releases/latest") else {
+        // The list, not releases/latest: that endpoint skips prereleases and
+        // drafts, and this project publishes its builds as a draft, so it could
+        // only ever answer 404.
+        guard let url = URL(string: "https://api.github.com/repos/shplash/fallout1-ce-iosimproved/releases?per_page=1") else {
             return
         }
 
@@ -771,23 +774,29 @@ struct LauncherView: View {
         }.resume()
     }
 
-    /// Reads `tag_name` out of the release JSON and compares it with this build.
-    /// Anything unexpected - no network, a rate limit, a shape that changed -
-    /// ends as a plain failure rather than a wrong answer.
+    /// Reads the newest release out of GitHub's list and compares its tag with
+    /// this build. Anything unexpected - no network, a rate limit, a shape that
+    /// changed - ends as a plain failure rather than a wrong answer, and an
+    /// empty list is said plainly instead of being reported as an error.
     private static func outcomeFromGitHub(data: Data?,
                                           error: Error?,
                                           current: String) -> UpdateOutcome {
         guard error == nil,
               let data = data,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = json["tag_name"] as? String else {
+              let releases = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             return UpdateOutcome(message: L.t("Could not check for updates. Try again later."),
+                                 address: nil)
+        }
+
+        guard let release = releases.first,
+              let tag = release["tag_name"] as? String else {
+            return UpdateOutcome(message: L.t("No releases have been published yet."),
                                  address: nil)
         }
 
         // Tags are written v1.0.1 as often as 1.0.1.
         let latest = tag.hasPrefix("v") || tag.hasPrefix("V") ? String(tag.dropFirst()) : tag
-        let address = json["html_url"] as? String
+        let address = release["html_url"] as? String
 
         if compareVersions(latest, current) > 0 {
             return UpdateOutcome(message: "\(L.t("Update available")) \(latest) · \(L.t("you have")) \(current)",

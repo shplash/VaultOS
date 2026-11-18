@@ -101,7 +101,7 @@ void ios_send_scan_code(SDL_Scancode scanCode)
 }
 
 // The interface initialises both hand slots to (Object*)-1 (an upstream quirk
-// in intface_reset), so "no item" is either nullptr or that sentinel.
+// in intface_init_items), so "no item" is either nullptr or that sentinel.
 static bool is_real_item(fallout::Object* item)
 {
     return item != nullptr && item != reinterpret_cast<fallout::Object*>(-1);

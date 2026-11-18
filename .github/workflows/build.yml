@@ -76,6 +76,7 @@ jobs:
             -D ENABLE_BITCODE=0 \
             -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -D VAULTOS_BUILD_SHA=${{ github.sha }} \
+            -D VAULTOS_BUILD=${{ github.run_number }} \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO

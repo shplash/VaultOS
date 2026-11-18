@@ -373,6 +373,14 @@ if(APPLE)
     set(MACOSX_BUNDLE_BUNDLE_VERSION "109")
 endif()
 
+# The CI run number becomes the build number, so two IPAs from two runs are
+# told apart by Settings and by the About page instead of both saying 109.
+if(VAULTOS_BUILD)
+    set(MACOSX_BUNDLE_BUNDLE_VERSION "${VAULTOS_BUILD}")
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES
+        XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "${VAULTOS_BUILD}")
+endif()
+
 add_subdirectory("third_party/sdl2")
 
 add_subdirectory("third_party/adecode")
@@ -416,6 +424,13 @@ if(IOS)
 
     FetchContent_GetProperties(fallout2_ce)
     if(NOT fallout2_ce_POPULATED)
+        # Populate rather than MakeAvailable: upstream's CMakeLists builds a
+        # second application bundle with its own SDL, which is the last thing
+        # wanted here. CMP0169 turns the single-argument form into an error in
+        # future CMake; keep it working on purpose.
+        if(POLICY CMP0169)
+            cmake_policy(SET CMP0169 OLD)
+        endif()
         FetchContent_Populate(fallout2_ce)
     endif()
 

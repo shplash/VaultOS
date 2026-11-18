@@ -29,6 +29,13 @@ FetchContent_Declare(sdl2
 
 FetchContent_GetProperties(sdl2)
 if (NOT sdl2_POPULATED)
+    # Populate rather than MakeAvailable: SDL's own CMakeLists would then be run
+    # with whatever options this project happens to have set. CMP0169 turns the
+    # single-argument form into an error in future CMake; keep it working on
+    # purpose rather than by luck.
+    if (POLICY CMP0169)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
     FetchContent_Populate(sdl2)
 endif()
 

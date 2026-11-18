@@ -52,7 +52,7 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 1. Grab `VaultOS.ipa` from the latest [release](https://github.com/shplash/fallout1-ce-iosimproved/releases).
 2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
-If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings or **”Files”** will not let you select the zip
+If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings or **"Files"** will not let you select the zip
 
 ## Requirements
 
