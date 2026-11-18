@@ -19,6 +19,16 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          # Same pin as the CI build: a release must be made with the toolchain
+          # the tested build uses, not whatever the runner defaults to.
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          fi
+          xcodebuild -version
+
       - name: Cache cmake build
         uses: actions/cache@v4
         with:
@@ -30,12 +40,14 @@ jobs:
           set -euo pipefail
           cmake \
             -B build \
+            -G Xcode \
             -D CMAKE_BUILD_TYPE=RelWithDebInfo \
             -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/ios.toolchain.cmake \
             -D PLATFORM=OS64 \
             -D DEPLOYMENT_TARGET=14.0 \
             -D ENABLE_BITCODE=0 \
             -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D VAULTOS_BUILD_SHA=${{ github.sha }} \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO

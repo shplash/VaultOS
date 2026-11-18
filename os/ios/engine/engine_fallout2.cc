@@ -234,8 +234,8 @@ void press_action(int action)
         send_key(SDL_SCANCODE_N);
         break;
     case 10:
-        // SAVES opens the game's own save/load screen: F6 is its save key, and
-        // the screen it brings up loads as well as saves.
+        // SAVES. These are Fallout 2's own bindings, from the engine this app
+        // fetches at build time - not Fallout 1's, whose save screen is F4.
         send_key(SDL_SCANCODE_F6);
         break;
     default:

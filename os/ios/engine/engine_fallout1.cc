@@ -59,8 +59,17 @@ int run(int argc, char** argv)
 
     // Which binary this log came from. Without it there is no way to tell a
     // fresh install from a stale one, and every build writes the same version
-    // number to the About page.
+    // number to the About page. The commit is the reliable half: a restored
+    // build tree compiles incrementally, so __DATE__ and __TIME__ can be older
+    // than the source the IPA was made from.
+#ifdef VAULTOS_BUILD_SHA
+    fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s, commit %s\n",
+        __DATE__,
+        __TIME__,
+        VAULTOS_BUILD_SHA);
+#else
     fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s\n", __DATE__, __TIME__);
+#endif
 
     SDL_ShowCursor(SDL_DISABLE);
 
@@ -213,9 +222,10 @@ void press_action(int action)
         ios_send_scan_code(SDL_SCANCODE_N);
         break;
     case 10:
-        // SAVES opens the game's own save/load screen: F6 is its save key, and
-        // the screen it brings up loads as well as saves.
-        ios_send_scan_code(SDL_SCANCODE_F6);
+        // SAVES opens the engine's save screen: game.cc binds KEY_CTRL_S and
+        // KEY_F4 to SaveGame(1). F6 is a silent quick save into the quick slot
+        // and F7 a quick load, and neither of those shows a screen.
+        ios_send_scan_code(SDL_SCANCODE_F4);
         break;
     default:
         break;

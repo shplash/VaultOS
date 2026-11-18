@@ -43,6 +43,12 @@ endif()
 
 target_include_directories(${EXECUTABLE_NAME} PUBLIC src)
 
+# The commit this build came from, so the engine log can name the source it was
+# made from. Passed by CI as -D VAULTOS_BUILD_SHA=<sha>; empty in a local build.
+if(VAULTOS_BUILD_SHA)
+    target_compile_definitions(${EXECUTABLE_NAME} PUBLIC VAULTOS_BUILD_SHA="${VAULTOS_BUILD_SHA}")
+endif()
+
 # ---------------------------------------------------------------------------
 # Fallout 1 CE engine
 #

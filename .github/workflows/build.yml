@@ -75,6 +75,7 @@ jobs:
             -D DEPLOYMENT_TARGET=14.0 \
             -D ENABLE_BITCODE=0 \
             -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -D VAULTOS_BUILD_SHA=${{ github.sha }} \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
@@ -128,6 +129,10 @@ jobs:
               --notes "Unsigned development build. Not for public distribution." \
               --target "${{ github.sha }}"
           fi
+          # The asset is overwritten every build, so the release itself has to
+          # say which commit it currently holds.
+          gh release edit "$TAG" \
+            --notes "Unsigned development build of ${{ github.sha }}, made on the ${{ runner.name }} runner. Not for public distribution. Install with LiveContainer or Feather; LiveContainer needs its \"Fix File Picker\" option on."
 
       - name: Summary
         run: |
@@ -135,7 +140,7 @@ jobs:
             echo "### VaultOS iOS IPA"
             echo ""
             echo "Unsigned IPA built from ${{ github.sha }} on the ${{ runner.name }} runner."
-            echo "Install it with AltStore or Sideloadly, which sign it with your own Apple ID."
+            echo "Install it with LiveContainer or Feather. LiveContainer needs its \"Fix File Picker\" option on, or its file picker will not open."
           } >> "$GITHUB_STEP_SUMMARY"
 
   tests:
