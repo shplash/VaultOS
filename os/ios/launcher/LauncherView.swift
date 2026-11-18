@@ -109,36 +109,15 @@ struct LauncherView: View {
             }
             saveImportCountdown -= 1
         }
-        .fileImporter(
-            isPresented: $model.showImporter,
-            allowedContentTypes: [UTType.zip],
-            allowsMultipleSelection: false
-        ) { result in
-            // What the picker was opened for, read after it closes: one picker
-            // serves both, because two of them in the same view fight over the
-            // presentation.
-            let kind = pendingImport
-
-            switch result {
-            case .success(let urls):
-                // The picker is single-selection, because one file is one
-                // archive. Should it ever hand back more than one, only the
-                // first is used: two imports must never run over the same
-                // folder at once, and the extra file is simply ignored.
-                guard let url = urls.first else {
-                    return
-                }
-                switch kind {
-                case .game:
-                    model.importZip(from: url)
-                case .language:
-                    model.importLanguagePack(from: url)
-                case .saves:
-                    model.importSaves(from: url)
-                }
-            case .failure(let error):
-                model.errorMessage = error.localizedDescription
+        .onChange(of: model.showImporter) { shown in
+            guard shown else {
+                return
             }
+
+            // One picker serves all three imports, and what it was opened for
+            // has to be read now: its answer arrives later.
+            model.showImporter = false
+            presentImporter(for: pendingImport)
         }
         .alert(
             isPresented: Binding(
@@ -173,6 +152,30 @@ struct LauncherView: View {
                 message: Text(outcome.message),
                 dismissButton: .default(Text("OK"))
             )
+        }
+    }
+
+    // MARK: - Importing
+
+    /// Opens the document picker in copy mode for whichever import asked for
+    /// it, and hands what comes back to the model. LauncherDocumentPicker
+    /// explains why the copy matters.
+    private func presentImporter(for kind: LauncherImport) {
+        LauncherLog.write("picker opened for \(kind)")
+
+        LauncherDocumentPicker.shared.present { url in
+            guard let url = url else {
+                return
+            }
+
+            switch kind {
+            case .game:
+                model.importZip(from: url)
+            case .language:
+                model.importLanguagePack(from: url)
+            case .saves:
+                model.importSaves(from: url)
+            }
         }
     }
 
@@ -2026,5 +2029,105 @@ private struct TouchControlEditor: View {
             .onEnded { _ in
                 dragOrigins[control] = nil
             }
+    }
+}
+
+
+
+// MARK: - Launcher log
+
+/// A line-by-line record of what the launcher itself did: what the picker was
+/// opened for, what it handed back, whether that file could be read, and what
+/// each import was given. It lives beside the game data as
+/// `vaultos-launcher.log`, separate from the engine's `vaultos-log.txt` because
+/// the engine truncates its own file on every start.
+///
+/// Nothing here is for the player. It exists so that a picker which does
+/// nothing can be read instead of guessed at.
+enum LauncherLog {
+    static func write(_ message: String) {
+        NSLog("VaultOS: %@", message)
+
+        let manager = FileManager.default
+        guard let documents = manager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        guard let data = "\(stamp) \(message)\n".data(using: .utf8) else {
+            return
+        }
+
+        let file = documents.appendingPathComponent("vaultos-launcher.log")
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: file)
+        }
+    }
+}
+
+// MARK: - Document picker
+
+/// The document picker, in copy mode.
+///
+/// `UIDocumentPickerViewController(forOpeningContentTypes:asCopy: true)` copies
+/// the chosen archive into the app's own temporary directory before handing it
+/// over, so the import never depends on a security scope the app is allowed to
+/// open - the difference between working and doing nothing on a sideloaded
+/// install. SwiftUI's `fileImporter` has no copy mode on iOS 14, which is why
+/// this is UIKit.
+final class LauncherDocumentPicker: NSObject, UIDocumentPickerDelegate {
+    static let shared = LauncherDocumentPicker()
+
+    private var completion: ((URL?) -> Void)?
+
+    func present(completion: @escaping (URL?) -> Void) {
+        guard let controller = LauncherDocumentPicker.topViewController() else {
+            LauncherLog.write("picker: no view controller to present from")
+            completion(nil)
+            return
+        }
+
+        self.completion = completion
+
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.zip], asCopy: true)
+        picker.allowsMultipleSelection = false
+        picker.delegate = self
+        controller.present(picker, animated: true)
+        LauncherLog.write("picker: presented")
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        finish(with: nil, reason: "cancelled")
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        finish(with: urls.first, reason: urls.isEmpty ? "nothing selected" : "selected")
+    }
+
+    private func finish(with url: URL?, reason: String) {
+        if let url = url {
+            let readable = FileManager.default.isReadableFile(atPath: url.path)
+            LauncherLog.write("picker: \(reason) \(url.path) (readable: \(readable))")
+        } else {
+            LauncherLog.write("picker: \(reason)")
+        }
+
+        completion?(url)
+        completion = nil
+    }
+
+    private static func topViewController() -> UIViewController? {
+        let windows = UIApplication.shared.windows
+        let window = windows.first { $0.isKeyWindow && !$0.isHidden }
+            ?? windows.first { !$0.isHidden }
+        var controller = window?.rootViewController
+        while let presented = controller?.presentedViewController {
+            controller = presented
+        }
+        return controller
     }
 }

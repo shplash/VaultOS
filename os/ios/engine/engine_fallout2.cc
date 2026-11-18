@@ -234,9 +234,11 @@ void press_action(int action)
         send_key(SDL_SCANCODE_N);
         break;
     case 10:
-        // SAVES. These are Fallout 2's own bindings, from the engine this app
-        // fetches at build time - not Fallout 1's, whose save screen is F4.
-        send_key(SDL_SCANCODE_F6);
+        // SAVES: F4 is the save screen, the same key Fallout 1 uses. Both
+        // engines share this keyboard handling, but Fallout 2's sources are
+        // fetched at build time and are not in this repository, so this key is
+        // not verified against them here.
+        send_key(SDL_SCANCODE_F4);
         break;
     default:
         break;

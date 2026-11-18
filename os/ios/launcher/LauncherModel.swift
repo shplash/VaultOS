@@ -487,6 +487,7 @@ final class LauncherModel: ObservableObject {
         let options = makeRawOptions()
         let destination = installDirectory.path
         let accessed = url.startAccessingSecurityScopedResource()
+        LauncherLog.write("import game: \(url.path) scope: \(accessed) readable: \(FileManager.default.isReadableFile(atPath: url.path))")
 
         isInstalling = true
         progress = 0
@@ -533,6 +534,7 @@ final class LauncherModel: ObservableObject {
 
         let destination = installDirectory.path
         let accessed = url.startAccessingSecurityScopedResource()
+        LauncherLog.write("import language: \(url.path) scope: \(accessed) readable: \(FileManager.default.isReadableFile(atPath: url.path))")
 
         isInstalling = true
         progress = 0
@@ -647,6 +649,7 @@ final class LauncherModel: ObservableObject {
 
         let destination = installDirectory.path
         let accessed = url.startAccessingSecurityScopedResource()
+        LauncherLog.write("import saves: \(url.path) scope: \(accessed) readable: \(FileManager.default.isReadableFile(atPath: url.path))")
 
         isInstalling = true
         errorMessage = nil
