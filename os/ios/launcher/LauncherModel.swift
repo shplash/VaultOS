@@ -75,7 +75,9 @@ final class LauncherModel: ObservableObject {
     @Published var speechVolume: Double = 70 { didSet { store(speechVolume, "speechVolume") } }
     @Published var language = 0 { didSet { store(language, "language") } }
     @Published var subtitles = true { didSet { store(subtitles, "subtitles") } }
-    @Published var alwaysRun = false { didSet { store(alwaysRun, "alwaysRun") } }
+    /// A run is the only way to get anywhere at a decent pace on a phone, and
+    /// the touch controls have no Shift to walk with, so running is the default.
+    @Published var alwaysRun = true { didSet { store(alwaysRun, "alwaysRun") } }
     @Published var joystickScale: Double = 1 { didSet { store(joystickScale, "joystickScale") } }
     @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
     /// Opacity of the in-game touch controls, 0.15 (barely there) to 1.
@@ -331,7 +333,7 @@ final class LauncherModel: ObservableObject {
         speechVolume = storedDouble("speechVolume", for: game, fallback: 70)
         language = storedInt("language", for: game, fallback: LauncherModel.deviceLanguage)
         subtitles = storedBool("subtitles", for: game, fallback: true)
-        alwaysRun = storedBool("alwaysRun", for: game, fallback: false)
+        alwaysRun = storedBool("alwaysRun", for: game, fallback: true)
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
         controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.15), 1)

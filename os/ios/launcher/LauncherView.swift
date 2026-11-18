@@ -880,7 +880,7 @@ struct LauncherView: View {
     private func resetGame() {
         model.language = 0
         model.subtitles = false
-        model.alwaysRun = false
+        model.alwaysRun = true
     }
 
     private func resetControls() {
