@@ -13,14 +13,14 @@
     <img src="https://img.shields.io/github/stars/shplash/fallout1-ce-iosimproved?style=for-the-badge&label=stars&color=729864">
   </a>
 
-  <a href="https://github.com/shplash/fallout1-ce-iosimproved/actions/workflows/build.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/shplash/fallout1-ce-iosimproved/build.yml?branch=main&style=for-the-badge&label=build&color=729864">
+  <a href="https://raw.githubusercontent.com/shplash/shplash-repo/main/apps.json">
+    <img src="https://img.shields.io/badge/AltSource-Get-729864?style=for-the-badge">
   </a>
 
   <br>
 
-  <a href="https://github.com/shplash/fallout1-ce-iosimproved/releases">
-    <img src="https://img.shields.io/badge/Releases-View-0A84FF?style=for-the-badge">
+  <a href="https://github.com/shplash/fallout1-ce-iosimproved/releases/latest">
+    <img src="https://img.shields.io/github/v/release/shplash/fallout1-ce-iosimproved?style=for-the-badge&label=release&color=0A84FF">
   </a>
 
   <a href="https://github.com/shplash/fallout1-ce-iosimproved/releases/latest/download/VaultOS.ipa">
