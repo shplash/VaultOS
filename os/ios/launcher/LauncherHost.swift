@@ -1394,15 +1394,6 @@ final class LauncherMusic {
         return nil
     }
 
-    /// What the launcher shows for a game's music: the theme's name, or SHARED
-    /// when the fallback is standing in for it.
-    static func themeLabel(for game: FalloutGame) -> String {
-        guard let name = themeName(for: game) else {
-            return "NONE"
-        }
-        return name == sharedTrack ? "SHARED" : name.uppercased()
-    }
-
     private func play(track: String) {
         guard let url = Bundle.main.url(forResource: track, withExtension: "mp3") else {
             return

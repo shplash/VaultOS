@@ -179,6 +179,17 @@ static void present_engine_failure(NSString* message)
     exit(EXIT_FAILURE);
 }
 
+// Called by an engine adapter whose start-up failed. The launcher window is
+// already gone at this point, so without this the app would simply close with
+// no explanation.
+extern "C" void fallout_ios_report_engine_failure(const char* message)
+{
+    NSString* text = message != NULL
+        ? [NSString stringWithUTF8String:message]
+        : @"The game could not start.";
+    present_engine_failure(text);
+}
+
 int fallout_ios_launch_selected_engine(int argc, char** argv)
 {
     NSString* identifier = [[NSUserDefaults standardUserDefaults] stringForKey:@"launcher.game"];

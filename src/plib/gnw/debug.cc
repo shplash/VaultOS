@@ -55,7 +55,9 @@ void debug_register_mono()
 // 0x4B2DD8
 void debug_register_log(const char* fileName, const char* mode)
 {
-    if ((mode[0] == 'w' && mode[1] == 'a') && mode[1] == 't') {
+    // Upstream's condition can never be true, so no log file was ever opened.
+    // "wa" appends to an existing log, "wt" starts a new one.
+    if ((mode[0] == 'w' && mode[1] == 'a') || mode[1] == 't') {
         if (fd != NULL) {
             fclose(fd);
         }

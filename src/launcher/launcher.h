@@ -163,6 +163,10 @@ void fallout_launcher_finish(int launch_game);
 // iOS only: whether the engine should boot after the launcher closed.
 int fallout_ios_should_launch_game(void);
 
+// iOS only: shows why an engine could not start, instead of letting the app
+// close itself with no explanation. Implemented in Objective-C++.
+void fallout_ios_report_engine_failure(const char* message);
+
 #if defined(__cplusplus)
 }
 #endif

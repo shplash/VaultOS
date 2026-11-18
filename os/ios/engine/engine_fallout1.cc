@@ -22,6 +22,8 @@
 #include "game/main.h"
 #include "game/object.h"
 #include "game/object_types.h"
+#include "launcher/launcher.h"
+#include "plib/gnw/debug.h"
 #include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/svga.h"
@@ -49,10 +51,29 @@ int run(int argc, char** argv)
         chdir(installDir);
     }
 
+    // The engine's own log, written beside the game data. Start-up prints every
+    // step it completes and every step that fails, so a game that stops before
+    // its first frame leaves behind the step it stopped at - and the player can
+    // open the file in the Files app instead of guessing.
+    fallout::debug_register_log("vaultos-log.txt", "wt");
+
     SDL_ShowCursor(SDL_DISABLE);
 
     fallout::GNW95_isActive = true;
-    return fallout::gnw_main(argc, argv);
+
+    int result = fallout::gnw_main(argc, argv);
+    if (result != 0) {
+        // The engine gives up with a plain return, which would leave the app
+        // closing itself with no explanation at all.
+        fallout_ios_report_engine_failure(
+            "The game stopped while starting up. The files it needs are missing "
+            "or damaged, or the game data left over from an earlier import is "
+            "in the way. Import the game ZIP again from the launcher's HOME "
+            "page. A log naming the step that failed is in vaultos-log.txt, "
+            "beside your game files.");
+    }
+
+    return result;
 }
 
 void ios_send_scan_code(SDL_Scancode scanCode)

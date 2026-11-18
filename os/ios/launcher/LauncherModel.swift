@@ -36,12 +36,6 @@ enum FalloutGame: String, CaseIterable, Identifiable {
         case .fallout2: return "Fallout2"
         }
     }
-
-    /// Both engines ship inside this application. Kept so the interface can
-    /// describe a game whose data is missing without special cases.
-    var supportsLaunch: Bool {
-        return true
-    }
 }
 
 /// What the file picker was opened for.
@@ -218,11 +212,6 @@ final class LauncherModel: ObservableObject {
         let shortSide = Int(min(pixelWidth, pixelHeight).rounded())
 
         return (max(640, longSide), max(480, shortSide))
-    }
-
-    var nativeResolutionLabel: String {
-        let native = LauncherModel.nativeResolution()
-        return "\(native.0)x\(native.1)"
     }
 
     /// Logical game sizes, matched to the screen's aspect ratio. Rendering at

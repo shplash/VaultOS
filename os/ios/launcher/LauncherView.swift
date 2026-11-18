@@ -214,7 +214,6 @@ struct LauncherView: View {
                     .fill(selected ? Color.white.opacity(0.05) : Color.clear)
             )
             .contentShape(Rectangle())
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -984,7 +983,7 @@ struct LauncherView: View {
                 .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 14) {
-                Text(L.t("Replace your savegames?"))
+                Text(L.t("Replace your saved games?"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(Theme.text)
 
@@ -1352,8 +1351,6 @@ private enum Theme {
     static let text = Color(red: 0.95, green: 0.91, blue: 0.85)
     static let dim = Color(red: 0.71, green: 0.66, blue: 0.58)
     static let faint = Color(red: 0.50, green: 0.46, blue: 0.40)
-    static let warning = Color(red: 0.85, green: 0.42, blue: 0.28)
-    static let amber = Color(red: 0.89, green: 0.64, blue: 0.29)
 }
 
 private struct LauncherBackdrop: View {
@@ -1473,8 +1470,11 @@ private struct TouchControlEditor: View {
         _scales = State(initialValue: ControlLayout.allScales(profile: profile, game: game))
     }
 
+    /// The editor's own chrome is drawn in the colour the player picked for the
+    /// controls, so the tool and the thing it edits look alike. The game's own
+    /// accent stays on the launcher pages, where it marks the game.
     private var accent: Color {
-        return game.accent
+        return model.controlColour.color
     }
 
     var body: some View {
@@ -1492,19 +1492,8 @@ private struct TouchControlEditor: View {
                         .opacity(model.controlsOpacity)
                 }
 
-                VStack(spacing: 0) {
-                    if !barsHidden {
-                        editorBar
-                        opacityBar
-                    }
-                    Spacer(minLength: 0)
-                }
-
-                // Pinned to the top middle, over the gap between the bar's pills
-                // on the left and its hint on the right, so it holds still whether
-                // the bars are shown or hidden and never lands near a control.
-                VStack(spacing: 0) {
-                    barsToggle
+                VStack(alignment: .leading, spacing: 0) {
+                    chrome(in: geometry.size)
                     Spacer(minLength: 0)
                 }
 
@@ -1520,93 +1509,123 @@ private struct TouchControlEditor: View {
 
     /// Hides the editor's own bars to give the whole screen to the layout. It is
     /// a filled capsule with a word on it, deliberately unlike the controls it
-    /// sits among, and it stays in one place so it can always be found again.
+    /// sits among, and it is pinned to the panel's corner so it can always be
+    /// found again in the same place.
     private var barsToggle: some View {
         Button {
             barsHidden.toggle()
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 Image(systemName: barsHidden ? "chevron.down" : "chevron.up")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
 
                 Text(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .kerning(1.1)
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .kerning(1)
             }
             .foregroundColor(Color.black.opacity(0.85))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
             .background(Capsule().fill(accent))
             .overlay(Capsule().stroke(Color.white.opacity(0.28), lineWidth: 1))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
-        .padding(.top, 8)
     }
 
-    private var editorBar: some View {
-        HStack(spacing: 10) {
-            Text(L.t("Touch controls"))
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(Theme.text)
+    /// The editor's own controls, in one compact panel in the top-left corner
+    /// instead of two bars across the whole screen: the controls it edits live
+    /// on the right and along the bottom, and a full-width bar used to sit on
+    /// top of them and push its own buttons off the edge. Two short lines fit
+    /// in half the width, and the bars toggle is pinned to the panel's corner
+    /// so it holds exactly the same place whether they are shown or hidden.
+    private func chrome(in size: CGSize) -> some View {
+        let width = min(620, max(320, size.width * 0.60))
+        let insets = LauncherHost.safeInsets
 
-            presetButton("FULL LAYOUT", profile: .full)
-            presetButton("HALF LAYOUT", profile: .half)
+        return ZStack(alignment: .topLeading) {
+            if !barsHidden {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Text(L.t("Touch controls"))
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Theme.text)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
 
-            Button(L.t("RESET")) {
-                ControlLayout.reset(profile: profile, game: game)
-                model.controlsOpacity = 1
-                centers = ControlLayout.allCenters(profile: profile, game: game)
-                scales = ControlLayout.allScales(profile: profile, game: game)
-                dragOrigins.removeAll()
-                selected = nil
+                        Spacer(minLength: 6)
+
+                        presetButton("FULL LAYOUT", profile: .full)
+                        presetButton("HALF LAYOUT", profile: .half)
+
+                        Button(L.t("RESET")) {
+                            ControlLayout.reset(profile: profile, game: game)
+                            model.controlsOpacity = 1
+                            centers = ControlLayout.allCenters(profile: profile, game: game)
+                            scales = ControlLayout.allScales(profile: profile, game: game)
+                            dragOrigins.removeAll()
+                            selected = nil
+                        }
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Theme.dim)
+
+                        Button(L.t("DONE")) {
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(Color.black.opacity(0.85))
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(accent)
+                        )
+                    }
+
+                    HStack(spacing: 9) {
+                        Text(L.t("OPACITY"))
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .kerning(1.1)
+                            .foregroundColor(Theme.faint)
+
+                        Slider(value: $model.controlsOpacity, in: 0.15...1)
+                            .accentColor(accent)
+                            .frame(width: 96)
+
+                        Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundColor(Theme.dim)
+                            .frame(width: 30, alignment: .leading)
+
+                        Text(L.t("DRAG TO MOVE, TAP TO SIZE"))
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundColor(Theme.faint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
+                    // The toggle sits in this row's trailing corner.
+                    .padding(.trailing, 148)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
-            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-            .foregroundColor(Theme.dim)
 
-            Spacer(minLength: 0)
-
-            Text(L.t("DRAG TO MOVE, TAP TO SIZE"))
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundColor(Theme.faint)
-
-            Button(L.t("DONE")) {
-                presentationMode.wrappedValue.dismiss()
-            }
-            .font(.system(size: 11, weight: .bold, design: .monospaced))
-            .foregroundColor(Color.black.opacity(0.85))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(accent)
-            )
+            barsToggle
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, 12)
+                .padding(.bottom, 10)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 11)
-        .background(Theme.background.opacity(0.94))
-    }
-
-    private var opacityBar: some View {
-        HStack(spacing: 12) {
-            Text(L.t("OPACITY"))
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .kerning(1.2)
-                .foregroundColor(Theme.faint)
-
-            Slider(value: $model.controlsOpacity, in: 0.15...1)
-                .accentColor(accent)
-                .frame(maxWidth: 260)
-
-            Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(Theme.dim)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 8)
-        .background(Theme.background.opacity(0.82))
+        .frame(width: width, height: 80, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.background.opacity(0.94))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Theme.line, lineWidth: 1)
+        )
+        .padding(.leading, 16 + insets.left)
+        .padding(.top, 10 + insets.top)
     }
 
     private func presetButton(_ title: String, profile target: LayoutProfile) -> some View {
@@ -1630,8 +1649,17 @@ private struct TouchControlEditor: View {
         )
     }
 
+    /// The game's own screen, drawn where the renderer puts it, with the
+    /// interface bar marked in the place the game actually draws it: 640 by 100
+    /// game pixels, centred horizontally and sitting on the bottom edge in both
+    /// engines. The editor view is not the game screen, so both are mapped
+    /// through the same aspect fit SDL applies, which is why the marker no
+    /// longer drifts away from the real bar when the resolution changes.
     private func previewSurface(_ size: CGSize) -> some View {
-        ZStack {
+        let screen = gameScreen(in: size)
+        let bar = interfaceBar(in: size)
+
+        return ZStack(alignment: .topLeading) {
             LinearGradient(
                 colors: [
                     Color(red: 0.055, green: 0.056, blue: 0.062),
@@ -1642,15 +1670,47 @@ private struct TouchControlEditor: View {
                 endPoint: .bottom
             )
 
+            Rectangle()
+                .fill(Color.black.opacity(0.45))
+                .frame(width: screen.width, height: screen.height)
+                .offset(x: screen.minX, y: screen.minY)
+
             // A plain opaque red rectangle for the in-game HUD: the exact
             // footprint the controls have to avoid. No fake interface.
             Rectangle()
                 .fill(Color.red.opacity(0.85))
-                .frame(width: size.width * 0.484, height: size.height * 0.125)
-                .position(x: size.width * 0.492, y: size.height * 0.929)
+                .frame(width: bar.width, height: bar.height)
+                .offset(x: bar.minX, y: bar.minY)
         }
         .clipped()
         .allowsHitTesting(false)
+    }
+
+    /// The interface bar's size in game pixels. Both engines draw the same
+    /// 640 by 100 bar; Fallout 2's optional leather side panels are switched
+    /// off in the app, so the bar is all that is left of the HUD.
+    private static let interfaceBarSize = CGSize(width: 640, height: 100)
+
+    private func gameScreen(in size: CGSize) -> CGRect {
+        let gameWidth = max(CGFloat(model.width), 1)
+        let gameHeight = max(CGFloat(model.height), 1)
+        let scale = min(size.width / gameWidth, size.height / gameHeight)
+        let shown = CGSize(width: gameWidth * scale, height: gameHeight * scale)
+        return CGRect(x: (size.width - shown.width) / 2,
+                      y: (size.height - shown.height) / 2,
+                      width: shown.width,
+                      height: shown.height)
+    }
+
+    private func interfaceBar(in size: CGSize) -> CGRect {
+        let screen = gameScreen(in: size)
+        let scale = screen.width / max(CGFloat(model.width), 1)
+        let barWidth = min(screen.width, TouchControlEditor.interfaceBarSize.width * scale)
+        let barHeight = min(screen.height, TouchControlEditor.interfaceBarSize.height * scale)
+        return CGRect(x: screen.minX + (screen.width - barWidth) / 2,
+                      y: screen.maxY - barHeight,
+                      width: barWidth,
+                      height: barHeight)
     }
 
     private func editorSize(for control: TouchControl, in size: CGSize) -> CGSize {

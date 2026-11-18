@@ -1334,7 +1334,7 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
     const fs::path root(install_dir);
     const std::vector<std::string> names = savegame_files(root);
     if (names.empty()) {
-        fail("No savegames to back up.");
+        fail("No saved games to back up.");
         return LAUNCHER_ERROR;
     }
 
