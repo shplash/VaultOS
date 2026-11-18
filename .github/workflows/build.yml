@@ -20,13 +20,20 @@ defaults:
 jobs:
   build:
     name: Build unsigned IPA
-    # macOS runners queue for a long time on the default label. Pointing
-    # VAULTOS_MACOS_RUNNER at another label (macos-15, macos-14, macos-13) in
-    # the repository's Actions variables moves the build there without editing
-    # this file; unset, it stays on the label the project has always used.
-    # GitHub cannot cancel individual jobs, so a matrix of labels would keep
-    # every copy running instead of letting the first one to start win.
-    runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15-intel' }}
+    # GitHub has no page showing which macOS runners are free - only its status
+    # page, which reports outages, not queues - and its reference says macOS
+    # jobs "may take longer to start" in busy periods. The labels it currently
+    # offers are macos-15 and macos-26 (arm64, 3 cores), macos-15-intel and
+    # macos-26-intel (Intel, 4 cores) and macos-latest (macos-26 today).
+    #
+    # macos-15 (arm64) is the default: current image, Xcode 16.x on it, and
+    # Xcode runs natively there instead of under Rosetta on an Intel machine.
+    # Its three cores match the --parallel 3 below. Set VAULTOS_MACOS_RUNNER as
+    # a repository variable to move the build to any of the others without
+    # touching this file. A matrix of labels cannot be used to "take whichever
+    # starts first": GitHub has no per-job cancel, so every copy would keep
+    # building.
+    runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15' }}
     timeout-minutes: 150
 
     steps:
@@ -131,13 +138,13 @@ jobs:
           {
             echo "### VaultOS iOS IPA"
             echo ""
-            echo "Unsigned IPA built from ${{ github.sha }} on the macos-15-intel runner."
+            echo "Unsigned IPA built from ${{ github.sha }} on the ${{ runner.name }} runner."
             echo "Install it with AltStore or Sideloadly, which sign it with your own Apple ID."
           } >> "$GITHUB_STEP_SUMMARY"
 
   tests:
     name: Launcher validation tests
-    runs-on: macos-15-intel
+    runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15' }}
     timeout-minutes: 15
 
     steps:
