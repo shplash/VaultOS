@@ -83,7 +83,6 @@ final class LauncherModel: ObservableObject {
     @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
     /// Opacity of the in-game touch controls, 0.15 (barely there) to 1.
     @Published var controlsOpacity: Double = 1 { didSet { store(controlsOpacity, "controlsOpacity") } }
-    @Published var leftHanded = false { didSet { store(leftHanded, "leftHanded") } }
     @Published var whiteButtons = false { didSet { store(whiteButtons, "whiteButtons") } }
 
     /// Every option is written the moment it changes, so settings survive
@@ -115,7 +114,6 @@ final class LauncherModel: ObservableObject {
     /// launcher view, so the picker's own dismissal cannot clear the intent
     /// before the chosen file arrives.
     @Published var showImporter = false
-    @Published var savedNotice = false
 
     private let documentsDirectory: URL
     private var progressTimer: Timer?
@@ -249,7 +247,6 @@ final class LauncherModel: ObservableObject {
         "joystickScale",
         "buttonScale",
         "controlsOpacity",
-        "leftHanded",
         "whiteButtons",
     ]
 
@@ -338,7 +335,6 @@ final class LauncherModel: ObservableObject {
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
         controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.15), 1)
-        leftHanded = storedBool("leftHanded", for: game, fallback: false)
         whiteButtons = storedBool("whiteButtons", for: game, fallback: false)
     }
 
@@ -358,7 +354,6 @@ final class LauncherModel: ObservableObject {
         defaults.set(joystickScale, forKey: LauncherModel.optionKey("joystickScale", for: game))
         defaults.set(buttonScale, forKey: LauncherModel.optionKey("buttonScale", for: game))
         defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: game))
-        defaults.set(leftHanded, forKey: LauncherModel.optionKey("leftHanded", for: game))
         defaults.set(whiteButtons, forKey: LauncherModel.optionKey("whiteButtons", for: game))
     }
 
@@ -682,16 +677,6 @@ final class LauncherModel: ObservableObject {
             errorMessage = failure
         }
         return false
-    }
-
-    func saveOptions() {
-        if applyOptions() {
-            statusText = "Settings saved."
-            savedNotice = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                self?.savedNotice = false
-            }
-        }
     }
 
     func play(onPlay: () -> Void) {

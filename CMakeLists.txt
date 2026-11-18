@@ -360,19 +360,20 @@ endif()
 
 if(APPLE)
     if(IOS)
-        # Any MP3 in the repository root is bundled as a theme track, so a song
-        # can be dropped in without editing this list. The launcher looks for
-        # "maybe" for Fallout, "blue moon" for Fallout 2, and "intro music" as
-        # the shared fallback used by any game without a theme of its own.
-        file(GLOB MUSIC_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/*.mp3")
+        # Any MP3 in assets/audio is bundled as a theme track, so a song can be
+        # dropped in without editing this list. The launcher looks for "maybe"
+        # for Fallout, "blue moon" for Fallout 2, and "intro music" as the shared
+        # fallback used by any game without a theme of its own.
+        file(GLOB MUSIC_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/assets/audio/*.mp3")
 
         set(RESOURCES
             "os/ios/AppIcon.xcassets"
             "os/ios/LaunchScreen.storyboard"
-            # The home screen artwork for each game, bundled from the repository
-            # root so the launcher needs no network to show it.
-            "${CMAKE_SOURCE_DIR}/IMG_3570.webp"
-            "${CMAKE_SOURCE_DIR}/IMG_3579.jpeg"
+            # The home screen artwork for each game, bundled so the launcher
+            # needs no network to show it. These names are the ones
+            # LauncherView.heroImage asks the bundle for.
+            "${CMAKE_SOURCE_DIR}/assets/artwork/fallout1.webp"
+            "${CMAKE_SOURCE_DIR}/assets/artwork/fallout2.jpeg"
             ${MUSIC_RESOURCES}
         )
 

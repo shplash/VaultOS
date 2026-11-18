@@ -472,7 +472,7 @@ struct LauncherView: View {
     /// directly, so the two can never disagree.
     private var heroImage: UIImage? {
         let isFallout2 = model.selectedGame == .fallout2
-        let name = isFallout2 ? "IMG_3579" : "IMG_3570"
+        let name = isFallout2 ? "fallout2" : "fallout1"
         if let image = UIImage(named: name) {
             return image
         }

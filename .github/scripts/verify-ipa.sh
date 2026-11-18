@@ -256,7 +256,7 @@ fi
 
 # --- Bundled artwork --------------------------------------------------------
 
-for artwork in IMG_3570.webp IMG_3579.jpeg; do
+for artwork in fallout1.webp fallout2.jpeg; do
     if [ ! -f "$app/$artwork" ]; then
         fail "the application bundle is missing $artwork"
     fi
