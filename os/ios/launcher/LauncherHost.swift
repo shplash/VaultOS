@@ -659,7 +659,6 @@ final class GameControlsOverlay: UIView {
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
     private var cursorModeTitle: String?
-    private var cursorModeTimer: Timer?
     private var fireModeValue: Int32 = -2
 
     static func install() {
@@ -828,29 +827,16 @@ final class GameControlsOverlay: UIView {
         addSubview(savesButton)
 
         refreshControls()
-        // The overlay polls the engine for what it can do right now (attack
-        // mode, reload, skip). Those change with the player's own taps, so a
-        // half-second poll is quick enough and reads the settings far less
-        // often on the main thread than the old 0.15 s did.
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.refreshControls()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        cursorModeTimer = timer
+        // No timer. The overlay used to poll the engine every half second to
+        // learn what it could do (cursor mode, attack mode, reload, skip), from
+        // an NSTimer running inside the engine's own loop - and a crash report
+        // shows exactly that: __NSFireTimer on the main thread, a few frames of
+        // ours, then a read through a null pointer. The engine is asked only
+        // when the player actually presses something now.
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-
-    deinit {
-        cursorModeTimer?.invalidate()
-    }
-
-    override func removeFromSuperview() {
-        cursorModeTimer?.invalidate()
-        cursorModeTimer = nil
-        super.removeFromSuperview()
     }
 
     override func layoutSubviews() {
@@ -920,17 +906,28 @@ final class GameControlsOverlay: UIView {
 
     @objc private func primaryAction() {
         fallout_ios_right_click()
+        refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
     @objc private func goBack() {
         fallout_ios_back()
+        refreshControls()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     @objc private func sideActionPressed(_ sender: LabeledControlButton) {
         fallout_ios_press_action(Int32(sender.tag))
+        refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    /// Laying a finger on the screen is the other moment the controls are
+    /// refreshed: the player is about to act, so what is on offer is looked up
+    /// then, and never from a clock running inside the engine's loop.
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        refreshControls()
+        super.touchesBegan(touches, with: event)
     }
 
     /// Pushes the player's opacity setting into every control. Buttons combine
