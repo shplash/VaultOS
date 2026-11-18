@@ -314,8 +314,8 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
             destRect.x = winRect.ulx + movieX;
         }
 
-        destRect.w = 4 * srcWidth / 3 + destRect.x;
-        destRect.h = destHeight + destRect.y;
+        destRect.w = 4 * srcWidth / 3;
+        destRect.h = destHeight;
     } else {
         if ((movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0) {
             destRect.y = (winHeight - destHeight) / 2;
