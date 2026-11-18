@@ -265,6 +265,13 @@ static void movieScaleFrame(unsigned char* dest, int destWidth, int destHeight, 
 // 0x478464
 static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeight, int srcX, int srcY, int destWidth, int destHeight, int a8, int a9)
 {
+    // The screen surfaces are rebuilt when the window changes size, and on iOS
+    // that can land between two movie frames. A frame with nothing to draw into
+    // is dropped rather than blitted through a NULL surface.
+    if (surface == NULL || gSdlSurface == NULL || gSdlTextureSurface == NULL) {
+        return;
+    }
+
     SDL_Rect srcRect;
     srcRect.x = srcX;
     srcRect.y = srcY;
@@ -333,6 +340,22 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
 
     destRect.x += winRect.ulx;
     destRect.y += winRect.uly;
+
+    // One line per run, so a log that stops during a cutscene says what the
+    // first frame was asked to draw and what it had to draw into.
+    static bool loggedFirstFrame = false;
+    if (!loggedFirstFrame) {
+        loggedFirstFrame = true;
+        debug_printf("[movie] frame %dx%d at %d,%d into %dx%d, screen %dx%d\n",
+            srcWidth,
+            srcHeight,
+            destRect.x,
+            destRect.y,
+            destRect.w,
+            destRect.h,
+            gSdlSurface->w,
+            gSdlSurface->h);
+    }
 
     if (movieCaptureFrameFunc != NULL) {
         if (SDL_LockSurface(surface) == 0) {

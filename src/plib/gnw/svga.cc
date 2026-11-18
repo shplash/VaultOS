@@ -4,6 +4,7 @@
 #include <TargetConditionals.h>
 #endif
 
+#include "plib/gnw/debug.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/mouse.h"
@@ -35,10 +36,25 @@ SDL_Surface* gSdlTextureSurface = NULL;
 // TODO: Remove once migration to update-render cycle is completed.
 FpsLimiter sharedFpsLimiter;
 
+/// Whether there is a screen and something to present it with.
+///
+/// The renderer and its surface are torn down and rebuilt when the window
+/// changes size, which on iOS happens as the interface rotates to landscape -
+/// often while the intro movie is running. A rebuild that fails (a lost GL
+/// context during rotation, say) used to leave these NULL while every drawing
+/// path kept using them, so the first frame after it read through NULL.
+static bool canPresent()
+{
+    return gSdlSurface != NULL
+        && gSdlTextureSurface != NULL
+        && gSdlTexture != NULL
+        && gSdlRenderer != NULL;
+}
+
 // 0x4CB310
 void GNW95_SetPaletteEntries(unsigned char* palette, int start, int count)
 {
-    if (gSdlSurface != NULL && gSdlSurface->format->palette != NULL) {
+    if (canPresent() && gSdlSurface->format->palette != NULL) {
         SDL_Color colors[256];
 
         if (count != 0) {
@@ -58,7 +74,7 @@ void GNW95_SetPaletteEntries(unsigned char* palette, int start, int count)
 // 0x4CB568
 void GNW95_SetPalette(unsigned char* palette)
 {
-    if (gSdlSurface != NULL && gSdlSurface->format->palette != NULL) {
+    if (canPresent() && gSdlSurface->format->palette != NULL) {
         SDL_Color colors[256];
 
         for (int index = 0; index < 256; index++) {
@@ -76,6 +92,10 @@ void GNW95_SetPalette(unsigned char* palette)
 // 0x4CB850
 void GNW95_ShowRect(unsigned char* src, unsigned int srcPitch, unsigned int a3, unsigned int srcX, unsigned int srcY, unsigned int srcWidth, unsigned int srcHeight, unsigned int destX, unsigned int destY)
 {
+    if (!canPresent()) {
+        return;
+    }
+
     buf_to_buf(src + srcPitch * srcY + srcX, srcWidth, srcHeight, srcPitch, (unsigned char*)gSdlSurface->pixels + gSdlSurface->pitch * destY + destX, gSdlSurface->pitch);
 
     SDL_Rect srcRect;
@@ -241,11 +261,21 @@ static void destroyRenderer()
 void handleWindowSizeChanged()
 {
     destroyRenderer();
-    createRenderer(screenGetWidth(), screenGetHeight());
+
+    if (!createRenderer(screenGetWidth(), screenGetHeight())) {
+        // Half a renderer is worse than none: drop whatever was made and say
+        // so, rather than leaving a NULL surface for the next blit to find.
+        destroyRenderer();
+        debug_printf("[svga] renderer could not be rebuilt for %dx%d\n", screenGetWidth(), screenGetHeight());
+    }
 }
 
 void renderPresent()
 {
+    if (!canPresent()) {
+        return;
+    }
+
     SDL_UpdateTexture(gSdlTexture, NULL, gSdlTextureSurface->pixels, gSdlTextureSurface->pitch);
     SDL_RenderClear(gSdlRenderer);
     SDL_RenderCopy(gSdlRenderer, gSdlTexture, NULL, NULL);
