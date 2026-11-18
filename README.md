@@ -89,12 +89,16 @@ $ mv app /Applications/Fallout
 - Run the app. The launcher starts instead of the game. The left rail switches game and page, and Play sits at its foot; nothing in the launcher scrolls:
     - **HOME**: the selected game, its artwork, the installation state and **IMPORT GAME ZIP**. **PLAY** stays in the bottom right corner on every page.
     - **DISPLAY**: the FULL/HALF resolution presets, or a custom width and height.
-    - **AUDIO**: sound, music and speech switches, plus the four volumes.
+    - **AUDIO**: the master, music, effects and speech volumes, for the game, plus the launcher's own music switch.
     - **GAME**: language, subtitles and running (the character runs instead of walking, unless Shift is held).
     - **CONTROLS**: joystick and button size, control opacity, white buttons and **EDIT CONTROL LAYOUT**.
+    - **TIPS**: touch, survival and launcher notes, with links to the Fallout and Fallout 2 wikis.
+    - **CREDITS**: what the app is built on, whose work it contains and the trademark notice.
+    - Each page with settings has **RESET**, which puts that page back to its defaults.
     - Every option is stored per game. Importing a ZIP again replaces the game data and keeps your savegames.
+    - The launcher's own text follows the device language: English, French, German, Italian or Spanish. Each game still uses the language set on the GAME page.
     - Music: the launcher looks for `maybe.mp3` for Fallout and `blue moon.mp3` for Fallout 2, and falls back to `intro music.mp3` for any game without a theme of its own. Any MP3 in the repository root is bundled automatically, so a track is added by dropping the file in; the AUDIO page shows which theme is in use.
-    - Home shows the selected game's own still: `IMG_3570.webp` for Fallout, `IMG_3571.webp` for Fallout 2. Both are bundled from the repository root, so the launcher needs no network.
+    - Home shows the selected game's own still: `IMG_3570.webp` for Fallout, `IMG_3579.jpeg` for Fallout 2. Both are bundled from the repository root, so the launcher needs no network.
 
 - Imported Fallout 1 data lives in the app's Documents folder, together with `fallout.cfg`, `f1_res.ini` and `SAVEGAME`. Imported Fallout 2 data lives in `Documents/Fallout2` with its own `fallout2.cfg`, `f2_res.ini` and `SAVEGAME`. File Sharing remains enabled, so you can still copy the files manually with Finder or iTunes ([how-to](https://support.apple.com/HT210598)) - the launcher detects them.
 

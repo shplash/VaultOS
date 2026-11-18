@@ -324,6 +324,7 @@ if(IOS)
         "os/ios/launcher/LauncherBridge.mm"
         "os/ios/launcher/LauncherHost.swift"
         "os/ios/launcher/LauncherModel.swift"
+        "os/ios/launcher/LauncherText.swift"
         "os/ios/launcher/LauncherView.swift"
     )
 

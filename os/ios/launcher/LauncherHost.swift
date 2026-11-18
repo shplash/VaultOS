@@ -177,21 +177,23 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     var id: String { rawValue }
 
     var label: String {
+        let english: String
         switch self {
-        case .joystick: return "LOOK"
-        case .back: return "BACK"
-        case .action: return "ACTION"
-        case .skip: return "SKIP"
-        case .inv: return "INV"
-        case .map: return "MAP"
-        case .cha: return "CHA"
-        case .pip: return "PIP"
-        case .skill: return "SKILL"
-        case .swap: return "SWAP"
-        case .end: return "END"
-        case .reload: return "RELOAD"
-        case .fireMode: return "MODE"
+        case .joystick: english = "LOOK"
+        case .back: english = "BACK"
+        case .action: english = "ACTION"
+        case .skip: english = "SKIP"
+        case .inv: english = "INV"
+        case .map: english = "MAP"
+        case .cha: english = "CHA"
+        case .pip: english = "PIP"
+        case .skill: english = "SKILL"
+        case .swap: english = "SWAP"
+        case .end: english = "END"
+        case .reload: english = "RELOAD"
+        case .fireMode: english = "MODE"
         }
+        return L.t(english)
     }
 
     var symbol: String {
@@ -1036,14 +1038,14 @@ private final class LabeledControlButton: UIControl {
             systemName: symbol,
             withConfiguration: UIImage.SymbolConfiguration(pointSize: iconPointSize, weight: .semibold)
         )
-        label.text = title
+        label.text = L.t(title)
         self.accessibilityLabel = accessibilityLabel ?? title
         setNeedsLayout()
     }
 
     func set(image: UIImage, title: String, accessibilityLabel: String? = nil) {
         iconView.image = image.withRenderingMode(.alwaysOriginal)
-        label.text = title
+        label.text = L.t(title)
         self.accessibilityLabel = accessibilityLabel ?? title
         setNeedsLayout()
     }
@@ -1156,7 +1158,7 @@ private final class CameraJoystickControl: UIControl {
         knob.layer.shadowOffset = .zero
         addSubview(knob)
 
-        caption.text = "LOOK"
+        caption.text = L.t("LOOK")
         caption.font = UIFont.monospacedSystemFont(ofSize: 8, weight: .bold)
         caption.textColor = ControlTheme.dim
         caption.textAlignment = .center

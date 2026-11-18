@@ -76,7 +76,7 @@ struct LauncherView: View {
         ) {
             Alert(
                 title: Text(model.selectedGame.title),
-                message: Text(model.errorMessage ?? ""),
+                message: Text(L.t(model.errorMessage ?? "")),
                 dismissButton: .default(Text("OK"))
             )
         }
@@ -161,7 +161,7 @@ struct LauncherView: View {
             model.play(onPlay: onPlay)
         } label: {
             VStack(spacing: 3) {
-                Text("PLAY")
+                Text(L.t("PLAY"))
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
 
                 Text(statusText)
@@ -209,9 +209,9 @@ struct LauncherView: View {
 
     private var statusText: String {
         if model.isInstalling {
-            return "INSTALLING"
+            return L.t("INSTALLING")
         }
-        return model.install.installed == 1 ? "READY" : "NEEDS FILES"
+        return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
     }
 
     // MARK: - Pages
@@ -250,7 +250,7 @@ struct LauncherView: View {
                     Button {
                         model.showImporter = true
                     } label: {
-                        Text(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP")
+                        Text(L.t(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
                     }
                     .buttonStyle(SmallButtonStyle(accent: accent))
                     .disabled(model.isInstalling)
@@ -275,7 +275,7 @@ struct LauncherView: View {
                         .accentColor(accent)
                         .padding(.vertical, 10)
 
-                    Text(model.statusText)
+                    Text(L.t(model.statusText))
                         .font(.system(size: 10, weight: .regular, design: .monospaced))
                         .foregroundColor(Theme.faint)
                         .lineLimit(1)
@@ -433,7 +433,7 @@ struct LauncherView: View {
         Button {
             tipGroup = group
         } label: {
-            Text(group.title)
+            Text(L.t(group.title))
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .kerning(0.8)
                 .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
@@ -554,11 +554,11 @@ struct LauncherView: View {
                 .padding(.top, 3)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(L.t(title))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(Theme.text)
 
-                Text(text)
+                Text(L.t(text))
                     .font(.system(size: 10, weight: .regular))
                     .foregroundColor(Theme.faint)
                     .fixedSize(horizontal: false, vertical: true)
@@ -613,7 +613,7 @@ struct LauncherView: View {
         } label: {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(preset.id.uppercased())
+                    Text(L.t(preset.id.uppercased()))
                         .font(.system(size: 9, weight: .semibold, design: .monospaced))
                         .kerning(1.6)
                         .foregroundColor(selected ? accent : Theme.faint)
@@ -627,7 +627,7 @@ struct LauncherView: View {
 
                 Spacer(minLength: 0)
 
-                Text(selected ? "IN USE" : "USE")
+                Text(selected ? L.t("IN USE") : L.t("USE"))
                     .font(.system(size: 8, weight: .semibold, design: .monospaced))
                     .foregroundColor(selected ? accent : Theme.faint)
             }
@@ -749,7 +749,7 @@ struct LauncherView: View {
                 Button {
                     showControlEditor = true
                 } label: {
-                    Text("EDIT CONTROL LAYOUT")
+                    Text(L.t("EDIT CONTROL LAYOUT"))
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
             }
@@ -834,11 +834,11 @@ struct LauncherView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
+                    Text(L.t(title))
                         .font(.system(size: 25, weight: .bold))
                         .foregroundColor(Theme.text)
 
-                    Text(detail)
+                    Text(L.t(detail))
                         .font(.system(size: 11, weight: .regular))
                         .foregroundColor(Theme.faint)
                         .lineLimit(1)
@@ -853,7 +853,7 @@ struct LauncherView: View {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.system(size: 9, weight: .bold))
 
-                            Text("RESET")
+                            Text(L.t("RESET"))
                                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                                 .kerning(0.8)
                         }
@@ -905,12 +905,12 @@ struct LauncherView: View {
     private func row<C: View>(_ title: String, detail: String?, @ViewBuilder control: () -> C) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(L.t(title))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Theme.text)
 
                 if let detail = detail {
-                    Text(detail)
+                    Text(L.t(detail))
                         .font(.system(size: 10, weight: .regular))
                         .foregroundColor(Theme.faint)
                         .lineLimit(2)
@@ -932,7 +932,7 @@ struct LauncherView: View {
     }
 
     private func footnote(_ text: String) -> some View {
-        Text(text)
+        Text(L.t(text))
             .font(.system(size: 10, weight: .regular))
             .foregroundColor(Theme.faint)
             .fixedSize(horizontal: false, vertical: true)
@@ -961,13 +961,13 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .home: return "Home"
-        case .display: return "Display"
-        case .audio: return "Audio"
-        case .game: return "Game"
-        case .touch: return "Controls"
-        case .tips: return "Tips"
-        case .credits: return "Credits"
+        case .home: return L.t("Home")
+        case .display: return L.t("Display")
+        case .audio: return L.t("Audio")
+        case .game: return L.t("Game")
+        case .touch: return L.t("Controls")
+        case .tips: return L.t("Tips")
+        case .credits: return L.t("Credits")
         }
     }
 
@@ -1258,15 +1258,16 @@ private struct TouchControlEditor: View {
 
     private var editorBar: some View {
         HStack(spacing: 10) {
-            Text("Touch controls")
+            Text(L.t("Touch controls"))
                 .font(.system(size: 17, weight: .bold))
                 .foregroundColor(Theme.text)
 
             presetButton("FULL LAYOUT", profile: .full)
             presetButton("HALF LAYOUT", profile: .half)
 
-            Button("RESET") {
+            Button(L.t("RESET")) {
                 ControlLayout.reset(profile: profile, game: game)
+                model.controlsOpacity = 1
                 centers = ControlLayout.allCenters(profile: profile, game: game)
                 scales = ControlLayout.allScales(profile: profile, game: game)
                 dragOrigins.removeAll()
@@ -1277,7 +1278,7 @@ private struct TouchControlEditor: View {
 
             Spacer(minLength: 0)
 
-            Text("DRAG TO MOVE, TAP TO SIZE")
+            Text(L.t("DRAG TO MOVE, TAP TO SIZE"))
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Theme.faint)
 
@@ -1297,7 +1298,7 @@ private struct TouchControlEditor: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Hide toolbars")
 
-            Button("DONE") {
+            Button(L.t("DONE")) {
                 presentationMode.wrappedValue.dismiss()
             }
             .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -1315,7 +1316,7 @@ private struct TouchControlEditor: View {
 
     private var opacityBar: some View {
         HStack(spacing: 12) {
-            Text("OPACITY")
+            Text(L.t("OPACITY"))
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .kerning(1.2)
                 .foregroundColor(Theme.faint)
@@ -1336,7 +1337,7 @@ private struct TouchControlEditor: View {
     }
 
     private func presetButton(_ title: String, profile target: LayoutProfile) -> some View {
-        Button(title) {
+        Button(L.t(title)) {
             profile = target
             if let preset = model.presets.first(where: { $0.id == target.rawValue }) {
                 model.apply(preset: preset)
@@ -1447,7 +1448,7 @@ private struct TouchControlEditor: View {
                 Text(control.label)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(model.whiteButtons ? .white : accent)
-                Text("SIZE")
+                Text(L.t("SIZE"))
                     .font(.system(size: 8, weight: .semibold, design: .monospaced))
                     .foregroundColor(Theme.faint)
             }
