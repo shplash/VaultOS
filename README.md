@@ -69,7 +69,7 @@ Fallout 2    master.dat, critter.dat, patch000.dat, data/
 - **HOME** installs the game, **LANGUAGE FILES** adds a translation you supply, **GAME** has language, subtitles, running and save backups, **CONTROLS** sizes and fades the on-screen buttons
 - Every settings page has **RESET**, and every option is stored per game
 - A language your installation does not have stays English
-- **BACK UP** writes `fo1-save-backup-….zip` beside the game data; **IMPORT** replaces the saves after a five second warning
+- **BACK UP** writes `fo(1/2)-save-backup-(date).zip` inside the games “data” folder ; **IMPORT** replaces the saves
 
 ## Notes & Licensing
 
