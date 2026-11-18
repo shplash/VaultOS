@@ -45,9 +45,6 @@ struct LauncherView: View {
         .onDisappear {
             model.saveSettingsNow()
         }
-        .onChange(of: model.selectedGame) { game in
-            LauncherMusic.shared.crossfade(to: game)
-        }
         .onChange(of: model.install.installed) { installed in
             if installed == 1 {
                 LauncherMusic.shared.playIfAvailable()

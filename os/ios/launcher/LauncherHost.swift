@@ -1260,18 +1260,13 @@ public func falloutIOSInstallGameControls() {
 
 // MARK: - Launcher music
 
-/// Background music for the launcher, reused by the game's main menu.
-///
-/// Each game can have a track of its own and switching games crossfades between
-/// them. A game with no track of its own keeps the bundled one playing rather
-/// than restarting it, so the shared app still has music everywhere. Loading a
+/// Background music for the launcher, reused by the game's main menu. Loading a
 /// small MP3 directly avoids the delay of decoding an ACM track from the game
 /// data first.
 final class LauncherMusic {
     static let shared = LauncherMusic()
 
     private static let volume: Float = 0.32
-    private static let fade: TimeInterval = 0.9
     /// The track bundled with the app, used by any game that has no theme of
     /// its own. It stops being used once both games have theirs.
     private static let sharedTrack = "intro music"
@@ -1321,7 +1316,7 @@ final class LauncherMusic {
         return name == sharedTrack ? "SHARED" : name.uppercased()
     }
 
-    private func play(track: String, crossfade: Bool) {
+    private func play(track: String) {
         guard let url = Bundle.main.url(forResource: track, withExtension: "mp3") else {
             return
         }
@@ -1333,34 +1328,16 @@ final class LauncherMusic {
 
             let next = try AVAudioPlayer(contentsOf: url)
             next.numberOfLoops = -1
-            next.volume = crossfade || LauncherMusic.isMuted ? 0 : LauncherMusic.volume
+            next.volume = LauncherMusic.isMuted ? 0 : LauncherMusic.volume
             // Loading the buffers now is what keeps the first second of the
             // track from being late; the game's ACMs take seconds to decode,
             // an MP3 prepared this way starts at once.
             next.prepareToPlay()
             next.play()
 
-            let outgoing = player
+            player?.stop()
             player = next
             trackName = track
-
-            guard let outgoing = outgoing else {
-                return
-            }
-
-            guard crossfade else {
-                outgoing.stop()
-                return
-            }
-
-            // Both tracks keep playing while they swap volumes, so the change
-            // of game is a fade rather than a cut. The old player is released
-            // by its own stop, which is all it needs to disappear.
-            next.setVolume(LauncherMusic.isMuted ? 0 : LauncherMusic.volume, fadeDuration: LauncherMusic.fade)
-            outgoing.setVolume(0, fadeDuration: LauncherMusic.fade)
-            DispatchQueue.main.asyncAfter(deadline: .now() + LauncherMusic.fade) {
-                outgoing.stop()
-            }
         } catch {
             // The launcher still works without music.
         }
@@ -1378,19 +1355,7 @@ final class LauncherMusic {
             return
         }
 
-        play(track: track, crossfade: false)
-    }
-
-    /// Called when the player picks the other game in the launcher.
-    func crossfade(to game: FalloutGame) {
-        guard let track = LauncherMusic.themeName(for: game) else {
-            return
-        }
-        guard track != trackName else {
-            return
-        }
-
-        play(track: track, crossfade: player != nil)
+        play(track: track)
     }
 
     func pause() {
