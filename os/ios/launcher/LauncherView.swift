@@ -95,6 +95,12 @@ struct LauncherView: View {
                 LauncherMusic.shared.playIfAvailable()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // The app's Documents folder is in the Files app now, so game files
+            // can be dropped in while the launcher is in the background. Look
+            // at the installation again when it comes back to the front.
+            model.refreshInstall()
+        }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             // Only the save-import countdown needs a tick. Without it this ran a
             // full redraw of the launcher every second for as long as it was open.

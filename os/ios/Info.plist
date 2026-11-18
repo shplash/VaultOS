@@ -30,6 +30,14 @@
     <true/>
     <key>UIFileSharingEnabled</key>
     <true/>
+    <!-- With UIFileSharingEnabled this is what puts the app's Documents folder
+         in the Files app, under On My iPhone, so game files can be copied in by
+         hand. It is also what lets a file handed over by the document picker be
+         opened where it lives; without it a picker started from outside the
+         sandbox - any install that is not LiveContainer - cannot read what the
+         player chose. -->
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
     <key>UIRequiresFullScreen</key>
