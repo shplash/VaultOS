@@ -34,20 +34,19 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 
 ## Features
 
-- Fallout and Fallout 2 in one app, one engine at a time
-- Runs natively: no JIT, no entitlements, no tweak injection
-- Launcher made for touch: fixed pages that never scroll, PLAY at the foot
+- Fallout and Fallout 2 in one app
+- Runs natively: no JIT or entitlements.
+- Launcher with everything you’d need
 - Your own game ZIP per game, with separate installs and saves
-- Touch controls you can move, resize, fade and tint
-- One language setting for the game, the launcher and the controls
-- Language packs and savegame backups handled in the launcher
+- Touch controls you can move, resize and change opacity
+- Language pack imports and savegame backups handled in the launcher
 
 ## Install
 
-1. Grab `vaultos-ios-unsigned` from the latest [Build iOS IPA](https://github.com/shplash/fallout1-ce-iosimproved/actions/workflows/build.yml) run, or from a [release](https://github.com/shplash/fallout1-ce-iosimproved/releases).
-2. Sideload it with SideStore, AltStore, Feather, LiveContainer or TrollStore.
+1. Grab `vaultos` from the latest [release](https://github.com/shplash/fallout1-ce-iosimproved/releases).
+2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
-Installed through **LiveContainer**, turn on **Fix File Picker** in that app's settings, or the ZIP picker will not open.
+Installed through **LiveContainer**, turn on **Fix File Picker** in the app's settings, or the ZIP picker will not open.
 
 ## Requirements
 
