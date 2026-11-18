@@ -348,12 +348,17 @@ int main_menu_loop()
     while (rc == -1) {
         sharedFpsLimiter.mark();
 
+        // The first few frames of the menu, before and after the input poll, so
+        // a log that stops says which side of it the crash is on.
+        static int loggedFrames = 0;
+        const bool logThisFrame = loggedFrames < 3;
+        if (logThisFrame) {
+            debug_printf("[menu] frame %d\n", loggedFrames);
+        }
+
         int keyCode = get_input();
 
-        // The first few frames of the menu, so a log that stops says whether
-        // the menu was ever reached or only created.
-        static int loggedFrames = 0;
-        if (loggedFrames < 3) {
+        if (logThisFrame) {
             loggedFrames++;
             debug_printf("[menu] input %d\n", keyCode);
         }

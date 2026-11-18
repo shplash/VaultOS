@@ -952,18 +952,13 @@ final class GameControlsOverlay: UIView {
     }
 
     private func refreshControls() {
-        // The overlay is attached while SDL is still creating its window, and
-        // SDL's own view may be inserted after it. Keep the controls sized to
-        // the window, above the game view, and alive if SDL recreates it.
-        if tag == Self.overlayTag {
-            if let host = superview {
-                if frame.size != host.bounds.size {
-                    frame = host.bounds
-                }
-                host.bringSubviewToFront(self)
-            } else if let window = Self.sdlWindow() {
-                Self.attach(to: window)
-            }
+        // Re-attach only when SDL has replaced its window. This used to resize
+        // the overlay and push it to the front of SDL's window every tick,
+        // which is UIKit layout and compositing from a timer running inside the
+        // engine's own loop - the app is locked to one full-screen window, so
+        // none of that was needed.
+        if superview == nil, let window = Self.sdlWindow() {
+            Self.attach(to: window)
         }
 
         applyControlOpacity(ControlLayout.controlsOpacity())
