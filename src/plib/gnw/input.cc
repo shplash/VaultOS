@@ -11,6 +11,7 @@
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
+#include "plib/gnw/debug.h"
 #include "plib/gnw/dxinput.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
@@ -195,22 +196,51 @@ int get_input()
 {
     int v3;
 
+    // The first few calls name every step. The app stops somewhere in here,
+    // before the menu has read a single key, and this says where.
+    static int traced = 0;
+    const bool trace = traced < 3;
+    if (trace) {
+        traced++;
+    }
+
 #if defined(__APPLE__) && TARGET_OS_IPHONE
     // Keep the on-screen controls honest - which are available, whether reload
     // and attack mode exist, what the action button says - from the engine's
     // own loop. Anything else interrupts the engine mid-frame.
+    if (trace) {
+        debug_printf("[input] refresh\n");
+    }
     fallout_engine_refresh_controls();
 #endif
 
+    if (trace) {
+        debug_printf("[input] messages\n");
+    }
     GNW95_process_message();
+
+    if (trace) {
+        debug_printf("[input] active %d\n", GNW95_isActive ? 1 : 0);
+    }
 
     if (!GNW95_isActive) {
         GNW95_lost_focus();
     }
 
+    if (trace) {
+        debug_printf("[input] background\n");
+    }
     process_bk();
 
+    if (trace) {
+        debug_printf("[input] buffer\n");
+    }
     v3 = get_input_buffer();
+
+    if (trace) {
+        debug_printf("[input] key %d\n", v3);
+    }
+
     if (v3 == -1 && mouse_get_buttons() & 0x33) {
         mouse_get_position(&input_mx, &input_my);
         return -2;
@@ -233,18 +263,42 @@ void process_bk()
 {
     int v1;
 
-    GNW_do_bk_process();
-
-    if (vcr_update() != 3) {
-        mouse_info();
+    static int traced = 0;
+    const bool trace = traced < 3;
+    if (trace) {
+        traced++;
     }
 
+    if (trace) {
+        debug_printf("[bk] processes\n");
+    }
+    GNW_do_bk_process();
+
+    if (trace) {
+        debug_printf("[bk] vcr\n");
+    }
+    if (vcr_update() != 3) {
+        if (trace) {
+            debug_printf("[bk] mouse\n");
+        }
+        mouse_info();
+        if (trace) {
+            debug_printf("[bk] mouse done\n");
+        }
+    }
+
+    if (trace) {
+        debug_printf("[bk] buttons\n");
+    }
     v1 = win_check_all_buttons();
     if (v1 != -1) {
         GNW_add_input_buffer(v1);
         return;
     }
 
+    if (trace) {
+        debug_printf("[bk] keyboard\n");
+    }
     v1 = kb_getch();
     if (v1 != -1) {
         GNW_add_input_buffer(v1);

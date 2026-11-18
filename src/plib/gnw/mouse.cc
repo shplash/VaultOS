@@ -523,7 +523,10 @@ void mouse_info()
     int y;
     int buttons = 0;
 
-    MouseData mouseData;
+    // Zeroed: dxinput has nothing to say on a device without a hardware mouse,
+    // and the wheel values at the end of this function used to be read from
+    // whatever happened to be on the stack.
+    MouseData mouseData = {};
     if (dxinput_get_mouse_state(&mouseData)) {
         x = mouseData.x;
         y = mouseData.y;
