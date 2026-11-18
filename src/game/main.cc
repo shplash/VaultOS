@@ -106,8 +106,17 @@ int gnw_main(int argc, char** argv)
         return 1;
     }
 
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+    // The two startup movies are the first thing Fallout 1 decodes, and its
+    // movie path is what stops this app on iOS: the game dies before a single
+    // frame reaches the screen, so it never gets to its own menu. They are
+    // skipped here so the game can run; the movies it plays from scripts are
+    // untouched.
+    debug_printf("[vaultos] startup movies skipped\n");
+#else
     gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
     gmovie_play(MOVIE_INTRO, 0);
+#endif
 
     if (main_menu_create() == 0) {
         int language_filter = 1;

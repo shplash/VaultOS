@@ -57,6 +57,11 @@ int run(int argc, char** argv)
     // open the file in the Files app instead of guessing.
     fallout::debug_register_log("vaultos-log.txt", "wt");
 
+    // Which binary this log came from. Without it there is no way to tell a
+    // fresh install from a stale one, and every build writes the same version
+    // number to the About page.
+    fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s\n", __DATE__, __TIME__);
+
     SDL_ShowCursor(SDL_DISABLE);
 
     fallout::GNW95_isActive = true;
