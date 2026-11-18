@@ -474,7 +474,8 @@ final class LauncherModel: ObservableObject {
         startProgressUpdates()
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let result = launcher_install_language_pack(url.path, destination)
+            var languages: Int32 = 0
+            let result = launcher_install_language_pack(url.path, destination, &languages)
             let failure = String(cString: launcher_last_error())
 
             if accessed {
@@ -493,11 +494,38 @@ final class LauncherModel: ObservableObject {
                 if result == 0 {
                     self.progress = 1
                     self.statusText = "Language files added."
+                    self.selectInstalledLanguage(mask: languages)
                 } else {
                     self.errorMessage = failure.isEmpty ? "Installation failed." : failure
                     self.statusText = ""
                 }
             }
+        }
+    }
+
+    /// Picks the language the pack carried: the one already selected when it is
+    /// in the pack, otherwise the only language the pack has, otherwise the
+    /// device's own when the pack has that too. A pack holding several leaves
+    /// the choice alone.
+    private func selectInstalledLanguage(mask: Int32) {
+        guard mask != 0 else {
+            return
+        }
+
+        func has(_ index: Int) -> Bool {
+            let bit = Int32(1) << Int32(index)
+            return mask & bit != 0
+        }
+
+        if has(language) {
+            return
+        }
+
+        let carried = [0, 1, 2, 3, 4].filter { has($0) }
+        if carried.count == 1 {
+            language = carried[0]
+        } else if has(LauncherModel.deviceLanguage) {
+            language = LauncherModel.deviceLanguage
         }
     }
 

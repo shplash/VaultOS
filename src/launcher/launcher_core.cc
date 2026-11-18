@@ -1101,12 +1101,60 @@ static std::string find_text_prefix(const std::vector<ZipEntry>& entries, bool& 
     return best;
 }
 
-int launcher_install_language_pack(const char* zip_path, const char* install_dir)
+// A pack's language folder, under whichever name its edition used. The engine
+// asks for `text/<language>` with the English name, so a pack that shipped as
+// text/FRANCAIS or text/DEUTSCH has to be stored under the name it looks for.
+struct LanguageFolder {
+    const char* folder;
+    const char* canonical;
+    int32_t bit;
+};
+
+const LanguageFolder kLanguageFolders[] = {
+    { "english", "english", 1 << LAUNCHER_LANGUAGE_ENGLISH },
+    { "englisch", "english", 1 << LAUNCHER_LANGUAGE_ENGLISH },
+    { "anglais", "english", 1 << LAUNCHER_LANGUAGE_ENGLISH },
+    { "french", "french", 1 << LAUNCHER_LANGUAGE_FRENCH },
+    { "francais", "french", 1 << LAUNCHER_LANGUAGE_FRENCH },
+    { "german", "german", 1 << LAUNCHER_LANGUAGE_GERMAN },
+    { "deutsch", "german", 1 << LAUNCHER_LANGUAGE_GERMAN },
+    { "italian", "italian", 1 << LAUNCHER_LANGUAGE_ITALIAN },
+    { "italiano", "italian", 1 << LAUNCHER_LANGUAGE_ITALIAN },
+    { "spanish", "spanish", 1 << LAUNCHER_LANGUAGE_SPANISH },
+    { "espanol", "spanish", 1 << LAUNCHER_LANGUAGE_SPANISH },
+};
+
+// Rewrites the `text/<language>/` head of a pack entry to the name the engine
+// looks for, and records the language the entry belongs to.
+static std::string canonical_text_path(const std::string& relative, int32_t& languages)
+{
+    const size_t start = sizeof("text/") - 1;
+    const size_t slash = relative.find('/', start);
+    if (slash == std::string::npos) {
+        return relative;
+    }
+
+    const std::string folder = lower_ascii(relative.substr(start, slash - start));
+    for (const LanguageFolder& known : kLanguageFolders) {
+        if (folder == known.folder) {
+            languages |= known.bit;
+            return std::string("text/") + known.canonical + relative.substr(slash);
+        }
+    }
+
+    return relative;
+}
+
+int launcher_install_language_pack(const char* zip_path, const char* install_dir, int32_t* out_languages)
 {
     clear_messages();
     g_progress_done.store(0);
     g_progress_total.store(0);
     set_status("Opening language pack...");
+
+    if (out_languages != NULL) {
+        *out_languages = 0;
+    }
 
     if (zip_path == NULL || zip_path[0] == '\0') {
         fail("No language pack was selected.");
@@ -1137,6 +1185,7 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
     };
 
     std::vector<PackFile> files;
+    int32_t languages = 0;
     uint64_t total_bytes = 0;
 
     for (const ZipEntry& entry : entries) {
@@ -1149,7 +1198,7 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
             continue;
         }
 
-        files.push_back({ &entry, relative });
+        files.push_back({ &entry, canonical_text_path(relative, languages) });
         total_bytes += entry.uncompressed_size;
     }
 
@@ -1178,6 +1227,10 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
     }
 
     archive.close();
+
+    if (out_languages != NULL) {
+        *out_languages = languages;
+    }
 
     g_progress_done.store(g_progress_total.load());
     set_status("Language files added.");

@@ -105,8 +105,12 @@ int launcher_write_options(const char* install_dir, const LauncherOptions* optio
 // `text/<language>/...` before the archive, so a player can add a language the
 // installation does not carry. The pack is the game's own `text` tree, zipped -
 // at the root, inside one wrapper folder or inside a `data` folder - and
-// anything else it holds is ignored. Returns LAUNCHER_OK on success.
-int launcher_install_language_pack(const char* zip_path, const char* install_dir);
+// anything else it holds is ignored. A pack that names its folders in its own
+// language (`text/FRANCAIS`, `text/DEUTSCH`) is stored under the name the
+// engine asks for. `out_languages` receives one bit per LAUNCHER_LANGUAGE_* the
+// pack carried, so the launcher can select one; it may be NULL. Returns
+// LAUNCHER_OK on success.
+int launcher_install_language_pack(const char* zip_path, const char* install_dir, int32_t* out_languages);
 
 // iOS game controls (implemented in Swift, input helpers in Objective-C++).
 void fallout_ios_install_game_controls(void);

@@ -313,7 +313,8 @@ int main()
     }
 
     // A language pack carries only the game's own text tree, and it lands where
-    // the engine looks for it before the archive.
+    // the engine looks for it before the archive. The pack reports which
+    // languages it carried so the launcher can select one.
     {
         const fs::path pack = root / "fallout french.zip";
         write_zip(pack, {
@@ -321,8 +322,10 @@ int main()
             { "readme.txt", "unofficial translation" },
         });
 
-        CHECK(launcher_install_language_pack(pack.string().c_str(), fallout1.string().c_str())
-            == LAUNCHER_OK);
+        int32_t languages = 0;
+        CHECK(launcher_install_language_pack(pack.string().c_str(), fallout1.string().c_str(),
+                  &languages) == LAUNCHER_OK);
+        CHECK((languages & (1 << LAUNCHER_LANGUAGE_FRENCH)) != 0);
         CHECK(file_contains(fallout1 / "data" / "text" / "french" / "game" / "misc.msg",
             "bonjour"));
         CHECK(!fs::exists(fallout1 / "readme.txt"));
@@ -331,14 +334,19 @@ int main()
         CHECK(file_contains(fallout1 / "master.dat", "test"));
     }
 
-    // A pack wrapped in a folder, or holding a whole data folder, is found too.
+    // A pack wrapped in a folder, holding a whole data folder, and naming its
+    // language folder in its own language: it is found, and stored under the
+    // name the engine asks for.
     {
         const fs::path wrapped = root / "wrapped pack.zip";
-        write_zip(wrapped, { { "Fallout/data/text/german/game/misc.msg", "hallo" } });
+        write_zip(wrapped, { { "Fallout/data/text/FRANCAIS/game/misc.msg", "salut" } });
 
-        CHECK(launcher_install_language_pack(wrapped.string().c_str(), fallout1.string().c_str())
-            == LAUNCHER_OK);
-        CHECK(file_contains(fallout1 / "data" / "text" / "german" / "game" / "misc.msg", "hallo"));
+        int32_t languages = 0;
+        CHECK(launcher_install_language_pack(wrapped.string().c_str(),
+                  fallout1.string().c_str(), &languages) == LAUNCHER_OK);
+        CHECK((languages & (1 << LAUNCHER_LANGUAGE_FRENCH)) != 0);
+        CHECK(file_contains(fallout1 / "data" / "text" / "french" / "game" / "misc.msg", "salut"));
+        CHECK(!fs::exists(fallout1 / "data" / "text" / "FRANCAIS"));
     }
 
     // Anything that is not a text tree is refused rather than scattered over the
@@ -347,8 +355,10 @@ int main()
         const fs::path wrong = root / "no text.zip";
         write_zip(wrong, { { "art/tiles.trx", "not a translation" } });
 
-        CHECK(launcher_install_language_pack(wrong.string().c_str(), fallout1.string().c_str())
-            == LAUNCHER_ERROR);
+        int32_t languages = 0;
+        CHECK(launcher_install_language_pack(wrong.string().c_str(), fallout1.string().c_str(),
+                  &languages) == LAUNCHER_ERROR);
+        CHECK(languages == 0);
         CHECK(std::string(launcher_last_error()).find("text") != std::string::npos);
         CHECK(!fs::exists(fallout1 / "data" / "art" / "tiles.trx"));
     }
