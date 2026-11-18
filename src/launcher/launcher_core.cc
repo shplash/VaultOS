@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -1073,19 +1074,20 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
 // Language packs
 // ---------------------------------------------------------------------------
 
-// A translation is the game's own `text` tree. A pack may carry it at the root,
-// inside one wrapper folder or inside a `data` folder, and may hold other files
-// beside it; the shallowest text tree wins.
-static std::string find_text_prefix(const std::vector<ZipEntry>& entries, bool& found)
+// Finds the shallowest `<folder>` tree in the archive - `text/` for a language
+// pack, `savegame/` for a backup - so a pack wrapped in one folder, or holding a
+// whole data folder, is still found.
+static std::string find_tree_prefix(const std::vector<ZipEntry>& entries, const char* folder, bool& found)
 {
+    const std::string wanted = lower_ascii(folder);
     std::string best;
     found = false;
 
     for (const ZipEntry& entry : entries) {
         const std::string lower = lower_ascii(entry.name);
-        size_t position = lower.find("text/");
+        size_t position = lower.find(wanted);
         while (position != std::string::npos) {
-            // Only a `text` folder at the start of a path counts, not `art/text/`.
+            // Only the folder at the start of a path counts, not `art/text/`.
             if (position == 0 || lower[position - 1] == '/') {
                 std::string prefix = entry.name.substr(0, position);
                 if (!found || prefix.size() < best.size()) {
@@ -1094,7 +1096,7 @@ static std::string find_text_prefix(const std::vector<ZipEntry>& entries, bool& 
                 }
                 break;
             }
-            position = lower.find("text/", position + 1);
+            position = lower.find(wanted, position + 1);
         }
     }
 
@@ -1173,7 +1175,7 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
     }
 
     bool found = false;
-    const std::string prefix = find_text_prefix(entries, found);
+    const std::string prefix = find_tree_prefix(entries, "text/", found);
     if (!found) {
         fail("This ZIP has no text folder. A language pack is the game's own data/text folder, zipped.");
         return LAUNCHER_ERROR;
@@ -1234,6 +1236,295 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
 
     g_progress_done.store(g_progress_total.load());
     set_status("Language files added.");
+    return LAUNCHER_OK;
+}
+
+// ---------------------------------------------------------------------------
+// Savegame backups
+// ---------------------------------------------------------------------------
+
+static void write_u16(std::string& out, uint16_t value)
+{
+    out.push_back(static_cast<char>(value & 0xff));
+    out.push_back(static_cast<char>((value >> 8) & 0xff));
+}
+
+static void write_u32(std::string& out, uint32_t value)
+{
+    out.push_back(static_cast<char>(value & 0xff));
+    out.push_back(static_cast<char>((value >> 8) & 0xff));
+    out.push_back(static_cast<char>((value >> 16) & 0xff));
+    out.push_back(static_cast<char>((value >> 24) & 0xff));
+}
+
+static std::string backup_stamp()
+{
+    const std::time_t now = std::time(nullptr);
+    std::tm parts = {};
+#if defined(_WIN32)
+    localtime_s(&parts, &now);
+#else
+    localtime_r(&now, &parts);
+#endif
+
+    char stamp[32];
+    if (std::strftime(stamp, sizeof(stamp), "%Y-%m-%d-%H%M", &parts) == 0) {
+        return "saves";
+    }
+    return stamp;
+}
+
+// Every file under SAVEGAME, as a path relative to the installation.
+static std::vector<std::string> savegame_files(const fs::path& install_dir)
+{
+    std::vector<std::string> names;
+
+    std::error_code ec;
+    const fs::path root = install_dir / "SAVEGAME";
+    if (!fs::is_directory(root, ec)) {
+        return names;
+    }
+
+    for (fs::recursive_directory_iterator it(root, ec), end; it != end; it.increment(ec)) {
+        if (ec) {
+            break;
+        }
+
+        const fs::path& path = it->path();
+        if (fs::is_symlink(fs::symlink_status(path, ec)) || !fs::is_regular_file(path, ec)) {
+            continue;
+        }
+
+        const std::string name = fs::relative(path, install_dir, ec).generic_string();
+        if (ec || name.empty()) {
+            continue;
+        }
+        names.push_back(name);
+    }
+
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+int launcher_backup_saves(const char* install_dir, char* out_path, int32_t out_size)
+{
+    clear_messages();
+    set_status("Backing up saves...");
+
+    if (out_path != NULL && out_size > 0) {
+        out_path[0] = '\0';
+    }
+
+    if (install_dir == NULL || install_dir[0] == '\0') {
+        fail("No install folder was provided.");
+        return LAUNCHER_ERROR;
+    }
+
+    const fs::path root(install_dir);
+    const std::vector<std::string> names = savegame_files(root);
+    if (names.empty()) {
+        fail("No savegames to back up.");
+        return LAUNCHER_ERROR;
+    }
+
+    struct CentralEntry {
+        std::string name;
+        uint32_t crc;
+        uint32_t size;
+        uint32_t offset;
+    };
+
+    std::string archive;
+    std::vector<CentralEntry> central;
+
+    for (const std::string& name : names) {
+        const fs::path source = root / fs::path(name);
+
+        std::error_code size_ec;
+        const auto file_size = fs::file_size(source, size_ec);
+        if (size_ec || file_size > 0xffffffffull) {
+            fail("Cannot read " + source.string() + ".");
+            return LAUNCHER_ERROR;
+        }
+
+        std::string data(static_cast<size_t>(file_size), '\0');
+        if (!data.empty()) {
+            std::ifstream input(source, std::ios::binary);
+            if (!input) {
+                fail("Cannot read " + source.string() + ".");
+                return LAUNCHER_ERROR;
+            }
+            input.read(&data[0], static_cast<std::streamsize>(data.size()));
+            if (!input) {
+                fail("Cannot read " + source.string() + ".");
+                return LAUNCHER_ERROR;
+            }
+        }
+
+        const uLong crc = crc32(crc32(0L, Z_NULL, 0),
+            reinterpret_cast<const Bytef*>(data.data()),
+            static_cast<uInt>(data.size()));
+
+        CentralEntry entry;
+        entry.name = name;
+        entry.crc = static_cast<uint32_t>(crc);
+        entry.size = static_cast<uint32_t>(data.size());
+        entry.offset = static_cast<uint32_t>(archive.size());
+
+        write_u32(archive, 0x04034b50); // local file header
+        write_u16(archive, 20);         // version needed
+        write_u16(archive, 0);          // flags
+        write_u16(archive, 0);          // method: stored
+        write_u16(archive, 0);          // time
+        write_u16(archive, 0);          // date
+        write_u32(archive, entry.crc);
+        write_u32(archive, entry.size); // compressed
+        write_u32(archive, entry.size); // uncompressed
+        write_u16(archive, static_cast<uint16_t>(name.size()));
+        write_u16(archive, 0);          // extra field length
+        archive += name;
+        archive += data;
+
+        central.push_back(entry);
+    }
+
+    const uint32_t directory_offset = static_cast<uint32_t>(archive.size());
+
+    for (const CentralEntry& entry : central) {
+        write_u32(archive, 0x02014b50); // central directory entry
+        write_u16(archive, 20);         // version made by
+        write_u16(archive, 20);         // version needed
+        write_u16(archive, 0);          // flags
+        write_u16(archive, 0);          // method: stored
+        write_u16(archive, 0);          // time
+        write_u16(archive, 0);          // date
+        write_u32(archive, entry.crc);
+        write_u32(archive, entry.size);
+        write_u32(archive, entry.size);
+        write_u16(archive, static_cast<uint16_t>(entry.name.size()));
+        write_u16(archive, 0);          // extra field length
+        write_u16(archive, 0);          // comment length
+        write_u16(archive, 0);          // disk number
+        write_u16(archive, 0);          // internal attributes
+        write_u32(archive, 0);          // external attributes
+        write_u32(archive, entry.offset);
+        archive += entry.name;
+    }
+
+    const uint32_t directory_size = static_cast<uint32_t>(archive.size()) - directory_offset;
+    const uint16_t count = static_cast<uint16_t>(central.size());
+
+    write_u32(archive, 0x06054b50); // end of central directory
+    write_u16(archive, 0);          // disk number
+    write_u16(archive, 0);          // disk with the directory
+    write_u16(archive, count);      // entries on this disk
+    write_u16(archive, count);      // entries in total
+    write_u32(archive, directory_size);
+    write_u32(archive, directory_offset);
+    write_u16(archive, 0);          // comment length
+
+    const fs::path target = root / ("saves-" + backup_stamp() + ".zip");
+    FILE* file = std::fopen(target.string().c_str(), "wb");
+    if (file == NULL) {
+        fail("Cannot write " + target.string() + ". The device may be out of storage.");
+        return LAUNCHER_ERROR;
+    }
+
+    const bool written = std::fwrite(archive.data(), 1, archive.size(), file) == archive.size();
+    const bool closed = std::fclose(file) == 0;
+    if (!written || !closed) {
+        std::remove(target.string().c_str());
+        fail("Cannot write " + target.string() + ". The device may be out of storage.");
+        return LAUNCHER_ERROR;
+    }
+
+    if (out_path != NULL && out_size > 0) {
+        std::snprintf(out_path, static_cast<size_t>(out_size), "%s", target.string().c_str());
+    }
+
+    set_status("Saves backed up.");
+    return LAUNCHER_OK;
+}
+
+int launcher_import_saves(const char* zip_path, const char* install_dir)
+{
+    clear_messages();
+    g_progress_done.store(0);
+    g_progress_total.store(0);
+    set_status("Opening backup...");
+
+    if (zip_path == NULL || zip_path[0] == '\0') {
+        fail("No backup was selected.");
+        return LAUNCHER_ERROR;
+    }
+
+    if (install_dir == NULL || install_dir[0] == '\0') {
+        fail("No install folder was provided.");
+        return LAUNCHER_ERROR;
+    }
+
+    std::ifstream archive;
+    std::vector<ZipEntry> entries;
+    if (!load_archive(zip_path, archive, entries)) {
+        return LAUNCHER_ERROR;
+    }
+
+    bool found = false;
+    const std::string prefix = find_tree_prefix(entries, "savegame/", found);
+    if (!found) {
+        fail("This ZIP has no SAVEGAME folder.");
+        return LAUNCHER_ERROR;
+    }
+
+    struct SaveFile {
+        const ZipEntry* entry;
+        std::string relative;
+    };
+
+    std::vector<SaveFile> files;
+    uint64_t total_bytes = 0;
+
+    for (const ZipEntry& entry : entries) {
+        if (lower_ascii(entry.name).compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
+            continue;
+        }
+
+        const std::string relative = entry.name.substr(prefix.size());
+        if (lower_ascii(relative).rfind("savegame/", 0) != 0) {
+            continue;
+        }
+
+        files.push_back({ &entry, relative });
+        total_bytes += entry.uncompressed_size;
+    }
+
+    if (files.empty()) {
+        fail("This ZIP has no SAVEGAME folder.");
+        return LAUNCHER_ERROR;
+    }
+
+    const fs::path destination(install_dir);
+
+    // The import replaces rather than merges: a slot left behind by newer saves
+    // would otherwise look like part of the backup. The launcher warns first.
+    std::error_code ec;
+    fs::remove_all(destination / "SAVEGAME", ec);
+
+    g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
+    set_status("Restoring saves...");
+
+    for (const SaveFile& file : files) {
+        if (!extract_entry(archive, *file.entry, destination / fs::path(file.relative))) {
+            return LAUNCHER_ERROR;
+        }
+    }
+
+    archive.close();
+
+    ensure_save_directories(destination);
+
+    g_progress_done.store(g_progress_total.load());
+    set_status("Saves restored.");
     return LAUNCHER_OK;
 }
 

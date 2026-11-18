@@ -112,6 +112,16 @@ int launcher_write_options(const char* install_dir, const LauncherOptions* optio
 // LAUNCHER_OK on success.
 int launcher_install_language_pack(const char* zip_path, const char* install_dir, int32_t* out_languages);
 
+// Zips the installation's SAVEGAME folder into a new archive beside the game
+// data and writes its full path into `out_path`, NUL terminated. Returns
+// LAUNCHER_ERROR when there is nothing to back up or the file cannot be written.
+int launcher_backup_saves(const char* install_dir, char* out_path, int32_t out_size);
+
+// Replaces the installation's SAVEGAME folder with the one in an archive made by
+// launcher_backup_saves. Everything in the archive outside that folder is
+// ignored; the caller is expected to have warned about the replacement.
+int launcher_import_saves(const char* zip_path, const char* install_dir);
+
 // iOS game controls (implemented in Swift, input helpers in Objective-C++).
 void fallout_ios_install_game_controls(void);
 void fallout_ios_camera_pan(double x, double y);

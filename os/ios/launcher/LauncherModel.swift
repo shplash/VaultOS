@@ -47,6 +47,7 @@ enum FalloutGame: String, CaseIterable, Identifiable {
 enum LauncherImport {
     case game
     case language
+    case saves
 }
 
 struct DisplayPreset: Identifiable, Hashable {
@@ -526,6 +527,94 @@ final class LauncherModel: ObservableObject {
             language = carried[0]
         } else if has(LauncherModel.deviceLanguage) {
             language = LauncherModel.deviceLanguage
+        }
+    }
+
+    /// A short confirmation under the Savegames row, cleared by itself.
+    @Published var savesNotice: String?
+
+    /// Zips this game's SAVEGAME folder into a file beside the game data, so it
+    /// can be copied out of the app, kept, or brought back later.
+    func backupSaves() {
+        guard !isInstalling, install.has_saves == 1 else {
+            return
+        }
+
+        let destination = installDirectory.path
+
+        isInstalling = true
+        errorMessage = nil
+        savesNotice = nil
+        statusText = "Backing up saves..."
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var path = [CChar](repeating: 0, count: 1024)
+            let result = launcher_backup_saves(destination, &path, Int32(path.count))
+            let failure = String(cString: launcher_last_error())
+
+            DispatchQueue.main.async {
+                guard let self = self else {
+                    return
+                }
+
+                self.isInstalling = false
+                self.statusText = ""
+
+                if result == 0 {
+                    self.notice("Saves backed up.")
+                } else {
+                    self.errorMessage = failure.isEmpty ? "Installation failed." : failure
+                }
+            }
+        }
+    }
+
+    /// Replaces this game's savegames with the ones in a backup the player picks.
+    func importSaves(from url: URL) {
+        guard !isInstalling else {
+            return
+        }
+
+        let destination = installDirectory.path
+        let accessed = url.startAccessingSecurityScopedResource()
+
+        isInstalling = true
+        errorMessage = nil
+        savesNotice = nil
+        statusText = "Restoring saves..."
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = launcher_import_saves(url.path, destination)
+            let failure = String(cString: launcher_last_error())
+
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
+            }
+
+            DispatchQueue.main.async {
+                guard let self = self else {
+                    return
+                }
+
+                self.isInstalling = false
+                self.statusText = ""
+                self.refreshInstall()
+
+                if result == 0 {
+                    self.notice("Saves restored.")
+                } else {
+                    self.errorMessage = failure.isEmpty ? "Installation failed." : failure
+                }
+            }
+        }
+    }
+
+    private func notice(_ text: String) {
+        savesNotice = text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            if self?.savesNotice == text {
+                self?.savesNotice = nil
+            }
         }
     }
 

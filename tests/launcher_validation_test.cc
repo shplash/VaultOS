@@ -363,6 +363,38 @@ int main()
         CHECK(!fs::exists(fallout1 / "data" / "art" / "tiles.trx"));
     }
 
+    // A backup carries the savegames and nothing else, and putting one back
+    // replaces what is there.
+    {
+        write_file(fallout1 / "SAVEGAME" / "SLOT02" / "SAVE.DAT", "slot-two");
+
+        char backup[1024] = { 0 };
+        CHECK(launcher_backup_saves(fallout1.string().c_str(), backup,
+                  static_cast<int32_t>(sizeof(backup))) == LAUNCHER_OK);
+        CHECK(backup[0] != '\0');
+        CHECK(fs::exists(fs::path(backup)));
+
+        // The newer saves are replaced by the ones in the backup, so a slot that
+        // is not in it must be gone afterwards.
+        write_file(fallout1 / "SAVEGAME" / "SLOT07" / "SAVE.DAT", "newer");
+
+        CHECK(launcher_import_saves(backup, fallout1.string().c_str()) == LAUNCHER_OK);
+        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT02" / "SAVE.DAT", "slot-two"));
+        CHECK(!fs::exists(fallout1 / "SAVEGAME" / "SLOT07" / "SAVE.DAT"));
+    }
+
+    // An archive that is not a backup is refused, and the saves stay put.
+    {
+        const fs::path wrong = root / "not a backup.zip";
+        write_zip(wrong, { { "art/tiles.trx", "not a save" } });
+
+        CHECK(launcher_import_saves(wrong.string().c_str(), fallout1.string().c_str())
+            == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("SAVEGAME") != std::string::npos);
+        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+    }
+
     // Uppercase installations (CD-era copies) are detected as well.
     const fs::path uppercase = root / "FALLOUT2";
     write_file(uppercase / "MASTER.DAT");

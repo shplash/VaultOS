@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import UIKit
@@ -17,6 +18,8 @@ struct LauncherView: View {
     @State private var musicMuted = LauncherMusic.isMuted
     /// What the ZIP picker is being opened for.
     @State private var pendingImport: LauncherImport = .game
+    @State private var showSaveImportWarning = false
+    @State private var saveImportCountdown = 0
 
     private var accent: Color {
         return model.selectedGame.accent
@@ -63,6 +66,13 @@ struct LauncherView: View {
         // safe area to SwiftUI instead shrank the launcher into a box with black
         // bands around it on every device with a cut-out.
         .ignoresSafeArea()
+        .overlay(
+            Group {
+                if showSaveImportWarning {
+                    saveImportWarning
+                }
+            }
+        )
         .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $showControlEditor) {
             TouchControlEditor(model: model)
@@ -79,6 +89,11 @@ struct LauncherView: View {
         .onChange(of: model.install.installed) { installed in
             if installed == 1 {
                 LauncherMusic.shared.playIfAvailable()
+            }
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            if showSaveImportWarning && saveImportCountdown > 0 {
+                saveImportCountdown -= 1
             }
         }
         .fileImporter(
@@ -105,6 +120,8 @@ struct LauncherView: View {
                     model.importZip(from: url)
                 case .language:
                     model.importLanguagePack(from: url)
+                case .saves:
+                    model.importSaves(from: url)
                 }
             case .failure(let error):
                 model.errorMessage = error.localizedDescription
@@ -792,6 +809,8 @@ struct LauncherView: View {
                       detail: "Moves at a run; hold Shift to walk",
                       isOn: $model.alwaysRun)
 
+            savegamesRow
+
             footnote("Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.")
         }
     }
@@ -816,6 +835,94 @@ struct LauncherView: View {
                 .buttonStyle(SmallButtonStyle(accent: accent))
             }
             .padding(.top, 12)
+        }
+    }
+
+    /// Backing the saves up is harmless; putting a backup back replaces them, so
+    /// that one waits out a countdown with the warning on screen.
+    private var savegamesRow: some View {
+        row("Savegames", detail: model.savesNotice) {
+            HStack(spacing: 8) {
+                Button {
+                    model.backupSaves()
+                } label: {
+                    Text(L.t("BACK UP"))
+                }
+                .buttonStyle(SmallButtonStyle(accent: accent))
+                .disabled(model.isInstalling || model.install.has_saves == 0)
+
+                Button {
+                    saveImportCountdown = 5
+                    showSaveImportWarning = true
+                } label: {
+                    Text(L.t("IMPORT"))
+                }
+                .buttonStyle(SmallButtonStyle(accent: accent))
+                .disabled(model.isInstalling)
+            }
+        }
+    }
+
+    private var saveImportWarning: some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(L.t("Replace your savegames?"))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(Theme.text)
+
+                Text(L.t("Every save in this installation is deleted and the ones in the backup you choose take their place. This cannot be undone."))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+
+                    Button(L.t("CANCEL")) {
+                        showSaveImportWarning = false
+                        saveImportCountdown = 0
+                    }
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                    )
+
+                    Button(saveImportCountdown > 0
+                        ? "\(L.t("IMPORT")) \(saveImportCountdown)"
+                        : L.t("IMPORT")) {
+                        showSaveImportWarning = false
+                        pendingImport = .saves
+                        model.showImporter = true
+                    }
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color.black.opacity(0.85))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(accent.opacity(saveImportCountdown > 0 ? 0.4 : 1))
+                    )
+                    .disabled(saveImportCountdown > 0)
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 440)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Theme.sheet)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Theme.line, lineWidth: 1)
+            )
+            .padding(24)
         }
     }
 
