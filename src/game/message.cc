@@ -190,6 +190,14 @@ bool message_load(MessageList* messageList, const char* path)
     snprintf(localized_path, sizeof(localized_path), "%s\\%s\\%s", "text", language, path);
 
     file_ptr = db_fopen(localized_path, "rt");
+    if (file_ptr == NULL && strcmp(language, "english") != 0) {
+        // The player can pick a language the installation does not carry - an
+        // English copy set to French, say. Falling back to the English text
+        // keeps the game readable instead of losing every message file.
+        snprintf(localized_path, sizeof(localized_path), "%s\\%s\\%s", "text", "english", path);
+        file_ptr = db_fopen(localized_path, "rt");
+    }
+
     if (file_ptr == NULL) {
         return false;
     }

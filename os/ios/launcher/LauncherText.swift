@@ -9,17 +9,29 @@ enum LauncherLanguage: String, CaseIterable {
     case italian
     case spanish
 
-    /// The device's preferred language, when the launcher speaks it. Resolved
-    /// once: the launcher looks up every string it shows on every redraw.
-    static let current: LauncherLanguage = {
-        for tag in Locale.preferredLanguages {
-            let code = String(tag.prefix(2)).lowercased()
-            if let match = LauncherLanguage(rawValue: code) {
-                return match
-            }
+    /// The engine's own language codes (LAUNCHER_LANGUAGE_*), in the order the
+    /// launcher offers them.
+    init(gameLanguage: Int) {
+        switch gameLanguage {
+        case 1: self = .french
+        case 2: self = .german
+        case 3: self = .italian
+        case 4: self = .spanish
+        default: self = .english
         }
-        return .english
-    }()
+    }
+
+    /// The language chosen on the GAME page for the game the app is showing.
+    /// The launcher draws its own text in it and the in-game overlay draws the
+    /// control labels in it, so one setting governs the launcher, the controls
+    /// and the game itself.
+    static var selected: LauncherLanguage {
+        let defaults = UserDefaults.standard
+        let identifier = defaults.string(forKey: "launcher.game") ?? FalloutGame.fallout1.rawValue
+        let game = FalloutGame(rawValue: identifier) ?? .fallout1
+        let index = defaults.integer(forKey: LauncherModel.optionKey("language", for: game))
+        return LauncherLanguage(gameLanguage: index)
+    }
 }
 
 /// One lookup for every piece of launcher text. Keys are the English strings,
@@ -27,7 +39,7 @@ enum LauncherLanguage: String, CaseIterable {
 /// each game's own localisation (Abri, P.A., Vault and so on).
 enum L {
     static func t(_ english: String) -> String {
-        let language = LauncherLanguage.current
+        let language = LauncherLanguage.selected
         if language == .english {
             return english
         }
@@ -179,6 +191,11 @@ enum L {
             "SIZE": "TAILLE",
             "OPACITY": "OPACITÉ",
             "DRAG TO MOVE, TAP TO SIZE": "GLISSER : DÉPLACER, TAPER : TAILLE",
+            // Language note and the editor's bars
+            "HIDE BARS": "MASQUER LES BARRES",
+            "SHOW BARS": "MONTRER LES BARRES",
+            "Game text, voice, the launcher and the controls": "Textes et voix du jeu, le lanceur et les commandes",
+            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Sous-titres, course et langue sont écrits dans la configuration du jeu au lancement. Le lanceur et les commandes à l'écran suivent la langue immédiatement ; les textes et voix absents de votre installation restent en anglais.",
         ],
 
         .german: [
@@ -313,6 +330,10 @@ enum L {
             "SIZE": "GRÖSSE",
             "OPACITY": "DECKKRAFT",
             "DRAG TO MOVE, TAP TO SIZE": "ZIEHEN: VERSCHIEBEN, TIPPEN: GRÖSSE",
+            "HIDE BARS": "LEISTEN AUSBLENDEN",
+            "SHOW BARS": "LEISTEN EINBLENDEN",
+            "Game text, voice, the launcher and the controls": "Spieltext und Stimmen, Starter und Steuerung",
+            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Untertitel, Rennen und Sprache werden beim Start in die Spielkonfiguration geschrieben. Starter und Bildschirmsteuerung folgen der Sprache sofort; Texte und Stimmen, die deine Installation nicht enthält, bleiben Englisch.",
         ],
 
         .italian: [
@@ -447,6 +468,10 @@ enum L {
             "SIZE": "DIMENSIONE",
             "OPACITY": "OPACITÀ",
             "DRAG TO MOVE, TAP TO SIZE": "TRASCINA: SPOSTA, TOCCA: DIMENSIONE",
+            "HIDE BARS": "NASCONDI BARRE",
+            "SHOW BARS": "MOSTRA BARRE",
+            "Game text, voice, the launcher and the controls": "Testi e voci del gioco, il launcher e i comandi",
+            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Sottotitoli, corsa e lingua vengono scritti nella configurazione del gioco all'avvio. Il launcher e i comandi a schermo seguono la lingua subito; testi e voci assenti dalla tua installazione restano in inglese.",
         ],
 
         .spanish: [
@@ -581,6 +606,10 @@ enum L {
             "SIZE": "TAMAÑO",
             "OPACITY": "OPACIDAD",
             "DRAG TO MOVE, TAP TO SIZE": "ARRASTRA: MOVER, TOCA: TAMAÑO",
+            "HIDE BARS": "OCULTAR BARRAS",
+            "SHOW BARS": "MOSTRAR BARRAS",
+            "Game text, voice, the launcher and the controls": "Textos y voces del juego, el lanzador y los controles",
+            "Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.": "Los subtítulos, el correr y el idioma se escriben en la configuración del juego al iniciar. El lanzador y los controles en pantalla siguen el idioma al instante; los textos y voces que tu instalación no incluye permanecen en inglés.",
         ],
     ]
 }

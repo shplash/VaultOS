@@ -90,13 +90,13 @@ $ mv app /Applications/Fallout
     - **HOME**: the selected game, its artwork, the installation state and **IMPORT GAME ZIP**. **PLAY** stays in the bottom right corner on every page.
     - **DISPLAY**: the FULL/HALF resolution presets, or a custom width and height.
     - **AUDIO**: the master, music, effects and speech volumes, for the game, plus the launcher's own music switch.
-    - **GAME**: language, subtitles and running (the character runs instead of walking, unless Shift is held).
+    - **GAME**: language (for the game, the launcher and the controls), subtitles and running (the character runs instead of walking, unless Shift is held).
     - **CONTROLS**: joystick and button size, control opacity, white buttons and **EDIT CONTROL LAYOUT**.
     - **TIPS**: touch, survival and launcher notes, with links to the Fallout and Fallout 2 wikis.
     - **CREDITS**: what the app is built on, whose work it contains and the trademark notice.
     - Each page with settings has **RESET**, which puts that page back to its defaults.
     - Every option is stored per game. Importing a ZIP again replaces the game data and keeps your savegames.
-    - The launcher's own text follows the device language: English, French, German, Italian or Spanish. Each game still uses the language set on the GAME page.
+    - The GAME page's language applies to the whole app: the launcher's text and the on-screen control labels switch at once, and the game's own text and voice switch the next time you tap Play. A language your installation does not contain stays English, so an English copy set to French still plays in English.
     - Music: the launcher looks for `maybe.mp3` for Fallout and `blue moon.mp3` for Fallout 2, and falls back to `intro music.mp3` for any game without a theme of its own. Any MP3 in the repository root is bundled automatically, so a track is added by dropping the file in; the AUDIO page shows which theme is in use.
     - Home shows the selected game's own still: `IMG_3570.webp` for Fallout, `IMG_3579.jpeg` for Fallout 2. Both are bundled from the repository root, so the launcher needs no network.
 

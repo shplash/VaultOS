@@ -26,6 +26,17 @@ struct LauncherView: View {
     /// and leaves it untouched at the size of a phone or tablet.
     private static let smallestLayout = CGSize(width: 560, height: 320)
 
+    /// What the display keeps for the sensor housing and the home indicator. The
+    /// launcher draws edge to edge and keeps its content inside these, so it
+    /// fills the screen on every device rather than leaving bands around itself.
+    private var screenInsets: EdgeInsets {
+        let insets = LauncherHost.safeInsets
+        return EdgeInsets(top: insets.top,
+                          leading: insets.left,
+                          bottom: insets.bottom,
+                          trailing: insets.right)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let fits = geometry.size.width > 1 && geometry.size.height > 1
@@ -38,13 +49,18 @@ struct LauncherView: View {
                 LauncherBackdrop(accent: accent)
 
                 HStack(spacing: 0) {
-                    rail
+                    rail(leading: screenInsets.leading, bottom: screenInsets.bottom)
                     content
                 }
                 .frame(width: geometry.size.width / scale, height: geometry.size.height / scale)
                 .scaleEffect(scale)
             }
         }
+        // The launcher is the app's own screen, like the game after it: it covers
+        // the whole display and keeps its content inside the edges. Leaving the
+        // safe area to SwiftUI instead shrank the launcher into a box with black
+        // bands around it on every device with a cut-out.
+        .ignoresSafeArea()
         .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $showControlEditor) {
             TouchControlEditor(model: model)
@@ -102,7 +118,7 @@ struct LauncherView: View {
 
     // MARK: - Rail
 
-    private var rail: some View {
+    private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -126,10 +142,11 @@ struct LauncherView: View {
 
             playButton
         }
-        .padding(.horizontal, 10)
+        .padding(.leading, 10 + leading)
+        .padding(.trailing, 10)
         .padding(.top, 14)
-        .padding(.bottom, 14)
-        .frame(width: 168, alignment: .leading)
+        .padding(.bottom, 14 + bottom)
+        .frame(width: 168 + leading, alignment: .leading)
         .background(Color.white.opacity(0.03))
         .overlay(
             Rectangle()
@@ -318,7 +335,8 @@ struct LauncherView: View {
                 .stroke(Theme.line, lineWidth: 1)
         )
         .padding(.horizontal, 18)
-        .padding(.vertical, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 16 + screenInsets.bottom)
     }
 
     /// The hero: the selected game's own wasteland still on the right, its
@@ -710,7 +728,7 @@ struct LauncherView: View {
 
     private var gameSheet: some View {
         sheet(title: "Game", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
-            row("Language", detail: "Text and voice") {
+            row("Language", detail: "Game text, voice, the launcher and the controls") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
@@ -748,7 +766,7 @@ struct LauncherView: View {
                       detail: "Moves at a run; hold Shift to walk",
                       isOn: $model.alwaysRun)
 
-            footnote("Both are written into the game's own configuration on Play.")
+            footnote("Subtitles, running and the language are written into the game's configuration on Play. The launcher and the on-screen controls follow the language immediately; text and voice the installation does not contain stay English.")
         }
     }
 
@@ -917,7 +935,8 @@ struct LauncherView: View {
                 .stroke(Theme.line, lineWidth: 1)
         )
         .padding(.horizontal, 18)
-        .padding(.vertical, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 16 + screenInsets.bottom)
     }
 
     private func row<C: View>(_ title: String, detail: String?, @ViewBuilder control: () -> C) -> some View {
@@ -1225,43 +1244,19 @@ private struct TouchControlEditor: View {
                         .opacity(model.controlsOpacity)
                 }
 
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
                     if !barsHidden {
                         editorBar
                         opacityBar
                     }
+
+                    // The toggle sits outside the bars, so it keeps the same
+                    // place whether they are shown or hidden, and it is a
+                    // labelled capsule rather than a bare chevron, so it can
+                    // never be mistaken for one of the game controls.
+                    barsToggle
+
                     Spacer(minLength: 0)
-                }
-
-                if barsHidden {
-                    VStack {
-                        HStack {
-                            Spacer(minLength: 0)
-
-                            Button {
-                                barsHidden = false
-                            } label: {
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(accent)
-                                    .padding(.horizontal, 11)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Theme.background.opacity(0.9))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .stroke(Theme.hairline, lineWidth: 1)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Show toolbars")
-                        }
-
-                        Spacer(minLength: 0)
-                    }
-                    .padding(10)
                 }
 
                 if let selected = selected {
@@ -1272,6 +1267,34 @@ private struct TouchControlEditor: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+    }
+
+    /// Hides the editor's own bars to give the whole screen to the layout. It is
+    /// a filled capsule with a word on it, deliberately unlike the controls it
+    /// sits among, and it stays in one place so it can always be found again.
+    private var barsToggle: some View {
+        Button {
+            barsHidden.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: barsHidden ? "chevron.down" : "chevron.up")
+                    .font(.system(size: 11, weight: .bold))
+
+                Text(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .kerning(1.1)
+            }
+            .foregroundColor(Color.black.opacity(0.85))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .background(Capsule().fill(accent))
+            .overlay(Capsule().stroke(Color.white.opacity(0.28), lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
+        .padding(.leading, 18)
+        .padding(.top, 10)
     }
 
     private var editorBar: some View {
@@ -1299,22 +1322,6 @@ private struct TouchControlEditor: View {
             Text(L.t("DRAG TO MOVE, TAP TO SIZE"))
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundColor(Theme.faint)
-
-            Button {
-                barsHidden = true
-            } label: {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Theme.dim)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
-                    )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Hide toolbars")
 
             Button(L.t("DONE")) {
                 presentationMode.wrappedValue.dismiss()

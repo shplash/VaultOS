@@ -34,6 +34,13 @@ final class LauncherHost {
         }
     }
 
+    /// What the display keeps for the sensor housing and the home indicator.
+    /// The launcher covers the whole screen and keeps its own content inside
+    /// these, so it fills a phone or a tablet instead of sitting in a box.
+    static var safeInsets: UIEdgeInsets {
+        return shared.window?.safeAreaInsets ?? .zero
+    }
+
     private func appWillResignActive() {
         if finished {
             // The game is running; pause both its SDL stream and the launcher

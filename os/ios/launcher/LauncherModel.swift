@@ -120,7 +120,24 @@ final class LauncherModel: ObservableObject {
         return documentsDirectory.appendingPathComponent(game.installFolder, isDirectory: true)
     }
 
-    private static let languageNames = ["ENGLISH", "FRENCH", "GERMAN", "ITALIAN", "SPANISH"]
+    /// Shown in each language's own words, so the list can be read whatever the
+    /// launcher is currently set to.
+    private static let languageNames = ["ENGLISH", "FRANÇAIS", "DEUTSCH", "ITALIANO", "ESPAÑOL"]
+
+    /// A fresh installation starts in the device's language when the launcher
+    /// speaks it; the GAME page's own choice overrides it from then on.
+    private static let deviceLanguage: Int = {
+        for tag in Locale.preferredLanguages {
+            switch String(tag.prefix(2)).lowercased() {
+            case "fr": return 1
+            case "de": return 2
+            case "it": return 3
+            case "es": return 4
+            default: continue
+            }
+        }
+        return 0
+    }()
 
     init() {
         ControlLayout.migrateIfNeeded()
@@ -303,7 +320,7 @@ final class LauncherModel: ObservableObject {
         musicVolume = storedDouble("musicVolume", for: game, fallback: 70)
         sfxVolume = storedDouble("sfxVolume", for: game, fallback: 70)
         speechVolume = storedDouble("speechVolume", for: game, fallback: 70)
-        language = storedInt("language", for: game, fallback: 0)
+        language = storedInt("language", for: game, fallback: LauncherModel.deviceLanguage)
         subtitles = storedBool("subtitles", for: game, fallback: true)
         alwaysRun = storedBool("alwaysRun", for: game, fallback: false)
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
