@@ -20,7 +20,13 @@ defaults:
 jobs:
   build:
     name: Build unsigned IPA
-    runs-on: macos-15-intel
+    # macOS runners queue for a long time on the default label. Pointing
+    # VAULTOS_MACOS_RUNNER at another label (macos-15, macos-14, macos-13) in
+    # the repository's Actions variables moves the build there without editing
+    # this file; unset, it stays on the label the project has always used.
+    # GitHub cannot cancel individual jobs, so a matrix of labels would keep
+    # every copy running instead of letting the first one to start win.
+    runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15-intel' }}
     timeout-minutes: 150
 
     steps:
