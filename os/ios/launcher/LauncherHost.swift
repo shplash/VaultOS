@@ -1241,11 +1241,10 @@ final class GameControlsOverlay: UIView {
             setNeedsLayout()
         }
 
-        let inventory = screen == .inventory
         let itemScreen = screen.listsItems
         lookButton.isHidden = !itemScreen
-        helpButton.isHidden = !inventory
-        if !inventory {
+        helpButton.isHidden = !itemScreen
+        if !itemScreen {
             helpCard.isHidden = true
         }
 
