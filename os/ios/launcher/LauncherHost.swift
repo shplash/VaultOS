@@ -706,11 +706,6 @@ final class GameControlsOverlay: UIView {
     )
     private let movieShield = UIView()
     private let skipMovieButton = MovieSkipButton()
-    private let useButton = LabeledControlButton(
-        title: "USE",
-        symbol: "hand.tap",
-        iconPointSize: 16
-    )
     private let lookButton = LabeledControlButton(
         title: "LOOK",
         symbol: "eye",
@@ -941,11 +936,6 @@ final class GameControlsOverlay: UIView {
         movieShield.isHidden = true
         addSubview(movieShield)
 
-        useButton.isHidden = true
-        useButton.accessibilityLabel = "Use"
-        useButton.addTarget(self, action: #selector(usePressed), for: .touchUpInside)
-        addSubview(useButton)
-
         lookButton.isHidden = true
         lookButton.accessibilityLabel = "Look"
         lookButton.addTarget(self, action: #selector(lookPressed), for: .touchUpInside)
@@ -1024,15 +1014,13 @@ final class GameControlsOverlay: UIView {
         let surface = gameSurface()
         let side = min(max(48, surface.height * 0.17), 84)
         let gap: CGFloat = 10
-        let pair = side * 2 + gap
-        let middle = min(max(box.midY, pair / 2 + safeAreaInsets.top + 4),
-                         bounds.height - pair / 2 - safeAreaInsets.bottom - 4)
+        let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
+                         bounds.height - side / 2 - safeAreaInsets.bottom - 4)
         let left = max(box.minX - gap - side, safeAreaInsets.left + 4)
         let right = min(box.maxX + gap, bounds.width - safeAreaInsets.right - 4 - side)
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
-        useButton.frame = CGRect(x: right, y: middle - side - gap / 2, width: side, height: side)
-        lookButton.frame = CGRect(x: right, y: middle + gap / 2, width: side, height: side)
+        lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
     }
 
     private func menuBox(for screen: ScreenMode) -> CGRect {
@@ -1135,12 +1123,6 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
-    @objc private func usePressed() {
-        fallout_ios_press_action(14)
-        refreshControls()
-        UISelectionFeedbackGenerator().selectionChanged()
-    }
-
     @objc private func lookPressed() {
         fallout_ios_press_action(16)
         refreshControls()
@@ -1169,7 +1151,6 @@ final class GameControlsOverlay: UIView {
         fireModeButton.controlOpacity = value
         savesButton.controlOpacity = value
         loadButton.controlOpacity = value
-        useButton.controlOpacity = value
         lookButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
@@ -1193,7 +1174,6 @@ final class GameControlsOverlay: UIView {
             for control in controls {
                 control.isHidden = true
             }
-            useButton.isHidden = true
             lookButton.isHidden = true
             if isHidden {
                 isHidden = false
@@ -1212,7 +1192,6 @@ final class GameControlsOverlay: UIView {
         }
 
         let itemScreen = screen.listsItems
-        useButton.isHidden = !itemScreen
         lookButton.isHidden = !itemScreen
 
         if screen.isMenu {

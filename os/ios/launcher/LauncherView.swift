@@ -860,6 +860,8 @@ struct LauncherView: View {
                 return [
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
+                    ("Menus", "A tap in a menu puts the cursor where you touched and clicks there, so you can tap the row you want. Hold to take an item and drag it, two fingers scroll a list."),
+                    ("Inventory", "The right-hand button switches the inventory between taking an item and opening the item's own menu."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
                     ("Layout", "Every control can be moved, resized, faded and coloured from Controls."),
