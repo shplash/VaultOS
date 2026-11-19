@@ -707,10 +707,12 @@ final class GameControlsOverlay: UIView {
     private let movieShield = UIView()
     private let skipMovieButton = MovieSkipButton()
     private let lookButton = LabeledControlButton(
-        title: "LOOK",
+        title: "INSPECT",
         symbol: "eye",
         iconPointSize: 16
     )
+    private let helpButton = UIButton(type: .system)
+    private let helpCard = InventoryHelpCard()
     private var currentScreen: ScreenMode = .game
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
@@ -937,9 +939,24 @@ final class GameControlsOverlay: UIView {
         addSubview(movieShield)
 
         lookButton.isHidden = true
-        lookButton.accessibilityLabel = "Look"
+        lookButton.accessibilityLabel = "Inspect"
         lookButton.addTarget(self, action: #selector(lookPressed), for: .touchUpInside)
         addSubview(lookButton)
+
+        helpButton.isHidden = true
+        helpButton.setImage(UIImage(systemName: "info.circle",
+                                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)),
+                            for: .normal)
+        helpButton.tintColor = InventoryHelpCard.green
+        helpButton.accessibilityLabel = "Inventory help"
+        helpButton.addTarget(self, action: #selector(helpPressed), for: .touchUpInside)
+        addSubview(helpButton)
+
+        helpCard.isHidden = true
+        helpCard.text = L.t("Hold and drag an item to equip or move it.")
+            + "\n\n"
+            + L.t("Toggle INSPECT to examine an item's characteristics. Hold an item while INSPECT is on to open its menu.")
+        addSubview(helpCard)
 
         skipMovieButton.isHidden = true
         skipMovieButton.onTrigger = {
@@ -1001,6 +1018,10 @@ final class GameControlsOverlay: UIView {
             layoutMenuControls()
         }
 
+        if !helpCard.isHidden {
+            layoutHelpCard()
+        }
+
         let skipWidth: CGFloat = 120
         let skipHeight: CGFloat = 40
         skipMovieButton.frame = CGRect(x: bounds.width - skipWidth - 44,
@@ -1021,6 +1042,22 @@ final class GameControlsOverlay: UIView {
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
+
+        let helpSide = max(30, side * 0.44)
+        let helpX = min(box.maxX - helpSide - 6, bounds.width - safeAreaInsets.right - helpSide - 6)
+        helpButton.frame = CGRect(x: max(helpX, safeAreaInsets.left + 4),
+                                  y: max(box.minY + 6, safeAreaInsets.top + 4),
+                                  width: helpSide,
+                                  height: helpSide)
+    }
+
+    private func layoutHelpCard() {
+        let width = min(bounds.width - 60, 520)
+        let size = helpCard.preferredSize(maxWidth: width)
+        helpCard.frame = CGRect(x: (bounds.width - size.width) / 2,
+                                y: (bounds.height - size.height) / 2,
+                                width: size.width,
+                                height: size.height)
     }
 
     private func menuBox(for screen: ScreenMode) -> CGRect {
@@ -1129,6 +1166,14 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
+    @objc private func helpPressed() {
+        helpCard.isHidden = !helpCard.isHidden
+        if !helpCard.isHidden {
+            setNeedsLayout()
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
     /// Laying a finger on the screen is the other moment the controls are
     /// refreshed: the player is about to act, so what is on offer is looked up
     /// then, and never from a clock running inside the engine's loop.
@@ -1175,6 +1220,8 @@ final class GameControlsOverlay: UIView {
                 control.isHidden = true
             }
             lookButton.isHidden = true
+            helpButton.isHidden = true
+            helpCard.isHidden = true
             if isHidden {
                 isHidden = false
             }
@@ -1191,18 +1238,29 @@ final class GameControlsOverlay: UIView {
             setNeedsLayout()
         }
 
+        let inventory = screen == .inventory
         let itemScreen = screen.listsItems
         lookButton.isHidden = !itemScreen
+        helpButton.isHidden = !inventory
+        if !inventory {
+            helpCard.isHidden = true
+        }
 
         if screen.isMenu {
             if !ControlLayout.touchControls() {
+                helpButton.isHidden = true
+                helpCard.isHidden = true
                 isHidden = true
                 return
             }
 
-            for control in controls where control !== backButton {
-                control.isHidden = true
+            if inventory {
+                for control in controls where control !== backButton {
+                    control.isHidden = true
+                }
+                lookButton.isHidden = false
             }
+
             if isHidden {
                 isHidden = false
             }
@@ -1873,5 +1931,64 @@ final class MovieSkipButton: UIControl {
     private func trigger() {
         cancelProgress()
         onTrigger?()
+    }
+}
+
+
+final class InventoryHelpCard: UIView {
+    static let green = UIColor(red: 0.30, green: 1.0, blue: 0.40, alpha: 1)
+
+    private let label = UILabel()
+
+    var text: String {
+        get {
+            return label.text ?? ""
+        }
+        set {
+            label.text = newValue
+            setNeedsLayout()
+        }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        backgroundColor = UIColor.black.withAlphaComponent(0.88)
+        layer.cornerRadius = 14
+        layer.borderWidth = 1
+        layer.borderColor = InventoryHelpCard.green.withAlphaComponent(0.5).cgColor
+
+        label.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+        label.textColor = InventoryHelpCard.green
+        label.numberOfLines = 0
+        label.isUserInteractionEnabled = false
+        addSubview(label)
+
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        accessibilityLabel = "Inventory help"
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dismiss)))
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func preferredSize(maxWidth: CGFloat) -> CGSize {
+        let inset: CGFloat = 16
+        let textSize = label.sizeThatFits(CGSize(width: maxWidth - inset * 2,
+                                                 height: .greatestFiniteMagnitude))
+        return CGSize(width: maxWidth, height: textSize.height + inset * 2)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        let inset: CGFloat = 16
+        label.frame = bounds.insetBy(dx: inset, dy: inset)
+    }
+
+    @objc private func dismiss() {
+        isHidden = true
     }
 }
