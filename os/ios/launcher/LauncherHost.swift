@@ -609,6 +609,25 @@ enum ControlLayout {
     }
 }
 
+enum ScreenMode: Int {
+    case game = 0
+    case inventory = 1
+    case loot = 2
+    case barter = 3
+    case dialogue = 4
+    case character = 5
+    case pipboy = 6
+    case skilldex = 7
+    case automap = 8
+    case worldmap = 9
+    case options = 10
+    case saves = 11
+
+    var isMenu: Bool {
+        return self != .game
+    }
+}
+
 final class GameControlsOverlay: UIView {
     /// The overlay is a subview of the engine's own window, exactly like the
     /// original single-engine build. A separate window above SDL looks the same
@@ -678,6 +697,17 @@ final class GameControlsOverlay: UIView {
     )
     private let movieShield = UIView()
     private let skipMovieButton = MovieSkipButton()
+    private let moveButton = LabeledControlButton(
+        title: "MOVE",
+        symbol: "cursorarrow",
+        iconPointSize: 16
+    )
+    private let lookButton = LabeledControlButton(
+        title: "LOOK",
+        symbol: "eye",
+        iconPointSize: 16
+    )
+    private var currentScreen: ScreenMode = .game
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
@@ -902,6 +932,16 @@ final class GameControlsOverlay: UIView {
         movieShield.isHidden = true
         addSubview(movieShield)
 
+        moveButton.isHidden = true
+        moveButton.accessibilityLabel = "Move"
+        moveButton.addTarget(self, action: #selector(movePressed), for: .touchUpInside)
+        addSubview(moveButton)
+
+        lookButton.isHidden = true
+        lookButton.accessibilityLabel = "Look"
+        lookButton.addTarget(self, action: #selector(lookPressed), for: .touchUpInside)
+        addSubview(lookButton)
+
         skipMovieButton.isHidden = true
         skipMovieButton.onTrigger = {
             fallout_ios_back()
@@ -957,6 +997,15 @@ final class GameControlsOverlay: UIView {
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
 
         movieShield.frame = bounds
+
+        if currentScreen.isMenu {
+            let size = CGSize(width: 78, height: 46)
+            let inset: CGFloat = 28
+            let y = bounds.height - size.height - 40
+            backButton.frame = CGRect(x: inset, y: y, width: size.width, height: size.height)
+            moveButton.frame = CGRect(x: bounds.width - size.width * 2 - inset - 12, y: y, width: size.width, height: size.height)
+            lookButton.frame = CGRect(x: bounds.width - size.width - inset, y: y, width: size.width, height: size.height)
+        }
 
         let skipWidth: CGFloat = 120
         let skipHeight: CGFloat = 40
@@ -1014,6 +1063,18 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
+    @objc private func movePressed() {
+        fallout_ios_press_action(14)
+        refreshControls()
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    @objc private func lookPressed() {
+        fallout_ios_right_click()
+        refreshControls()
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
     /// Laying a finger on the screen is the other moment the controls are
     /// refreshed: the player is about to act, so what is on offer is looked up
     /// then, and never from a clock running inside the engine's loop.
@@ -1066,6 +1127,32 @@ final class GameControlsOverlay: UIView {
 
         for control in controls {
             control.isHidden = false
+        }
+
+        let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
+        if screen != currentScreen {
+            currentScreen = screen
+            setNeedsLayout()
+        }
+
+        moveButton.isHidden = !screen.isMenu
+        lookButton.isHidden = !screen.isMenu
+
+        if screen.isMenu {
+            if !ControlLayout.touchControls() {
+                isHidden = true
+                return
+            }
+
+            for control in controls where control !== backButton {
+                control.isHidden = true
+            }
+            moveButton.isHidden = false
+            lookButton.isHidden = screen != .inventory && screen != .loot && screen != .barter
+            if isHidden {
+                isHidden = false
+            }
+            return
         }
 
         // With the touch controls switched off the overlay leaves the screen

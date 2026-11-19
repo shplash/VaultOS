@@ -63,6 +63,7 @@ static bool mouse_is_hidden;
 // A right click requested by the on-screen LOOT/RMB button. It is delivered
 // as a normal press followed by a release from the input loop.
 static bool mouse_ios_right_click_pending = false;
+static bool mouse_ios_left_click_pending = false;
 
 // Trackpad-style one-finger movement multiplier set by the on-screen slider.
 static double mouse_ios_touch_sensitivity = 1.0;
@@ -408,6 +409,7 @@ void mouse_hide()
     Rect rect;
 
     mouse_ios_right_click_pending = false;
+    mouse_ios_left_click_pending = false;
 
     if (have_mouse) {
         if (!mouse_is_hidden) {
@@ -445,6 +447,13 @@ void mouse_info()
     if (pendingTapRelease != 0) {
         pendingTapRelease = 0;
         mouse_simulate_input(0, 0, 0);
+        return;
+    }
+
+    if (mouse_ios_left_click_pending) {
+        mouse_ios_left_click_pending = false;
+        mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        pendingTapRelease = MOUSE_STATE_LEFT_BUTTON_DOWN;
         return;
     }
 
@@ -873,6 +882,11 @@ double mouse_get_sensitivity()
 void mouse_ios_right_click()
 {
     mouse_ios_right_click_pending = true;
+}
+
+void mouse_ios_left_click()
+{
+    mouse_ios_left_click_pending = true;
 }
 
 void mouse_set_ios_touch_sensitivity(double value)

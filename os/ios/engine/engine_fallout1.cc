@@ -16,6 +16,7 @@
 #include "game/combat.h"
 #include "game/combat_defs.h"
 #include "game/game_vars.h"
+#include "game/gdialog.h"
 #include "game/gmouse.h"
 #include "game/gmovie.h"
 #include "game/intface.h"
@@ -244,6 +245,9 @@ void press_action(int action)
         fallout::gmouse_set_cursor(fallout::MOUSE_CURSOR_ARROW);
         fallout::gmouse_3d_set_mode(fallout::GAME_MOUSE_MODE_MOVE);
         break;
+    case 14:
+        fallout::mouse_ios_left_click();
+        break;
     default:
         break;
     }
@@ -397,11 +401,16 @@ int movie_state()
         return 0;
     }
 
-    if (movie == fallout::MOVIE_IPLOGO || movie == fallout::MOVIE_INTRO) {
-        return 1;
+    return movie == fallout::MOVIE_IPLOGO || movie == fallout::MOVIE_INTRO ? 1 : 2;
+}
+
+int screen()
+{
+    if (fallout::dialogue_scr_id >= 0) {
+        return 4;
     }
 
-    return 2;
+    return 0;
 }
 
 const FalloutEngineAPI g_api = {
@@ -424,6 +433,7 @@ const FalloutEngineAPI g_api = {
     fire_mode,
     in_game,
     movie_state,
+    screen,
 };
 
 } // namespace

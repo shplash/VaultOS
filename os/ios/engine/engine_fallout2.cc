@@ -13,6 +13,7 @@
 #include "combat.h"
 #include "engine_glue.h"
 #include "fallout_engine.h"
+#include "game.h"
 #include "game_movie.h"
 #include "game_mouse.h"
 #include "interface.h"
@@ -193,6 +194,59 @@ int movie_state()
     return 2;
 }
 
+int screen()
+{
+    const int mode = fallout::GameMode::getCurrentGameMode();
+
+    if ((mode & fallout::GameMode::kLoot) != 0) {
+        return 2;
+    }
+
+    if ((mode & fallout::GameMode::kBarter) != 0) {
+        return 3;
+    }
+
+    if ((mode & fallout::GameMode::kDialog) != 0) {
+        return 4;
+    }
+
+    if ((mode & fallout::GameMode::kInventory) != 0) {
+        return 1;
+    }
+
+    if ((mode & fallout::GameMode::kPipboy) != 0) {
+        return 6;
+    }
+
+    if ((mode & fallout::GameMode::kSkilldex) != 0) {
+        return 7;
+    }
+
+    if ((mode & fallout::GameMode::kAutomap) != 0) {
+        return 8;
+    }
+
+    if ((mode & fallout::GameMode::kWorldmap) != 0) {
+        return 9;
+    }
+
+    if ((mode & fallout::GameMode::kSaveGame) != 0
+        || (mode & fallout::GameMode::kLoadGame) != 0) {
+        return 11;
+    }
+
+    if ((mode & fallout::GameMode::kOptions) != 0
+        || (mode & fallout::GameMode::kPreferences) != 0) {
+        return 10;
+    }
+
+    if ((mode & fallout::GameMode::kHero) != 0) {
+        return 5;
+    }
+
+    return 0;
+}
+
 // In Fallout 2 reloading is one of the attack modes cycled with N. Walk to the
 // RELOAD mode and use the active item so the game applies its own AP cost,
 // animation and sound.
@@ -298,6 +352,31 @@ void press_action(int action)
         fallout::gameMouseSetCursor(fallout::MOUSE_CURSOR_ARROW);
         fallout::gameMouseSetMode(fallout::GAME_MOUSE_MODE_MOVE);
         break;
+    case 14: {
+        int x = 0;
+        int y = 0;
+        fallout::mouseGetPosition(&x, &y);
+
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = SDL_MOUSEBUTTONDOWN;
+        event.button.button = SDL_BUTTON_LEFT;
+        event.button.state = SDL_PRESSED;
+        event.button.clicks = 1;
+        event.button.x = x;
+        event.button.y = y;
+        SDL_PushEvent(&event);
+
+        SDL_zero(event);
+        event.type = SDL_MOUSEBUTTONUP;
+        event.button.button = SDL_BUTTON_LEFT;
+        event.button.state = SDL_RELEASED;
+        event.button.clicks = 1;
+        event.button.x = x;
+        event.button.y = y;
+        SDL_PushEvent(&event);
+        break;
+    }
     default:
         break;
     }
@@ -410,6 +489,7 @@ const FalloutEngineAPI g_api = {
     fire_mode,
     in_game,
     movie_state,
+    screen,
 };
 
 } // namespace

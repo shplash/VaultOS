@@ -341,6 +341,13 @@ extern "C" int fallout_ios_movie_state(void)
         : 0;
 }
 
+extern "C" int fallout_ios_screen(void)
+{
+    return g_engine != NULL && g_engine->screen != NULL
+        ? g_engine->screen()
+        : 0;
+}
+
 // Pause the game's SDL audio stream when the app leaves the foreground. SDL's
 // device is shared by music and sound effects, so this silences both without
 // closing the device or losing playback positions.
