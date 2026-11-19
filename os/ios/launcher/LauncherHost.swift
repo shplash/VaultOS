@@ -1043,7 +1043,7 @@ final class GameControlsOverlay: UIView {
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
 
-        let helpSide = max(30, side * 0.44)
+        let helpSide = max(40, side * 0.5)
         let helpY = max(box.minY + 6, safeAreaInsets.top + 4)
         let outsideX = box.maxX + 6
         let insideX = box.maxX - helpSide - 6
