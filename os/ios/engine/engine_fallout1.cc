@@ -20,6 +20,7 @@
 #include "game/gmouse.h"
 #include "game/gmovie.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/main.h"
 #include "game/mainmenu.h"
@@ -406,11 +407,11 @@ int movie_state()
 
 int screen()
 {
-    if (fallout::dialogue_scr_id >= 0) {
-        return 4;
+    if (fallout::ios_screen != fallout::IOS_SCREEN_GAME) {
+        return fallout::ios_screen;
     }
 
-    return 0;
+    return fallout::dialog_active() ? fallout::IOS_SCREEN_DIALOGUE : fallout::IOS_SCREEN_GAME;
 }
 
 const FalloutEngineAPI g_api = {

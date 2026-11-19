@@ -20,6 +20,7 @@
 #include "game/graphlib.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/map_defs.h"
 #include "game/message.h"
@@ -938,6 +939,8 @@ int load_world_map(DB_FILE* stream)
 // 0x4AA360
 int world_map(WorldMapContext ctx)
 {
+    IosScreenScope screenScope(IOS_SCREEN_WORLDMAP);
+
     const char* title;
     const char* text;
     const char* body[1];

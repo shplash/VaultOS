@@ -9,6 +9,7 @@
 #include "game/gmouse.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/map.h"
 #include "game/message.h"
 #include "game/object.h"
@@ -116,6 +117,8 @@ static int fontsave;
 // 0x499560
 int skilldex_select()
 {
+    IosScreenScope screenScope(IOS_SCREEN_SKILLDEX);
+
     if (skilldex_start() == -1) {
         debug_printf("\n ** Error loading skilldex dialog data! **\n");
         return -1;

@@ -12,6 +12,7 @@
 #include "game/gmouse.h"
 #include "game/graphlib.h"
 #include "game/gsound.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/map.h"
 #include "game/object.h"
@@ -197,6 +198,8 @@ int automap_save(DB_FILE* stream)
 // 0x41A80C
 void automap(bool isInGame, bool isUsingScanner)
 {
+    IosScreenScope screenScope(IOS_SCREEN_AUTOMAP);
+
     // 0x41A738
     static const int frmIds[AUTOMAP_FRM_COUNT] = {
         171, // automap.frm - automap window

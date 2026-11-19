@@ -21,6 +21,7 @@
 #include "game/gmovie.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/map.h"
 #include "game/object.h"
@@ -338,6 +339,8 @@ void ResetLoadSave()
 // 0x46D9C4
 int SaveGame(int mode)
 {
+    IosScreenScope screenScope(IOS_SCREEN_SAVES);
+
     MessageListItem messageListItem;
 
     ls_error_code = 0;
@@ -846,6 +849,8 @@ static int QuickSnapShot()
 // 0x46E754
 int LoadGame(int mode)
 {
+    IosScreenScope screenScope(IOS_SCREEN_SAVES);
+
     MessageListItem messageListItem;
 
     const char* body[] = {

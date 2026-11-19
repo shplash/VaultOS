@@ -15,6 +15,7 @@
 #include "game/gmouse.h"
 #include "game/graphlib.h"
 #include "game/gsound.h"
+#include "game/ios_screen.h"
 #include "game/loadsave.h"
 #include "game/message.h"
 #include "game/scripts.h"
@@ -380,6 +381,8 @@ static PreferenceDescription btndat[PREF_COUNT] = {
 // 0x481328
 int do_options()
 {
+    IosScreenScope screenScope(IOS_SCREEN_OPTIONS);
+
     if (OptnStart() == -1) {
         debug_printf("\nOPTION MENU: Error loading option dialog data!\n");
         return -1;

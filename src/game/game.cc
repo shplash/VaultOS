@@ -23,6 +23,7 @@
 #include "game/gsound.h"
 #include "game/intface.h"
 #include "game/inventry.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/loadsave.h"
 #include "game/map.h"
@@ -111,6 +112,8 @@ const char* msg_path = "game\\";
 
 // 0x504FD4
 int game_user_wants_to_quit = 0;
+
+int ios_screen = IOS_SCREEN_GAME;
 
 // misc.msg
 //

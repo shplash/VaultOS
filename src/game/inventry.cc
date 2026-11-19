@@ -20,6 +20,7 @@
 #include "game/gmouse.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/light.h"
 #include "game/map.h"
@@ -387,6 +388,8 @@ static int inventry_msg_unload()
 // 0x462480
 void handle_inventory()
 {
+    IosScreenScope screenScope(IOS_SCREEN_INVENTORY);
+
     if (isInCombat()) {
         if (combat_whose_turn() != inven_dude) {
             return;
@@ -2281,6 +2284,8 @@ void adjust_fid()
 // 0x464F00
 void use_inventory_on(Object* a1)
 {
+    IosScreenScope screenScope(IOS_SCREEN_INVENTORY);
+
     if (inven_init() == -1) {
         return;
     }
@@ -3617,6 +3622,8 @@ int loot_container(Object* a1, Object* a2)
     CacheEntry* arrowFrmHandles[INVENTORY_ARROW_FRM_COUNT];
     MessageListItem messageListItem;
 
+    IosScreenScope screenScope(IOS_SCREEN_LOOT);
+
     if (a1 != inven_dude) {
         return 0;
     }
@@ -4562,6 +4569,8 @@ static void display_table_inventories(int win, Object* a2, Object* a3, int a4)
 // 0x4684E4
 void barter_inventory(int win, Object* a2, Object* a3, Object* a4, int a5)
 {
+    IosScreenScope screenScope(IOS_SCREEN_BARTER);
+
     barter_mod = a5;
 
     if (inven_init() == -1) {

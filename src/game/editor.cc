@@ -14,6 +14,7 @@
 #include "game/graphlib.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/map.h"
 #include "game/message.h"
@@ -628,6 +629,8 @@ static unsigned char first_skill_list;
 // 0x42C40C
 int editor_design(bool isCreationMode)
 {
+    IosScreenScope screenScope(IOS_SCREEN_CHARACTER);
+
     char* messageListItemText;
     char line1[128];
     char line2[128];

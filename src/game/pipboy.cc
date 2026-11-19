@@ -16,6 +16,7 @@
 #include "game/gmovie.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/map.h"
 #include "game/object.h"
 #include "game/queue.h"
@@ -531,6 +532,8 @@ static unsigned char stat_flag;
 // 0x486A80
 int pipboy(int intent)
 {
+    IosScreenScope screenScope(IOS_SCREEN_PIPBOY);
+
     intent = StartPipboy(intent);
     if (intent == -1) {
         return -1;
