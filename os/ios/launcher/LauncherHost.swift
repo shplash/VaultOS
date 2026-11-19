@@ -697,9 +697,9 @@ final class GameControlsOverlay: UIView {
     )
     private let movieShield = UIView()
     private let skipMovieButton = MovieSkipButton()
-    private let moveButton = LabeledControlButton(
-        title: "MOVE",
-        symbol: "cursorarrow",
+    private let useButton = LabeledControlButton(
+        title: "USE",
+        symbol: "hand.tap",
         iconPointSize: 16
     )
     private let lookButton = LabeledControlButton(
@@ -932,10 +932,10 @@ final class GameControlsOverlay: UIView {
         movieShield.isHidden = true
         addSubview(movieShield)
 
-        moveButton.isHidden = true
-        moveButton.accessibilityLabel = "Move"
-        moveButton.addTarget(self, action: #selector(movePressed), for: .touchUpInside)
-        addSubview(moveButton)
+        useButton.isHidden = true
+        useButton.accessibilityLabel = "Use"
+        useButton.addTarget(self, action: #selector(usePressed), for: .touchUpInside)
+        addSubview(useButton)
 
         lookButton.isHidden = true
         lookButton.accessibilityLabel = "Look"
@@ -999,12 +999,7 @@ final class GameControlsOverlay: UIView {
         movieShield.frame = bounds
 
         if currentScreen.isMenu {
-            let size = CGSize(width: 78, height: 46)
-            let inset: CGFloat = 28
-            let y = bounds.height - size.height - 40
-            backButton.frame = CGRect(x: inset, y: y, width: size.width, height: size.height)
-            moveButton.frame = CGRect(x: bounds.width - size.width * 2 - inset - 12, y: y, width: size.width, height: size.height)
-            lookButton.frame = CGRect(x: bounds.width - size.width - inset, y: y, width: size.width, height: size.height)
+            layoutMenuControls()
         }
 
         let skipWidth: CGFloat = 120
@@ -1013,6 +1008,18 @@ final class GameControlsOverlay: UIView {
                                        y: bounds.height - skipHeight - 58,
                                        width: skipWidth,
                                        height: skipHeight)
+    }
+
+    private func layoutMenuControls() {
+        let side = max(56, min(92, bounds.height * 0.2))
+        let margin = max(60, max(safeAreaInsets.left, safeAreaInsets.right))
+        let middle = bounds.midY
+        let column = bounds.width - margin - side
+        let gap: CGFloat = 10
+
+        backButton.frame = CGRect(x: margin, y: middle - side / 2, width: side, height: side)
+        useButton.frame = CGRect(x: column, y: middle - side - gap / 2, width: side, height: side)
+        lookButton.frame = CGRect(x: column, y: middle + gap / 2, width: side, height: side)
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
@@ -1063,7 +1070,7 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
-    @objc private func movePressed() {
+    @objc private func usePressed() {
         fallout_ios_press_action(14)
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
@@ -1097,6 +1104,8 @@ final class GameControlsOverlay: UIView {
         fireModeButton.controlOpacity = value
         savesButton.controlOpacity = value
         loadButton.controlOpacity = value
+        useButton.controlOpacity = value
+        lookButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }
@@ -1119,6 +1128,8 @@ final class GameControlsOverlay: UIView {
             for control in controls {
                 control.isHidden = true
             }
+            useButton.isHidden = true
+            lookButton.isHidden = true
             if isHidden {
                 isHidden = false
             }
@@ -1135,8 +1146,9 @@ final class GameControlsOverlay: UIView {
             setNeedsLayout()
         }
 
-        moveButton.isHidden = !screen.isMenu
-        lookButton.isHidden = !screen.isMenu
+        let itemScreen = screen == .inventory || screen == .loot || screen == .barter
+        useButton.isHidden = !itemScreen
+        lookButton.isHidden = !itemScreen
 
         if screen.isMenu {
             if !ControlLayout.touchControls() {
@@ -1147,8 +1159,6 @@ final class GameControlsOverlay: UIView {
             for control in controls where control !== backButton {
                 control.isHidden = true
             }
-            moveButton.isHidden = false
-            lookButton.isHidden = screen != .inventory && screen != .loot && screen != .barter
             if isHidden {
                 isHidden = false
             }
