@@ -1064,6 +1064,8 @@ final class GameControlsOverlay: UIView {
                 return CGRect(x: 80, y: 290, width: 480, height: 180)
             case .automap:
                 return CGRect(x: 60, y: 0, width: 519, height: 480)
+            case .dialogue:
+                return CGRect(x: 127, y: 225, width: 393, height: 227)
             default:
                 return CGRect(x: 0, y: 0, width: 640, height: 480)
             }
