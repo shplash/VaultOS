@@ -247,16 +247,10 @@ void press_action(int action)
         fallout::gmouse_3d_set_mode(fallout::GAME_MOUSE_MODE_MOVE);
         break;
     case 14:
-        fallout::mouse_ios_hold(MOUSE_STATE_LEFT_BUTTON_DOWN, 1);
-        break;
-    case 15:
-        fallout::mouse_ios_hold(MOUSE_STATE_LEFT_BUTTON_DOWN, 0);
+        fallout::mouse_ios_left_click();
         break;
     case 16:
-        fallout::mouse_ios_hold(MOUSE_STATE_RIGHT_BUTTON_DOWN, 1);
-        break;
-    case 17:
-        fallout::mouse_ios_hold(MOUSE_STATE_RIGHT_BUTTON_DOWN, 0);
+        fallout::mouse_ios_right_click();
         break;
     default:
         break;

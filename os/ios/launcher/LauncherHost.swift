@@ -717,8 +717,6 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16
     )
     private var currentScreen: ScreenMode = .game
-    private var leftHeld = false
-    private var rightHeld = false
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
@@ -1138,33 +1136,15 @@ final class GameControlsOverlay: UIView {
     }
 
     @objc private func usePressed() {
-        leftHeld.toggle()
-        fallout_ios_press_action(leftHeld ? 14 : 15)
-        useButton.isLatched = leftHeld
+        fallout_ios_press_action(14)
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
     @objc private func lookPressed() {
-        rightHeld.toggle()
-        fallout_ios_press_action(rightHeld ? 16 : 17)
-        lookButton.isLatched = rightHeld
+        fallout_ios_press_action(16)
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
-    }
-
-    private func releaseHeldButtons() {
-        if leftHeld {
-            leftHeld = false
-            fallout_ios_press_action(15)
-            useButton.isLatched = false
-        }
-
-        if rightHeld {
-            rightHeld = false
-            fallout_ios_press_action(17)
-            lookButton.isLatched = false
-        }
     }
 
     /// Laying a finger on the screen is the other moment the controls are
@@ -1210,7 +1190,6 @@ final class GameControlsOverlay: UIView {
         skipMovieButton.requiresHold = movie != 1
         movieShield.isHidden = movie == 0
         if movie != 0 {
-            releaseHeldButtons()
             for control in controls {
                 control.isHidden = true
             }
@@ -1228,7 +1207,6 @@ final class GameControlsOverlay: UIView {
 
         let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
         if screen != currentScreen {
-            releaseHeldButtons()
             currentScreen = screen
             setNeedsLayout()
         }
@@ -1239,7 +1217,6 @@ final class GameControlsOverlay: UIView {
 
         if screen.isMenu {
             if !ControlLayout.touchControls() {
-                releaseHeldButtons()
                 isHidden = true
                 return
             }
@@ -1495,28 +1472,15 @@ private final class LabeledControlButton: UIControl {
         alpha = isEnabled ? baseOpacity : min(Self.disabledOpacity, baseOpacity)
     }
 
-    var isLatched: Bool = false {
-        didSet {
-            updateColours()
-        }
-    }
-
     override var isHighlighted: Bool {
         didSet {
-            updateColours()
+            let normal = accent ? ControlTheme.control : ControlTheme.control
+            backgroundColor = isHighlighted ? ControlTheme.highlight : ControlTheme.panel
+            layer.borderColor = (isHighlighted ? UIColor.white : normal)
+                .withAlphaComponent(isHighlighted ? 0.75 : 0.6).cgColor
+            tintColor = isHighlighted ? .white : normal
+            label.textColor = isHighlighted ? .white : normal
         }
-    }
-
-    private func updateColours() {
-        let normal = accent ? ControlTheme.control : ControlTheme.control
-        let lit = isHighlighted || isLatched
-        backgroundColor = isLatched
-            ? ControlTheme.control.withAlphaComponent(0.24)
-            : (isHighlighted ? ControlTheme.highlight : ControlTheme.panel)
-        layer.borderColor = (lit ? UIColor.white : normal)
-            .withAlphaComponent(lit ? 0.9 : 0.6).cgColor
-        tintColor = lit ? .white : normal
-        label.textColor = lit ? .white : normal
     }
 
     override func layoutSubviews() {

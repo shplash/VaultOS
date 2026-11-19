@@ -59,7 +59,8 @@ static int last_buttons = 0;
 // 0x6AC790
 static bool gCursorIsHidden;
 
-static int gIosHeldButtons = 0;
+static int gIosClickButtons = 0;
+static int gIosClickRelease = 0;
 
 // 0x6AC794
 static int _raw_x;
@@ -383,24 +384,16 @@ void _mouse_info()
         return;
     }
 
-    if (gIosHeldButtons != 0) {
-        static int heldX;
-        static int heldY;
+    if (gIosClickButtons != 0) {
+        gIosClickRelease = gIosClickButtons;
+        gIosClickButtons = 0;
+        _mouse_simulate_input(0, 0, gIosClickRelease);
+        return;
+    }
 
-        Gesture heldGesture;
-        if (touch_get_gesture(&heldGesture)) {
-            if (heldGesture.state == kBegan) {
-                heldX = heldGesture.x;
-                heldY = heldGesture.y;
-            }
-
-            _mouse_simulate_input(heldGesture.x - heldX, heldGesture.y - heldY, gIosHeldButtons);
-            heldX = heldGesture.x;
-            heldY = heldGesture.y;
-        } else {
-            _mouse_simulate_input(0, 0, gIosHeldButtons);
-        }
-
+    if (gIosClickRelease != 0) {
+        gIosClickRelease = 0;
+        _mouse_simulate_input(0, 0, 0);
         return;
     }
 
@@ -489,13 +482,9 @@ void _mouse_info()
     }
 }
 
-void mouseIosHold(int state, int down)
+void mouseIosClick(int state)
 {
-    if (down) {
-        gIosHeldButtons |= state;
-    } else {
-        gIosHeldButtons &= ~state;
-    }
+    gIosClickButtons |= state;
 }
 
 // 0x4CA698

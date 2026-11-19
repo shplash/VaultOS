@@ -30,7 +30,7 @@
 
 namespace fallout {
 extern int gMovieCurrent;
-void mouseIosHold(int state, int down);
+void mouseIosClick(int state);
 }
 
 namespace {
@@ -354,16 +354,10 @@ void press_action(int action)
         fallout::gameMouseSetMode(fallout::GAME_MOUSE_MODE_MOVE);
         break;
     case 14:
-        fallout::mouseIosHold(MOUSE_STATE_LEFT_BUTTON_DOWN, 1);
-        break;
-    case 15:
-        fallout::mouseIosHold(MOUSE_STATE_LEFT_BUTTON_DOWN, 0);
+        fallout::mouseIosClick(MOUSE_STATE_LEFT_BUTTON_DOWN);
         break;
     case 16:
-        fallout::mouseIosHold(MOUSE_STATE_RIGHT_BUTTON_DOWN, 1);
-        break;
-    case 17:
-        fallout::mouseIosHold(MOUSE_STATE_RIGHT_BUTTON_DOWN, 0);
+        fallout::mouseIosClick(MOUSE_STATE_RIGHT_BUTTON_DOWN);
         break;
     default:
         break;
