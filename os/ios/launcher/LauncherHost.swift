@@ -493,6 +493,12 @@ enum ControlLayout {
         return value ?? true
     }
 
+    static func autoTarget() -> Bool {
+        let value = UserDefaults.standard.object(
+            forKey: LauncherModel.optionKey("autoTarget", for: activeGame())) as? Bool
+        return value ?? false
+    }
+
     /// The first build with the reference layout used saved drag positions
     /// from the older oversized layout. This migration copies the existing
     /// single layout into the FULL profile, then starts a separate HALF
@@ -675,6 +681,7 @@ final class GameControlsOverlay: UIView {
     private var cursorModeIcon: String?
     private var cursorModeTitle: String?
     private var fireModeValue: Int32 = -2
+    private var wasInCombat = false
 
     /// Refreshes the overlay that is on screen, if there is one. The engine
     /// calls this from its own input loop, on the main thread between frames,
@@ -1027,6 +1034,12 @@ final class GameControlsOverlay: UIView {
         if isHidden == shown {
             isHidden = !shown
         }
+
+        let inCombat = fallout_ios_action_available(5) != 0
+        if inCombat && !wasInCombat && ControlLayout.autoTarget() && fallout_ios_cursor_mode() != 2 {
+            fallout_ios_right_click()
+        }
+        wasInCombat = inCombat
 
         let mode = fallout_ios_cursor_mode()
         let symbol: String

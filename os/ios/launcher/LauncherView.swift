@@ -861,6 +861,7 @@ struct LauncherView: View {
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
+                    ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
                     ("Layout", "Every control can be moved, resized, faded and coloured from Controls."),
                 ]
             case .survival:
@@ -1081,7 +1082,7 @@ struct LauncherView: View {
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
             }
-            // The three rows below the switch are greyed, not hidden, while the
+            // The rows below the switch are greyed, not hidden, while the
             // controls are off: there is nothing on the screen to edit, colour
             // or dim then.
             .disabled(!model.touchControls)
@@ -1090,6 +1091,12 @@ struct LauncherView: View {
             toggleRow("On-screen controls",
                       detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
                       isOn: $model.touchControls)
+
+            toggleRow("Auto target in combat",
+                      detail: "Switch to attack mode by itself when a fight starts.",
+                      isOn: $model.autoTarget)
+            .disabled(!model.touchControls)
+            .opacity(model.touchControls ? 1 : 0.4)
 
             row("Button colour", detail: "White, orange, green or blue") {
                 Menu {
@@ -1288,6 +1295,7 @@ struct LauncherView: View {
         model.buttonScale = 1
         model.controlsOpacity = 1
         model.touchControls = true
+        model.autoTarget = false
         model.buttonColour = ControlColour.white.rawValue
     }
 
