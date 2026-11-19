@@ -717,6 +717,8 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16
     )
     private var currentScreen: ScreenMode = .game
+    private var leftHeld = false
+    private var rightHeld = false
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
@@ -1007,7 +1009,7 @@ final class GameControlsOverlay: UIView {
 
         movieShield.frame = bounds
 
-        if currentScreen.isMenu {
+        if currentScreen.isMenu && currentScreen != .options {
             layoutMenuControls()
         }
 
@@ -1021,7 +1023,8 @@ final class GameControlsOverlay: UIView {
 
     private func layoutMenuControls() {
         let box = menuBox(for: currentScreen)
-        let side = min(max(48, box.height * 0.2), 84)
+        let surface = gameSurface()
+        let side = min(max(48, surface.height * 0.17), 84)
         let gap: CGFloat = 10
         let pair = side * 2 + gap
         let middle = min(max(box.midY, pair / 2 + safeAreaInsets.top + 4),
@@ -1054,24 +1057,20 @@ final class GameControlsOverlay: UIView {
     }
 
     private func menuDesignBox(for screen: ScreenMode) -> CGRect {
-        if game == .fallout1 {
-            switch screen {
-            case .inventory:
-                return CGRect(x: 80, y: 0, width: 499, height: 377)
-            case .loot:
-                return CGRect(x: 80, y: 0, width: 537, height: 376)
-            case .barter:
-                return CGRect(x: 80, y: 290, width: 480, height: 180)
-            case .automap:
-                return CGRect(x: 60, y: 0, width: 519, height: 480)
-            case .dialogue:
-                return CGRect(x: 127, y: 225, width: 393, height: 227)
-            default:
-                return CGRect(x: 0, y: 0, width: 640, height: 480)
-            }
+        switch screen {
+        case .inventory:
+            return CGRect(x: 80, y: 0, width: 499, height: 377)
+        case .loot:
+            return CGRect(x: 80, y: 0, width: 537, height: 376)
+        case .barter:
+            return CGRect(x: 80, y: 290, width: 480, height: 180)
+        case .automap:
+            return CGRect(x: 60, y: 0, width: 519, height: 480)
+        case .dialogue:
+            return CGRect(x: 127, y: 225, width: 393, height: 227)
+        default:
+            return CGRect(x: 0, y: 0, width: 640, height: 480)
         }
-
-        return CGRect(x: 0, y: 0, width: 640, height: 480)
     }
 
     private func gameSurface() -> CGRect {
@@ -1139,15 +1138,33 @@ final class GameControlsOverlay: UIView {
     }
 
     @objc private func usePressed() {
-        fallout_ios_press_action(14)
+        leftHeld.toggle()
+        fallout_ios_press_action(leftHeld ? 14 : 15)
+        useButton.isLatched = leftHeld
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
     @objc private func lookPressed() {
-        fallout_ios_right_click()
+        rightHeld.toggle()
+        fallout_ios_press_action(rightHeld ? 16 : 17)
+        lookButton.isLatched = rightHeld
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func releaseHeldButtons() {
+        if leftHeld {
+            leftHeld = false
+            fallout_ios_press_action(15)
+            useButton.isLatched = false
+        }
+
+        if rightHeld {
+            rightHeld = false
+            fallout_ios_press_action(17)
+            lookButton.isLatched = false
+        }
     }
 
     /// Laying a finger on the screen is the other moment the controls are
@@ -1193,6 +1210,7 @@ final class GameControlsOverlay: UIView {
         skipMovieButton.requiresHold = movie != 1
         movieShield.isHidden = movie == 0
         if movie != 0 {
+            releaseHeldButtons()
             for control in controls {
                 control.isHidden = true
             }
@@ -1210,6 +1228,7 @@ final class GameControlsOverlay: UIView {
 
         let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
         if screen != currentScreen {
+            releaseHeldButtons()
             currentScreen = screen
             setNeedsLayout()
         }
@@ -1220,6 +1239,7 @@ final class GameControlsOverlay: UIView {
 
         if screen.isMenu {
             if !ControlLayout.touchControls() {
+                releaseHeldButtons()
                 isHidden = true
                 return
             }
@@ -1475,15 +1495,28 @@ private final class LabeledControlButton: UIControl {
         alpha = isEnabled ? baseOpacity : min(Self.disabledOpacity, baseOpacity)
     }
 
+    var isLatched: Bool = false {
+        didSet {
+            updateColours()
+        }
+    }
+
     override var isHighlighted: Bool {
         didSet {
-            let normal = accent ? ControlTheme.control : ControlTheme.control
-            backgroundColor = isHighlighted ? ControlTheme.highlight : ControlTheme.panel
-            layer.borderColor = (isHighlighted ? UIColor.white : normal)
-                .withAlphaComponent(isHighlighted ? 0.75 : 0.6).cgColor
-            tintColor = isHighlighted ? .white : normal
-            label.textColor = isHighlighted ? .white : normal
+            updateColours()
         }
+    }
+
+    private func updateColours() {
+        let normal = accent ? ControlTheme.control : ControlTheme.control
+        let lit = isHighlighted || isLatched
+        backgroundColor = isLatched
+            ? ControlTheme.control.withAlphaComponent(0.24)
+            : (isHighlighted ? ControlTheme.highlight : ControlTheme.panel)
+        layer.borderColor = (lit ? UIColor.white : normal)
+            .withAlphaComponent(lit ? 0.9 : 0.6).cgColor
+        tintColor = lit ? .white : normal
+        label.textColor = lit ? .white : normal
     }
 
     override func layoutSubviews() {
