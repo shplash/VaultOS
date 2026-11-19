@@ -1079,6 +1079,8 @@ final class GameControlsOverlay: UIView {
         let inCombat = fallout_ios_action_available(5) != 0
         if inCombat && !wasInCombat && ControlLayout.autoTarget() && fallout_ios_cursor_mode() != 2 {
             fallout_ios_press_action(12)
+        } else if !inCombat && wasInCombat {
+            fallout_ios_press_action(13)
         }
         wasInCombat = inCombat
 

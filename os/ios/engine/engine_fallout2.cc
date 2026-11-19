@@ -294,6 +294,10 @@ void press_action(int action)
         fallout::gameMouseSetCursor(fallout::MOUSE_CURSOR_CROSSHAIR);
         fallout::gameMouseSetMode(fallout::GAME_MOUSE_MODE_CROSSHAIR);
         break;
+    case 13:
+        fallout::gameMouseSetCursor(fallout::MOUSE_CURSOR_ARROW);
+        fallout::gameMouseSetMode(fallout::GAME_MOUSE_MODE_MOVE);
+        break;
     default:
         break;
     }
