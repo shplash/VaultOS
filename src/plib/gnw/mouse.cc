@@ -65,6 +65,7 @@ static bool mouse_is_hidden;
 // as a normal press followed by a release from the input loop.
 static bool mouse_ios_right_click_pending = false;
 static bool mouse_ios_left_click_pending = false;
+static bool mouse_ios_drop_click_pending = false;
 
 // Trackpad-style one-finger movement multiplier set by the on-screen slider.
 static double mouse_ios_touch_sensitivity = 1.0;
@@ -411,6 +412,7 @@ void mouse_hide()
 
     mouse_ios_right_click_pending = false;
     mouse_ios_left_click_pending = false;
+    mouse_ios_drop_click_pending = false;
 
     if (have_mouse) {
         if (!mouse_is_hidden) {
@@ -423,6 +425,11 @@ void mouse_hide()
             win_refresh_all(&rect);
         }
     }
+}
+
+static bool ios_inventory_active()
+{
+    return ios_screen == IOS_SCREEN_INVENTORY;
 }
 
 // 0x4B4DD8
@@ -451,6 +458,13 @@ void mouse_info()
         return;
     }
 
+    if (mouse_ios_drop_click_pending) {
+        mouse_ios_drop_click_pending = false;
+        mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        pendingTapRelease = MOUSE_STATE_LEFT_BUTTON_DOWN;
+        return;
+    }
+
     if (mouse_ios_left_click_pending) {
         mouse_ios_left_click_pending = false;
         mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
@@ -475,10 +489,10 @@ void mouse_info()
         switch (gesture.type) {
         case kTap:
             // Trackpad behavior in the game: a tap clicks at the current
-            // cursor instead of teleporting it to the finger. A menu has no
-            // world to steer, so there a tap puts the cursor under the finger
-            // and clicks there, which is how its rows and buttons are used.
-            if (ios_menu_active()) {
+            // cursor instead of teleporting it to the finger. The inventory is
+            // an item grid rather than a world to steer, so a tap there puts
+            // the cursor under the finger and clicks it.
+            if (ios_inventory_active()) {
                 mouse_set_position(gesture.x, gesture.y);
             }
 
@@ -496,11 +510,17 @@ void mouse_info()
                 // A long press holds the button down; always release it when
                 // the finger lifts, otherwise Fallout keeps walking.
                 mouse_simulate_input(0, 0, 0);
+
+                if (gesture.type == kPan && gesture.numberOfTouches == 1 && ios_inventory_active()) {
+                    mouse_ios_drop_click_pending = true;
+                }
+
                 break;
             }
 
             if (gesture.state == kBegan) {
-                if (gesture.type == kLongPress && ios_menu_active()) {
+                if (ios_inventory_active() && gesture.numberOfTouches == 1
+                    && (gesture.type == kLongPress || gesture.type == kPan)) {
                     mouse_set_position(gesture.x, gesture.y);
                 }
 
@@ -519,7 +539,7 @@ void mouse_info()
                 }
             } else if (gesture.type == kPan) {
                 if (gesture.numberOfTouches == 1) {
-                    mouse_simulate_input(moveX, moveY, 0);
+                    mouse_simulate_input(moveX, moveY, ios_inventory_active() ? primaryButton : 0);
                 } else if (gesture.numberOfTouches == 2) {
                     gMouseWheelX = (prevx - gesture.x) / 2;
                     gMouseWheelY = (gesture.y - prevy) / 2;

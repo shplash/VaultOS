@@ -20,8 +20,6 @@ typedef enum IosScreen {
 
 extern int ios_screen;
 
-bool ios_menu_active();
-
 class IosScreenScope {
 public:
     explicit IosScreenScope(int screen)

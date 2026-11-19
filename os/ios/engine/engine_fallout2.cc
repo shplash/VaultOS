@@ -478,9 +478,9 @@ const FalloutEngineAPI g_api = {
 
 namespace fallout {
 
-bool iosMenuScreen()
+bool iosInventoryScreen()
 {
-    return screen() != 0;
+    return screen() == 1;
 }
 
 } // namespace fallout
