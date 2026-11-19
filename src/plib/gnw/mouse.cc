@@ -65,7 +65,6 @@ static bool mouse_is_hidden;
 // as a normal press followed by a release from the input loop.
 static bool mouse_ios_right_click_pending = false;
 static bool mouse_ios_left_click_pending = false;
-static bool mouse_ios_drop_click_pending = false;
 
 // Trackpad-style one-finger movement multiplier set by the on-screen slider.
 static double mouse_ios_touch_sensitivity = 1.0;
@@ -412,7 +411,6 @@ void mouse_hide()
 
     mouse_ios_right_click_pending = false;
     mouse_ios_left_click_pending = false;
-    mouse_ios_drop_click_pending = false;
 
     if (have_mouse) {
         if (!mouse_is_hidden) {
@@ -455,13 +453,6 @@ void mouse_info()
     if (pendingTapRelease != 0) {
         pendingTapRelease = 0;
         mouse_simulate_input(0, 0, 0);
-        return;
-    }
-
-    if (mouse_ios_drop_click_pending) {
-        mouse_ios_drop_click_pending = false;
-        mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
-        pendingTapRelease = MOUSE_STATE_LEFT_BUTTON_DOWN;
         return;
     }
 
@@ -510,12 +501,6 @@ void mouse_info()
                 // A long press holds the button down; always release it when
                 // the finger lifts, otherwise Fallout keeps walking.
                 mouse_simulate_input(0, 0, 0);
-
-                if (gesture.numberOfTouches == 1 && ios_inventory_active()
-                    && (gesture.type == kLongPress || gesture.type == kPan)) {
-                    mouse_ios_drop_click_pending = true;
-                }
-
                 break;
             }
 

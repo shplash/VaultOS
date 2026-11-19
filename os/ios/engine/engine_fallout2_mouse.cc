@@ -63,7 +63,6 @@ static bool gCursorIsHidden;
 
 static int gIosClickButtons = 0;
 static int gIosClickRelease = 0;
-static bool gIosDropClick = false;
 
 // 0x6AC794
 static int _raw_x;
@@ -409,13 +408,6 @@ void _mouse_info()
         return;
     }
 
-    if (gIosDropClick) {
-        gIosDropClick = false;
-        gIosClickRelease = MOUSE_STATE_LEFT_BUTTON_DOWN;
-        _mouse_simulate_input(0, 0, gIosClickRelease);
-        return;
-    }
-
     Gesture gesture;
     if (touch_get_gesture(&gesture)) {
         static int prevx;
@@ -448,7 +440,6 @@ void _mouse_info()
             if (gesture.type == kLongPress) {
                 if (gesture.state == kEnded && gesture.numberOfTouches == 1 && iosInventoryScreen()) {
                     _mouse_simulate_input(0, 0, 0);
-                    gIosDropClick = true;
                 } else if (gesture.numberOfTouches == 1) {
                     _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 } else if (gesture.numberOfTouches == 2) {
@@ -458,7 +449,6 @@ void _mouse_info()
                 if (gesture.numberOfTouches == 1) {
                     if (gesture.state == kEnded && iosInventoryScreen()) {
                         _mouse_simulate_input(0, 0, 0);
-                        gIosDropClick = true;
                     } else {
                         _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy,
                             iosInventoryScreen() ? MOUSE_STATE_LEFT_BUTTON_DOWN : 0);
