@@ -476,6 +476,15 @@ const FalloutEngineAPI g_api = {
 
 } // namespace
 
+namespace fallout {
+
+bool iosMenuScreen()
+{
+    return screen() != 0;
+}
+
+} // namespace fallout
+
 extern "C" const FalloutEngineAPI* fallout_engine_api(void)
 {
     return &g_api;

@@ -1,5 +1,6 @@
 #include "plib/gnw/mouse.h"
 
+#include "game/ios_screen.h"
 #include "plib/color/color.h"
 #include "plib/gnw/dxinput.h"
 #include "plib/gnw/gnw.h"
@@ -473,8 +474,14 @@ void mouse_info()
 
         switch (gesture.type) {
         case kTap:
-            // Trackpad behavior: a tap clicks at the current cursor, it does
-            // not teleport the cursor to the finger position.
+            // Trackpad behavior in the game: a tap clicks at the current
+            // cursor instead of teleporting it to the finger. A menu has no
+            // world to steer, so there a tap puts the cursor under the finger
+            // and clicks there, which is how its rows and buttons are used.
+            if (ios_menu_active()) {
+                mouse_set_position(gesture.x, gesture.y);
+            }
+
             if (gesture.numberOfTouches == 1) {
                 mouse_simulate_input(0, 0, primaryButton);
                 pendingTapRelease = primaryButton;
@@ -493,6 +500,10 @@ void mouse_info()
             }
 
             if (gesture.state == kBegan) {
+                if (gesture.type == kLongPress && ios_menu_active()) {
+                    mouse_set_position(gesture.x, gesture.y);
+                }
+
                 prevx = gesture.x;
                 prevy = gesture.y;
             }

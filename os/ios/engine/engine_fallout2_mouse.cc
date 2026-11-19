@@ -10,6 +10,8 @@
 
 namespace fallout {
 
+bool iosMenuScreen();
+
 static void mousePrepareDefaultCursor();
 static void _mouse_anim();
 static void _mouse_clip();
@@ -404,6 +406,12 @@ void _mouse_info()
 
         switch (gesture.type) {
         case kTap:
+            if (iosMenuScreen()) {
+                mouseHideCursor();
+                _mouse_set_position(gesture.x, gesture.y);
+                mouseShowCursor();
+            }
+
             if (gesture.numberOfTouches == 1) {
                 _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
             } else if (gesture.numberOfTouches == 2) {
@@ -413,6 +421,12 @@ void _mouse_info()
         case kLongPress:
         case kPan:
             if (gesture.state == kBegan) {
+                if (gesture.type == kLongPress && iosMenuScreen()) {
+                    mouseHideCursor();
+                    _mouse_set_position(gesture.x, gesture.y);
+                    mouseShowCursor();
+                }
+
                 prevx = gesture.x;
                 prevy = gesture.y;
             }

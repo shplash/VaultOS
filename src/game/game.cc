@@ -115,6 +115,11 @@ int game_user_wants_to_quit = 0;
 
 int ios_screen = IOS_SCREEN_GAME;
 
+bool ios_menu_active()
+{
+    return ios_screen != IOS_SCREEN_GAME || dialog_active();
+}
+
 // misc.msg
 //
 // 0x58CC10
