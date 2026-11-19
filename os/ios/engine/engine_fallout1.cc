@@ -21,11 +21,13 @@
 #include "game/item.h"
 #include "game/main.h"
 #include "game/mainmenu.h"
+#include "game/map.h"
 #include "game/object.h"
 #include "game/object_types.h"
 #include "int/movie.h"
 #include "launcher/launcher.h"
 #include "plib/gnw/debug.h"
+#include "plib/gnw/gnw.h"
 #include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/svga.h"
@@ -230,6 +232,9 @@ void press_action(int action)
         // and F7 a quick load, and neither of those shows a screen.
         ios_send_scan_code(SDL_SCANCODE_F4);
         break;
+    case 11:
+        ios_send_scan_code(SDL_SCANCODE_F5);
+        break;
     default:
         break;
     }
@@ -361,6 +366,11 @@ int in_game()
     }
 
     if (fallout::obj_dude == nullptr) {
+        return 0;
+    }
+
+    fallout::Window* window = fallout::GNW_find(fallout::display_win);
+    if (window == nullptr || (window->flags & fallout::WINDOW_HIDDEN) != 0) {
         return 0;
     }
 

@@ -17,12 +17,14 @@
 #include "interface.h"
 #include "item.h"
 #include "main.h"
+#include "map.h"
 #include "mouse.h"
 #include "movie.h"
 #include "object.h"
 #include "proto_types.h"
 #include "svga.h"
 #include "win32.h"
+#include "window_manager.h"
 
 namespace {
 
@@ -158,6 +160,11 @@ int in_game()
         return 0;
     }
 
+    fallout::Window* window = fallout::windowGetWindow(fallout::gIsoWindow);
+    if (window == nullptr || (window->flags & fallout::WINDOW_HIDDEN) != 0) {
+        return 0;
+    }
+
     return fallout::interfaceBarEnabled() ? 1 : 0;
 }
 
@@ -254,6 +261,9 @@ void press_action(int action)
         // fetched at build time and are not in this repository, so this key is
         // not verified against them here.
         send_key(SDL_SCANCODE_F4);
+        break;
+    case 11:
+        send_key(SDL_SCANCODE_F5);
         break;
     default:
         break;

@@ -250,6 +250,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     case end
     case reload
     case fireMode
+    case load
     case saves
 
     var id: String { rawValue }
@@ -270,6 +271,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .end: english = "END"
         case .reload: english = "RELOAD"
         case .fireMode: english = "MODE"
+        case .load: english = "LOAD"
         case .saves: english = "SAVES"
         }
         return L.t(english)
@@ -290,6 +292,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .end: return "xmark"
         case .reload: return "arrow.clockwise"
         case .fireMode: return "scope"
+        case .load: return "tray.and.arrow.down"
         case .saves: return "tray.full"
         }
     }
@@ -336,8 +339,10 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
                 let gap = max(3.0, side * 0.12)
                 return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
+            case .load:
+                return topLeftCenter(for: profile, in: bounds, row: 0)
             case .saves:
-                return savesCenter(for: profile, in: bounds)
+                return topLeftCenter(for: profile, in: bounds, row: 1)
             }
         case .half:
             switch self {
@@ -361,19 +366,21 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
                 let gap = max(3.0, side * 0.12)
                 return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
+            case .load:
+                return topLeftCenter(for: profile, in: bounds, row: 0)
             case .saves:
-                return savesCenter(for: profile, in: bounds)
+                return topLeftCenter(for: profile, in: bounds, row: 1)
             }
         }
     }
 
-    /// The save button, mirrored from the END column onto the top left, where it
-    /// is out of the way of the HUD and the thumb that drives the cursor. It
-    /// sits in the same place in both layouts, and each layout's switch names it
-    /// because every control has to be covered.
-    private func savesCenter(for profile: LayoutProfile, in bounds: CGSize) -> CGPoint {
+    /// The load and save buttons, mirrored from the END column onto the top left,
+    /// where they are out of the way of the HUD and the thumb that drives the
+    /// cursor. LOAD takes the top row and SAVES the row below it, and each
+    /// layout's switch names them because every control has to be covered.
+    private func topLeftCenter(for profile: LayoutProfile, in bounds: CGSize, row: CGFloat) -> CGPoint {
         let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-        return CGPoint(x: 1 - end.x, y: 0.0750)
+        return CGPoint(x: 1 - end.x, y: 0.0750 + row * 0.1250)
     }
 
     /// Base size in points before the global and per-control scale settings.
@@ -395,7 +402,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
             case .inv, .map, .cha, .pip:
                 return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
-            case .skill, .swap, .end, .fireMode, .saves:
+            case .skill, .swap, .end, .fireMode, .load, .saves:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
@@ -419,7 +426,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .pip:
                 let side = min(bounds.width * 0.0644, bounds.height * 0.143)
                 return CGSize(width: side, height: side)
-            case .skill, .swap, .end, .fireMode, .saves:
+            case .skill, .swap, .end, .fireMode, .load, .saves:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
@@ -437,7 +444,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 12
+    private static let layoutVersion = 13
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -531,12 +538,15 @@ enum ControlLayout {
         }
 
         // Version 12 moved the attack mode control out from under SWAP to the
-        // row with END, so a position saved for its old place no longer fits
-        // the square button. Its size is kept.
+        // row with END, and version 13 moved the save button down to make room
+        // for the load button above it, so a position saved for either old place
+        // no longer fits the square button. Their sizes are kept.
         for game in FalloutGame.allCases {
             for profile in [LayoutProfile.full, .half] {
                 defaults.removeObject(forKey: key(.fireMode, xSuffix, profile: profile, game: game))
                 defaults.removeObject(forKey: key(.fireMode, ySuffix, profile: profile, game: game))
+                defaults.removeObject(forKey: key(.saves, xSuffix, profile: profile, game: game))
+                defaults.removeObject(forKey: key(.saves, ySuffix, profile: profile, game: game))
             }
         }
 
@@ -653,6 +663,11 @@ final class GameControlsOverlay: UIView {
     private let savesButton = LabeledControlButton(
         title: "SAVES",
         symbol: "tray.full",
+        iconPointSize: 16
+    )
+    private let loadButton = LabeledControlButton(
+        title: "LOAD",
+        symbol: "tray.and.arrow.down",
         iconPointSize: 16
     )
     private let game = ControlLayout.activeGame()
@@ -870,6 +885,11 @@ final class GameControlsOverlay: UIView {
         savesButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(savesButton)
 
+        loadButton.tag = 11
+        loadButton.accessibilityLabel = "Load"
+        loadButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(loadButton)
+
         refreshControls()
         // No timer. The overlay used to poll the engine every half second to
         // learn what it could do (cursor mode, attack mode, reload, skip), from
@@ -916,6 +936,7 @@ final class GameControlsOverlay: UIView {
         place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, globalScale: buttonScale, profile: profile))
 
         place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
@@ -987,6 +1008,7 @@ final class GameControlsOverlay: UIView {
         reloadButton.controlOpacity = value
         fireModeButton.controlOpacity = value
         savesButton.controlOpacity = value
+        loadButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }

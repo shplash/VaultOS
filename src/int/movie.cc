@@ -210,6 +210,8 @@ static unsigned char* alphaBuf;
 
 static SDL_Surface* gMovieSdlSurface = NULL;
 
+static bool movieFitted = false;
+
 // 0x4783F0
 void movieSetPreDrawFunc(MoviePreDrawFunc* func)
 {
@@ -293,18 +295,27 @@ static void movie_MVE_ShowFrame(SDL_Surface* surface, int srcWidth, int srcHeigh
         && srcWidth > 0
         && srcHeight > 0;
 
+    movieFitted = false;
+
     if (scaleToWindow) {
+        const int margin = (movieFlags & MOVIE_EXTENDED_FLAG_0x10) != 0 ? subtitleH : 0;
+        int fitHeight = winHeight - margin;
+        if (fitHeight < 1) {
+            fitHeight = winHeight;
+        }
+
         int drawWidth = winWidth;
         int drawHeight = winWidth * srcHeight / srcWidth;
-        if (drawHeight > winHeight) {
-            drawHeight = winHeight;
-            drawWidth = winHeight * srcWidth / srcHeight;
+        if (drawHeight > fitHeight) {
+            drawHeight = fitHeight;
+            drawWidth = fitHeight * srcWidth / srcHeight;
         }
 
         destRect.x = (winWidth - drawWidth) / 2;
-        destRect.y = (winHeight - drawHeight) / 2;
+        destRect.y = (fitHeight - drawHeight) / 2;
         destRect.w = drawWidth;
         destRect.h = drawHeight;
+        movieFitted = margin > 0;
     } else if (movieScaleFlag) {
         if ((movieFlags & MOVIE_EXTENDED_FLAG_0x08) != 0) {
             destRect.y = (winHeight - destHeight) / 2;
@@ -652,6 +663,7 @@ static void cleanupMovie(int a1)
     movieScaleFlag = 0;
     movieAlphaFlag = 0;
     movieFlags = 0;
+    movieFitted = false;
     GNWWin = -1;
 }
 
@@ -850,7 +862,9 @@ static void doSubtitle()
     }
 
     int v1 = text_height();
-    int v2 = (480 - lastMovieH - lastMovieY - v1) / 2 + lastMovieH + lastMovieY;
+    int v2 = movieFitted
+        ? lastMovieH + lastMovieY
+        : (480 - lastMovieH - lastMovieY - v1) / 2 + lastMovieH + lastMovieY;
 
     if (subtitleH + v2 > windowGetYres()) {
         subtitleH = windowGetYres() - v2;
