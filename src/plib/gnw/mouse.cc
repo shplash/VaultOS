@@ -511,7 +511,8 @@ void mouse_info()
                 // the finger lifts, otherwise Fallout keeps walking.
                 mouse_simulate_input(0, 0, 0);
 
-                if (gesture.type == kPan && gesture.numberOfTouches == 1 && ios_inventory_active()) {
+                if (gesture.numberOfTouches == 1 && ios_inventory_active()
+                    && (gesture.type == kLongPress || gesture.type == kPan)) {
                     mouse_ios_drop_click_pending = true;
                 }
 

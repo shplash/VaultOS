@@ -446,7 +446,10 @@ void _mouse_info()
             }
 
             if (gesture.type == kLongPress) {
-                if (gesture.numberOfTouches == 1) {
+                if (gesture.state == kEnded && gesture.numberOfTouches == 1 && iosInventoryScreen()) {
+                    _mouse_simulate_input(0, 0, 0);
+                    gIosDropClick = true;
+                } else if (gesture.numberOfTouches == 1) {
                     _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 } else if (gesture.numberOfTouches == 2) {
                     _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_RIGHT_BUTTON_DOWN);
