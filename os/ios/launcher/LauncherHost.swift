@@ -1257,7 +1257,7 @@ final class GameControlsOverlay: UIView {
                 return
             }
 
-            if inventory {
+            if itemScreen {
                 for control in controls where control !== backButton {
                     control.isHidden = true
                 }

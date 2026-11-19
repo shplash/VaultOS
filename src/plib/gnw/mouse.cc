@@ -425,9 +425,11 @@ void mouse_hide()
     }
 }
 
-static bool ios_inventory_active()
+static bool ios_item_screen_active()
 {
-    return ios_screen == IOS_SCREEN_INVENTORY;
+    return ios_screen == IOS_SCREEN_INVENTORY
+        || ios_screen == IOS_SCREEN_LOOT
+        || ios_screen == IOS_SCREEN_BARTER;
 }
 
 // 0x4B4DD8
@@ -480,10 +482,10 @@ void mouse_info()
         switch (gesture.type) {
         case kTap:
             // Trackpad behavior in the game: a tap clicks at the current
-            // cursor instead of teleporting it to the finger. The inventory is
-            // an item grid rather than a world to steer, so a tap there puts
-            // the cursor under the finger and clicks it.
-            if (ios_inventory_active()) {
+            // cursor instead of teleporting it to the finger. The item screens
+            // are grids rather than a world to steer, so a tap there puts the
+            // cursor under the finger and clicks it.
+            if (ios_item_screen_active()) {
                 mouse_set_position(gesture.x, gesture.y);
             }
 
@@ -505,7 +507,7 @@ void mouse_info()
             }
 
             if (gesture.state == kBegan) {
-                if (ios_inventory_active() && gesture.numberOfTouches == 1
+                if (ios_item_screen_active() && gesture.numberOfTouches == 1
                     && (gesture.type == kLongPress || gesture.type == kPan)) {
                     mouse_set_position(gesture.x, gesture.y);
                 }
@@ -525,7 +527,7 @@ void mouse_info()
                 }
             } else if (gesture.type == kPan) {
                 if (gesture.numberOfTouches == 1) {
-                    mouse_simulate_input(moveX, moveY, ios_inventory_active() ? primaryButton : 0);
+                    mouse_simulate_input(moveX, moveY, ios_item_screen_active() ? primaryButton : 0);
                 } else if (gesture.numberOfTouches == 2) {
                     gMouseWheelX = (prevx - gesture.x) / 2;
                     gMouseWheelY = (gesture.y - prevy) / 2;

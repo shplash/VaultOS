@@ -10,7 +10,7 @@
 
 namespace fallout {
 
-bool iosInventoryScreen();
+bool iosItemScreen();
 
 static void mousePrepareDefaultCursor();
 static void _mouse_anim();
@@ -415,7 +415,7 @@ void _mouse_info()
 
         switch (gesture.type) {
         case kTap:
-            if (iosInventoryScreen()) {
+            if (iosItemScreen()) {
                 mouseIosMovePointer(gesture.x, gesture.y);
             }
 
@@ -428,7 +428,7 @@ void _mouse_info()
         case kLongPress:
         case kPan:
             if (gesture.state == kBegan) {
-                if (iosInventoryScreen() && gesture.numberOfTouches == 1
+                if (iosItemScreen() && gesture.numberOfTouches == 1
                     && (gesture.type == kLongPress || gesture.type == kPan)) {
                     mouseIosMovePointer(gesture.x, gesture.y);
                 }
@@ -438,7 +438,7 @@ void _mouse_info()
             }
 
             if (gesture.type == kLongPress) {
-                if (gesture.state == kEnded && gesture.numberOfTouches == 1 && iosInventoryScreen()) {
+                if (gesture.state == kEnded && gesture.numberOfTouches == 1 && iosItemScreen()) {
                     _mouse_simulate_input(0, 0, 0);
                 } else if (gesture.numberOfTouches == 1) {
                     _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_LEFT_BUTTON_DOWN);
@@ -447,11 +447,11 @@ void _mouse_info()
                 }
             } else if (gesture.type == kPan) {
                 if (gesture.numberOfTouches == 1) {
-                    if (gesture.state == kEnded && iosInventoryScreen()) {
+                    if (gesture.state == kEnded && iosItemScreen()) {
                         _mouse_simulate_input(0, 0, 0);
                     } else {
                         _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy,
-                            iosInventoryScreen() ? MOUSE_STATE_LEFT_BUTTON_DOWN : 0);
+                            iosItemScreen() ? MOUSE_STATE_LEFT_BUTTON_DOWN : 0);
                     }
                 } else if (gesture.numberOfTouches == 2) {
                     gMouseWheelX = (prevx - gesture.x) / 2;

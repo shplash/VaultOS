@@ -482,9 +482,10 @@ const FalloutEngineAPI g_api = {
 
 namespace fallout {
 
-bool iosInventoryScreen()
+bool iosItemScreen()
 {
-    return screen() == 1;
+    const int current = screen();
+    return current == 1 || current == 2 || current == 3;
 }
 
 } // namespace fallout
