@@ -1020,16 +1020,56 @@ final class GameControlsOverlay: UIView {
     }
 
     private func layoutMenuControls() {
-        let surface = gameSurface()
-        let side = max(48, min(84, surface.height * 0.17))
+        let box = menuBox(for: currentScreen)
+        let side = min(max(48, box.height * 0.2), 84)
         let gap: CGFloat = 10
-        let middle = surface.midY
-        let left = max(surface.minX + 10, safeAreaInsets.left + 4)
-        let right = min(surface.maxX - 10 - side, bounds.width - safeAreaInsets.right - 4 - side)
+        let pair = side * 2 + gap
+        let middle = min(max(box.midY, pair / 2 + safeAreaInsets.top + 4),
+                         bounds.height - pair / 2 - safeAreaInsets.bottom - 4)
+        let left = max(box.minX - gap - side, safeAreaInsets.left + 4)
+        let right = min(box.maxX + gap, bounds.width - safeAreaInsets.right - 4 - side)
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         useButton.frame = CGRect(x: right, y: middle - side - gap / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle + gap / 2, width: side, height: side)
+    }
+
+    private func menuBox(for screen: ScreenMode) -> CGRect {
+        let surface = gameSurface()
+        let defaults = UserDefaults.standard
+        let width = CGFloat(defaults.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0)
+        let height = CGFloat(defaults.object(forKey: LauncherModel.optionKey("height", for: game)) as? Int ?? 0)
+        guard width > 1, height > 1 else {
+            return surface
+        }
+
+        let design = menuDesignBox(for: screen)
+        let scale = surface.width / width
+        let originX = surface.minX + (width - 640) / 2 * scale
+        let originY = surface.minY + (height - 480) / 2 * scale
+        return CGRect(x: originX + design.minX * scale,
+                      y: originY + design.minY * scale,
+                      width: design.width * scale,
+                      height: design.height * scale)
+    }
+
+    private func menuDesignBox(for screen: ScreenMode) -> CGRect {
+        if game == .fallout1 {
+            switch screen {
+            case .inventory:
+                return CGRect(x: 80, y: 0, width: 499, height: 377)
+            case .loot:
+                return CGRect(x: 80, y: 0, width: 537, height: 376)
+            case .barter:
+                return CGRect(x: 80, y: 290, width: 480, height: 180)
+            case .automap:
+                return CGRect(x: 60, y: 0, width: 519, height: 480)
+            default:
+                return CGRect(x: 0, y: 0, width: 640, height: 480)
+            }
+        }
+
+        return CGRect(x: 0, y: 0, width: 640, height: 480)
     }
 
     private func gameSurface() -> CGRect {
