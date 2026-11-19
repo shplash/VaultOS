@@ -626,6 +626,15 @@ enum ScreenMode: Int {
     var isMenu: Bool {
         return self != .game
     }
+
+    var listsItems: Bool {
+        switch self {
+        case .inventory, .loot, .barter:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 final class GameControlsOverlay: UIView {
@@ -1011,15 +1020,32 @@ final class GameControlsOverlay: UIView {
     }
 
     private func layoutMenuControls() {
-        let side = max(56, min(92, bounds.height * 0.2))
-        let margin = max(60, max(safeAreaInsets.left, safeAreaInsets.right))
-        let middle = bounds.midY
-        let column = bounds.width - margin - side
+        let surface = gameSurface()
+        let side = max(48, min(84, surface.height * 0.17))
         let gap: CGFloat = 10
+        let middle = surface.midY
+        let left = max(surface.minX + 10, safeAreaInsets.left + 4)
+        let right = min(surface.maxX - 10 - side, bounds.width - safeAreaInsets.right - 4 - side)
 
-        backButton.frame = CGRect(x: margin, y: middle - side / 2, width: side, height: side)
-        useButton.frame = CGRect(x: column, y: middle - side - gap / 2, width: side, height: side)
-        lookButton.frame = CGRect(x: column, y: middle + gap / 2, width: side, height: side)
+        backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
+        useButton.frame = CGRect(x: right, y: middle - side - gap / 2, width: side, height: side)
+        lookButton.frame = CGRect(x: right, y: middle + gap / 2, width: side, height: side)
+    }
+
+    private func gameSurface() -> CGRect {
+        let defaults = UserDefaults.standard
+        let width = CGFloat(defaults.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0)
+        let height = CGFloat(defaults.object(forKey: LauncherModel.optionKey("height", for: game)) as? Int ?? 0)
+        guard width > 1, height > 1 else {
+            return bounds
+        }
+
+        let scale = min(bounds.width / width, bounds.height / height)
+        let shown = CGSize(width: width * scale, height: height * scale)
+        return CGRect(x: (bounds.width - shown.width) / 2,
+                      y: (bounds.height - shown.height) / 2,
+                      width: shown.width,
+                      height: shown.height)
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
@@ -1146,7 +1172,7 @@ final class GameControlsOverlay: UIView {
             setNeedsLayout()
         }
 
-        let itemScreen = screen == .inventory || screen == .loot || screen == .barter
+        let itemScreen = screen.listsItems
         useButton.isHidden = !itemScreen
         lookButton.isHidden = !itemScreen
 
