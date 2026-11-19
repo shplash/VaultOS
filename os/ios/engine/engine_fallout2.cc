@@ -30,6 +30,7 @@
 
 namespace fallout {
 extern int gMovieCurrent;
+void mouseIosHold(int state, int down);
 }
 
 namespace {
@@ -352,31 +353,18 @@ void press_action(int action)
         fallout::gameMouseSetCursor(fallout::MOUSE_CURSOR_ARROW);
         fallout::gameMouseSetMode(fallout::GAME_MOUSE_MODE_MOVE);
         break;
-    case 14: {
-        int x = 0;
-        int y = 0;
-        fallout::mouseGetPosition(&x, &y);
-
-        SDL_Event event;
-        SDL_zero(event);
-        event.type = SDL_MOUSEBUTTONDOWN;
-        event.button.button = SDL_BUTTON_LEFT;
-        event.button.state = SDL_PRESSED;
-        event.button.clicks = 1;
-        event.button.x = x;
-        event.button.y = y;
-        SDL_PushEvent(&event);
-
-        SDL_zero(event);
-        event.type = SDL_MOUSEBUTTONUP;
-        event.button.button = SDL_BUTTON_LEFT;
-        event.button.state = SDL_RELEASED;
-        event.button.clicks = 1;
-        event.button.x = x;
-        event.button.y = y;
-        SDL_PushEvent(&event);
+    case 14:
+        fallout::mouseIosHold(fallout::MOUSE_STATE_LEFT_BUTTON_DOWN, 1);
         break;
-    }
+    case 15:
+        fallout::mouseIosHold(fallout::MOUSE_STATE_LEFT_BUTTON_DOWN, 0);
+        break;
+    case 16:
+        fallout::mouseIosHold(fallout::MOUSE_STATE_RIGHT_BUTTON_DOWN, 1);
+        break;
+    case 17:
+        fallout::mouseIosHold(fallout::MOUSE_STATE_RIGHT_BUTTON_DOWN, 0);
+        break;
     default:
         break;
     }

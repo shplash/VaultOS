@@ -63,7 +63,8 @@ static bool mouse_is_hidden;
 // A right click requested by the on-screen LOOT/RMB button. It is delivered
 // as a normal press followed by a release from the input loop.
 static bool mouse_ios_right_click_pending = false;
-static bool mouse_ios_left_click_pending = false;
+
+static int mouse_ios_held_buttons = 0;
 
 // Trackpad-style one-finger movement multiplier set by the on-screen slider.
 static double mouse_ios_touch_sensitivity = 1.0;
@@ -409,7 +410,6 @@ void mouse_hide()
     Rect rect;
 
     mouse_ios_right_click_pending = false;
-    mouse_ios_left_click_pending = false;
 
     if (have_mouse) {
         if (!mouse_is_hidden) {
@@ -450,10 +450,27 @@ void mouse_info()
         return;
     }
 
-    if (mouse_ios_left_click_pending) {
-        mouse_ios_left_click_pending = false;
-        mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
-        pendingTapRelease = MOUSE_STATE_LEFT_BUTTON_DOWN;
+    if (mouse_ios_held_buttons != 0) {
+        static int heldX;
+        static int heldY;
+
+        Gesture heldGesture;
+        if (touch_get_gesture(&heldGesture)) {
+            if (heldGesture.state == kBegan) {
+                heldX = heldGesture.x;
+                heldY = heldGesture.y;
+            }
+
+            const int heldMoveX = static_cast<int>((heldGesture.x - heldX) * mouse_ios_touch_sensitivity);
+            const int heldMoveY = static_cast<int>((heldGesture.y - heldY) * mouse_ios_touch_sensitivity);
+            heldX = heldGesture.x;
+            heldY = heldGesture.y;
+
+            mouse_simulate_input(heldMoveX, heldMoveY, mouse_ios_held_buttons);
+        } else {
+            mouse_simulate_input(0, 0, mouse_ios_held_buttons);
+        }
+
         return;
     }
 
@@ -884,9 +901,13 @@ void mouse_ios_right_click()
     mouse_ios_right_click_pending = true;
 }
 
-void mouse_ios_left_click()
+void mouse_ios_hold(int state, int down)
 {
-    mouse_ios_left_click_pending = true;
+    if (down) {
+        mouse_ios_held_buttons |= state;
+    } else {
+        mouse_ios_held_buttons &= ~state;
+    }
 }
 
 void mouse_set_ios_touch_sensitivity(double value)

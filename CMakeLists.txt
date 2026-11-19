@@ -456,6 +456,7 @@ if(IOS)
         "${fallout2_ce_SOURCE_DIR}/src/game_movie.cc"
         "${fallout2_ce_SOURCE_DIR}/src/combat.cc"
         "${fallout2_ce_SOURCE_DIR}/src/input.cc"
+        "${fallout2_ce_SOURCE_DIR}/src/mouse.cc"
     )
 
     if(NOT FALLOUT2_CE_SOURCES)
@@ -468,6 +469,7 @@ if(IOS)
         "os/ios/engine/engine_fallout2_movie.cc"
         "os/ios/engine/engine_fallout2_combat.cc"
         "os/ios/engine/engine_fallout2_input.cc"
+        "os/ios/engine/engine_fallout2_mouse.cc"
         "os/ios/engine/engine_glue.cc"
         "os/ios/engine/engine_paths.cc"
         "os/ios/engine/engine_fallout2.cc"
