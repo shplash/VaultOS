@@ -236,6 +236,10 @@ void press_action(int action)
     case 11:
         ios_send_scan_code(SDL_SCANCODE_F5);
         break;
+    case 12:
+        fallout::gmouse_set_cursor(fallout::MOUSE_CURSOR_CROSSHAIR);
+        fallout::gmouse_3d_set_mode(fallout::GAME_MOUSE_MODE_CROSSHAIR);
+        break;
     default:
         break;
     }
@@ -368,6 +372,10 @@ int in_game()
 
     if (fallout::obj_dude == nullptr) {
         return 0;
+    }
+
+    if (fallout::isInCombat()) {
+        return 1;
     }
 
     fallout::Window* window = fallout::GNW_find(fallout::display_win);

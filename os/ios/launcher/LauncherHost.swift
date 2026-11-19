@@ -958,10 +958,10 @@ final class GameControlsOverlay: UIView {
 
         movieShield.frame = bounds
 
-        let skipWidth: CGFloat = 86
-        let skipHeight: CGFloat = 34
-        skipMovieButton.frame = CGRect(x: bounds.width - skipWidth - 28,
-                                       y: bounds.height - skipHeight - 32,
+        let skipWidth: CGFloat = 120
+        let skipHeight: CGFloat = 40
+        skipMovieButton.frame = CGRect(x: bounds.width - skipWidth - 44,
+                                       y: bounds.height - skipHeight - 58,
                                        width: skipWidth,
                                        height: skipHeight)
     }
@@ -1078,7 +1078,7 @@ final class GameControlsOverlay: UIView {
 
         let inCombat = fallout_ios_action_available(5) != 0
         if inCombat && !wasInCombat && ControlLayout.autoTarget() && fallout_ios_cursor_mode() != 2 {
-            fallout_ios_right_click()
+            fallout_ios_press_action(12)
         }
         wasInCombat = inCombat
 
@@ -1630,7 +1630,11 @@ public func fallout_ios_refresh_game_controls() {
 
 final class MovieSkipButton: UIControl {
     var onTrigger: (() -> Void)?
-    var requiresHold = false
+    var requiresHold = false {
+        didSet {
+            caption.text = L.t(requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP")
+        }
+    }
 
     private let fill = UIView()
     private let caption = UILabel()
@@ -1652,10 +1656,13 @@ final class MovieSkipButton: UIControl {
         fill.isUserInteractionEnabled = false
         addSubview(fill)
 
-        caption.text = L.t("SKIP VIDEO")
-        caption.font = .monospacedSystemFont(ofSize: 10, weight: .bold)
+        caption.text = L.t("TAP TO SKIP")
+        caption.font = .monospacedSystemFont(ofSize: 9, weight: .bold)
         caption.textColor = UIColor.white.withAlphaComponent(0.80)
         caption.textAlignment = .center
+        caption.numberOfLines = 2
+        caption.adjustsFontSizeToFitWidth = true
+        caption.minimumScaleFactor = 0.6
         caption.isUserInteractionEnabled = false
         addSubview(caption)
     }

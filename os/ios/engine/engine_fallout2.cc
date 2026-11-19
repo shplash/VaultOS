@@ -165,6 +165,10 @@ int in_game()
         return 0;
     }
 
+    if (fallout::isInCombat()) {
+        return 1;
+    }
+
     fallout::Window* window = fallout::windowGetWindow(fallout::gIsoWindow);
     if (window == nullptr || (window->flags & fallout::WINDOW_HIDDEN) != 0) {
         return 0;
@@ -285,6 +289,10 @@ void press_action(int action)
         break;
     case 11:
         send_key(SDL_SCANCODE_F5);
+        break;
+    case 12:
+        fallout::gameMouseSetCursor(fallout::MOUSE_CURSOR_CROSSHAIR);
+        fallout::gameMouseSetMode(fallout::GAME_MOUSE_MODE_CROSSHAIR);
         break;
     default:
         break;
