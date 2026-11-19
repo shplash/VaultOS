@@ -354,16 +354,16 @@ void press_action(int action)
         fallout::gameMouseSetMode(fallout::GAME_MOUSE_MODE_MOVE);
         break;
     case 14:
-        fallout::mouseIosHold(fallout::MOUSE_STATE_LEFT_BUTTON_DOWN, 1);
+        fallout::mouseIosHold(MOUSE_STATE_LEFT_BUTTON_DOWN, 1);
         break;
     case 15:
-        fallout::mouseIosHold(fallout::MOUSE_STATE_LEFT_BUTTON_DOWN, 0);
+        fallout::mouseIosHold(MOUSE_STATE_LEFT_BUTTON_DOWN, 0);
         break;
     case 16:
-        fallout::mouseIosHold(fallout::MOUSE_STATE_RIGHT_BUTTON_DOWN, 1);
+        fallout::mouseIosHold(MOUSE_STATE_RIGHT_BUTTON_DOWN, 1);
         break;
     case 17:
-        fallout::mouseIosHold(fallout::MOUSE_STATE_RIGHT_BUTTON_DOWN, 0);
+        fallout::mouseIosHold(MOUSE_STATE_RIGHT_BUTTON_DOWN, 0);
         break;
     default:
         break;
