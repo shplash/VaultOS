@@ -371,6 +371,15 @@ void mouseHideCursor()
     }
 }
 
+static void mouseIosMovePointer(int x, int y)
+{
+    Rect previousRect;
+    mouseGetRect(&previousRect);
+    _mouse_set_position(x, y);
+    windowRefreshAll(&previousRect);
+    mouseShowCursor();
+}
+
 // 0x4CA59C
 void _mouse_info()
 {
@@ -407,9 +416,7 @@ void _mouse_info()
         switch (gesture.type) {
         case kTap:
             if (iosMenuScreen()) {
-                mouseHideCursor();
-                _mouse_set_position(gesture.x, gesture.y);
-                mouseShowCursor();
+                mouseIosMovePointer(gesture.x, gesture.y);
             }
 
             if (gesture.numberOfTouches == 1) {
@@ -422,9 +429,7 @@ void _mouse_info()
         case kPan:
             if (gesture.state == kBegan) {
                 if (gesture.type == kLongPress && iosMenuScreen()) {
-                    mouseHideCursor();
-                    _mouse_set_position(gesture.x, gesture.y);
-                    mouseShowCursor();
+                    mouseIosMovePointer(gesture.x, gesture.y);
                 }
 
                 prevx = gesture.x;
