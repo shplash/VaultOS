@@ -391,7 +391,7 @@ int obj_examine_func(Object* critter, Object* target, void (*fn)(char* string))
                     exit(1);
                 }
 
-                debug_printf(hpMessageListItem.text);
+                debug_printf("%s", hpMessageListItem.text);
                 return 0;
             }
 
@@ -406,13 +406,6 @@ int obj_examine_func(Object* critter, Object* target, void (*fn)(char* string))
 
                 snprintf(formattedText, sizeof(formattedText), v66.text, hpMessageListItem.text);
             } else {
-                // %s %s
-                v66.num = 521 + v12;
-                if (!message_search(&proto_main_msg_file, &v66)) {
-                    debug_printf("\nError: Can't find msg num!");
-                    exit(1);
-                }
-
                 MessageListItem v63;
                 v63.num = 522 + stat_level(target, STAT_GENDER);
                 if (!message_search(&proto_main_msg_file, &v63)) {
@@ -420,7 +413,7 @@ int obj_examine_func(Object* critter, Object* target, void (*fn)(char* string))
                     exit(1);
                 }
 
-                snprintf(formattedText, sizeof(formattedText), v66.text, v63.text, hpMessageListItem.text);
+                snprintf(formattedText, sizeof(formattedText), v63.text, hpMessageListItem.text);
             }
         }
 
@@ -965,7 +958,7 @@ static int protinst_default_use_item(Object* a1, Object* a2, Object* item)
 
     messageListItem.num = 582;
     if (message_search(&proto_main_msg_file, &messageListItem)) {
-        snprintf(formattedText, sizeof(formattedText), messageListItem.text);
+        snprintf(formattedText, sizeof(formattedText), "%s", messageListItem.text);
         display_print(formattedText);
     }
     return -1;

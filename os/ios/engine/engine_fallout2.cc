@@ -13,6 +13,7 @@
 #include "combat.h"
 #include "engine_glue.h"
 #include "fallout_engine.h"
+#include "game_movie.h"
 #include "game_mouse.h"
 #include "interface.h"
 #include "item.h"
@@ -25,6 +26,10 @@
 #include "svga.h"
 #include "win32.h"
 #include "window_manager.h"
+
+namespace fallout {
+extern int gMovieCurrent;
+}
 
 namespace {
 
@@ -166,6 +171,22 @@ int in_game()
     }
 
     return fallout::interfaceBarEnabled() ? 1 : 0;
+}
+
+int movie_state()
+{
+    const int movie = fallout::gMovieCurrent;
+    if (movie < 0) {
+        return 0;
+    }
+
+    if (movie == fallout::MOVIE_IPLOGO
+        || movie == fallout::MOVIE_INTRO
+        || movie == fallout::MOVIE_CREDITS) {
+        return 1;
+    }
+
+    return 2;
 }
 
 // In Fallout 2 reloading is one of the attack modes cycled with N. Walk to the
@@ -376,6 +397,7 @@ const FalloutEngineAPI g_api = {
     resume_audio,
     fire_mode,
     in_game,
+    movie_state,
 };
 
 } // namespace

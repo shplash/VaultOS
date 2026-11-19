@@ -17,6 +17,7 @@
 #include "game/combat_defs.h"
 #include "game/game_vars.h"
 #include "game/gmouse.h"
+#include "game/gmovie.h"
 #include "game/intface.h"
 #include "game/item.h"
 #include "game/main.h"
@@ -377,6 +378,20 @@ int in_game()
     return fallout::main_menu_is_shown() ? 0 : 1;
 }
 
+int movie_state()
+{
+    const int movie = fallout::gmovie_current;
+    if (movie < 0) {
+        return 0;
+    }
+
+    if (movie == fallout::MOVIE_IPLOGO || movie == fallout::MOVIE_INTRO) {
+        return 1;
+    }
+
+    return 2;
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout1",
@@ -396,6 +411,7 @@ const FalloutEngineAPI g_api = {
     resume_audio,
     fire_mode,
     in_game,
+    movie_state,
 };
 
 } // namespace

@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 3
+#define FALLOUT_ENGINE_ABI_VERSION 4
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -87,6 +87,11 @@ typedef struct FalloutEngineAPI {
     int (*fire_mode)(void);
 
     int (*in_game)(void);
+
+    // 0 when no movie is playing, 1 for a startup movie that a tap may skip,
+    // and 2 for any other movie, which the overlay lets the player skip only by
+    // holding the button.
+    int (*movie_state)(void);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

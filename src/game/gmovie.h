@@ -38,6 +38,8 @@ int gmovie_save(DB_FILE* stream);
 int gmovie_play(int game_movie, int game_movie_flags);
 bool gmovie_has_been_played(int game_movie);
 
+extern int gmovie_current;
+
 } // namespace fallout
 
 #endif /* FALLOUT_GAME_GMOVIE_H_ */

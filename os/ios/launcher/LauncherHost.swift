@@ -676,6 +676,8 @@ final class GameControlsOverlay: UIView {
         symbol: "tray.and.arrow.down",
         iconPointSize: 16
     )
+    private let movieShield = UIView()
+    private let skipMovieButton = MovieSkipButton()
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
     private var cursorModeIcon: String?
@@ -897,6 +899,15 @@ final class GameControlsOverlay: UIView {
         loadButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(loadButton)
 
+        movieShield.isHidden = true
+        addSubview(movieShield)
+
+        skipMovieButton.isHidden = true
+        skipMovieButton.onTrigger = {
+            fallout_ios_back()
+        }
+        addSubview(skipMovieButton)
+
         refreshControls()
         // No timer. The overlay used to poll the engine every half second to
         // learn what it could do (cursor mode, attack mode, reload, skip), from
@@ -944,6 +955,15 @@ final class GameControlsOverlay: UIView {
 
         place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
+
+        movieShield.frame = bounds
+
+        let skipWidth: CGFloat = 86
+        let skipHeight: CGFloat = 34
+        skipMovieButton.frame = CGRect(x: bounds.width - skipWidth - 28,
+                                       y: bounds.height - skipHeight - 32,
+                                       width: skipWidth,
+                                       height: skipHeight)
     }
 
     private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
@@ -1026,6 +1046,27 @@ final class GameControlsOverlay: UIView {
         // own loop; attaching, resizing or reordering views there is what used
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
+
+        var controls: [UIView] = [joystick, actionButton, backButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton]
+        controls.append(contentsOf: sideButtons as [UIView])
+
+        let movie = fallout_ios_movie_state()
+        skipMovieButton.isHidden = movie == 0
+        skipMovieButton.requiresHold = movie != 1
+        movieShield.isHidden = movie == 0
+        if movie != 0 {
+            for control in controls {
+                control.isHidden = true
+            }
+            if isHidden {
+                isHidden = false
+            }
+            return
+        }
+
+        for control in controls {
+            control.isHidden = false
+        }
 
         // With the touch controls switched off the overlay leaves the screen
         // entirely, so the game gets every touch, not only the ones that miss a
@@ -1585,4 +1626,102 @@ public func fallout_ios_menu_music_stop() {
 @_cdecl("fallout_ios_refresh_game_controls")
 public func fallout_ios_refresh_game_controls() {
     GameControlsOverlay.refreshInstalled()
+}
+
+final class MovieSkipButton: UIControl {
+    var onTrigger: (() -> Void)?
+    var requiresHold = false
+
+    private let fill = UIView()
+    private let caption = UILabel()
+    private var progressTimer: Timer?
+    private var startedAt: Date?
+
+    private static let holdSeconds: TimeInterval = 2.5
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        layer.cornerRadius = 9
+        layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+
+        fill.backgroundColor = UIColor.white.withAlphaComponent(0.30)
+        fill.isUserInteractionEnabled = false
+        addSubview(fill)
+
+        caption.text = L.t("SKIP VIDEO")
+        caption.font = .monospacedSystemFont(ofSize: 10, weight: .bold)
+        caption.textColor = UIColor.white.withAlphaComponent(0.80)
+        caption.textAlignment = .center
+        caption.isUserInteractionEnabled = false
+        addSubview(caption)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        caption.frame = bounds
+        fill.frame = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
+    }
+
+    override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        if requiresHold {
+            startedAt = Date()
+            startProgress()
+        } else {
+            trigger()
+        }
+        return true
+    }
+
+    override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
+        cancelProgress()
+    }
+
+    override func cancelTracking(with event: UIEvent?) {
+        cancelProgress()
+    }
+
+    private var fraction: CGFloat {
+        guard let startedAt = startedAt else {
+            return 0
+        }
+        let elapsed = Date().timeIntervalSince(startedAt)
+        return min(1, max(0, CGFloat(elapsed / MovieSkipButton.holdSeconds)))
+    }
+
+    private func startProgress() {
+        progressTimer?.invalidate()
+
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let self = self else {
+                return
+            }
+
+            self.fill.frame = CGRect(x: 0, y: 0, width: self.bounds.width * self.fraction, height: self.bounds.height)
+            if self.fraction >= 1 {
+                self.trigger()
+            }
+        }
+        progressTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func cancelProgress() {
+        progressTimer?.invalidate()
+        progressTimer = nil
+        startedAt = nil
+        fill.frame = .zero
+    }
+
+    private func trigger() {
+        cancelProgress()
+        onTrigger?()
+    }
 }

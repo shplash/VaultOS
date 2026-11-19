@@ -23,6 +23,8 @@
 
 namespace fallout {
 
+int gMovieCurrent = -1;
+
 static char* gameMovieBuildSubtitlesFilePath(char* movieFilePath);
 
 // 0x50352A
@@ -178,6 +180,8 @@ int gameMoviePlay(int movie, int flags)
         return -1;
     }
 
+    gMovieCurrent = movie;
+
     if ((flags & GAME_MOVIE_STOP_MUSIC) != 0) {
         backgroundSoundDelete();
     } else if ((flags & GAME_MOVIE_PAUSE_MUSIC) != 0) {
@@ -303,6 +307,7 @@ int gameMoviePlay(int movie, int flags)
     }
 
     gGameMovieIsPlaying = false;
+    gMovieCurrent = -1;
     return 0;
 }
 

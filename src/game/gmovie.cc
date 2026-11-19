@@ -46,6 +46,8 @@ static const char* movie_list[MOVIE_COUNT] = {
 // 0x596C78
 static unsigned char gmovie_played_list[MOVIE_COUNT];
 
+int gmovie_current = -1;
+
 // gmovie_init
 // 0x44E5C0
 int gmovie_init()
@@ -125,6 +127,8 @@ int gmovie_play(int game_movie, int game_movie_flags)
     if (win == -1) {
         return -1;
     }
+
+    gmovie_current = game_movie;
 
     if ((game_movie_flags & GAME_MOVIE_STOP_MUSIC) != 0) {
         gsound_background_stop();
@@ -283,6 +287,8 @@ int gmovie_play(int game_movie, int game_movie_flags)
 
         palette_fade_to(cmap);
     }
+
+    gmovie_current = -1;
 
     return 0;
 }
