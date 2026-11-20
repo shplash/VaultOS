@@ -180,6 +180,10 @@ int action_available(int action)
             return 0;
         }
         return has_item_in_hand();
+    case 20:
+        return 0;
+    case 21:
+        return 1;
     default:
         return 1;
     }

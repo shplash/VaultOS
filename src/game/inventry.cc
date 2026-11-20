@@ -5116,6 +5116,8 @@ void draw_amount(int value, int inventoryWindowType)
 // 0x469458
 static int do_move_timer(int inventoryWindowType, Object* item, int max)
 {
+    IosScreenScope screenScope(IOS_SCREEN_PICK_AMOUNT);
+
     setup_move_timer_win(inventoryWindowType, item);
 
     int value;

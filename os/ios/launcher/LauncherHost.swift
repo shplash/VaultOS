@@ -631,6 +631,8 @@ enum ScreenMode: Int {
     /// inventory, but the touch layer keeps the trackpad there.
     case useOn = 12
 
+    case pickAmount = 13
+
     var isMenu: Bool {
         return self != .game
     }
@@ -715,7 +717,7 @@ final class GameControlsOverlay: UIView {
     )
     private let quickSaveButton = LabeledControlButton(
         title: "QUICK\nSAVE",
-        symbol: "square.and.arrow.down",
+        symbol: "bolt.fill",
         iconPointSize: 16,
         labelLines: 2
     )
@@ -727,6 +729,11 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16
     )
     private let helpButton = UIButton(type: .system)
+    private let barterButton = LabeledControlButton(
+        title: "BARTER",
+        symbol: "dollarsign.circle",
+        iconPointSize: 16
+    )
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let helpCard = InventoryHelpCard()
     private var currentScreen: ScreenMode = .game
@@ -868,10 +875,6 @@ final class GameControlsOverlay: UIView {
 
         let timer = Timer(timeInterval: 0.5, repeats: true) { _ in
             ensureFrontmost()
-
-            if ControlLayout.activeGame() == .fallout2 {
-                installedOverlay?.refreshControls()
-            }
         }
         overlayClock = timer
         RunLoop.main.add(timer, forMode: .common)
@@ -967,6 +970,12 @@ final class GameControlsOverlay: UIView {
         lookButton.accessibilityLabel = "Inspect"
         lookButton.addTarget(self, action: #selector(lookPressed), for: .touchUpInside)
         addSubview(lookButton)
+
+        barterButton.isHidden = true
+        barterButton.tag = 20
+        barterButton.accessibilityLabel = "Barter"
+        barterButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(barterButton)
 
         // The help button is the same square as INSPECT, in the same panel, so
         // the two read as one column against the menu's edge.
@@ -1104,7 +1113,7 @@ final class GameControlsOverlay: UIView {
             // twice.
             let width = min(152, panel.width - 30)
             backButton.solidBackground = true
-            backButton.frame = gameRect(CGRect(x: panel.midX - width / 2 + 6, y: panel.minY + 332,
+            backButton.frame = gameRect(CGRect(x: panel.midX - width / 2 + 4, y: panel.minY + 332,
                                                width: max(96, width), height: 34))
             return
         }
@@ -1120,6 +1129,7 @@ final class GameControlsOverlay: UIView {
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
+        barterButton.frame = lookButton.frame
 
         // A third of a control, tucked into the menu's top right corner.
         let helpSide = max(22, side / 3)
@@ -1308,7 +1318,7 @@ final class GameControlsOverlay: UIView {
                             accessibilityLabel: saved ? "Saved" : "Save failed")
         UINotificationFeedbackGenerator().notificationOccurred(saved ? .success : .error)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
-            self?.quickSaveButton.set(symbol: "square.and.arrow.down", title: "QUICK\nSAVE",
+            self?.quickSaveButton.set(symbol: "bolt.fill", title: "QUICK\nSAVE",
                                       accessibilityLabel: "Quick save")
         }
     }
@@ -1366,6 +1376,7 @@ final class GameControlsOverlay: UIView {
         loadButton.controlOpacity = value
         quickSaveButton.controlOpacity = value
         lookButton.controlOpacity = value
+        barterButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }
@@ -1391,6 +1402,7 @@ final class GameControlsOverlay: UIView {
             }
             lookButton.isHidden = true
             helpButton.isHidden = true
+            barterButton.isHidden = true
             helpCard.isHidden = true
             helpBackdrop.isHidden = true
             if isHidden {
@@ -1435,6 +1447,9 @@ final class GameControlsOverlay: UIView {
             helpBackdrop.isHidden = true
         }
 
+        let dialogueBarter = screen == .dialogue && fallout_ios_action_available(20) != 0
+        barterButton.isHidden = !dialogueBarter
+
         if screen.isMenu {
             if !ControlLayout.touchControls() {
                 helpButton.isHidden = true
@@ -1452,6 +1467,11 @@ final class GameControlsOverlay: UIView {
             }
             lookButton.isHidden = !itemScreen
             helpButton.isHidden = !itemScreen
+            barterButton.isHidden = !dialogueBarter
+
+            if fallout_ios_action_available(21) == 0 {
+                backButton.isHidden = true
+            }
 
             if isHidden {
                 isHidden = false

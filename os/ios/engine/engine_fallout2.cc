@@ -206,6 +206,10 @@ int screen()
 {
     const int mode = fallout::GameMode::getCurrentGameMode();
 
+    if ((mode & fallout::GameMode::kCounter) != 0) {
+        return 13;
+    }
+
     if ((mode & fallout::GameMode::kLoot) != 0) {
         return 2;
     }
@@ -317,6 +321,10 @@ int action_available(int action)
     case 9:
         // Fire mode: any weapon has attack modes to cycle.
         return has_weapon_in_hand();
+    case 20:
+        return screen() == 4 ? 1 : 0;
+    case 21:
+        return screen() == 4 ? 0 : 1;
     default:
         return 1;
     }
@@ -390,6 +398,9 @@ void press_action(int action)
     case 19:
         // QUICK SAVE: the engine's own quick save into its own quick slot.
         send_key(SDL_SCANCODE_F6);
+        break;
+    case 20:
+        send_key(SDL_SCANCODE_B);
         break;
     default:
         break;

@@ -875,7 +875,7 @@ struct LauncherView: View {
         var title: String {
             switch self {
             case .touch: return "TOUCH"
-            case .survival: return "SURVIVAL"
+            case .survival: return "VATS & SKILLS"
             case .launcher: return "LAUNCHER"
             }
         }
@@ -894,7 +894,8 @@ struct LauncherView: View {
                 return [
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
-                    ("Inventory", "Hold and drag an item to move or equip it. INSPECT switches the inventory between moving items and opening an item's menu."),
+                    ("Inventory", L.t("Tap an item to inspect its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
+                    ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to. A conversation ends with one of its replies, not with BACK."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
                     ("Auto target", "On by default. The game switches to attack mode as a fight starts, so the first tap is an attack."),
                 ]
@@ -985,10 +986,18 @@ struct LauncherView: View {
         } label: {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(L.t(preset.id.uppercased()))
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .kerning(1.6)
-                        .foregroundColor(selected ? accent : Theme.faint)
+                    HStack(spacing: 6) {
+                        Text(L.t(preset.id.uppercased()))
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .kerning(1.6)
+                            .foregroundColor(selected ? accent : Theme.faint)
+
+                        if preset.id == "half" {
+                            Text(L.t("DEFAULT"))
+                                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                                .foregroundColor(Theme.faint)
+                        }
+                    }
 
                     Text(verbatim: "\(preset.width) × \(preset.height)")
                         .font(.system(size: 17, weight: .semibold))
