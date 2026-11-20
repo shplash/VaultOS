@@ -107,7 +107,7 @@ static int intface_destroy_end_turn_button();
 static int intface_create_end_combat_button();
 static int intface_destroy_end_combat_button();
 static void intface_draw_ammo_lights(int x, int ratio);
-static int intface_item_reload();
+
 static void intface_rotate_numbers(int x, int y, int previousValue, int value, int offset, int delay);
 static int intface_fatal_error(int rc);
 static int construct_box_bar_win();
