@@ -1390,11 +1390,11 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
-    @objc private func keyboardWillShow() {
+    @objc private func keyboardWillShow(_ notification: Notification) {
         keyboardCatcher.isHidden = false
     }
 
-    @objc private func keyboardWillHide() {
+    @objc private func keyboardWillHide(_ notification: Notification) {
         keyboardCatcher.isHidden = true
     }
 
