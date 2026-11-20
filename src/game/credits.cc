@@ -6,6 +6,7 @@
 #include "game/cycle.h"
 #include "game/gconfig.h"
 #include "game/gmouse.h"
+#include "game/ios_screen.h"
 #include "game/message.h"
 #include "game/palette.h"
 #include "int/sound.h"
@@ -44,6 +45,8 @@ static int title_color;
 // 0x426FE0
 void credits(const char* filePath, int backgroundFid, bool useReversedStyle)
 {
+    IosScreenScope screenScope(IOS_SCREEN_OPTIONS);
+
     int oldFont = text_curr();
 
     loadColorTable("color.pal");

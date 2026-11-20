@@ -1107,6 +1107,8 @@ static void game_unload_info()
 // 0x43D130
 static void game_help()
 {
+    IosScreenScope screenScope(IOS_SCREEN_OPTIONS);
+
     bool isoWasEnabled = map_disable_bk_processes();
     gmouse_3d_off();
 

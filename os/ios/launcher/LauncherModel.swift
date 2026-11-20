@@ -806,6 +806,21 @@ final class LauncherModel: ObservableObject {
         errorMessage = nil
     }
 
+    func resetEverything() {
+        for game in FalloutGame.allCases {
+            for name in LauncherModel.optionNames {
+                defaults.removeObject(forKey: LauncherModel.optionKey(name, for: game))
+            }
+
+            for profile in [LayoutProfile.full, .half] {
+                ControlLayout.reset(profile: profile, game: game)
+            }
+        }
+
+        loadSettings(for: selectedGame)
+        saveSettings(for: selectedGame)
+    }
+
     /// Writes the launcher's own settings without touching the game's config,
     /// so a change survives quitting the app without pressing Play.
     func saveSettingsNow() {

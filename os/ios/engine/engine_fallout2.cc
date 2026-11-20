@@ -359,10 +359,8 @@ void press_action(int action)
         send_key(SDL_SCANCODE_N);
         break;
     case 10:
-        // SAVES: F4 is the save screen, the same key Fallout 1 uses. Both
-        // engines share this keyboard handling, but Fallout 2's sources are
-        // fetched at build time and are not in this repository, so this key is
-        // not verified against them here.
+        // SAVES: F4 is the save screen, the key the game's own key handler
+        // binds to lsgSaveGame(1).
         send_key(SDL_SCANCODE_F4);
         break;
     case 11:
@@ -500,8 +498,9 @@ int quick_save()
 // The window of the menu the player is looking at, in game pixels. Fallout 2
 // will not hand out its window list, so ask its manager which window is under a
 // few points inside the game view and take the first that is not the game view
-// itself. Panels that sit to one side, like the skill panel, are caught by the
-// outer probes.
+// itself. The points start in the middle and cover the lower half, the upper
+// half and both sides, so a panel that sits off centre - the barter table and
+// the dialogue reply are both in the bottom half - is found as well.
 int menu_rect(int* x, int* y, int* width, int* height)
 {
     if (screen() == 0) {
@@ -514,13 +513,17 @@ int menu_rect(int* x, int* y, int* width, int* height)
         return 0;
     }
 
-    const int probes[3][2] = {
+    const int probes[7][2] = {
         { screenWidth / 2, screenHeight / 2 },
+        { screenWidth / 2, (screenHeight * 3) / 4 },
+        { screenWidth / 2, screenHeight / 4 },
+        { screenWidth / 4, (screenHeight * 3) / 4 },
+        { (screenWidth * 3) / 4, (screenHeight * 3) / 4 },
         { screenWidth / 4, screenHeight / 2 },
         { (screenWidth * 3) / 4, screenHeight / 2 },
     };
 
-    for (int index = 0; index < 3; index++) {
+    for (int index = 0; index < 7; index++) {
         const int id = fallout::windowGetAtPoint(probes[index][0], probes[index][1]);
         if (id < 0 || id == fallout::gIsoWindow) {
             continue;

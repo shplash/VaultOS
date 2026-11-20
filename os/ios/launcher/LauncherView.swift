@@ -20,6 +20,7 @@ struct LauncherView: View {
     @State private var pendingImport: LauncherImport = .game
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
+    @State private var showResetAllWarning = false
     /// The update check runs only while the player waits for it, and its answer
     /// is shown once in a note over the About page.
     @State private var isCheckingForUpdates = false
@@ -74,6 +75,9 @@ struct LauncherView: View {
             Group {
                 if showSaveImportWarning {
                     saveImportWarning
+                }
+                if showResetAllWarning {
+                    resetAllWarning
                 }
             }
         )
@@ -641,6 +645,7 @@ struct LauncherView: View {
 
                 Spacer(minLength: 0)
 
+                resetAllButton
                 checkForUpdatesButton
             }
             .padding(.horizontal, 22)
@@ -728,6 +733,35 @@ struct LauncherView: View {
         .buttonStyle(.plain)
         .disabled(isCheckingForUpdates)
         .accessibilityLabel(L.t("Check for updates"))
+    }
+
+    private var resetAllButton: some View {
+        Button {
+            showResetAllWarning = true
+        } label: {
+            HStack(spacing: 4) {
+                Text(L.t("RESET ALL"))
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .kerning(0.6)
+
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundColor(Theme.dim)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Theme.hairline, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L.t("Reset all settings"))
     }
 
     /// The check's answer, shown as a small popup over the launcher rather than a
@@ -862,7 +896,7 @@ struct LauncherView: View {
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
                     ("Inventory", "Hold and drag an item to move or equip it. INSPECT switches the inventory between moving items and opening an item's menu."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
-                    ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
+                    ("Auto target", "On by default. The game switches to attack mode as a fight starts, so the first tap is an attack."),
                 ]
             case .survival:
                 return [
@@ -1227,6 +1261,64 @@ struct LauncherView: View {
                             .fill(accent.opacity(saveImportCountdown > 0 ? 0.4 : 1))
                     )
                     .disabled(saveImportCountdown > 0)
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 440)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Theme.sheet)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Theme.line, lineWidth: 1)
+            )
+            .padding(24)
+        }
+    }
+
+    private var resetAllWarning: some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(L.t("Reset every setting?"))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(Theme.text)
+
+                Text(L.t("Every setting in the launcher goes back to its default - resolution, audio, language, subtitles and the touch controls - for both games. Your game files and your saved games are kept."))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+
+                    Button(L.t("CANCEL")) {
+                        showResetAllWarning = false
+                    }
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Theme.dim)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                    )
+
+                    Button(L.t("RESET ALL")) {
+                        showResetAllWarning = false
+                        model.resetEverything()
+                    }
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color.black.opacity(0.85))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 11)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(accent)
+                    )
                 }
             }
             .padding(22)
