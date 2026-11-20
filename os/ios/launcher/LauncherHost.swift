@@ -752,9 +752,13 @@ final class GameControlsOverlay: UIView {
         symbol: "bubble.right",
         iconPointSize: 16
     )
-    private let keyboardCatcher = UIControl()
     private var menuRectCache: CGRect?
     private var menuRectScreen: ScreenMode = .game
+    private var keyboardIsUp = false
+    private var pushedUp: CGFloat = 0
+    private weak var pushedGameView: UIView?
+    private var keyboardTap: UITapGestureRecognizer?
+    private var keyboardSwipe: UISwipeGestureRecognizer?
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let helpCard = InventoryHelpCard()
     private var currentScreen: ScreenMode = .game
@@ -1018,13 +1022,7 @@ final class GameControlsOverlay: UIView {
         talkButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(talkButton)
 
-        keyboardCatcher.isHidden = true
-        keyboardCatcher.backgroundColor = .clear
-        keyboardCatcher.addTarget(self, action: #selector(keyboardDismissRequested), for: .touchUpInside)
-        let keyboardSwipe = UISwipeGestureRecognizer(target: self, action: #selector(keyboardDismissRequested))
-        keyboardSwipe.direction = .down
-        keyboardCatcher.addGestureRecognizer(keyboardSwipe)
-        insertSubview(keyboardCatcher, at: 0)
+        keyboardIsUp = false
 
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(keyboardWillShow),
@@ -1138,7 +1136,6 @@ final class GameControlsOverlay: UIView {
                                        height: loadButton.frame.height)
 
         movieShield.frame = bounds
-        keyboardCatcher.frame = bounds
         helpBackdrop.frame = bounds
 
         if currentScreen.isMenu && currentScreen != .options {
@@ -1412,15 +1409,70 @@ final class GameControlsOverlay: UIView {
     }
 
     @objc private func keyboardWillShow(_ notification: Notification) {
-        keyboardCatcher.isHidden = false
+        keyboardIsUp = true
+
+        let frame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+        let height = frame?.height ?? 0
+
+        if keyboardTap == nil, let window = self.window ?? GameControlsOverlay.sdlWindow() {
+            let tap = UITapGestureRecognizer(target: self, action: #selector(keyboardDismissRequested))
+            tap.cancelsTouchesInView = false
+            window.addGestureRecognizer(tap)
+            keyboardTap = tap
+
+            let swipe = UISwipeGestureRecognizer(target: self, action: #selector(keyboardDismissRequested))
+            swipe.direction = .down
+            swipe.cancelsTouchesInView = false
+            window.addGestureRecognizer(swipe)
+            keyboardSwipe = swipe
+        }
+
+        pushGameUp(by: height)
     }
 
     @objc private func keyboardWillHide(_ notification: Notification) {
-        keyboardCatcher.isHidden = true
+        keyboardIsUp = false
+
+        if let tap = keyboardTap {
+            tap.view?.removeGestureRecognizer(tap)
+            keyboardTap = nil
+        }
+        if let swipe = keyboardSwipe {
+            swipe.view?.removeGestureRecognizer(swipe)
+            keyboardSwipe = nil
+        }
+
+        pushGameUp(by: 0)
     }
 
     @objc private func keyboardDismissRequested() {
         fallout_ios_hide_keyboard()
+    }
+
+    private func pushGameUp(by keyboardHeight: CGFloat) {
+        guard let window = self.window ?? GameControlsOverlay.sdlWindow() else {
+            return
+        }
+
+        let surface = gameSurface()
+        let keyboardTop = bounds.height - keyboardHeight
+        let needed = keyboardHeight > 0 ? max(0, surface.maxY - keyboardTop + 12) : 0
+        let shift = min(needed, bounds.height * 0.55)
+        guard abs(shift - pushedUp) > 0.5 else {
+            return
+        }
+
+        if pushedGameView == nil {
+            pushedGameView = window.subviews
+                .filter { $0 !== self }
+                .max { $0.bounds.width * $0.bounds.height < $1.bounds.width * $1.bounds.height }
+        }
+
+        pushedUp = shift
+        let transform = shift > 0 ? CGAffineTransform(translationX: 0, y: -shift) : .identity
+        pushedGameView?.transform = transform
+        self.transform = transform
+        setNeedsLayout()
     }
 
     @objc private func offerHeld(_ recognizer: UILongPressGestureRecognizer) {
@@ -1583,7 +1635,7 @@ final class GameControlsOverlay: UIView {
             lookButton.isHidden = !itemScreen
             helpButton.isHidden = !itemScreen
 
-            if fallout_ios_action_available(21) == 0 {
+            if fallout_ios_action_available(21) == 0 && !keyboardIsUp {
                 backButton.isHidden = true
             }
 
