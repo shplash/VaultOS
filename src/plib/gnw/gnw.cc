@@ -1180,6 +1180,27 @@ int win_get_rect(int win, Rect* rect)
     return 0;
 }
 
+int win_top_menu_rect(int ignoreWin, Rect* rect)
+{
+    if (!GNW_win_init_flag || rect == NULL) {
+        return 0;
+    }
+
+    for (int index = num_windows - 1; index >= 1; index--) {
+        Window* w = window[index];
+        if (w == NULL || w->id == ignoreWin) {
+            continue;
+        }
+        if ((w->flags & WINDOW_HIDDEN) != 0) {
+            continue;
+        }
+        rectCopy(rect, &(w->rect));
+        return 1;
+    }
+
+    return 0;
+}
+
 // 0x4C3A34
 int win_check_all_buttons()
 {

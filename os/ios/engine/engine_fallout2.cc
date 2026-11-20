@@ -493,6 +493,8 @@ const FalloutEngineAPI g_api = {
     in_game,
     movie_state,
     screen,
+    NULL,
+    NULL,
 };
 
 } // namespace

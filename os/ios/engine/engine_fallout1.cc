@@ -22,6 +22,7 @@
 #include "game/intface.h"
 #include "game/ios_screen.h"
 #include "game/item.h"
+#include "game/loadsave.h"
 #include "game/main.h"
 #include "game/mainmenu.h"
 #include "game/map.h"
@@ -433,6 +434,34 @@ int screen()
     return fallout::dialog_active() ? fallout::IOS_SCREEN_DIALOGUE : fallout::IOS_SCREEN_GAME;
 }
 
+// The engine's own quick save, into its own quick slot. The return value is the
+// game's: 1 saved, 0 nothing to save, -1 failed.
+int quick_save()
+{
+    return fallout::SaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+}
+
+// The window of the menu the player is looking at, in game pixels. Every menu
+// opens its own window, so the topmost one other than the game's display window
+// is the panel the overlay should hang its buttons on.
+int menu_rect(int* x, int* y, int* width, int* height)
+{
+    if (fallout::ios_screen == fallout::IOS_SCREEN_GAME) {
+        return 0;
+    }
+
+    fallout::Rect rect;
+    if (!fallout::win_top_menu_rect(fallout::display_win, &rect)) {
+        return 0;
+    }
+
+    if (x != NULL) *x = rect.ulx;
+    if (y != NULL) *y = rect.uly;
+    if (width != NULL) *width = rect.lrx - rect.ulx + 1;
+    if (height != NULL) *height = rect.lry - rect.uly + 1;
+    return 1;
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout1",
@@ -454,6 +483,8 @@ const FalloutEngineAPI g_api = {
     in_game,
     movie_state,
     screen,
+    quick_save,
+    menu_rect,
 };
 
 } // namespace

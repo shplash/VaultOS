@@ -1083,11 +1083,23 @@ final class GameControlsOverlay: UIView {
     }
 
     private func layoutMenuControls() {
-        let box = menuBox(for: currentScreen)
+        let panel = engineMenuRect()
+        let box = panel.map(gameRect) ?? menuBox(for: currentScreen)
 
         let surface = gameSurface()
         let side = min(max(48, surface.height * 0.17), 84)
         let gap: CGFloat = 6
+
+        if currentScreen == .skilldex, let panel = panel {
+            // The skill panel's own CANCEL button sits at 48,338 in the panel's
+            // own pixels. BACK covers that strip, dark enough to hide it, so the
+            // panel does not offer the same way out twice.
+            backButton.solidBackground = true
+            backButton.frame = gameRect(CGRect(x: panel.minX + 40, y: panel.minY + 330,
+                                               width: 132, height: 46))
+            return
+        }
+        backButton.solidBackground = false
         let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
                          bounds.height - side / 2 - safeAreaInsets.bottom - 4)
 
@@ -1116,6 +1128,38 @@ final class GameControlsOverlay: UIView {
                                 y: (bounds.height - size.height) / 2,
                                 width: size.width,
                                 height: size.height)
+    }
+
+    /// The panel the engine says is on screen, in game pixels.
+    private func engineMenuRect() -> CGRect? {
+        var x: Int32 = 0
+        var y: Int32 = 0
+        var width: Int32 = 0
+        var height: Int32 = 0
+
+        guard fallout_ios_menu_rect(&x, &y, &width, &height) != 0, width > 1, height > 1 else {
+            return nil
+        }
+
+        return CGRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
+    }
+
+    /// A rectangle in game pixels, drawn where the engine draws its screen on
+    /// this display.
+    private func gameRect(_ rect: CGRect) -> CGRect {
+        let surface = gameSurface()
+        let defaults = UserDefaults.standard
+        let width = CGFloat(defaults.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 640)
+        let height = CGFloat(defaults.object(forKey: LauncherModel.optionKey("height", for: game)) as? Int ?? 480)
+        guard width > 1, height > 1 else {
+            return surface
+        }
+
+        let scale = surface.width / width
+        return CGRect(x: surface.minX + rect.minX * scale,
+                      y: surface.minY + rect.minY * scale,
+                      width: rect.width * scale,
+                      height: rect.height * scale)
     }
 
     private func menuBox(for screen: ScreenMode) -> CGRect {
@@ -1237,14 +1281,24 @@ final class GameControlsOverlay: UIView {
     }
 
     @objc private func quickSavePressed() {
-        fallout_ios_press_action(19)
-        // The engine prints its own "quick save game successfully saved" line
-        // into the game's message window; the tick is the button saying the
-        // save was asked for.
-        quickSaveButton.set(symbol: "checkmark", title: "QUICK\nSAVE",
-                            accessibilityLabel: "Quick save")
-        UISelectionFeedbackGenerator().selectionChanged()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+        let result = fallout_ios_quick_save()
+
+        if result == -2 {
+            // The engine cannot report a result: ask it the old way and claim
+            // nothing.
+            fallout_ios_press_action(19)
+            UISelectionFeedbackGenerator().selectionChanged()
+            return
+        }
+
+        // The tick means the game was really written, the cross means it was
+        // not. Nothing in between.
+        let saved = result == 1
+        quickSaveButton.set(symbol: saved ? "checkmark" : "xmark",
+                            title: "QUICK\nSAVE",
+                            accessibilityLabel: saved ? "Saved" : "Save failed")
+        UINotificationFeedbackGenerator().notificationOccurred(saved ? .success : .error)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
             self?.quickSaveButton.set(symbol: "square.and.arrow.down", title: "QUICK\nSAVE",
                                       accessibilityLabel: "Quick save")
         }

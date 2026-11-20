@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 5
+#define FALLOUT_ENGINE_ABI_VERSION 6
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -97,6 +97,16 @@ typedef struct FalloutEngineAPI {
     // loot, 3 barter, 4 dialogue, 5 character, 6 pip-boy, 7 skilldex, 8 automap,
     // 9 world map, 10 options, 11 save or load.
     int (*screen)(void);
+
+    // The engine's own quick save, writing to its own quick slot: 1 when the
+    // game was saved, 0 when there was nothing to save, -1 on failure. The
+    // overlay only shows its tick on 1. NULL where the engine cannot report it.
+    int (*quick_save)(void);
+
+    // The rectangle, in game screen pixels, of the panel the player is looking
+    // at, so the overlay can hang its buttons on the real window instead of a
+    // table of guesses. Returns 0 on the game view or when it cannot say.
+    int (*menu_rect)(int* x, int* y, int* width, int* height);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

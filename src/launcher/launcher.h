@@ -139,6 +139,14 @@ int fallout_ios_fire_mode(void);
 int fallout_ios_in_game(void);
 int fallout_ios_movie_state(void);
 int fallout_ios_screen(void);
+
+// The engine's own quick save: 1 saved, 0 nothing to save, -1 failed, and -2
+// when the running engine cannot report it.
+int fallout_ios_quick_save(void);
+
+// The rectangle, in game screen pixels, of the menu panel on screen. Returns 0
+// when the game view is up, or when the engine cannot say.
+int fallout_ios_menu_rect(int* x, int* y, int* width, int* height);
 void fallout_ios_menu_music_start(void);
 void fallout_ios_menu_music_stop(void);
 // Called from the engine's input loop, through the host callbacks, to refresh
