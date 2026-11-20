@@ -259,6 +259,10 @@ void press_action(int action)
     case 18:
         fallout::ios_inspect = false;
         break;
+    case 19:
+        // QUICK SAVE: the engine's own quick save into its own quick slot.
+        ios_send_scan_code(SDL_SCANCODE_F6);
+        break;
     default:
         break;
     }

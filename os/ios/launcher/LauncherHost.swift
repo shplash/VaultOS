@@ -708,6 +708,12 @@ final class GameControlsOverlay: UIView {
         symbol: "tray.and.arrow.down",
         iconPointSize: 16
     )
+    private let quickSaveButton = LabeledControlButton(
+        title: "QUICK\nSAVE",
+        symbol: "square.and.arrow.down",
+        iconPointSize: 16,
+        labelLines: 2
+    )
     private let movieShield = UIView()
     private let skipMovieButton = MovieSkipButton()
     private let lookButton = LabeledControlButton(
@@ -942,6 +948,13 @@ final class GameControlsOverlay: UIView {
         loadButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(loadButton)
 
+        // The engine's own quick save, with a tick for confirmation when it has
+        // been asked for.
+        quickSaveButton.tag = 19
+        quickSaveButton.accessibilityLabel = "Quick save"
+        quickSaveButton.addTarget(self, action: #selector(quickSavePressed), for: .touchUpInside)
+        addSubview(quickSaveButton)
+
         movieShield.isHidden = true
         addSubview(movieShield)
 
@@ -1038,6 +1051,17 @@ final class GameControlsOverlay: UIView {
 
         place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
+
+        // SAVES moves up and to the right of LOAD, and QUICK SAVE sits directly
+        // below it, so the three save controls read as one cluster.
+        savesButton.frame = savesButton.frame.offsetBy(
+            dx: loadButton.frame.width * 0.5 + 6,
+            dy: -loadButton.frame.height * 0.7
+        )
+        quickSaveButton.frame = CGRect(x: loadButton.frame.minX,
+                                       y: loadButton.frame.maxY + 6,
+                                       width: loadButton.frame.width,
+                                       height: loadButton.frame.height)
 
         movieShield.frame = bounds
         helpBackdrop.frame = bounds
@@ -1212,6 +1236,20 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
+    @objc private func quickSavePressed() {
+        fallout_ios_press_action(19)
+        // The engine prints its own "quick save game successfully saved" line
+        // into the game's message window; the tick is the button saying the
+        // save was asked for.
+        quickSaveButton.set(symbol: "checkmark", title: "QUICK\nSAVE",
+                            accessibilityLabel: "Quick save")
+        UISelectionFeedbackGenerator().selectionChanged()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.quickSaveButton.set(symbol: "square.and.arrow.down", title: "QUICK\nSAVE",
+                                      accessibilityLabel: "Quick save")
+        }
+    }
+
     @objc private func lookPressed() {
         fallout_ios_press_action(16)
         // The game keeps this mode to itself, so the button carries it, and a
@@ -1263,6 +1301,7 @@ final class GameControlsOverlay: UIView {
         fireModeButton.controlOpacity = value
         savesButton.controlOpacity = value
         loadButton.controlOpacity = value
+        quickSaveButton.controlOpacity = value
         lookButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
@@ -1275,7 +1314,7 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton]
+        var controls: [UIView] = [joystick, actionButton, backButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton]
         controls.append(contentsOf: sideButtons as [UIView])
 
         let movie = fallout_ios_movie_state()
