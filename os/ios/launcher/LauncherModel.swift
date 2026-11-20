@@ -359,9 +359,11 @@ final class LauncherModel: ObservableObject {
     }
 
     /// Subtitles ship on. Builds before this stored them off, so they are
-    /// switched on once here for both games.
+    /// switched on once here for both games; the version is raised when an
+    /// earlier build left the switch off, which puts an existing install back
+    /// on subtitles as well.
     private static let subtitlesVersionKey = "launcher.subtitlesVersion"
-    private static let subtitlesVersion = 1
+    private static let subtitlesVersion = 2
 
     private static func applyDefaultSubtitles() {
         let defaults = UserDefaults.standard

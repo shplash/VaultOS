@@ -862,6 +862,7 @@ struct LauncherView: View {
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
                     ("Inventory", "Hold and drag an item to move or equip it. INSPECT switches the inventory between moving items and opening an item's menu."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
+                    ("VATS", "The attack mode's aimed steps are the game's VATS: they show the chance to hit and cost one more action point. While a skill is armed the mode button reads USE SKILL, and pressing it goes back to move or target."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
                     ("Layout", "Every control can be moved, resized, faded and coloured from Controls."),
                 ]
@@ -1287,7 +1288,7 @@ struct LauncherView: View {
 
     private func resetGame() {
         model.language = 0
-        model.subtitles = false
+        model.subtitles = true
         model.alwaysRun = true
     }
 

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import QuartzCore
 import SwiftUI
 import UIKit
 
@@ -109,12 +110,12 @@ final class LauncherHost {
     }
 
     /// A window owned by the app's scene when it has one, so UIKit keeps it the
-    /// size of the space the app was given; a screen-sized window otherwise.
+    /// size of the space the app was given; a landscape window otherwise.
     private func launcherWindow() -> UIWindow {
         if let windowScene = scene() {
             return UIWindow(windowScene: windowScene)
         }
-        return UIWindow(frame: UIScreen.main.bounds)
+        return UIWindow(frame: availableBounds())
     }
 
     /// The scene the launcher belongs to, preferring the one in front.
@@ -124,15 +125,25 @@ final class LauncherHost {
     }
 
     /// The space the launcher may use: its own scene when UIKit gave it one,
-    /// the screen otherwise.
+    /// the screen otherwise, always in the shape the app is shown in. During
+    /// launch the scene still reports the portrait metrics until the interface
+    /// rotation to landscape lands, and a launcher laid out for those only puts
+    /// itself right once the device is turned.
     private func availableBounds() -> CGRect {
+        let bounds: CGRect
         if let windowScene = window?.windowScene {
-            return windowScene.coordinateSpace.bounds
+            bounds = windowScene.coordinateSpace.bounds
+        } else if let windowScene = scene() {
+            bounds = windowScene.coordinateSpace.bounds
+        } else {
+            bounds = UIScreen.main.bounds
         }
-        if let windowScene = scene() {
-            return windowScene.coordinateSpace.bounds
+
+        guard bounds.height > bounds.width else {
+            return bounds
         }
-        return UIScreen.main.bounds
+
+        return CGRect(x: bounds.minX, y: bounds.minY, width: bounds.height, height: bounds.width)
     }
 
     private func fitToAvailableSpace() {
@@ -165,13 +176,6 @@ final class LauncherHost {
             self?.fitToAvailableSpace()
         })
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-
-        DispatchQueue.main.async { [weak self] in
-            self?.fitToAvailableSpace()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            self?.fitToAvailableSpace()
-        }
     }
 
     private func finish(launchGame: Bool) {
@@ -712,6 +716,7 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16
     )
     private let helpButton = UIButton(type: .system)
+    private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let helpCard = InventoryHelpCard()
     private var currentScreen: ScreenMode = .game
     private let game = ControlLayout.activeGame()
@@ -720,6 +725,7 @@ final class GameControlsOverlay: UIView {
     private var cursorModeTitle: String?
     private var fireModeValue: Int32 = -2
     private var wasInCombat = false
+    private var inspectOn = false
 
     /// Refreshes the overlay that is on screen, if there is one. The engine
     /// calls this from its own input loop, on the main thread between frames,
@@ -943,24 +949,42 @@ final class GameControlsOverlay: UIView {
         lookButton.addTarget(self, action: #selector(lookPressed), for: .touchUpInside)
         addSubview(lookButton)
 
+        // The help button is the same square as INSPECT, in the same panel, so
+        // the two read as one column against the menu's edge.
         helpButton.isHidden = true
-        helpButton.setImage(UIImage(systemName: "info.circle",
-                                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)),
+        helpButton.backgroundColor = ControlTheme.panel
+        helpButton.layer.cornerRadius = 10
+        helpButton.layer.borderWidth = 1.5
+        helpButton.layer.borderColor = ControlTheme.control.withAlphaComponent(0.6).cgColor
+        helpButton.setImage(UIImage(systemName: "info",
+                                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)),
                             for: .normal)
-        helpButton.tintColor = InventoryHelpCard.green
+        helpButton.tintColor = ControlTheme.control
         helpButton.accessibilityLabel = "Inventory help"
         helpButton.addTarget(self, action: #selector(helpPressed), for: .touchUpInside)
         addSubview(helpButton)
 
+        helpBackdrop.isHidden = true
+        helpBackdrop.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dismissHelp)))
+        addSubview(helpBackdrop)
+
         helpCard.isHidden = true
         helpCard.text = L.t("Hold and drag an item to equip or move it.")
-            + "\n\n"
-            + L.t("Toggle INSPECT to examine an item's characteristics. Hold an item while INSPECT is on to open its menu.")
+        helpCard.onClose = { [weak self] in
+            self?.setHelp(visible: false)
+        }
         addSubview(helpCard)
 
         skipMovieButton.isHidden = true
-        skipMovieButton.onTrigger = {
-            fallout_ios_back()
+        skipMovieButton.onTrigger = { [weak self] in
+            // Asked again here and not trusted: the overlay is not refreshed
+            // while the engine is busy, so this button can still be on screen
+            // after the movie ended - and ESC in the main menu is the key that
+            // closes the game.
+            if fallout_ios_movie_state() != 0 {
+                fallout_ios_back()
+            }
+            self?.hideMovieControls()
         }
         addSubview(skipMovieButton)
 
@@ -1013,6 +1037,7 @@ final class GameControlsOverlay: UIView {
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
 
         movieShield.frame = bounds
+        helpBackdrop.frame = bounds
 
         if currentScreen.isMenu && currentScreen != .options {
             layoutMenuControls()
@@ -1034,24 +1059,21 @@ final class GameControlsOverlay: UIView {
         let box = menuBox(for: currentScreen)
         let surface = gameSurface()
         let side = min(max(48, surface.height * 0.17), 84)
-        let gap: CGFloat = 10
         let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
                          bounds.height - side / 2 - safeAreaInsets.bottom - 4)
-        let left = max(box.minX - gap - side, safeAreaInsets.left + 4)
-        let right = min(box.maxX + gap, bounds.width - safeAreaInsets.right - 4 - side)
+
+        // Both columns hug the edge of the screen rather than the menu's art,
+        // so the pair reads as one control strip on either side of it.
+        let left = safeAreaInsets.left + 8
+        let right = max(left, bounds.width - safeAreaInsets.right - 8 - side)
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
 
-        let helpSide = max(40, side * 0.5)
-        let helpY = max(box.minY + 6, safeAreaInsets.top + 4)
-        let outsideX = box.maxX + 6
-        let insideX = box.maxX - helpSide - 6
-        let helpX = outsideX + helpSide <= bounds.width - safeAreaInsets.right - 4 ? outsideX : insideX
-        helpButton.frame = CGRect(x: max(helpX, safeAreaInsets.left + 4),
-                                  y: helpY,
-                                  width: helpSide,
-                                  height: helpSide)
+        // The help button is the same square, stacked above INSPECT.
+        let helpTop = max(safeAreaInsets.top + 4, middle - side / 2 - side - 8)
+        helpButton.frame = CGRect(x: right, y: helpTop, width: side, height: side)
+        helpButton.layer.cornerRadius = max(8, side / 5)
     }
 
     private func layoutHelpCard() {
@@ -1146,7 +1168,14 @@ final class GameControlsOverlay: UIView {
     }
 
     @objc private func primaryAction() {
-        fallout_ios_right_click()
+        // USE SKILL is a mode of its own that the game's own cycle does not
+        // leave, so the button puts the game back into movement, or into combat
+        // targeting while a fight is on.
+        if currentScreen == .game && fallout_ios_cursor_mode() == 3 {
+            fallout_ios_press_action(fallout_ios_action_available(5) != 0 ? 12 : 13)
+        } else {
+            fallout_ios_right_click()
+        }
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
     }
@@ -1165,16 +1194,28 @@ final class GameControlsOverlay: UIView {
 
     @objc private func lookPressed() {
         fallout_ios_press_action(16)
-        refreshControls()
+        // The game keeps this mode to itself, so the button carries it, and a
+        // wash of white shows when the inventory is in look mode.
+        inspectOn.toggle()
+        lookButton.showsSelection = inspectOn
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
     @objc private func helpPressed() {
-        helpCard.isHidden = !helpCard.isHidden
-        if !helpCard.isHidden {
+        setHelp(visible: helpCard.isHidden)
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    @objc private func dismissHelp() {
+        setHelp(visible: false)
+    }
+
+    private func setHelp(visible: Bool) {
+        helpCard.isHidden = !visible
+        helpBackdrop.isHidden = !visible
+        if visible {
             setNeedsLayout()
         }
-        UISelectionFeedbackGenerator().selectionChanged()
     }
 
     /// Laying a finger on the screen is the other moment the controls are
@@ -1225,9 +1266,15 @@ final class GameControlsOverlay: UIView {
             lookButton.isHidden = true
             helpButton.isHidden = true
             helpCard.isHidden = true
+            helpBackdrop.isHidden = true
             if isHidden {
                 isHidden = false
             }
+            // The engine usually blocks on the loading screen that follows a
+            // movie, and UIKit would only commit these hides once it gets the
+            // run loop back - long after that screen is drawn. Flushing sends
+            // them to the screen now.
+            CATransaction.flush()
             return
         }
 
@@ -1238,6 +1285,8 @@ final class GameControlsOverlay: UIView {
         let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
         if screen != currentScreen {
             currentScreen = screen
+            inspectOn = false
+            lookButton.showsSelection = false
             setNeedsLayout()
         }
 
@@ -1246,22 +1295,26 @@ final class GameControlsOverlay: UIView {
         helpButton.isHidden = !itemScreen
         if !itemScreen {
             helpCard.isHidden = true
+            helpBackdrop.isHidden = true
         }
 
         if screen.isMenu {
             if !ControlLayout.touchControls() {
                 helpButton.isHidden = true
                 helpCard.isHidden = true
+                helpBackdrop.isHidden = true
                 isHidden = true
                 return
             }
 
-            if itemScreen {
-                for control in controls where control !== backButton {
-                    control.isHidden = true
-                }
-                lookButton.isHidden = false
+            // A menu already carries the game's own buttons, so the only
+            // control worth keeping is the way out of it. The item screens
+            // also keep INSPECT and its help beside them.
+            for control in controls where control !== backButton {
+                control.isHidden = true
             }
+            lookButton.isHidden = !itemScreen
+            helpButton.isHidden = !itemScreen
 
             if isHidden {
                 isHidden = false
@@ -1298,6 +1351,10 @@ final class GameControlsOverlay: UIView {
             symbol = "scope"
             title = "TARGET"
             accessibilityTitle = "Target"
+        case 3:
+            symbol = "hand.point.up.left.fill"
+            title = "USE SKILL"
+            accessibilityTitle = "Use skill"
         default:
             symbol = "hand.tap"
             title = "ACTIONS"
@@ -1337,6 +1394,14 @@ final class GameControlsOverlay: UIView {
         }
     }
 
+    /// Takes the movie controls off the screen at once, including the pending
+    /// layer commit: the engine blocks its own thread as soon as a movie ends.
+    private func hideMovieControls() {
+        skipMovieButton.isHidden = true
+        movieShield.isHidden = true
+        CATransaction.flush()
+    }
+
     /// The game exposes its selected attack mode through the interface item
     /// action: primary, primary aiming, secondary (burst) and secondary aiming.
     /// The pictogram carries the mode - one dot for the primary attack, two for
@@ -1344,7 +1409,11 @@ final class GameControlsOverlay: UIView {
     /// underneath says what the button is, since it applies to melee attacks
     /// as well.
     private func updateFireModeButton(_ mode: Int32) {
-        let title = "ATTACK\nMODE"
+        // Aimed steps of the attack mode are the game's VATS: they show the
+        // chance to hit and cost an extra action point, so the label says so
+        // while one of them is selected.
+        let aimed = mode == 2 || mode == 4
+        let title = aimed ? "MODE\nVATS" : "ATTACK\nMODE"
         switch mode {
         case 1:
             fireModeButton.set(image: fireModeImage(mode), title: title,
@@ -1427,6 +1496,7 @@ final class GameControlsOverlay: UIView {
 }
 
 private final class LabeledControlButton: UIControl {
+    private let selectionView = UIView()
     private let iconView = UIImageView()
     private let label = UILabel()
     private let iconPointSize: CGFloat
@@ -1445,6 +1515,13 @@ private final class LabeledControlButton: UIControl {
         layer.borderColor = (accent ? ControlTheme.control : ControlTheme.control)
             .withAlphaComponent(0.6).cgColor
         tintColor = accent ? ControlTheme.control : ControlTheme.control
+
+        // A translucent white wash over the panel, for a control that is
+        // switched on rather than pressed.
+        selectionView.backgroundColor = UIColor.white.withAlphaComponent(0.28)
+        selectionView.isUserInteractionEnabled = false
+        selectionView.isHidden = true
+        addSubview(selectionView)
 
         iconView.contentMode = .scaleAspectFit
         iconView.isUserInteractionEnabled = false
@@ -1491,6 +1568,12 @@ private final class LabeledControlButton: UIControl {
     private static let disabledOpacity: CGFloat = 0.35
     private var baseOpacity: CGFloat = 1
 
+    var showsSelection: Bool = false {
+        didSet {
+            selectionView.isHidden = !showsSelection
+        }
+    }
+
     var controlOpacity: CGFloat {
         get {
             return baseOpacity
@@ -1524,6 +1607,9 @@ private final class LabeledControlButton: UIControl {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+
+        selectionView.frame = bounds
+        selectionView.layer.cornerRadius = layer.cornerRadius
 
         let hasLabel = !(label.text?.isEmpty ?? true)
         // A two-line label has to share the button with the pictogram, so it
@@ -1844,7 +1930,7 @@ final class MovieSkipButton: UIControl {
     private var progressTimer: Timer?
     private var startedAt: Date?
 
-    private static let holdSeconds: TimeInterval = 2.5
+    private static let holdSeconds: TimeInterval = 2.0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -1877,7 +1963,9 @@ final class MovieSkipButton: UIControl {
     override func layoutSubviews() {
         super.layoutSubviews()
         caption.frame = bounds
-        fill.frame = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
+        if startedAt == nil {
+            fill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
+        }
     }
 
     override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
@@ -1891,7 +1979,7 @@ final class MovieSkipButton: UIControl {
     }
 
     override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
-        cancelProgress()
+        holdReached()
     }
 
     override func cancelTracking(with event: UIEvent?) {
@@ -1909,25 +1997,44 @@ final class MovieSkipButton: UIControl {
     private func startProgress() {
         progressTimer?.invalidate()
 
-        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
-            guard let self = self else {
-                return
-            }
+        // The fill is a Core Animation interpolation, not a timer redrawing it
+        // thirty times a second. The engine keeps the main run loop blocked
+        // while it runs, so a timer only gets a slot now and then and the bar
+        // crawls; an animation is drawn by the render server and stays smooth.
+        // Flushing hands it over now instead of waiting for a run loop turn.
+        fill.layer.removeAllAnimations()
+        fill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
+        UIView.animate(withDuration: MovieSkipButton.holdSeconds,
+                       delay: 0,
+                       options: [.curveLinear, .beginFromCurrentState]) {
+            self.fill.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: self.bounds.height)
+        }
+        CATransaction.flush()
 
-            self.fill.frame = CGRect(x: 0, y: 0, width: self.bounds.width * self.fraction, height: self.bounds.height)
-            if self.fraction >= 1 {
-                self.trigger()
-            }
+        // Only the moment the hold is long enough is timed.
+        let timer = Timer(timeInterval: MovieSkipButton.holdSeconds, repeats: false) { [weak self] _ in
+            self?.trigger()
         }
         progressTimer = timer
         RunLoop.main.add(timer, forMode: .common)
+    }
+
+    /// A hold counts as done the moment the finger comes up, whatever the timer
+    /// managed to do while the run loop was busy.
+    private func holdReached() {
+        if fraction >= 1 {
+            trigger()
+        } else {
+            cancelProgress()
+        }
     }
 
     private func cancelProgress() {
         progressTimer?.invalidate()
         progressTimer = nil
         startedAt = nil
-        fill.frame = .zero
+        fill.layer.removeAllAnimations()
+        fill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
     }
 
     private func trigger() {
@@ -1941,6 +2048,13 @@ final class InventoryHelpCard: UIView {
     static let green = UIColor(red: 0.30, green: 1.0, blue: 0.40, alpha: 1)
 
     private let label = UILabel()
+    private let closeButton = UIButton(type: .system)
+
+    /// Called by the small cross in the corner.
+    var onClose: (() -> Void)?
+
+    private let inset: CGFloat = 18
+    private let header: CGFloat = 18
 
     var text: String {
         get {
@@ -1955,21 +2069,24 @@ final class InventoryHelpCard: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        backgroundColor = UIColor.black.withAlphaComponent(0.88)
+        backgroundColor = UIColor.black.withAlphaComponent(0.78)
         layer.cornerRadius = 14
         layer.borderWidth = 1
-        layer.borderColor = InventoryHelpCard.green.withAlphaComponent(0.5).cgColor
+        layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
 
-        label.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .medium)
-        label.textColor = InventoryHelpCard.green
+        label.font = UIFont.monospacedSystemFont(ofSize: 15, weight: .medium)
+        label.textColor = .white
         label.numberOfLines = 0
         label.isUserInteractionEnabled = false
         addSubview(label)
 
-        isAccessibilityElement = true
-        accessibilityTraits = .button
-        accessibilityLabel = "Inventory help"
-        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dismiss)))
+        closeButton.setImage(UIImage(systemName: "xmark",
+                                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .bold)),
+                             for: .normal)
+        closeButton.tintColor = .white
+        closeButton.accessibilityLabel = "Close"
+        closeButton.addTarget(self, action: #selector(close), for: .touchUpInside)
+        addSubview(closeButton)
     }
 
     required init?(coder: NSCoder) {
@@ -1977,20 +2094,24 @@ final class InventoryHelpCard: UIView {
     }
 
     func preferredSize(maxWidth: CGFloat) -> CGSize {
-        let inset: CGFloat = 16
         let textSize = label.sizeThatFits(CGSize(width: maxWidth - inset * 2,
                                                  height: .greatestFiniteMagnitude))
-        return CGSize(width: maxWidth, height: textSize.height + inset * 2)
+        return CGSize(width: maxWidth, height: textSize.height + inset * 2 + header)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        let inset: CGFloat = 16
-        label.frame = bounds.insetBy(dx: inset, dy: inset)
+        label.frame = CGRect(x: inset,
+                             y: inset + header,
+                             width: max(0, bounds.width - inset * 2),
+                             height: max(0, bounds.height - inset * 2 - header))
+
+        let side: CGFloat = 30
+        closeButton.frame = CGRect(x: bounds.width - side - 6, y: 4, width: side, height: side)
     }
 
-    @objc private func dismiss() {
-        isHidden = true
+    @objc private func close() {
+        onClose?()
     }
 }
