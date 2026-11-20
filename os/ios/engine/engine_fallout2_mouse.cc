@@ -44,6 +44,8 @@ static bool iosWaitCursorWasUp = false;
 // How many of those passes the cursor still has to stand through.
 static int iosDragHoverPasses;
 
+static int iosDoneFrames;
+
 // A touch that clicks instead of dragging: INSPECT, and a tap, which has no
 // finger left on the screen to drag with.
 static bool iosDragClick;
@@ -637,6 +639,16 @@ void _mouse_info()
             iosDragState = IOS_DRAG_DONE;
         }
         _mouse_simulate_input(0, 0, 0);
+        iosDoneFrames = 0;
+        return;
+    }
+
+    if (iosDragState == IOS_DRAG_DONE) {
+        if (++iosDoneFrames >= 10) {
+            iosDoneFrames = 0;
+            iosDragState = IOS_DRAG_PRESSED;
+            _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        }
         return;
     }
 
