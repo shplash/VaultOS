@@ -443,12 +443,12 @@ struct LauncherView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
-                    Text(model.selectedGame.tagline)
+                    Text(L.t(model.selectedGame.tagline))
                         .font(.system(size: 13, weight: .regular))
                         .foregroundColor(Theme.dim)
                         .lineLimit(1)
 
-                    Text("COMMUNITY EDITION")
+                    Text(L.t("COMMUNITY EDITION"))
                         .font(.system(size: 9, weight: .semibold, design: .monospaced))
                         .kerning(2.2)
                         .foregroundColor(accent.opacity(0.85))
@@ -993,7 +993,7 @@ struct LauncherView: View {
                             .foregroundColor(selected ? accent : Theme.faint)
 
                         if preset.id == "half" {
-                            Text(L.t("DEFAULT"))
+                            Text(L.t("(recommended)"))
                                 .font(.system(size: 8, weight: .regular, design: .monospaced))
                                 .foregroundColor(Theme.faint)
                         }
