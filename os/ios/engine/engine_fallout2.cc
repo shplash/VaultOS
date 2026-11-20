@@ -218,6 +218,17 @@ int screen()
         return 4;
     }
 
+    // The dialogue review screen is a dialogue screen, and the character editor
+    // and the character sheet are both the character screen - the editor is a
+    // page of it, not a separate mode.
+    if ((mode & fallout::GameMode::kDialogReview) != 0) {
+        return 4;
+    }
+
+    if ((mode & fallout::GameMode::kEditor) != 0) {
+        return 5;
+    }
+
     if ((mode & fallout::GameMode::kInventory) != 0) {
         return 1;
     }
@@ -248,7 +259,8 @@ int screen()
     }
 
     if ((mode & fallout::GameMode::kOptions) != 0
-        || (mode & fallout::GameMode::kPreferences) != 0) {
+        || (mode & fallout::GameMode::kPreferences) != 0
+        || (mode & fallout::GameMode::kHelp) != 0) {
         return 10;
     }
 
