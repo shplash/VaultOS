@@ -498,6 +498,15 @@ void mouse_info()
         return;
     }
 
+    if (ios_drag_state == IOS_DRAG_PRESSED) {
+        // The finger owns the button. A click queued by another finger on one
+        // of the overlay's buttons would otherwise be fed in here, and feeding
+        // a right press while a left press is held turns the drag into its
+        // release.
+        mouse_ios_left_click_pending = false;
+        mouse_ios_right_click_pending = false;
+    }
+
     if (mouse_ios_left_click_pending) {
         mouse_ios_left_click_pending = false;
         mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
@@ -528,6 +537,13 @@ void mouse_info()
 
         switch (gesture.type) {
         case kTap:
+            if (ios_drag_state == IOS_DRAG_PRESSED) {
+                // A second finger tapped and lifted while the first is still
+                // dragging. The tap belongs to the other finger, and clicking
+                // here would end the drag.
+                break;
+            }
+
             // Trackpad behavior in the game: a tap clicks at the current
             // cursor instead of teleporting it to the finger. A menu is a grid
             // of buttons rather than a world to steer, so a tap there clicks

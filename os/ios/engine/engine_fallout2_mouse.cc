@@ -420,6 +420,14 @@ void _mouse_info()
         return;
     }
 
+    if (iosDragState == IOS_DRAG_PRESSED) {
+        // The finger owns the button. A click queued by another finger on one
+        // of the overlay's buttons would otherwise be fed in on the next line,
+        // and a right press while a left press is held releases the drag.
+        gIosClickButtons = 0;
+        gIosClickRelease = 0;
+    }
+
     if (gIosClickButtons != 0) {
         gIosClickRelease = gIosClickButtons;
         gIosClickButtons = 0;
@@ -474,6 +482,13 @@ void _mouse_info()
 
         switch (gesture.type) {
         case kTap:
+            if (iosDragState == IOS_DRAG_PRESSED) {
+                // A second finger tapped and lifted while the first is still
+                // dragging. The tap belongs to the other finger, and clicking
+                // here would end the drag.
+                break;
+            }
+
             if (iosMenuScreen()) {
                 mouseIosMovePointer(gesture.x, gesture.y);
             }
