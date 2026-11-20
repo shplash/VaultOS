@@ -1078,18 +1078,18 @@ final class GameControlsOverlay: UIView {
         let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
                          bounds.height - side / 2 - safeAreaInsets.bottom - 4)
 
-        // BACK hangs on the menu's own left edge. INSPECT sits outside the menu
-        // on the right, against the edge of the screen, and its help button,
-        // a third of the size, stacks above it in the same column.
+        // BACK hangs on the menu's left edge and INSPECT on its right edge, the
+        // same way, never under the sensor housing. The help button is a third
+        // of a control, in the menu's top right corner.
         let left = max(box.minX - gap - side, safeAreaInsets.left + 6)
-        let right = max(left, bounds.width - safeAreaInsets.right - 8 - side)
+        let right = min(box.maxX + gap, bounds.width - safeAreaInsets.right - 6 - side)
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
 
         let helpSide = max(22, side / 3)
-        helpButton.frame = CGRect(x: right + side - helpSide,
-                                  y: max(safeAreaInsets.top + 4, middle - side / 2 - helpSide - 8),
+        helpButton.frame = CGRect(x: max(box.maxX - helpSide - 4, safeAreaInsets.left + 4),
+                                  y: max(box.minY + 4, safeAreaInsets.top + 4),
                                   width: helpSide,
                                   height: helpSide)
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
