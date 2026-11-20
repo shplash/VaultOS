@@ -1178,6 +1178,14 @@ void GNW95_process_message()
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+            if (e.type == SDL_KEYDOWN
+                && (e.key.keysym.scancode == SDL_SCANCODE_RETURN
+                    || e.key.keysym.scancode == SDL_SCANCODE_KP_ENTER)) {
+                fallout_engine_hide_keyboard();
+            }
+#endif
+
             if (!kb_is_disabled()) {
                 keyboardData.key = e.key.keysym.scancode;
                 keyboardData.down = (e.key.state & SDL_PRESSED) != 0;

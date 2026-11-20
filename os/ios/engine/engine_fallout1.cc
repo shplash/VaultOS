@@ -181,9 +181,11 @@ int action_available(int action)
         }
         return has_item_in_hand();
     case 20:
-        return 0;
+        return fallout::dialog_active() ? 1 : 0;
     case 21:
-        return 1;
+        return fallout::dialog_active() ? 0 : 1;
+    case 22:
+        return fallout::dialog_active() ? 1 : 0;
     default:
         return 1;
     }
@@ -257,6 +259,12 @@ void press_action(int action)
     case 19:
         // QUICK SAVE: the engine's own quick save into its own quick slot.
         ios_send_scan_code(SDL_SCANCODE_F6);
+        break;
+    case 20:
+        ios_send_scan_code(SDL_SCANCODE_B);
+        break;
+    case 22:
+        ios_send_scan_code(SDL_SCANCODE_A);
         break;
     default:
         break;

@@ -875,7 +875,7 @@ struct LauncherView: View {
         var title: String {
             switch self {
             case .touch: return "TOUCH"
-            case .survival: return "VATS & SKILLS"
+            case .survival: return "SURVIVAL"
             case .launcher: return "LAUNCHER"
             }
         }
@@ -905,7 +905,8 @@ struct LauncherView: View {
                     ("Skills pay", "The skilldex covers Doctor, First Aid and Lockpick. Using them beats guessing at a door or a wound."),
                     ("Talk first", "Many fights can be talked past, and quests tend to pay better than what you can loot."),
                     ("Aim", "An aimed shot costs one more action point and can cripple a limb, which often ends a fight faster than damage."),
-                    ("VATS", "The attack mode's aimed steps are the game's VATS: they show the chance to hit and cost one more action point. While a skill is armed the mode button reads USE SKILL, and pressing it goes back to move or target."),
+                    ("VATS", "The attack mode's aimed steps are the game's VATS: they show the chance to hit and cost one more action point."),
+                    ("Skills", "While a skill is armed the mode button reads USE SKILL, and pressing it goes back to move or target. Arm one from the skilldex or from an object's menu."),
                 ]
             case .launcher:
                 return [

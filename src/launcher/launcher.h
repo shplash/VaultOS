@@ -152,6 +152,9 @@ void fallout_ios_menu_music_stop(void);
 // Called from the engine's input loop, through the host callbacks, to refresh
 // the on-screen controls.
 void fallout_ios_refresh_game_controls(void);
+// Dismisses the iOS keyboard without interrupting the engine, so a window whose
+// own buttons the keyboard covers can still be closed.
+void fallout_ios_hide_keyboard(void);
 void fallout_ios_pause_game_audio(void);
 void fallout_ios_resume_game_audio(void);
 

@@ -325,6 +325,8 @@ int action_available(int action)
         return screen() == 4 ? 1 : 0;
     case 21:
         return screen() == 4 ? 0 : 1;
+    case 22:
+        return 0;
     default:
         return 1;
     }

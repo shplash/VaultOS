@@ -33,4 +33,6 @@ void fallout_engine_refresh_controls(void);
 // already used up the limited call.
 void fallout_engine_refresh_controls_now(void);
 
+void fallout_engine_hide_keyboard(void);
+
 #endif /* FALLOUT_IOS_ENGINE_GLUE_H_ */

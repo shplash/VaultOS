@@ -734,6 +734,14 @@ final class GameControlsOverlay: UIView {
         symbol: "dollarsign.circle",
         iconPointSize: 16
     )
+    private let tellAboutButton = LabeledControlButton(
+        title: "TELL ME\nABOUT",
+        symbol: "bubble.left",
+        iconPointSize: 16,
+        labelLines: 2
+    )
+    private let keyboardCatcher = UIControl()
+    private var lastMenuRect: CGRect?
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let helpCard = InventoryHelpCard()
     private var currentScreen: ScreenMode = .game
@@ -977,6 +985,29 @@ final class GameControlsOverlay: UIView {
         barterButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(barterButton)
 
+        tellAboutButton.isHidden = true
+        tellAboutButton.tag = 22
+        tellAboutButton.accessibilityLabel = "Tell me about"
+        tellAboutButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(tellAboutButton)
+
+        keyboardCatcher.isHidden = true
+        keyboardCatcher.backgroundColor = .clear
+        keyboardCatcher.addTarget(self, action: #selector(keyboardDismissRequested), for: .touchUpInside)
+        let keyboardSwipe = UISwipeGestureRecognizer(target: self, action: #selector(keyboardDismissRequested))
+        keyboardSwipe.direction = .down
+        keyboardCatcher.addGestureRecognizer(keyboardSwipe)
+        insertSubview(keyboardCatcher, at: 0)
+
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(keyboardWillShow),
+                                               name: UIResponder.keyboardWillShowNotification,
+                                               object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(keyboardWillHide),
+                                               name: UIResponder.keyboardWillHideNotification,
+                                               object: nil)
+
         // The help button is the same square as INSPECT, in the same panel, so
         // the two read as one column against the menu's edge.
         helpButton.isHidden = true
@@ -1080,6 +1111,7 @@ final class GameControlsOverlay: UIView {
                                        height: loadButton.frame.height)
 
         movieShield.frame = bounds
+        keyboardCatcher.frame = bounds
         helpBackdrop.frame = bounds
 
         if currentScreen.isMenu && currentScreen != .options {
@@ -1129,7 +1161,25 @@ final class GameControlsOverlay: UIView {
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
-        barterButton.frame = lookButton.frame
+
+        var dialogueButtons: [LabeledControlButton] = []
+        if !barterButton.isHidden {
+            dialogueButtons.append(barterButton)
+        }
+        if !tellAboutButton.isHidden {
+            dialogueButtons.append(tellAboutButton)
+        }
+        if dialogueButtons.isEmpty {
+            barterButton.frame = lookButton.frame
+            tellAboutButton.frame = lookButton.frame
+        } else {
+            let stackHeight = CGFloat(dialogueButtons.count) * side + CGFloat(dialogueButtons.count - 1) * gap
+            var y = middle - stackHeight / 2
+            for button in dialogueButtons {
+                button.frame = CGRect(x: right, y: y, width: side, height: side)
+                y += side + gap
+            }
+        }
 
         // A third of a control, tucked into the menu's top right corner.
         let helpSide = max(22, side / 3)
@@ -1340,6 +1390,18 @@ final class GameControlsOverlay: UIView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
+    @objc private func keyboardWillShow() {
+        keyboardCatcher.isHidden = false
+    }
+
+    @objc private func keyboardWillHide() {
+        keyboardCatcher.isHidden = true
+    }
+
+    @objc private func keyboardDismissRequested() {
+        fallout_ios_hide_keyboard()
+    }
+
     @objc private func dismissHelp() {
         setHelp(visible: false)
     }
@@ -1377,6 +1439,7 @@ final class GameControlsOverlay: UIView {
         quickSaveButton.controlOpacity = value
         lookButton.controlOpacity = value
         barterButton.controlOpacity = value
+        tellAboutButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }
@@ -1403,6 +1466,7 @@ final class GameControlsOverlay: UIView {
             lookButton.isHidden = true
             helpButton.isHidden = true
             barterButton.isHidden = true
+            tellAboutButton.isHidden = true
             helpCard.isHidden = true
             helpBackdrop.isHidden = true
             if isHidden {
@@ -1449,8 +1513,15 @@ final class GameControlsOverlay: UIView {
 
         let dialogueBarter = screen == .dialogue && fallout_ios_action_available(20) != 0
         barterButton.isHidden = !dialogueBarter
+        tellAboutButton.isHidden = !(screen == .dialogue && fallout_ios_action_available(22) != 0)
 
         if screen.isMenu {
+            let panel = engineMenuRect()
+            if panel != lastMenuRect {
+                lastMenuRect = panel
+                setNeedsLayout()
+            }
+
             if !ControlLayout.touchControls() {
                 helpButton.isHidden = true
                 helpCard.isHidden = true
@@ -1467,7 +1538,6 @@ final class GameControlsOverlay: UIView {
             }
             lookButton.isHidden = !itemScreen
             helpButton.isHidden = !itemScreen
-            barterButton.isHidden = !dialogueBarter
 
             if fallout_ios_action_available(21) == 0 {
                 backButton.isHidden = true

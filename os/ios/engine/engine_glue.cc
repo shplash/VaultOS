@@ -89,3 +89,12 @@ void fallout_engine_refresh_controls_now(void)
 
     g_host->refresh_controls();
 }
+
+void fallout_engine_hide_keyboard(void)
+{
+    if (g_host == nullptr || g_host->hide_keyboard == nullptr) {
+        return;
+    }
+
+    g_host->hide_keyboard();
+}

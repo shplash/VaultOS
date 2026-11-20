@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 6
+#define FALLOUT_ENGINE_ABI_VERSION 7
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -48,6 +48,11 @@ typedef struct FalloutEngineHost {
     // frames, which is the only place it is safe: the overlay must never be
     // asked to do this from a timer of its own interrupting the engine.
     void (*refresh_controls)(void);
+
+    // Takes the iOS keyboard off the screen without touching what the game is
+    // doing, so a window whose own buttons the keyboard covers can still be
+    // closed. Called by the engine when Return is pressed.
+    void (*hide_keyboard)(void);
 } FalloutEngineHost;
 
 typedef struct FalloutEngineAPI {

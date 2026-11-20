@@ -73,13 +73,27 @@ static void host_refresh_controls(void)
     fallout_ios_refresh_game_controls();
 }
 
+static void host_hide_keyboard(void)
+{
+    fallout_ios_hide_keyboard();
+}
+
 static const FalloutEngineHost g_host = {
     FALLOUT_ENGINE_ABI_VERSION,
     host_install_controls,
     host_menu_music_start,
     host_menu_music_stop,
     host_refresh_controls,
+    host_hide_keyboard,
 };
+
+void fallout_ios_hide_keyboard(void)
+{
+    [[UIApplication sharedApplication] sendAction:@selector(resignFirstResponder)
+                                               to:nil
+                                             from:nil
+                                         forEvent:nil];
+}
 
 // MARK: - Engine loading
 

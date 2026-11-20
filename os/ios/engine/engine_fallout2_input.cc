@@ -934,6 +934,12 @@ void _GNW95_process_message()
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
+            if (e.type == SDL_KEYDOWN
+                && (e.key.keysym.scancode == SDL_SCANCODE_RETURN
+                    || e.key.keysym.scancode == SDL_SCANCODE_KP_ENTER)) {
+                fallout_engine_hide_keyboard();
+            }
+
             if (!keyboardIsDisabled()) {
                 keyboardData.key = e.key.keysym.scancode;
                 keyboardData.down = (e.key.state & SDL_PRESSED) != 0;
