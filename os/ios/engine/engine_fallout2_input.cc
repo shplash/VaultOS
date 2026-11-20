@@ -947,6 +947,7 @@ void _GNW95_process_message()
                 break;
             case SDL_WINDOWEVENT_SIZE_CHANGED:
                 handleWindowSizeChanged();
+                windowRefreshAll(&_scr_size);
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 gProgramIsActive = true;
