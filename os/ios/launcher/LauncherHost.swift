@@ -1066,11 +1066,11 @@ final class GameControlsOverlay: UIView {
             // strip along the panel's bottom edge. BACK covers that strip so
             // the panel does not offer the same thing twice, and the dark
             // background keeps the game's button from showing through.
-            backButton.opaque = true
+            backButton.solidBackground = true
             backButton.frame = designRect(CGRect(x: 320, y: 336, width: 120, height: 40))
             return
         }
-        backButton.opaque = false
+        backButton.solidBackground = false
 
         let surface = gameSurface()
         let side = min(max(48, surface.height * 0.17), 84)
@@ -1541,14 +1541,14 @@ private final class LabeledControlButton: UIControl {
 
     /// A control that has to hide what is under it, such as the skill panel's
     /// own CANCEL button, paints its panel solid instead of translucent.
-    var opaque = false {
+    var solidBackground = false {
         didSet {
             backgroundColor = normalBackground
         }
     }
 
     private var normalBackground: UIColor {
-        return opaque ? UIColor.black : ControlTheme.panel
+        return solidBackground ? UIColor.black : ControlTheme.panel
     }
     private let iconPointSize: CGFloat
     private let accent: Bool
