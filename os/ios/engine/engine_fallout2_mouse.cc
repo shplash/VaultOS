@@ -13,6 +13,7 @@ namespace fallout {
 
 bool iosItemScreen();
 bool iosMenuScreen();
+bool iosDirectTouchScreen();
 void touch_set_immediate_press(bool enabled);
 
 // Set by the INSPECT button: an item screen then takes a touch as a click
@@ -439,7 +440,7 @@ void _mouse_info()
 {
     // Menus take the finger as the pointer, so their touches are reported as
     // they land rather than after a move or a hold.
-    touch_set_immediate_press(iosMenuScreen());
+    touch_set_immediate_press(iosDirectTouchScreen());
 
     if (!gMouseInitialized) {
         return;
@@ -506,7 +507,7 @@ void _mouse_info()
                 break;
             }
 
-            if (!iosMenuScreen()) {
+            if (!iosDirectTouchScreen()) {
                 if (gesture.numberOfTouches == 1) {
                     _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 } else if (gesture.numberOfTouches == 2) {
@@ -536,7 +537,7 @@ void _mouse_info()
             if (gesture.state == kEnded) {
                 // A dragged item is dropped where the finger is, so the cursor
                 // is put there before the button comes up.
-                if (iosMenuScreen() && gesture.numberOfTouches == 1) {
+                if (iosDirectTouchScreen() && gesture.numberOfTouches == 1) {
                     mouseIosMovePointer(gesture.x, gesture.y);
                 }
 
@@ -553,7 +554,7 @@ void _mouse_info()
                 break;
             }
 
-            if (iosMenuScreen() && gesture.numberOfTouches == 1) {
+            if (iosDirectTouchScreen() && gesture.numberOfTouches == 1) {
                 // The position goes in first, on this update; the button
                 // follows once the cursor has stood there long enough for the
                 // button layer to take it as the hovered one. Once it is down

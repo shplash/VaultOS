@@ -1061,35 +1061,25 @@ final class GameControlsOverlay: UIView {
     private func layoutMenuControls() {
         let box = menuBox(for: currentScreen)
 
-        if currentScreen == .skilldex {
-            // The skill panel's own CANCEL button is the way out of it, in the
-            // strip along the panel's bottom edge. BACK covers that strip so
-            // the panel does not offer the same thing twice, and the dark
-            // background keeps the game's button from showing through.
-            backButton.solidBackground = true
-            backButton.frame = designRect(CGRect(x: 320, y: 336, width: 120, height: 40))
-            return
-        }
-        backButton.solidBackground = false
-
         let surface = gameSurface()
         let side = min(max(48, surface.height * 0.17), 84)
-        let gap: CGFloat = 8
+        let gap: CGFloat = 6
         let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
                          bounds.height - side / 2 - safeAreaInsets.bottom - 4)
 
-        // BACK hangs on the menu's left edge and INSPECT on its right edge, the
-        // same way, never under the sensor housing. The help button is a third
-        // of a control, in the menu's top right corner.
-        let left = max(box.minX - gap - side, safeAreaInsets.left + 6)
-        let right = min(box.maxX + gap, bounds.width - safeAreaInsets.right - 6 - side)
+        // Hung on the menu's own edges, inside the game's own area rather than
+        // out in the black bars, so each button sits right beside the panel it
+        // belongs to. BACK on the left edge, INSPECT on the right.
+        let left = max(box.minX - gap - side, surface.minX + 4)
+        let right = min(box.maxX + gap, surface.maxX - side - 4)
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
 
+        // A third of a control, tucked into the menu's top right corner.
         let helpSide = max(22, side / 3)
-        helpButton.frame = CGRect(x: max(box.maxX - helpSide - 4, safeAreaInsets.left + 4),
-                                  y: max(box.minY + 4, safeAreaInsets.top + 4),
+        helpButton.frame = CGRect(x: box.maxX - helpSide - 4,
+                                  y: max(box.minY + 4, surface.minY + 4),
                                   width: helpSide,
                                   height: helpSide)
         helpButton.layer.cornerRadius = max(6, helpSide / 5)

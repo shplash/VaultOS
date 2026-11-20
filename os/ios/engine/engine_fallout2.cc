@@ -501,6 +501,14 @@ bool iosItemScreen()
     return current == 1 || current == 2 || current == 3;
 }
 
+// Only the screens that are grids of items take the finger as the pointer;
+// everything else keeps the engine's trackpad behaviour.
+bool iosDirectTouchScreen()
+{
+    const int current = screen();
+    return current == 1 || current == 2 || current == 3 || current == 7;
+}
+
 // Every screen except the game view is a mouse UI: grids, lists and buttons,
 // where the finger is expected to be the pointer.
 bool iosMenuScreen()

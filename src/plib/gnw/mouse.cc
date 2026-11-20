@@ -427,10 +427,14 @@ void mouse_hide()
 
 static bool ios_direct_touch_active()
 {
-    // Every screen except the game view is a mouse UI: grids, lists and
-    // buttons, where the finger is expected to be the pointer. The game view
-    // keeps the trackpad model - a tap clicks where the cursor already is.
-    return ios_screen != IOS_SCREEN_GAME;
+    // Only the screens that are grids of items take the finger as the pointer.
+    // Everything else keeps the trackpad the engine ships with - a tap clicks
+    // at the cursor, a drag moves it - because those screens are laid out for a
+    // cursor and their own buttons are what the player aims at.
+    return ios_screen == IOS_SCREEN_INVENTORY
+        || ios_screen == IOS_SCREEN_LOOT
+        || ios_screen == IOS_SCREEN_BARTER
+        || ios_screen == IOS_SCREEN_SKILLDEX;
 }
 
 // The direct-touch press, in the order the game has to see it: the position
