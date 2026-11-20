@@ -862,9 +862,7 @@ struct LauncherView: View {
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
                     ("Inventory", "Hold and drag an item to move or equip it. INSPECT switches the inventory between moving items and opening an item's menu."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
-                    ("VATS", "The attack mode's aimed steps are the game's VATS: they show the chance to hit and cost one more action point. While a skill is armed the mode button reads USE SKILL, and pressing it goes back to move or target."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
-                    ("Layout", "Every control can be moved, resized, faded and coloured from Controls."),
                 ]
             case .survival:
                 return [
@@ -872,6 +870,7 @@ struct LauncherView: View {
                     ("Skills pay", "The skilldex covers Doctor, First Aid and Lockpick. Using them beats guessing at a door or a wound."),
                     ("Talk first", "Many fights can be talked past, and quests tend to pay better than what you can loot."),
                     ("Aim", "An aimed shot costs one more action point and can cripple a limb, which often ends a fight faster than damage."),
+                    ("VATS", "The attack mode's aimed steps are the game's VATS: they show the chance to hit and cost one more action point. While a skill is armed the mode button reads USE SKILL, and pressing it goes back to move or target."),
                 ]
             case .launcher:
                 return [
@@ -879,6 +878,7 @@ struct LauncherView: View {
                     ("HALF or FULL", "HALF keeps the interface readable on a phone; FULL is sharpest on a tablet."),
                     ("Per game", "Resolution, audio, language and controls are stored separately for each game."),
                     ("Own folders", "Fallout keeps its files in Documents, Fallout 2 in Documents/Fallout2, so the two never mix."),
+                    ("Layout", "Every control can be moved, resized, faded and coloured from Controls."),
                 ]
             }
         }

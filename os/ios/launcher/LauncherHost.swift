@@ -971,6 +971,8 @@ final class GameControlsOverlay: UIView {
 
         helpCard.isHidden = true
         helpCard.text = L.t("Hold and drag an item to equip or move it.")
+            + "\n\n"
+            + L.t("Toggle INSPECT to examine an item's characteristics. Hold an item while INSPECT is on to open its menu.")
         helpCard.onClose = { [weak self] in
             self?.setHelp(visible: false)
         }
@@ -1058,23 +1060,39 @@ final class GameControlsOverlay: UIView {
 
     private func layoutMenuControls() {
         let box = menuBox(for: currentScreen)
+
+        if currentScreen == .skilldex {
+            // The skill panel's own CANCEL button is the way out of it, in the
+            // strip along the panel's bottom edge. BACK covers that strip so
+            // the panel does not offer the same thing twice, and the dark
+            // background keeps the game's button from showing through.
+            backButton.opaque = true
+            backButton.frame = designRect(CGRect(x: 320, y: 336, width: 120, height: 40))
+            return
+        }
+        backButton.opaque = false
+
         let surface = gameSurface()
         let side = min(max(48, surface.height * 0.17), 84)
+        let gap: CGFloat = 8
         let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
                          bounds.height - side / 2 - safeAreaInsets.bottom - 4)
 
-        // Both columns hug the edge of the screen rather than the menu's art,
-        // so the pair reads as one control strip on either side of it.
-        let left = safeAreaInsets.left + 8
-        let right = max(left, bounds.width - safeAreaInsets.right - 8 - side)
+        // Hung on the menu's own edges, never under the sensor housing.
+        let left = max(box.minX - gap - side, safeAreaInsets.left + 6)
+        let right = min(box.maxX + gap, bounds.width - safeAreaInsets.right - 6 - side)
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
 
-        // The help button is the same square, stacked above INSPECT.
-        let helpTop = max(safeAreaInsets.top + 4, middle - side / 2 - side - 8)
-        helpButton.frame = CGRect(x: right, y: helpTop, width: side, height: side)
-        helpButton.layer.cornerRadius = max(8, side / 5)
+        // A third of a control, in the menu's top right corner.
+        let helpSide = max(22, side / 3)
+        let helpRight = min(box.maxX, bounds.width - safeAreaInsets.right) - helpSide - 4
+        helpButton.frame = CGRect(x: max(helpRight, safeAreaInsets.left + 4),
+                                  y: max(box.minY + 4, safeAreaInsets.top + 4),
+                                  width: helpSide,
+                                  height: helpSide)
+        helpButton.layer.cornerRadius = max(6, helpSide / 5)
     }
 
     private func layoutHelpCard() {
@@ -1120,6 +1138,17 @@ final class GameControlsOverlay: UIView {
         default:
             return CGRect(x: 0, y: 0, width: 640, height: 480)
         }
+    }
+
+    /// A rectangle in the game's own 640x480 design space, drawn where the
+    /// engine draws that space on this display.
+    private func designRect(_ design: CGRect) -> CGRect {
+        let surface = gameSurface()
+        let scale = surface.width / 640
+        return CGRect(x: surface.minX + design.minX * scale,
+                      y: surface.minY + design.minY * scale,
+                      width: design.width * scale,
+                      height: design.height * scale)
     }
 
     private func gameSurface() -> CGRect {
@@ -1509,6 +1538,18 @@ private final class LabeledControlButton: UIControl {
     private let selectionView = UIView()
     private let iconView = UIImageView()
     private let label = UILabel()
+
+    /// A control that has to hide what is under it, such as the skill panel's
+    /// own CANCEL button, paints its panel solid instead of translucent.
+    var opaque = false {
+        didSet {
+            backgroundColor = normalBackground
+        }
+    }
+
+    private var normalBackground: UIColor {
+        return opaque ? UIColor.black : ControlTheme.panel
+    }
     private let iconPointSize: CGFloat
     private let accent: Bool
     private let labelLines: Int
@@ -1607,7 +1648,7 @@ private final class LabeledControlButton: UIControl {
     override var isHighlighted: Bool {
         didSet {
             let normal = accent ? ControlTheme.control : ControlTheme.control
-            backgroundColor = isHighlighted ? ControlTheme.highlight : ControlTheme.panel
+            backgroundColor = isHighlighted ? ControlTheme.highlight : normalBackground
             layer.borderColor = (isHighlighted ? UIColor.white : normal)
                 .withAlphaComponent(isHighlighted ? 0.75 : 0.6).cgColor
             tintColor = isHighlighted ? .white : normal
