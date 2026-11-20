@@ -425,16 +425,21 @@ void mouse_hide()
     }
 }
 
-static bool ios_item_screen_active()
+static bool ios_direct_touch_active()
 {
-    return ios_screen == IOS_SCREEN_INVENTORY
-        || ios_screen == IOS_SCREEN_LOOT
-        || ios_screen == IOS_SCREEN_BARTER;
+    // Every screen except the game view is a mouse UI: grids, lists and
+    // buttons, where the finger is expected to be the pointer. The game view
+    // keeps the trackpad model - a tap clicks where the cursor already is.
+    return ios_screen != IOS_SCREEN_GAME;
 }
 
 // 0x4B4DD8
 void mouse_info()
 {
+    // Menus take the finger as the pointer, so their touches are reported as
+    // they land rather than after a move or a hold.
+    touch_set_immediate_press(ios_direct_touch_active());
+
     if (!have_mouse) {
         return;
     }
@@ -457,6 +462,10 @@ void mouse_info()
         mouse_simulate_input(0, 0, 0);
         return;
     }
+
+    // Menus take the finger as the pointer, so their touches are reported as
+    // they land rather than after a move or a hold.
+    touch_set_immediate_press(ios_direct_touch_active());
 
     if (mouse_ios_left_click_pending) {
         mouse_ios_left_click_pending = false;
@@ -489,10 +498,10 @@ void mouse_info()
         switch (gesture.type) {
         case kTap:
             // Trackpad behavior in the game: a tap clicks at the current
-            // cursor instead of teleporting it to the finger. The item screens
-            // are grids rather than a world to steer, so a tap there puts the
-            // cursor under the finger and clicks it.
-            if (ios_item_screen_active()) {
+            // cursor instead of teleporting it to the finger. A menu is a grid
+            // of buttons rather than a world to steer, so a tap there clicks
+            // the point it landed on.
+            if (ios_direct_touch_active()) {
                 mouse_set_position(gesture.x, gesture.y);
             }
 
@@ -509,7 +518,7 @@ void mouse_info()
             if (gesture.state == kEnded) {
                 // A dragged item is dropped where the finger is, so the cursor
                 // is put there before the button comes up.
-                if (ios_item_screen_active() && gesture.numberOfTouches == 1) {
+                if (ios_direct_touch_active() && gesture.numberOfTouches == 1) {
                     mouse_set_position(gesture.x, gesture.y);
                 }
 
@@ -519,13 +528,12 @@ void mouse_info()
                 break;
             }
 
-            if (ios_item_screen_active() && gesture.numberOfTouches == 1) {
-                // The item screens grab whatever sits under the cursor, so the
-                // finger is the cursor there: every event plants it on the
-                // finger and keeps the button down. Tracking the finger
-                // absolutely is what lets one touch pick an item up - a
-                // relative drag only moves what the cursor already covered
-                // when it started.
+            if (ios_direct_touch_active() && gesture.numberOfTouches == 1) {
+                // A menu grabs whatever sits under the cursor, so the finger is
+                // the cursor there: every event plants it on the finger and
+                // keeps the button down. Tracking the finger absolutely is what
+                // lets one touch pick an item up - a relative drag only moves
+                // what the cursor already covered when it started.
                 mouse_set_position(gesture.x, gesture.y);
                 prevx = gesture.x;
                 prevy = gesture.y;
@@ -549,7 +557,7 @@ void mouse_info()
                 }
             } else if (gesture.type == kPan) {
                 if (gesture.numberOfTouches == 1) {
-                    mouse_simulate_input(moveX, moveY, ios_item_screen_active() ? primaryButton : 0);
+                    mouse_simulate_input(moveX, moveY, ios_direct_touch_active() ? primaryButton : 0);
                 } else if (gesture.numberOfTouches == 2) {
                     gMouseWheelX = (prevx - gesture.x) / 2;
                     gMouseWheelY = (gesture.y - prevy) / 2;

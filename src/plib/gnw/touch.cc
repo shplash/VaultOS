@@ -36,6 +36,14 @@ static Touch touches[MAX_TOUCHES];
 static Gesture currentGesture;
 static std::stack<Gesture> gestureEventsQueue;
 
+// Set by the input layer while a menu is on screen.
+static bool immediatePress = false;
+
+void touch_set_immediate_press(bool enabled)
+{
+    immediatePress = enabled;
+}
+
 static int find_touch(SDL_FingerID fingerId)
 {
     for (int index = 0; index < MAX_TOUCHES; index++) {
@@ -255,7 +263,19 @@ void touch_process_gesture()
             TouchLocation currentCentroid = touch_get_current_location_centroid(active, activeCount);
 
             // Disambiguate between pan and long press.
-            if (abs(currentCentroid.x - startCentroid.x) >= PAN_MINIMUM_MOVEMENT
+            if (immediatePress && activeCount == 1) {
+                // A menu takes the finger as the pointer: report the touch now,
+                // at the point it landed on. Waiting for four pixels of travel
+                // or half a second of holding is what left a still finger doing
+                // nothing, and what made an item need to be tapped before it
+                // could be grabbed.
+                currentGesture.type = kPan;
+                currentGesture.state = kBegan;
+                currentGesture.numberOfTouches = 1;
+                currentGesture.x = startCentroid.x;
+                currentGesture.y = startCentroid.y;
+                gestureEventsQueue.push(currentGesture);
+            } else if (abs(currentCentroid.x - startCentroid.x) >= PAN_MINIMUM_MOVEMENT
                 || abs(currentCentroid.y - startCentroid.y) >= PAN_MINIMUM_MOVEMENT) {
                 currentGesture.type = kPan;
                 currentGesture.state = kBegan;

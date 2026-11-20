@@ -493,6 +493,13 @@ bool iosItemScreen()
     return current == 1 || current == 2 || current == 3;
 }
 
+// Every screen except the game view is a mouse UI: grids, lists and buttons,
+// where the finger is expected to be the pointer.
+bool iosMenuScreen()
+{
+    return screen() != 0;
+}
+
 } // namespace fallout
 
 extern "C" const FalloutEngineAPI* fallout_engine_api(void)

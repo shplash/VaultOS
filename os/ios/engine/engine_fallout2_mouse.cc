@@ -11,6 +11,8 @@
 namespace fallout {
 
 bool iosItemScreen();
+bool iosMenuScreen();
+void touch_set_immediate_press(bool enabled);
 
 static void mousePrepareDefaultCursor();
 static void _mouse_anim();
@@ -383,6 +385,10 @@ static void mouseIosMovePointer(int x, int y)
 // 0x4CA59C
 void _mouse_info()
 {
+    // Menus take the finger as the pointer, so their touches are reported as
+    // they land rather than after a move or a hold.
+    touch_set_immediate_press(iosMenuScreen());
+
     if (!gMouseInitialized) {
         return;
     }
@@ -422,7 +428,7 @@ void _mouse_info()
 
         switch (gesture.type) {
         case kTap:
-            if (iosItemScreen()) {
+            if (iosMenuScreen()) {
                 mouseIosMovePointer(gesture.x, gesture.y);
             }
 
@@ -437,7 +443,7 @@ void _mouse_info()
             if (gesture.state == kEnded) {
                 // A dragged item is dropped where the finger is, so the cursor
                 // is put there before the button comes up.
-                if (iosItemScreen() && gesture.numberOfTouches == 1) {
+                if (iosMenuScreen() && gesture.numberOfTouches == 1) {
                     mouseIosMovePointer(gesture.x, gesture.y);
                 }
 
@@ -445,13 +451,12 @@ void _mouse_info()
                 break;
             }
 
-            if (iosItemScreen() && gesture.numberOfTouches == 1) {
-                // The item screens grab whatever sits under the cursor, so the
-                // finger is the cursor there: every event plants it on the
-                // finger and keeps the button down. Tracking the finger
-                // absolutely is what lets one touch pick an item up - a
-                // relative drag only moves what the cursor already covered
-                // when it started.
+            if (iosMenuScreen() && gesture.numberOfTouches == 1) {
+                // A menu grabs whatever sits under the cursor, so the finger is
+                // the cursor there: every event plants it on the finger and
+                // keeps the button down. Tracking the finger absolutely is what
+                // lets one touch pick an item up - a relative drag only moves
+                // what the cursor already covered when it started.
                 mouseIosMovePointer(gesture.x, gesture.y);
                 prevx = gesture.x;
                 prevy = gesture.y;
