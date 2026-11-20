@@ -79,3 +79,12 @@ void fallout_engine_refresh_controls(void)
     lastRefresh = now;
     g_host->refresh_controls();
 }
+
+void fallout_engine_refresh_controls_now(void)
+{
+    if (g_host == nullptr || g_host->refresh_controls == nullptr) {
+        return;
+    }
+
+    g_host->refresh_controls();
+}

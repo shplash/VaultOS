@@ -27,4 +27,10 @@ void fallout_engine_menu_music_stop();
 // the main thread, between frames, never from a timer interrupting the engine.
 void fallout_engine_refresh_controls(void);
 
+// The same refresh without the rate limit. Used at the moment a movie ends:
+// the overlay has to drop the skip button before the engine blocks on the
+// loading screen that follows, and the last few frames of the movie have
+// already used up the limited call.
+void fallout_engine_refresh_controls_now(void);
+
 #endif /* FALLOUT_IOS_ENGINE_GLUE_H_ */

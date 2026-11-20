@@ -6,6 +6,7 @@
 #include "color.h"
 #include "cycle.h"
 #include "debug.h"
+#include "engine_glue.h"
 #include "game.h"
 #include "game_mouse.h"
 #include "game_sound.h"
@@ -308,6 +309,12 @@ int gameMoviePlay(int movie, int flags)
 
     gGameMovieIsPlaying = false;
     gMovieCurrent = -1;
+
+    // The overlay is not refreshed while the engine is busy, so the skip button
+    // belongs off the screen before the loading screen that usually follows a
+    // movie draws.
+    fallout_engine_refresh_controls_now();
+
     return 0;
 }
 

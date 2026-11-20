@@ -320,6 +320,11 @@ int cursor_mode()
     if (mode == fallout::GAME_MOUSE_MODE_CROSSHAIR) {
         return 2;
     }
+    // The skill modes all draw the yellow use crosshair, whether they were
+    // picked in the skilldex or from an object's action menu.
+    if (mode >= fallout::GAME_MOUSE_MODE_USE_CROSSHAIR) {
+        return 3;
+    }
     return 1;
 }
 

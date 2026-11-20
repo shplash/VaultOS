@@ -473,9 +473,16 @@ void mouse_info()
     }
 
     Gesture gesture;
-    if (touch_get_gesture(&gesture)) {
-        static int prevx;
-        static int prevy;
+    bool handledGesture = false;
+    static int prevx;
+    static int prevy;
+
+    // Every gesture queued this frame is applied, not one per frame: touches
+    // arrive faster than frames, and leaving a backlog made the cursor follow
+    // the finger late and an item land where the finger had been instead of
+    // where it was let go.
+    while (touch_get_gesture(&gesture)) {
+        handledGesture = true;
 
         const int primaryButton = MOUSE_STATE_LEFT_BUTTON_DOWN;
 
@@ -500,18 +507,33 @@ void mouse_info()
         case kLongPress:
         case kPan:
             if (gesture.state == kEnded) {
+                // A dragged item is dropped where the finger is, so the cursor
+                // is put there before the button comes up.
+                if (ios_item_screen_active() && gesture.numberOfTouches == 1) {
+                    mouse_set_position(gesture.x, gesture.y);
+                }
+
                 // A long press holds the button down; always release it when
                 // the finger lifts, otherwise Fallout keeps walking.
                 mouse_simulate_input(0, 0, 0);
                 break;
             }
 
-            if (gesture.state == kBegan) {
-                if (ios_item_screen_active() && gesture.numberOfTouches == 1
-                    && (gesture.type == kLongPress || gesture.type == kPan)) {
-                    mouse_set_position(gesture.x, gesture.y);
-                }
+            if (ios_item_screen_active() && gesture.numberOfTouches == 1) {
+                // The item screens grab whatever sits under the cursor, so the
+                // finger is the cursor there: every event plants it on the
+                // finger and keeps the button down. Tracking the finger
+                // absolutely is what lets one touch pick an item up - a
+                // relative drag only moves what the cursor already covered
+                // when it started.
+                mouse_set_position(gesture.x, gesture.y);
+                prevx = gesture.x;
+                prevy = gesture.y;
+                mouse_simulate_input(0, 0, primaryButton);
+                break;
+            }
 
+            if (gesture.state == kBegan) {
                 prevx = gesture.x;
                 prevy = gesture.y;
             }
@@ -543,7 +565,9 @@ void mouse_info()
             prevy = gesture.y;
             break;
         }
+    }
 
+    if (handledGesture) {
         return;
     }
 

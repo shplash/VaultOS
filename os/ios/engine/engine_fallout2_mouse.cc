@@ -409,9 +409,16 @@ void _mouse_info()
     }
 
     Gesture gesture;
-    if (touch_get_gesture(&gesture)) {
-        static int prevx;
-        static int prevy;
+    bool handledGesture = false;
+    static int prevx;
+    static int prevy;
+
+    // Every gesture queued this frame is applied, not one per frame: touches
+    // arrive faster than frames, and leaving a backlog made the cursor follow
+    // the finger late and an item land where the finger had been instead of
+    // where it was let go.
+    while (touch_get_gesture(&gesture)) {
+        handledGesture = true;
 
         switch (gesture.type) {
         case kTap:
@@ -427,32 +434,45 @@ void _mouse_info()
             break;
         case kLongPress:
         case kPan:
-            if (gesture.state == kBegan) {
-                if (iosItemScreen() && gesture.numberOfTouches == 1
-                    && (gesture.type == kLongPress || gesture.type == kPan)) {
+            if (gesture.state == kEnded) {
+                // A dragged item is dropped where the finger is, so the cursor
+                // is put there before the button comes up.
+                if (iosItemScreen() && gesture.numberOfTouches == 1) {
                     mouseIosMovePointer(gesture.x, gesture.y);
                 }
 
+                _mouse_simulate_input(0, 0, 0);
+                break;
+            }
+
+            if (iosItemScreen() && gesture.numberOfTouches == 1) {
+                // The item screens grab whatever sits under the cursor, so the
+                // finger is the cursor there: every event plants it on the
+                // finger and keeps the button down. Tracking the finger
+                // absolutely is what lets one touch pick an item up - a
+                // relative drag only moves what the cursor already covered
+                // when it started.
+                mouseIosMovePointer(gesture.x, gesture.y);
+                prevx = gesture.x;
+                prevy = gesture.y;
+                _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                break;
+            }
+
+            if (gesture.state == kBegan) {
                 prevx = gesture.x;
                 prevy = gesture.y;
             }
 
             if (gesture.type == kLongPress) {
-                if (gesture.state == kEnded && gesture.numberOfTouches == 1 && iosItemScreen()) {
-                    _mouse_simulate_input(0, 0, 0);
-                } else if (gesture.numberOfTouches == 1) {
+                if (gesture.numberOfTouches == 1) {
                     _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 } else if (gesture.numberOfTouches == 2) {
                     _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, MOUSE_STATE_RIGHT_BUTTON_DOWN);
                 }
             } else if (gesture.type == kPan) {
                 if (gesture.numberOfTouches == 1) {
-                    if (gesture.state == kEnded && iosItemScreen()) {
-                        _mouse_simulate_input(0, 0, 0);
-                    } else {
-                        _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy,
-                            iosItemScreen() ? MOUSE_STATE_LEFT_BUTTON_DOWN : 0);
-                    }
+                    _mouse_simulate_input(gesture.x - prevx, gesture.y - prevy, 0);
                 } else if (gesture.numberOfTouches == 2) {
                     gMouseWheelX = (prevx - gesture.x) / 2;
                     gMouseWheelY = (gesture.y - prevy) / 2;
@@ -468,7 +488,9 @@ void _mouse_info()
             prevy = gesture.y;
             break;
         }
+    }
 
+    if (handledGesture) {
         return;
     }
 
