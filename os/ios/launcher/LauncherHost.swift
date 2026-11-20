@@ -988,7 +988,9 @@ final class GameControlsOverlay: UIView {
         addSubview(helpBackdrop)
 
         helpCard.isHidden = true
-        helpCard.text = L.t("Hold and drag an item to equip or move it.")
+        helpCard.text = L.t("Tap an item to inspect its characteristics.")
+            + "\n\n"
+            + L.t("Hold and drag an item to equip or move it.")
             + "\n\n"
             + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")
         helpCard.onClose = { [weak self] in
@@ -1102,7 +1104,7 @@ final class GameControlsOverlay: UIView {
             // twice.
             let width = min(152, panel.width - 30)
             backButton.solidBackground = true
-            backButton.frame = gameRect(CGRect(x: panel.midX - width / 2, y: panel.minY + 332,
+            backButton.frame = gameRect(CGRect(x: panel.midX - width / 2 + 6, y: panel.minY + 332,
                                                width: max(96, width), height: 34))
             return
         }
