@@ -549,6 +549,17 @@ void _mouse_info()
         return;
     }
 
+    // A finger is holding the button. Calls of this function arrive without
+    // anything queued too - a window draw asking the mouse where it is - and
+    // the tail below would read that as "no button held" and release the drag
+    // between frames. That is why a slow drag kept being dropped while a fast
+    // one outran it. The press is put back instead, so the button stays down
+    // until the finger lifts, however many of these calls arrive.
+    if (iosDragState == IOS_DRAG_PRESSED) {
+        _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        return;
+    }
+
     int x;
     int y;
     int buttons = 0;
