@@ -1297,7 +1297,7 @@ struct LauncherView: View {
         model.buttonScale = 1
         model.controlsOpacity = 1
         model.touchControls = true
-        model.autoTarget = false
+        model.autoTarget = true
         model.buttonColour = ControlColour.white.rawValue
     }
 

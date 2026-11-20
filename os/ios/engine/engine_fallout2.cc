@@ -11,6 +11,7 @@
 
 #include "audio_engine.h"
 #include "combat.h"
+#include "debug.h"
 #include "engine_glue.h"
 #include "fallout_engine.h"
 #include "game.h"
@@ -60,6 +61,10 @@ int run(int argc, char** argv)
     if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
         return EXIT_FAILURE;
     }
+
+    // Fallout 2's own log, beside its game files, so a crash or a failed start
+    // leaves a trail the player can read - the same file Fallout 1 writes.
+    fallout::_debug_register_log("vaultos-log.txt", "wt");
 
     atexit(SDL_Quit);
 

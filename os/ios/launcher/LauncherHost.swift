@@ -500,7 +500,7 @@ enum ControlLayout {
     static func autoTarget() -> Bool {
         let value = UserDefaults.standard.object(
             forKey: LauncherModel.optionKey("autoTarget", for: activeGame())) as? Bool
-        return value ?? false
+        return value ?? true
     }
 
     /// The first build with the reference layout used saved drag positions
@@ -683,9 +683,10 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 18
     )
     private let endButton = LabeledControlButton(
-        title: "END",
+        title: "END\nTURN",
         symbol: "xmark",
-        iconPointSize: 18
+        iconPointSize: 18,
+        labelLines: 2
     )
     private let reloadButton = LabeledControlButton(
         title: "RELOAD",
