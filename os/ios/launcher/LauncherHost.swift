@@ -627,6 +627,10 @@ enum ScreenMode: Int {
     case options = 10
     case saves = 11
 
+    /// The panel that picks the item to use something on: drawn like the
+    /// inventory, but the touch layer keeps the trackpad there.
+    case useOn = 12
+
     var isMenu: Bool {
         return self != .game
     }

@@ -16,6 +16,9 @@ typedef enum IosScreen {
     IOS_SCREEN_WORLDMAP = 9,
     IOS_SCREEN_OPTIONS = 10,
     IOS_SCREEN_SAVES = 11,
+    // The panel that picks the item to use something on. It is drawn like the
+    // inventory but has a cursor of its own, so it keeps the trackpad.
+    IOS_SCREEN_USE_ON = 12,
 } IosScreen;
 
 extern int ios_screen;

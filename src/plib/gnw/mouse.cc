@@ -457,6 +457,10 @@ enum IosDragState {
 
 static IosDragState ios_drag_state = IOS_DRAG_IDLE;
 
+// Updates spent in IOS_DRAG_DONE before the press is made again, so a held
+// finger opens the item's extra actions instead of doing nothing.
+static int ios_done_frames;
+
 // How many of those passes the cursor still has to stand through.
 static int ios_drag_hover_passes;
 
@@ -701,6 +705,19 @@ void mouse_info()
             ios_drag_state = IOS_DRAG_DONE;
         }
         mouse_simulate_input(0, 0, 0);
+        ios_done_frames = 0;
+        return;
+    }
+
+    if (ios_drag_state == IOS_DRAG_DONE) {
+        // A finger still down after the click is asking for the item's extra
+        // actions: press again and keep holding, and the game opens its menu
+        // (use, look, unload, drop) the way a long click does.
+        if (++ios_done_frames >= 10) {
+            ios_done_frames = 0;
+            ios_drag_state = IOS_DRAG_PRESSED;
+            mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        }
         return;
     }
 

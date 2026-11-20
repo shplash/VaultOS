@@ -223,7 +223,7 @@ int screen()
     }
 
     if ((mode & fallout::GameMode::kUseOn) != 0) {
-        return 1;
+        return 12;
     }
 
     if ((mode & fallout::GameMode::kPipboy) != 0) {

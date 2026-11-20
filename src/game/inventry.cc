@@ -2284,7 +2284,7 @@ void adjust_fid()
 // 0x464F00
 void use_inventory_on(Object* a1)
 {
-    IosScreenScope screenScope(IOS_SCREEN_INVENTORY);
+    IosScreenScope screenScope(IOS_SCREEN_USE_ON);
 
     if (inven_init() == -1) {
         return;
