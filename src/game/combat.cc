@@ -2224,6 +2224,45 @@ bool combat_can_skip_turn()
         && combat_end_due_to_load == 0;
 }
 
+bool combat_can_end_combat()
+{
+    if (!isInCombat() || obj_dude == NULL) {
+        return false;
+    }
+
+    if (combat_elev == obj_dude->elevation) {
+        int dudeTeam = obj_dude->data.critter.combat.team;
+
+        for (int index = 0; index < list_com; index++) {
+            Object* critter = combat_list[index];
+            if (critter != obj_dude) {
+                int critterTeam = critter->data.critter.combat.team;
+                Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
+                if (critterTeam != dudeTeam || (critterWhoHitMe != NULL && critterWhoHitMe->data.critter.combat.team == critterTeam)) {
+                    if (!combatai_want_to_stop(critter)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        for (int index = list_com; index < list_com + list_noncom; index++) {
+            Object* critter = combat_list[index];
+            if (critter != obj_dude) {
+                int critterTeam = critter->data.critter.combat.team;
+                Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
+                if (critterTeam != dudeTeam || (critterWhoHitMe != NULL && critterWhoHitMe->data.critter.combat.team == critterTeam)) {
+                    if (combatai_want_to_join(critter)) {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 // 0x420798
 static int combat_turn(Object* a1, bool a2)
 {

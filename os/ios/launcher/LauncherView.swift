@@ -897,7 +897,7 @@ struct LauncherView: View {
                     ("Inventory", L.t("Tap an item to inspect its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to. A conversation ends with one of its replies, not with BACK."),
                     ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
-                    ("Auto target", "On by default. The game switches to attack mode as a fight starts, so the first tap is an attack."),
+                    ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
                 ]
             case .survival:
                 return [
@@ -1399,7 +1399,7 @@ struct LauncherView: View {
         model.buttonScale = 1
         model.controlsOpacity = 1
         model.touchControls = true
-        model.autoTarget = true
+        model.autoTarget = false
         model.buttonColour = ControlColour.white.rawValue
     }
 

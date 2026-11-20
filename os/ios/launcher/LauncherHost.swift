@@ -500,7 +500,7 @@ enum ControlLayout {
     static func autoTarget() -> Bool {
         let value = UserDefaults.standard.object(
             forKey: LauncherModel.optionKey("autoTarget", for: activeGame())) as? Bool
-        return value ?? true
+        return value ?? false
     }
 
     /// The first build with the reference layout used saved drag positions
@@ -741,12 +741,7 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16,
         labelLines: 2
     )
-    private let offerButton = LabeledControlButton(
-        title: "HOLD\nOFFER",
-        symbol: "arrow.left.arrow.right.circle",
-        iconPointSize: 16,
-        labelLines: 2
-    )
+    private let offerButton = MovieSkipButton()
     private let talkButton = LabeledControlButton(
         title: "TALK",
         symbol: "bubble.right",
@@ -1009,11 +1004,14 @@ final class GameControlsOverlay: UIView {
         addSubview(tellAboutButton)
 
         offerButton.isHidden = true
-        offerButton.tag = 23
+        offerButton.requiresHold = true
+        offerButton.captionKey = "HOLD OFFER"
         offerButton.accessibilityLabel = "Offer"
-        let offerHold = UILongPressGestureRecognizer(target: self, action: #selector(offerHeld(_:)))
-        offerHold.minimumPressDuration = 0.6
-        offerButton.addGestureRecognizer(offerHold)
+        offerButton.onTrigger = { [weak self] in
+            fallout_ios_press_action(23)
+            self?.refreshControls()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
         addSubview(offerButton)
 
         talkButton.isHidden = true
@@ -1053,11 +1051,7 @@ final class GameControlsOverlay: UIView {
         addSubview(helpBackdrop)
 
         helpCard.isHidden = true
-        helpCard.text = L.t("Tap an item to inspect its characteristics.")
-            + "\n\n"
-            + L.t("Hold and drag an item to equip or move it.")
-            + "\n\n"
-            + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")
+        updateHelpText(for: .inventory)
         helpCard.onClose = { [weak self] in
             self?.setHelp(visible: false)
         }
@@ -1175,37 +1169,82 @@ final class GameControlsOverlay: UIView {
         }
         backButton.solidBackground = false
 
-        // Hung on the edges of the display rather than on the panel, so a
-        // button can never land on top of the game's own interface however
-        // wide the panel is. Only the height follows the panel.
-        let insetLeft = max(10, safeAreaInsets.left + 6)
-        let insetRight = bounds.width - max(10, safeAreaInsets.right + 6) - side
-        let insetTop = max(10, safeAreaInsets.top + 6)
-        let insetBottom = max(10, safeAreaInsets.bottom + 6)
+        let clampLeft = max(10, safeAreaInsets.left + 6)
+        let clampRight = bounds.width - max(10, safeAreaInsets.right + 6) - side
+        let clampTop = max(10, safeAreaInsets.top + 6)
+        let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
 
-        let middle = min(max(box.midY, side / 2 + insetTop), bounds.height - side / 2 - insetBottom)
+        let middle = min(max(box.midY, side / 2 + clampTop), clampBottom - side / 2)
 
-        backButton.frame = CGRect(x: insetLeft, y: middle - side / 2, width: side, height: side)
+        // BACK hugs the left edge of the panel, with OFFER under it on the trade
+        // screen so the left pair reads as one column against the interface.
+        let leftX = min(max(box.minX - gap - side, clampLeft), clampRight)
+        backButton.frame = CGRect(x: leftX, y: middle - side / 2, width: side, height: side)
 
-        let column = [lookButton, offerButton, talkButton, barterButton, tellAboutButton]
-        let shown = column.filter { !$0.isHidden }
-        let stackHeight = CGFloat(shown.count) * side + CGFloat(max(0, shown.count - 1)) * gap
-        var y = max(insetTop, min(middle - stackHeight / 2, bounds.height - insetBottom - stackHeight))
-        for button in shown {
-            button.frame = CGRect(x: insetRight, y: y, width: side, height: side)
+        if !offerButton.isHidden {
+            let width = max(120, side * 1.6)
+            let x = min(max(leftX + side / 2 - width / 2, clampLeft), bounds.width - width - clampLeft)
+            offerButton.frame = CGRect(x: x, y: backButton.frame.maxY + gap, width: width, height: 40)
+        }
+
+        // INSPECT and TALK hug the right edge of the panel.
+        let rightX = max(min(box.maxX + gap, clampRight), clampLeft)
+        var column: [UIView] = []
+        if !lookButton.isHidden {
+            column.append(lookButton)
+        }
+        if !talkButton.isHidden {
+            column.append(talkButton)
+        }
+        let stackHeight = CGFloat(column.count) * side + CGFloat(max(0, column.count - 1)) * gap
+        var y = max(clampTop, middle - stackHeight / 2)
+        for view in column {
+            view.frame = CGRect(x: rightX, y: y, width: side, height: side)
             y += side + gap
         }
-        for button in column where button.isHidden {
-            button.frame = CGRect(x: insetRight, y: middle - side / 2, width: side, height: side)
+
+        if currentScreen == .dialogue {
+            // Fallout draws its own BARTER (and, in the first game, TELL ME
+            // ABOUT) as small red buttons at 593,41 and 593,116 inside the
+            // dialogue window. Ours sit on top of them, dark enough that the
+            // red ones cannot be seen through.
+            let unit = gameRect(CGRect(x: 0, y: 0, width: 1, height: 1)).width
+            let centreX = box.minX + 600 * unit
+            barterButton.solidBackground = true
+            tellAboutButton.solidBackground = true
+            barterButton.frame = CGRect(x: centreX - side / 2, y: box.minY + 48 * unit - side / 2,
+                                        width: side, height: side)
+            tellAboutButton.frame = CGRect(x: centreX - side / 2, y: box.minY + 123 * unit - side / 2,
+                                           width: side, height: side)
+        } else {
+            barterButton.solidBackground = false
+            tellAboutButton.solidBackground = false
         }
 
-        // A third of a control, in the display's own top right corner.
+        // A third of a control, in the panel's own top right corner.
         let helpSide = max(22, side / 3)
-        helpButton.frame = CGRect(x: bounds.width - max(10, safeAreaInsets.right + 6) - helpSide,
-                                  y: insetTop,
+        helpButton.frame = CGRect(x: min(box.maxX + gap, bounds.width - helpSide - clampLeft),
+                                  y: max(box.minY + 4, clampTop),
                                   width: helpSide,
                                   height: helpSide)
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
+    }
+
+    private func updateHelpText(for screen: ScreenMode) {
+        if screen == .barter {
+            helpCard.text = L.t("Drag an item onto the table to offer it.")
+                + "\n\n"
+                + L.t("Hold OFFER to make the trade.")
+                + "\n\n"
+                + L.t("TALK goes back to the conversation.")
+            return
+        }
+
+        helpCard.text = L.t("Hold and drag an item to equip or move it.")
+            + "\n\n"
+            + L.t("Tap an item to inspect its characteristics.")
+            + "\n\n"
+            + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")
     }
 
     private func layoutHelpCard() {
@@ -1475,16 +1514,6 @@ final class GameControlsOverlay: UIView {
         setNeedsLayout()
     }
 
-    @objc private func offerHeld(_ recognizer: UILongPressGestureRecognizer) {
-        guard recognizer.state == .began else {
-            return
-        }
-
-        fallout_ios_press_action(23)
-        refreshControls()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-
     @objc private func dismissHelp() {
         setHelp(visible: false)
     }
@@ -1523,7 +1552,6 @@ final class GameControlsOverlay: UIView {
         lookButton.controlOpacity = value
         barterButton.controlOpacity = value
         tellAboutButton.controlOpacity = value
-        offerButton.controlOpacity = value
         talkButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
@@ -1587,6 +1615,7 @@ final class GameControlsOverlay: UIView {
                 fallout_ios_press_action(18)
             }
             lookButton.showsSelection = false
+            updateHelpText(for: screen)
             setNeedsLayout()
         }
 
@@ -1635,7 +1664,7 @@ final class GameControlsOverlay: UIView {
             lookButton.isHidden = !itemScreen
             helpButton.isHidden = !itemScreen
 
-            if fallout_ios_action_available(21) == 0 && !keyboardIsUp {
+            if fallout_ios_action_available(21) == 0 {
                 backButton.isHidden = true
             }
 
@@ -1653,7 +1682,7 @@ final class GameControlsOverlay: UIView {
             isHidden = !shown
         }
 
-        let inCombat = fallout_ios_action_available(5) != 0
+        let inCombat = fallout_ios_action_available(25) != 0
         if inCombat && !wasInCombat && ControlLayout.autoTarget() && fallout_ios_cursor_mode() != 2 {
             fallout_ios_press_action(12)
         } else if !inCombat && wasInCombat {
@@ -1696,7 +1725,9 @@ final class GameControlsOverlay: UIView {
         }
         skillButton.isEnabled = fallout_ios_action_available(4) != 0
         swapButton.isEnabled = fallout_ios_action_available(7) != 0
-        endButton.isEnabled = fallout_ios_action_available(5) != 0
+        let canEndCombat = fallout_ios_action_available(5) != 0
+        endButton.isHidden = !canEndCombat
+        endButton.isEnabled = canEndCombat
         skipButton.isHidden = fallout_ios_action_available(6) == 0
 
         // Reload needs a firearm and the attack mode needs an item in hand; the
@@ -2254,9 +2285,14 @@ public func fallout_ios_refresh_game_controls() {
 
 final class MovieSkipButton: UIControl {
     var onTrigger: (() -> Void)?
+    var captionKey: String? {
+        didSet {
+            caption.text = L.t(captionKey ?? (requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP"))
+        }
+    }
     var requiresHold = false {
         didSet {
-            caption.text = L.t(requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP")
+            caption.text = L.t(captionKey ?? (requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP"))
         }
     }
 

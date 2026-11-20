@@ -34,6 +34,7 @@ namespace fallout {
 extern int gMovieCurrent;
 extern bool iosInspect;
 void mouseIosClick(int state);
+bool iosCombatCanEnd();
 }
 
 namespace {
@@ -313,6 +314,7 @@ int action_available(int action)
         // The pip-boy is unavailable in combat.
         return fallout::isInCombat() ? 0 : 1;
     case 5:
+        return fallout::iosCombatCanEnd() ? 1 : 0;
     case 6:
         return fallout::isInCombat() ? 1 : 0;
     case 8:
@@ -321,6 +323,8 @@ int action_available(int action)
     case 9:
         // Fire mode: any weapon has attack modes to cycle.
         return has_weapon_in_hand();
+    case 25:
+        return fallout::isInCombat() ? 1 : 0;
     case 20:
         return screen() == 4 ? 1 : 0;
     case 21:

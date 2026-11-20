@@ -117,7 +117,7 @@ final class LauncherModel: ObservableObject {
     /// Whether the touch controls are drawn over the game at all. Off leaves the
     /// whole screen to the game, for a session with a controller in hand.
     @Published var touchControls = true { didSet { store(touchControls, "touchControls") } }
-    @Published var autoTarget = true { didSet { store(autoTarget, "autoTarget") } }
+    @Published var autoTarget = false { didSet { store(autoTarget, "autoTarget") } }
     /// The colour of the on-screen controls. White unless the player picks one
     /// of the others; stored per game like every other option.
     @Published var buttonColour = ControlColour.white.rawValue {
@@ -420,7 +420,7 @@ final class LauncherModel: ObservableObject {
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
         controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.10), 1)
         touchControls = storedBool("touchControls", for: game, fallback: true)
-        autoTarget = storedBool("autoTarget", for: game, fallback: true)
+        autoTarget = storedBool("autoTarget", for: game, fallback: false)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 

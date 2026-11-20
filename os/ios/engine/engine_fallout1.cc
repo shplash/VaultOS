@@ -167,9 +167,11 @@ int action_available(int action)
     case 3:
         return fallout::isInCombat() ? 0 : 1;
     case 5:
-        return fallout::isInCombat() ? 1 : 0;
+        return fallout::combat_can_end_combat() ? 1 : 0;
     case 6:
         return fallout::combat_can_skip_turn() ? 1 : 0;
+    case 25:
+        return fallout::isInCombat() ? 1 : 0;
     case 8:
         // Reload: needs a loaded world and a weapon that takes ammunition.
         if (fallout::obj_dude == nullptr) {
