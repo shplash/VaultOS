@@ -6849,34 +6849,41 @@ bool iosCombatCanEnd()
         return false;
     }
 
-    if (_combat_elev == gDude->elevation) {
-        int dudeTeam = gDude->data.critter.combat.team;
+    if (_combat_elev != gDude->elevation) {
+        return true;
+    }
 
-        for (int index = 0; index < _list_com; index++) {
-            Object* critter = _combat_list[index];
-            if (critter != gDude) {
-                int critterTeam = critter->data.critter.combat.team;
-                Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
-                if (critterTeam != dudeTeam || (critterWhoHitMe != nullptr && critterWhoHitMe->data.critter.combat.team == critterTeam)) {
-                    if (!_combatai_want_to_stop(critter)) {
-                        return false;
-                    }
-                }
-            }
+    int dudeTeam = gDude->data.critter.combat.team;
+
+    for (int index = 0; index < _list_com + _list_noncom; index++) {
+        Object* critter = _combat_list[index];
+        if (critter == gDude) {
+            continue;
         }
 
-        for (int index = _list_com; index < _list_com + _list_noncom; index++) {
-            Object* critter = _combat_list[index];
-            if (critter != gDude) {
-                int critterTeam = critter->data.critter.combat.team;
-                Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
-                if (critterTeam != dudeTeam || (critterWhoHitMe != nullptr && critterWhoHitMe->data.critter.combat.team == critterTeam)) {
-                    if (_combatai_want_to_join(critter)) {
-                        return false;
-                    }
-                }
-            }
+        int critterTeam = critter->data.critter.combat.team;
+        Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
+        if (critterTeam == dudeTeam && (critterWhoHitMe == nullptr || critterWhoHitMe->data.critter.combat.team != critterTeam)) {
+            continue;
         }
+
+        if ((critter->data.critter.combat.maneuver & CRITTER_MANEUVER_DISENGAGING) != 0) {
+            continue;
+        }
+
+        if ((critter->data.critter.combat.results & (DAM_KNOCKED_OUT | DAM_DEAD)) != 0) {
+            continue;
+        }
+
+        if ((critter->data.critter.combat.maneuver & CRITTER_MANUEVER_FLEEING) != 0) {
+            continue;
+        }
+
+        if (critter->data.critter.combat.ap == critterGetStat(critter, STAT_MAXIMUM_ACTION_POINTS)) {
+            continue;
+        }
+
+        return false;
     }
 
     return true;
