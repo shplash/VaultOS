@@ -1,6 +1,7 @@
 #include "mouse.h"
 
 #include "color.h"
+#include "debug.h"
 #include "dinput.h"
 #include "game_mouse.h"
 #include "input.h"
@@ -32,6 +33,10 @@ enum IosDragState {
 
 static IosDragState iosDragState = IOS_DRAG_IDLE;
 static bool iosWaitCursorWasUp = false;
+
+// The finger position the press will land on, kept for the log line.
+static int iosDragX;
+static int iosDragY;
 
 static void mousePrepareDefaultCursor();
 static void _mouse_anim();
@@ -453,10 +458,20 @@ void _mouse_info()
     }
 
     if (iosDragState == IOS_DRAG_POSITIONED) {
-        // The position went in on the previous input update, so the game can
-        // read the press at the right place.
+        // The cursor has stood on the item for a whole input pass, which is
+        // what the button layer needs: a button only becomes the hovered one on
+        // a pass with nothing pressed, and a press on a button that is not
+        // hovered is dropped.
+        //
+        // The pass is also cleared of any leftover button. _mouse_simulate_input
+        // derives the event from the previous value, so a press that followed a
+        // still-held one would come out as a repeat - and the button layer only
+        // reads MOUSE_STATE_LEFT_BUTTON_DOWN as a press. Clearing first makes
+        // this press a genuine down every time, wherever the last one left off.
+        _mouse_simulate_input(0, 0, 0);
         iosDragState = iosInspect ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
         _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        debugPrint("[ios] press %d,%d state=%d\n", iosDragX, iosDragY, iosDragState);
         return;
     }
 
@@ -465,6 +480,7 @@ void _mouse_info()
         // finger lifts, so a finger that drifts cannot click again.
         iosDragState = IOS_DRAG_DONE;
         _mouse_simulate_input(0, 0, 0);
+        debugPrint("[ios] click release\n");
         return;
     }
 
@@ -510,6 +526,7 @@ void _mouse_info()
 
                 iosDragState = IOS_DRAG_IDLE;
                 _mouse_simulate_input(0, 0, 0);
+                debugPrint("[ios] release %d,%d\n", gesture.x, gesture.y);
                 break;
             }
 
@@ -523,6 +540,13 @@ void _mouse_info()
                 prevy = gesture.y;
                 if (iosDragState == IOS_DRAG_IDLE) {
                     iosDragState = IOS_DRAG_POSITIONED;
+                    iosDragX = gesture.x;
+                    iosDragY = gesture.y;
+                    // Nothing pressed while the cursor arrives, so the button
+                    // under it can become the hovered one; a press on a button
+                    // that is not hovered yet is dropped.
+                    _mouse_simulate_input(0, 0, 0);
+                    debugPrint("[ios] position %d,%d screen=%d\n", gesture.x, gesture.y, iosMenuScreen() ? 1 : 0);
                 } else if (iosDragState == IOS_DRAG_PRESSED) {
                     _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 }

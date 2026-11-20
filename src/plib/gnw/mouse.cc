@@ -2,6 +2,7 @@
 
 #include "game/ios_screen.h"
 #include "plib/color/color.h"
+#include "plib/gnw/debug.h"
 #include "plib/gnw/dxinput.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/input.h"
@@ -446,6 +447,10 @@ enum IosDragState {
 
 static IosDragState ios_drag_state = IOS_DRAG_IDLE;
 
+// The finger position the press will land on, kept for the log line.
+static int ios_drag_x;
+static int ios_drag_y;
+
 // 0x4B4DD8
 void mouse_info()
 {
@@ -481,12 +486,21 @@ void mouse_info()
     touch_set_immediate_press(ios_direct_touch_active());
 
     if (ios_drag_state == IOS_DRAG_POSITIONED) {
-        // The position went in on the previous input update, so the game can
-        // read the press at the right place. INSPECT turns it into a click:
-        // the button comes straight back up, which is the press Fallout keeps
-        // as a look at the item rather than as a hold that opens its menu.
+        // The cursor has stood on the item for a whole input pass, which is
+        // what the button layer needs: a button only becomes the hovered one on
+        // a pass with nothing pressed, and a press on a button that is not
+        // hovered is dropped.
+        //
+        // The pass is also cleared of any leftover button. mouse_simulate_input
+        // derives the event from the previous value, so a press that followed a
+        // still-held one would come out as a repeat - and the button layer only
+        // reads MOUSE_EVENT_LEFT_BUTTON_DOWN as a press. Clearing first makes
+        // this press a genuine down every time, wherever the last one left off.
+        mouse_simulate_input(0, 0, 0);
         ios_drag_state = ios_inspect ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
         mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        debug_printf("[ios] press %d,%d buttons=0x%02X\n",
+            ios_drag_x, ios_drag_y, mouse_get_buttons());
         return;
     }
 
@@ -495,6 +509,7 @@ void mouse_info()
         // finger lifts, so a finger that drifts cannot click again.
         ios_drag_state = IOS_DRAG_DONE;
         mouse_simulate_input(0, 0, 0);
+        debug_printf("[ios] click release buttons=0x%02X\n", mouse_get_buttons());
         return;
     }
 
@@ -573,6 +588,8 @@ void mouse_info()
                 // the finger lifts, otherwise Fallout keeps walking.
                 ios_drag_state = IOS_DRAG_IDLE;
                 mouse_simulate_input(0, 0, 0);
+                debug_printf("[ios] release %d,%d buttons=0x%02X\n",
+                    gesture.x, gesture.y, mouse_get_buttons());
                 break;
             }
 
@@ -586,6 +603,13 @@ void mouse_info()
                 prevy = gesture.y;
                 if (ios_drag_state == IOS_DRAG_IDLE) {
                     ios_drag_state = IOS_DRAG_POSITIONED;
+                    ios_drag_x = gesture.x;
+                    ios_drag_y = gesture.y;
+                    // Nothing pressed while the cursor arrives, so the button
+                    // under it can become the hovered one; a press on a button
+                    // that is not hovered yet is dropped.
+                    mouse_simulate_input(0, 0, 0);
+                    debug_printf("[ios] position %d,%d screen=%d\n", gesture.x, gesture.y, ios_screen);
                 } else if (ios_drag_state == IOS_DRAG_PRESSED) {
                     mouse_simulate_input(0, 0, primaryButton);
                 }
