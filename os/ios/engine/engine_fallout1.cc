@@ -155,6 +155,8 @@ void reload_active_weapon()
     fallout::intface_item_reload();
 }
 
+int screen();
+
 int action_available(int action)
 {
     if (!fallout::intface_is_enabled()) {
@@ -181,11 +183,14 @@ int action_available(int action)
         }
         return has_item_in_hand();
     case 20:
-        return fallout::dialog_active() ? 1 : 0;
+        return screen() == fallout::IOS_SCREEN_DIALOGUE ? 1 : 0;
     case 21:
-        return fallout::dialog_active() ? 0 : 1;
+        return screen() == fallout::IOS_SCREEN_DIALOGUE ? 0 : 1;
     case 22:
-        return fallout::dialog_active() ? 1 : 0;
+        return screen() == fallout::IOS_SCREEN_DIALOGUE ? 1 : 0;
+    case 23:
+    case 24:
+        return screen() == fallout::IOS_SCREEN_BARTER ? 1 : 0;
     default:
         return 1;
     }
@@ -265,6 +270,12 @@ void press_action(int action)
         break;
     case 22:
         ios_send_scan_code(SDL_SCANCODE_A);
+        break;
+    case 23:
+        ios_send_scan_code(SDL_SCANCODE_M);
+        break;
+    case 24:
+        ios_send_scan_code(SDL_SCANCODE_T);
         break;
     default:
         break;

@@ -327,6 +327,9 @@ int action_available(int action)
         return screen() == 4 ? 0 : 1;
     case 22:
         return 0;
+    case 23:
+    case 24:
+        return screen() == 3 ? 1 : 0;
     default:
         return 1;
     }
@@ -403,6 +406,12 @@ void press_action(int action)
         break;
     case 20:
         send_key(SDL_SCANCODE_B);
+        break;
+    case 23:
+        send_key(SDL_SCANCODE_M);
+        break;
+    case 24:
+        send_key(SDL_SCANCODE_T);
         break;
     default:
         break;

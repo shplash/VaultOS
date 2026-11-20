@@ -673,10 +673,11 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 18
     )
     private let skipButton = LabeledControlButton(
-        title: "SKIP",
+        title: "END\nTURN",
         symbol: "forward.end",
         iconPointSize: 18,
-        accent: true
+        accent: true,
+        labelLines: 2
     )
     private let skillButton = LabeledControlButton(
         title: "SKILL",
@@ -689,7 +690,7 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 18
     )
     private let endButton = LabeledControlButton(
-        title: "END\nTURN",
+        title: "END\nCOMBAT",
         symbol: "xmark",
         iconPointSize: 18,
         labelLines: 2
@@ -740,8 +741,20 @@ final class GameControlsOverlay: UIView {
         iconPointSize: 16,
         labelLines: 2
     )
+    private let offerButton = LabeledControlButton(
+        title: "HOLD\nOFFER",
+        symbol: "arrow.left.arrow.right.circle",
+        iconPointSize: 16,
+        labelLines: 2
+    )
+    private let talkButton = LabeledControlButton(
+        title: "TALK",
+        symbol: "bubble.right",
+        iconPointSize: 16
+    )
     private let keyboardCatcher = UIControl()
-    private var lastMenuRect: CGRect?
+    private var menuRectCache: CGRect?
+    private var menuRectScreen: ScreenMode = .game
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let helpCard = InventoryHelpCard()
     private var currentScreen: ScreenMode = .game
@@ -991,6 +1004,20 @@ final class GameControlsOverlay: UIView {
         tellAboutButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(tellAboutButton)
 
+        offerButton.isHidden = true
+        offerButton.tag = 23
+        offerButton.accessibilityLabel = "Offer"
+        let offerHold = UILongPressGestureRecognizer(target: self, action: #selector(offerHeld(_:)))
+        offerHold.minimumPressDuration = 0.6
+        offerButton.addGestureRecognizer(offerHold)
+        addSubview(offerButton)
+
+        talkButton.isHidden = true
+        talkButton.tag = 24
+        talkButton.accessibilityLabel = "Talk"
+        talkButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(talkButton)
+
         keyboardCatcher.isHidden = true
         keyboardCatcher.backgroundColor = .clear
         keyboardCatcher.addTarget(self, action: #selector(keyboardDismissRequested), for: .touchUpInside)
@@ -1131,7 +1158,7 @@ final class GameControlsOverlay: UIView {
     }
 
     private func layoutMenuControls() {
-        let panel = engineMenuRect()
+        let panel = menuRectCache ?? engineMenuRect()
         let box = panel.map(gameRect) ?? menuBox(for: currentScreen)
 
         let surface = gameSurface()
@@ -1150,41 +1177,35 @@ final class GameControlsOverlay: UIView {
             return
         }
         backButton.solidBackground = false
-        let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
-                         bounds.height - side / 2 - safeAreaInsets.bottom - 4)
 
-        // Hung on the menu's own edges, inside the game's own area rather than
-        // out in the black bars, so each button sits right beside the panel it
-        // belongs to. BACK on the left edge, INSPECT on the right.
-        let left = max(box.minX - gap - side, surface.minX + 4)
-        let right = min(box.maxX + gap, surface.maxX - side - 4)
+        // Hung on the edges of the display rather than on the panel, so a
+        // button can never land on top of the game's own interface however
+        // wide the panel is. Only the height follows the panel.
+        let insetLeft = max(10, safeAreaInsets.left + 6)
+        let insetRight = bounds.width - max(10, safeAreaInsets.right + 6) - side
+        let insetTop = max(10, safeAreaInsets.top + 6)
+        let insetBottom = max(10, safeAreaInsets.bottom + 6)
 
-        backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
-        lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
+        let middle = min(max(box.midY, side / 2 + insetTop), bounds.height - side / 2 - insetBottom)
 
-        var dialogueButtons: [LabeledControlButton] = []
-        if !barterButton.isHidden {
-            dialogueButtons.append(barterButton)
+        backButton.frame = CGRect(x: insetLeft, y: middle - side / 2, width: side, height: side)
+
+        let column = [lookButton, offerButton, talkButton, barterButton, tellAboutButton]
+        let shown = column.filter { !$0.isHidden }
+        let stackHeight = CGFloat(shown.count) * side + CGFloat(max(0, shown.count - 1)) * gap
+        var y = max(insetTop, min(middle - stackHeight / 2, bounds.height - insetBottom - stackHeight))
+        for button in shown {
+            button.frame = CGRect(x: insetRight, y: y, width: side, height: side)
+            y += side + gap
         }
-        if !tellAboutButton.isHidden {
-            dialogueButtons.append(tellAboutButton)
-        }
-        if dialogueButtons.isEmpty {
-            barterButton.frame = lookButton.frame
-            tellAboutButton.frame = lookButton.frame
-        } else {
-            let stackHeight = CGFloat(dialogueButtons.count) * side + CGFloat(dialogueButtons.count - 1) * gap
-            var y = middle - stackHeight / 2
-            for button in dialogueButtons {
-                button.frame = CGRect(x: right, y: y, width: side, height: side)
-                y += side + gap
-            }
+        for button in column where button.isHidden {
+            button.frame = CGRect(x: insetRight, y: middle - side / 2, width: side, height: side)
         }
 
-        // A third of a control, tucked into the menu's top right corner.
+        // A third of a control, in the display's own top right corner.
         let helpSide = max(22, side / 3)
-        helpButton.frame = CGRect(x: box.maxX - helpSide - 4,
-                                  y: max(box.minY + 4, surface.minY + 4),
+        helpButton.frame = CGRect(x: bounds.width - max(10, safeAreaInsets.right + 6) - helpSide,
+                                  y: insetTop,
                                   width: helpSide,
                                   height: helpSide)
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
@@ -1402,6 +1423,16 @@ final class GameControlsOverlay: UIView {
         fallout_ios_hide_keyboard()
     }
 
+    @objc private func offerHeld(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.state == .began else {
+            return
+        }
+
+        fallout_ios_press_action(23)
+        refreshControls()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
     @objc private func dismissHelp() {
         setHelp(visible: false)
     }
@@ -1440,6 +1471,8 @@ final class GameControlsOverlay: UIView {
         lookButton.controlOpacity = value
         barterButton.controlOpacity = value
         tellAboutButton.controlOpacity = value
+        offerButton.controlOpacity = value
+        talkButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }
@@ -1467,6 +1500,8 @@ final class GameControlsOverlay: UIView {
             helpButton.isHidden = true
             barterButton.isHidden = true
             tellAboutButton.isHidden = true
+            offerButton.isHidden = true
+            talkButton.isHidden = true
             helpCard.isHidden = true
             helpBackdrop.isHidden = true
             if isHidden {
@@ -1514,12 +1549,21 @@ final class GameControlsOverlay: UIView {
         let dialogueBarter = screen == .dialogue && fallout_ios_action_available(20) != 0
         barterButton.isHidden = !dialogueBarter
         tellAboutButton.isHidden = !(screen == .dialogue && fallout_ios_action_available(22) != 0)
+        let barterScreen = screen == .barter
+        offerButton.isHidden = !(barterScreen && fallout_ios_action_available(23) != 0)
+        talkButton.isHidden = !(barterScreen && fallout_ios_action_available(24) != 0)
 
         if screen.isMenu {
-            let panel = engineMenuRect()
-            if panel != lastMenuRect {
-                lastMenuRect = panel
-                setNeedsLayout()
+            if menuRectScreen != screen {
+                menuRectScreen = screen
+                menuRectCache = nil
+            }
+
+            if menuRectCache == nil {
+                menuRectCache = engineMenuRect()
+                if menuRectCache != nil {
+                    setNeedsLayout()
+                }
             }
 
             if !ControlLayout.touchControls() {
