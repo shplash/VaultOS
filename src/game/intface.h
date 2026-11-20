@@ -50,6 +50,9 @@ int intface_get_attack(int* hitMode, bool* aiming);
 int intface_update_items(bool animated);
 int intface_toggle_items(bool animated);
 int intface_toggle_item_state();
+// The interface's own reload: fills the weapon in hand, redraws the ammo lights
+// and plays its ready sound. 0 when something was loaded, -1 when nothing was.
+int intface_item_reload();
 void intface_use_item();
 int intface_is_item_right_hand();
 int intface_get_current_item(Object** itemPtr);

@@ -149,20 +149,10 @@ int has_reloadable_weapon()
 
 void reload_active_weapon()
 {
-    fallout::Object* item = nullptr;
-    if (fallout::obj_dude == nullptr
-        || fallout::intface_get_current_item(&item) != 0
-        || !is_real_item(item)) {
-        return;
-    }
-
-    // The interface's own reload, step for step: fill the weapon, then let the
-    // item state and the ammo lights catch up so the HUD updates at once.
-    while (fallout::item_w_try_reload(fallout::obj_dude, item) != -1) {
-    }
-
-    fallout::intface_toggle_item_state();
-    fallout::intface_update_items(false);
+    // The interface's own reload, sound included, so the on-screen button does
+    // exactly what the game does when the weapon slot reloads - not a silent
+    // copy of half of it.
+    fallout::intface_item_reload();
 }
 
 int action_available(int action)

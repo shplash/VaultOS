@@ -2166,7 +2166,7 @@ static void intface_draw_ammo_lights(int x, int ratio)
 }
 
 // 0x4560E4
-static int intface_item_reload()
+int intface_item_reload()
 {
     if (interfaceWindow == -1) {
         return -1;
