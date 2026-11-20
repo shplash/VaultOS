@@ -726,6 +726,7 @@ final class GameControlsOverlay: UIView {
     private var fireModeValue: Int32 = -2
     private var wasInCombat = false
     private var inspectOn = false
+    private var movieWasPlaying = false
 
     /// Refreshes the overlay that is on screen, if there is one. The engine
     /// calls this from its own input loop, on the main thread between frames,
@@ -1260,6 +1261,7 @@ final class GameControlsOverlay: UIView {
         skipMovieButton.requiresHold = movie != 1
         movieShield.isHidden = movie == 0
         if movie != 0 {
+            movieWasPlaying = true
             for control in controls {
                 control.isHidden = true
             }
@@ -1276,6 +1278,14 @@ final class GameControlsOverlay: UIView {
             // them to the screen now.
             CATransaction.flush()
             return
+        }
+
+        if movieWasPlaying {
+            movieWasPlaying = false
+            // What follows a movie is usually a loading screen the engine draws
+            // without handing the run loop back for a while, so the controls
+            // that just went away are sent to the screen now.
+            CATransaction.flush()
         }
 
         for control in controls {
