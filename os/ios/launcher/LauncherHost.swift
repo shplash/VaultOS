@@ -1078,18 +1078,18 @@ final class GameControlsOverlay: UIView {
         let middle = min(max(box.midY, side / 2 + safeAreaInsets.top + 4),
                          bounds.height - side / 2 - safeAreaInsets.bottom - 4)
 
-        // Hung on the menu's own edges, never under the sensor housing.
+        // BACK hangs on the menu's own left edge. INSPECT sits outside the menu
+        // on the right, against the edge of the screen, and its help button,
+        // a third of the size, stacks above it in the same column.
         let left = max(box.minX - gap - side, safeAreaInsets.left + 6)
-        let right = min(box.maxX + gap, bounds.width - safeAreaInsets.right - 6 - side)
+        let right = max(left, bounds.width - safeAreaInsets.right - 8 - side)
 
         backButton.frame = CGRect(x: left, y: middle - side / 2, width: side, height: side)
         lookButton.frame = CGRect(x: right, y: middle - side / 2, width: side, height: side)
 
-        // A third of a control, in the menu's top right corner.
         let helpSide = max(22, side / 3)
-        let helpRight = min(box.maxX, bounds.width - safeAreaInsets.right) - helpSide - 4
-        helpButton.frame = CGRect(x: max(helpRight, safeAreaInsets.left + 4),
-                                  y: max(box.minY + 4, safeAreaInsets.top + 4),
+        helpButton.frame = CGRect(x: right + side - helpSide,
+                                  y: max(safeAreaInsets.top + 4, middle - side / 2 - helpSide - 8),
                                   width: helpSide,
                                   height: helpSide)
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
@@ -1225,8 +1225,11 @@ final class GameControlsOverlay: UIView {
     @objc private func lookPressed() {
         fallout_ios_press_action(16)
         // The game keeps this mode to itself, so the button carries it, and a
-        // wash of white shows when the inventory is in look mode.
+        // wash of white shows when the inventory is in look mode. The engine is
+        // told as well: in look mode a touch clicks an item instead of dragging
+        // it, and that click is what shows the item's description.
         inspectOn.toggle()
+        fallout_ios_press_action(inspectOn ? 17 : 18)
         lookButton.showsSelection = inspectOn
         UISelectionFeedbackGenerator().selectionChanged()
     }
@@ -1324,7 +1327,10 @@ final class GameControlsOverlay: UIView {
         let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
         if screen != currentScreen {
             currentScreen = screen
-            inspectOn = false
+            if inspectOn {
+                inspectOn = false
+                fallout_ios_press_action(18)
+            }
             lookButton.showsSelection = false
             setNeedsLayout()
         }
