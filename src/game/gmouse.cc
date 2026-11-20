@@ -1195,6 +1195,13 @@ int gmouse_set_cursor(int cursor)
         return -1;
     }
 
+    // The globe is the game's loading cursor. Centring the pointer as it comes
+    // up keeps the first mouse position of a new map away from a corner, which
+    // the game would otherwise read as "walk there" once the world appears.
+    if (cursor == MOUSE_CURSOR_WAIT_PLANET) {
+        mouse_set_position(screenGetWidth() / 2, screenGetHeight() / 2);
+    }
+
     if (cursor != MOUSE_CURSOR_ARROW && cursor == gmouse_current_cursor && (gmouse_current_cursor < 25 || gmouse_current_cursor >= 27)) {
         return -1;
     }

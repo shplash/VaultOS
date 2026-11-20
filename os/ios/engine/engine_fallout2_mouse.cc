@@ -2,6 +2,7 @@
 
 #include "color.h"
 #include "dinput.h"
+#include "game_mouse.h"
 #include "input.h"
 #include "kb.h"
 #include "memory.h"
@@ -13,6 +14,24 @@ namespace fallout {
 bool iosItemScreen();
 bool iosMenuScreen();
 void touch_set_immediate_press(bool enabled);
+
+// Set by the INSPECT button: an item screen then takes a touch as a click
+// instead of a drag, which is the press Fallout keeps as a look at the item.
+bool iosInspect = false;
+
+// The direct-touch press, in the order the game has to see it: the position
+// goes in on one input update, the button on the next, and the touch is only a
+// drag once the button is actually down.
+enum IosDragState {
+    IOS_DRAG_IDLE,
+    IOS_DRAG_POSITIONED,
+    IOS_DRAG_PRESSED,
+    IOS_DRAG_CLICK_RELEASE,
+    IOS_DRAG_DONE,
+};
+
+static IosDragState iosDragState = IOS_DRAG_IDLE;
+static bool iosWaitCursorWasUp = false;
 
 static void mousePrepareDefaultCursor();
 static void _mouse_anim();
@@ -414,6 +433,33 @@ void _mouse_info()
         return;
     }
 
+    // The globe is the game's loading cursor. Centring the pointer as it comes
+    // up keeps the first click of a new map away from a corner, which the game
+    // would otherwise read as "walk there" as soon as the world appears.
+    const bool waitingCursorUp = gameMouseGetCursor() >= FIRST_GAME_MOUSE_ANIMATED_CURSOR;
+    if (waitingCursorUp != iosWaitCursorWasUp) {
+        iosWaitCursorWasUp = waitingCursorUp;
+        if (waitingCursorUp) {
+            mouseIosMovePointer(screenGetWidth() / 2, screenGetHeight() / 2);
+        }
+    }
+
+    if (iosDragState == IOS_DRAG_POSITIONED) {
+        // The position went in on the previous input update, so the game can
+        // read the press at the right place.
+        iosDragState = iosInspect ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
+        _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        return;
+    }
+
+    if (iosDragState == IOS_DRAG_CLICK_RELEASE) {
+        // One click per touch: the rest of the touch is ignored until the
+        // finger lifts, so a finger that drifts cannot click again.
+        iosDragState = IOS_DRAG_DONE;
+        _mouse_simulate_input(0, 0, 0);
+        return;
+    }
+
     Gesture gesture;
     bool handledGesture = false;
     static int prevx;
@@ -447,20 +493,24 @@ void _mouse_info()
                     mouseIosMovePointer(gesture.x, gesture.y);
                 }
 
+                iosDragState = IOS_DRAG_IDLE;
                 _mouse_simulate_input(0, 0, 0);
                 break;
             }
 
             if (iosMenuScreen() && gesture.numberOfTouches == 1) {
-                // A menu grabs whatever sits under the cursor, so the finger is
-                // the cursor there: every event plants it on the finger and
-                // keeps the button down. Tracking the finger absolutely is what
-                // lets one touch pick an item up - a relative drag only moves
-                // what the cursor already covered when it started.
+                // The position goes in first, on this update; the button
+                // follows on the next one. Once it is down the finger is the
+                // cursor: every event plants it there and keeps the button
+                // down, which is what makes one touch a continuous drag.
                 mouseIosMovePointer(gesture.x, gesture.y);
                 prevx = gesture.x;
                 prevy = gesture.y;
-                _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                if (iosDragState == IOS_DRAG_IDLE) {
+                    iosDragState = IOS_DRAG_POSITIONED;
+                } else if (iosDragState == IOS_DRAG_PRESSED) {
+                    _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                }
                 break;
             }
 

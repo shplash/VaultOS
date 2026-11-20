@@ -30,6 +30,7 @@
 
 namespace fallout {
 extern int gMovieCurrent;
+extern bool iosInspect;
 void mouseIosClick(int state);
 }
 
@@ -362,6 +363,13 @@ void press_action(int action)
         break;
     case 16:
         fallout::mouseIosClick(MOUSE_STATE_RIGHT_BUTTON_DOWN);
+        break;
+    case 17:
+        // INSPECT switched on: an item screen takes a touch as a click.
+        fallout::iosInspect = true;
+        break;
+    case 18:
+        fallout::iosInspect = false;
         break;
     default:
         break;

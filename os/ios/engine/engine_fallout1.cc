@@ -252,6 +252,13 @@ void press_action(int action)
     case 16:
         fallout::mouse_ios_right_click();
         break;
+    case 17:
+        // INSPECT switched on: an item screen takes a touch as a click.
+        fallout::ios_inspect = true;
+        break;
+    case 18:
+        fallout::ios_inspect = false;
+        break;
     default:
         break;
     }

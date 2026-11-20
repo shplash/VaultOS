@@ -20,6 +20,10 @@ typedef enum IosScreen {
 
 extern int ios_screen;
 
+// Set by the INSPECT button. On the item screens it turns a touch into a click
+// on the item instead of a drag, which is the path that shows its description.
+extern bool ios_inspect;
+
 class IosScreenScope {
 public:
     explicit IosScreenScope(int screen)

@@ -433,6 +433,19 @@ static bool ios_direct_touch_active()
     return ios_screen != IOS_SCREEN_GAME;
 }
 
+// The direct-touch press, in the order the game has to see it: the position
+// goes in on one input update, the button on the next, and the touch is only a
+// drag once the button is actually down.
+enum IosDragState {
+    IOS_DRAG_IDLE,
+    IOS_DRAG_POSITIONED,
+    IOS_DRAG_PRESSED,
+    IOS_DRAG_CLICK_RELEASE,
+    IOS_DRAG_DONE,
+};
+
+static IosDragState ios_drag_state = IOS_DRAG_IDLE;
+
 // 0x4B4DD8
 void mouse_info()
 {
@@ -466,6 +479,24 @@ void mouse_info()
     // Menus take the finger as the pointer, so their touches are reported as
     // they land rather than after a move or a hold.
     touch_set_immediate_press(ios_direct_touch_active());
+
+    if (ios_drag_state == IOS_DRAG_POSITIONED) {
+        // The position went in on the previous input update, so the game can
+        // read the press at the right place. INSPECT turns it into a click:
+        // the button comes straight back up, which is the press Fallout keeps
+        // as a look at the item rather than as a hold that opens its menu.
+        ios_drag_state = ios_inspect ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
+        mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        return;
+    }
+
+    if (ios_drag_state == IOS_DRAG_CLICK_RELEASE) {
+        // One click per touch: the rest of the touch is ignored until the
+        // finger lifts, so a finger that drifts cannot click again.
+        ios_drag_state = IOS_DRAG_DONE;
+        mouse_simulate_input(0, 0, 0);
+        return;
+    }
 
     if (mouse_ios_left_click_pending) {
         mouse_ios_left_click_pending = false;
@@ -524,20 +555,24 @@ void mouse_info()
 
                 // A long press holds the button down; always release it when
                 // the finger lifts, otherwise Fallout keeps walking.
+                ios_drag_state = IOS_DRAG_IDLE;
                 mouse_simulate_input(0, 0, 0);
                 break;
             }
 
             if (ios_direct_touch_active() && gesture.numberOfTouches == 1) {
-                // A menu grabs whatever sits under the cursor, so the finger is
-                // the cursor there: every event plants it on the finger and
-                // keeps the button down. Tracking the finger absolutely is what
-                // lets one touch pick an item up - a relative drag only moves
-                // what the cursor already covered when it started.
+                // The position goes in first, on this update; the button
+                // follows on the next one. Once it is down the finger is the
+                // cursor: every event plants it there and keeps the button
+                // down, which is what makes one touch a continuous drag.
                 mouse_set_position(gesture.x, gesture.y);
                 prevx = gesture.x;
                 prevy = gesture.y;
-                mouse_simulate_input(0, 0, primaryButton);
+                if (ios_drag_state == IOS_DRAG_IDLE) {
+                    ios_drag_state = IOS_DRAG_POSITIONED;
+                } else if (ios_drag_state == IOS_DRAG_PRESSED) {
+                    mouse_simulate_input(0, 0, primaryButton);
+                }
                 break;
             }
 
