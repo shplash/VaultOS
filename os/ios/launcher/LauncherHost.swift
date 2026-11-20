@@ -985,7 +985,7 @@ final class GameControlsOverlay: UIView {
         helpCard.isHidden = true
         helpCard.text = L.t("Hold and drag an item to equip or move it.")
             + "\n\n"
-            + L.t("Toggle INSPECT to examine an item's characteristics. Hold an item while INSPECT is on to open its menu.")
+            + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")
         helpCard.onClose = { [weak self] in
             self?.setHelp(visible: false)
         }
@@ -1052,10 +1052,10 @@ final class GameControlsOverlay: UIView {
         place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
 
-        // SAVES moves up and to the right of LOAD, clear of it, and QUICK SAVE
-        // sits flush under LOAD the way END sits over SKILL on the right.
-        savesButton.frame = CGRect(x: loadButton.frame.maxX + 2,
-                                   y: loadButton.frame.minY - loadButton.frame.height - 2,
+        // SAVES sits to the right of LOAD, in line with it, and QUICK SAVE
+        // flush under LOAD the way END sits over SKILL on the right.
+        savesButton.frame = CGRect(x: loadButton.frame.maxX,
+                                   y: loadButton.frame.minY,
                                    width: loadButton.frame.width,
                                    height: loadButton.frame.height)
         quickSaveButton.frame = CGRect(x: loadButton.frame.minX,
@@ -1092,12 +1092,12 @@ final class GameControlsOverlay: UIView {
 
         if currentScreen == .skilldex, let panel = panel {
             // The skill panel's own CANCEL button sits at 48,338 in the panel's
-            // own pixels. BACK covers that strip, dark enough to hide it, and
-            // stops short of the panel's right edge so it reads as part of the
-            // panel rather than hanging off it.
-            let width = min(152, panel.width - 46)
+            // own pixels. BACK is centred on the panel's bottom strip, dark
+            // enough to hide it, so the panel does not offer the same way out
+            // twice.
+            let width = min(152, panel.width - 30)
             backButton.solidBackground = true
-            backButton.frame = gameRect(CGRect(x: panel.minX + 40, y: panel.minY + 332,
+            backButton.frame = gameRect(CGRect(x: panel.midX - width / 2, y: panel.minY + 332,
                                                width: max(96, width), height: 34))
             return
         }

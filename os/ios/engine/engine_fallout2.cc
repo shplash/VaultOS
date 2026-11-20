@@ -481,18 +481,36 @@ int quick_save()
 }
 
 // The window of the menu the player is looking at, in game pixels. Fallout 2
-// has no list of windows to ask, but ids are handed out in creation order and a
-// menu is always created after the game view, so the highest visible window
-// that is not the game view is the panel on top.
+// will not hand out its window list, so ask its manager which window is under a
+// few points inside the game view and take the first that is not the game view
+// itself. Panels that sit to one side, like the skill panel, are caught by the
+// outer probes.
 int menu_rect(int* x, int* y, int* width, int* height)
 {
     if (screen() == 0) {
         return 0;
     }
 
-    for (int id = 63; id >= 1; id--) {
+    const int screenWidth = fallout::screenGetWidth();
+    const int screenHeight = fallout::screenGetHeight();
+    if (screenWidth < 8 || screenHeight < 8) {
+        return 0;
+    }
+
+    const int probes[3][2] = {
+        { screenWidth / 2, screenHeight / 2 },
+        { screenWidth / 4, screenHeight / 2 },
+        { (screenWidth * 3) / 4, screenHeight / 2 },
+    };
+
+    for (int index = 0; index < 3; index++) {
+        const int id = fallout::windowGetAtPoint(probes[index][0], probes[index][1]);
+        if (id < 0 || id == fallout::gIsoWindow) {
+            continue;
+        }
+
         fallout::Window* window = fallout::windowGetWindow(id);
-        if (window == nullptr || window->id == fallout::gIsoWindow) {
+        if (window == nullptr) {
             continue;
         }
         if ((window->flags & fallout::WINDOW_HIDDEN) != 0) {
