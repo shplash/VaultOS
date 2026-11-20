@@ -477,7 +477,7 @@ void resume_audio()
 // game's: 1 saved, 0 nothing to save, -1 failed.
 int quick_save()
 {
-    return fallout::SaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+    return fallout::lsgSaveGame(fallout::LOAD_SAVE_MODE_QUICK);
 }
 
 // The window of the menu the player is looking at, in game pixels. Fallout 2
@@ -502,8 +502,8 @@ int menu_rect(int* x, int* y, int* width, int* height)
             continue;
         }
 
-        if (x != NULL) *x = window->rect.ulx;
-        if (y != NULL) *y = window->rect.uly;
+        if (x != NULL) *x = window->rect.left;
+        if (y != NULL) *y = window->rect.top;
         if (width != NULL) *width = window->width;
         if (height != NULL) *height = window->height;
         return 1;
