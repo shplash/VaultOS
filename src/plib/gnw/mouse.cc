@@ -435,8 +435,8 @@ static bool ios_direct_touch_active()
 }
 
 // The direct-touch press, in the order the game has to see it: the position
-// goes in on one input update, the button on the next, and the touch is only a
-// drag once the button is actually down.
+// goes in on one input update, the button a couple of updates later once the
+// cursor has settled, and the touch is only a drag once the button is down.
 enum IosDragState {
     IOS_DRAG_IDLE,
     IOS_DRAG_POSITIONED,
@@ -445,11 +445,46 @@ enum IosDragState {
     IOS_DRAG_DONE,
 };
 
+// The button layer only presses a button its window already counts as the
+// hovered one, and only a pass with nothing held can make a button hovered. It
+// can spend one pass letting go of the window it hovered last and another
+// letting go of this one, so the cursor stands on the finger's point for three
+// passes before the press goes in.
+#define IOS_DRAG_HOVER_PASSES 3
+
 static IosDragState ios_drag_state = IOS_DRAG_IDLE;
+
+// How many of those passes the cursor still has to stand through.
+static int ios_drag_hover_passes;
+
+// A touch that clicks instead of dragging: INSPECT, and a tap, which has no
+// finger left on the screen to drag with.
+static bool ios_drag_click;
+
+// The finger that clicked has already lifted.
+static bool ios_drag_click_ends;
 
 // The finger position the press will land on, kept for the log line.
 static int ios_drag_x;
 static int ios_drag_y;
+
+static void ios_drag_reset()
+{
+    ios_drag_state = IOS_DRAG_IDLE;
+    ios_drag_hover_passes = 0;
+    ios_drag_click = false;
+    ios_drag_click_ends = false;
+}
+
+static void ios_drag_start(int x, int y, bool click, bool clickEnds)
+{
+    ios_drag_x = x;
+    ios_drag_y = y;
+    ios_drag_click = click;
+    ios_drag_click_ends = clickEnds;
+    ios_drag_hover_passes = IOS_DRAG_HOVER_PASSES;
+    ios_drag_state = IOS_DRAG_POSITIONED;
+}
 
 // 0x4B4DD8
 void mouse_info()
@@ -484,34 +519,6 @@ void mouse_info()
     // Menus take the finger as the pointer, so their touches are reported as
     // they land rather than after a move or a hold.
     touch_set_immediate_press(ios_direct_touch_active());
-
-    if (ios_drag_state == IOS_DRAG_POSITIONED) {
-        // The cursor has stood on the item for a whole input pass, which is
-        // what the button layer needs: a button only becomes the hovered one on
-        // a pass with nothing pressed, and a press on a button that is not
-        // hovered is dropped.
-        //
-        // The pass is also cleared of any leftover button. mouse_simulate_input
-        // derives the event from the previous value, so a press that followed a
-        // still-held one would come out as a repeat - and the button layer only
-        // reads MOUSE_EVENT_LEFT_BUTTON_DOWN as a press. Clearing first makes
-        // this press a genuine down every time, wherever the last one left off.
-        mouse_simulate_input(0, 0, 0);
-        ios_drag_state = ios_inspect ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
-        mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
-        debug_printf("[ios] press %d,%d buttons=0x%02X\n",
-            ios_drag_x, ios_drag_y, mouse_get_buttons());
-        return;
-    }
-
-    if (ios_drag_state == IOS_DRAG_CLICK_RELEASE) {
-        // One click per touch: the rest of the touch is ignored until the
-        // finger lifts, so a finger that drifts cannot click again.
-        ios_drag_state = IOS_DRAG_DONE;
-        mouse_simulate_input(0, 0, 0);
-        debug_printf("[ios] click release buttons=0x%02X\n", mouse_get_buttons());
-        return;
-    }
 
     if (ios_drag_state == IOS_DRAG_PRESSED) {
         // The finger owns the button. A click queued by another finger on one
@@ -563,14 +570,31 @@ void mouse_info()
             // cursor instead of teleporting it to the finger. A menu is a grid
             // of buttons rather than a world to steer, so a tap there clicks
             // the point it landed on.
-            if (ios_direct_touch_active()) {
-                mouse_set_position(gesture.x, gesture.y);
+            if (!ios_direct_touch_active()) {
+                if (gesture.numberOfTouches == 1) {
+                    mouse_simulate_input(0, 0, primaryButton);
+                    pendingTapRelease = primaryButton;
+                } else if (gesture.numberOfTouches == 2) {
+                    mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
+                    pendingTapRelease = MOUSE_STATE_RIGHT_BUTTON_DOWN;
+                }
+                break;
+            }
+
+            // A menu tap is the same click as a finger held down and lifted,
+            // and it needs the same passes: pressing in the pass the cursor
+            // arrives is what the button layer drops, which is why a quick tap
+            // on an item moved the cursor there and picked nothing up.
+            if (ios_drag_state != IOS_DRAG_IDLE) {
+                break;
             }
 
             if (gesture.numberOfTouches == 1) {
-                mouse_simulate_input(0, 0, primaryButton);
-                pendingTapRelease = primaryButton;
+                mouse_set_position(gesture.x, gesture.y);
+                ios_drag_start(gesture.x, gesture.y, true, true);
+                debug_printf("[ios] tap %d,%d screen=%d\n", gesture.x, gesture.y, ios_screen);
             } else if (gesture.numberOfTouches == 2) {
+                mouse_set_position(gesture.x, gesture.y);
                 mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
                 pendingTapRelease = MOUSE_STATE_RIGHT_BUTTON_DOWN;
             }
@@ -584,9 +608,17 @@ void mouse_info()
                     mouse_set_position(gesture.x, gesture.y);
                 }
 
+                // The finger came up before the press went in, so what it
+                // touched is played out as the click it was meant to be.
+                if (ios_drag_state == IOS_DRAG_POSITIONED) {
+                    ios_drag_click = true;
+                    ios_drag_click_ends = true;
+                    break;
+                }
+
                 // A long press holds the button down; always release it when
                 // the finger lifts, otherwise Fallout keeps walking.
-                ios_drag_state = IOS_DRAG_IDLE;
+                ios_drag_reset();
                 mouse_simulate_input(0, 0, 0);
                 debug_printf("[ios] release %d,%d buttons=0x%02X\n",
                     gesture.x, gesture.y, mouse_get_buttons());
@@ -595,20 +627,16 @@ void mouse_info()
 
             if (ios_direct_touch_active() && gesture.numberOfTouches == 1) {
                 // The position goes in first, on this update; the button
-                // follows on the next one. Once it is down the finger is the
-                // cursor: every event plants it there and keeps the button
-                // down, which is what makes one touch a continuous drag.
+                // follows once the cursor has stood there long enough for the
+                // button layer to take it as the hovered one. Once it is down
+                // the finger is the cursor: every event plants it there and
+                // keeps the button down, which is what makes one touch a
+                // continuous drag.
                 mouse_set_position(gesture.x, gesture.y);
                 prevx = gesture.x;
                 prevy = gesture.y;
                 if (ios_drag_state == IOS_DRAG_IDLE) {
-                    ios_drag_state = IOS_DRAG_POSITIONED;
-                    ios_drag_x = gesture.x;
-                    ios_drag_y = gesture.y;
-                    // Nothing pressed while the cursor arrives, so the button
-                    // under it can become the hovered one; a press on a button
-                    // that is not hovered yet is dropped.
-                    mouse_simulate_input(0, 0, 0);
+                    ios_drag_start(gesture.x, gesture.y, ios_inspect, false);
                     debug_printf("[ios] position %d,%d screen=%d\n", gesture.x, gesture.y, ios_screen);
                 } else if (ios_drag_state == IOS_DRAG_PRESSED) {
                     mouse_simulate_input(0, 0, primaryButton);
@@ -648,6 +676,46 @@ void mouse_info()
             prevy = gesture.y;
             break;
         }
+    }
+
+    if (ios_drag_state == IOS_DRAG_POSITIONED) {
+        // A button is only pressed if its window already counts it as hovered,
+        // and only a pass with nothing held can make it one. One pass is not
+        // enough: the first can be spent letting go of the window or the item
+        // the cursor stood on before, which is why a press on any item other
+        // than the last one hovered was dropped. The cursor stands on the
+        // finger's point for the passes it takes, and the press follows.
+        if (ios_drag_hover_passes > 0) {
+            ios_drag_hover_passes--;
+            mouse_simulate_input(0, 0, 0);
+            return;
+        }
+
+        // The pass is also cleared of any leftover button. mouse_simulate_input
+        // derives the event from the previous value, so a press that followed a
+        // still-held one would come out as a repeat - and the button layer only
+        // reads MOUSE_EVENT_LEFT_BUTTON_DOWN as a press. Clearing first makes
+        // this press a genuine down every time, wherever the last one left off.
+        mouse_simulate_input(0, 0, 0);
+        ios_drag_state = ios_drag_click ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
+        mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        debug_printf("[ios] press %d,%d buttons=0x%02X\n",
+            ios_drag_x, ios_drag_y, mouse_get_buttons());
+        return;
+    }
+
+    if (ios_drag_state == IOS_DRAG_CLICK_RELEASE) {
+        // One click per touch: the rest of the touch is ignored until the
+        // finger lifts, so a finger that drifts cannot click again. A tap has
+        // no finger left, so its click frees the state straight away.
+        if (ios_drag_click_ends) {
+            ios_drag_reset();
+        } else {
+            ios_drag_state = IOS_DRAG_DONE;
+        }
+        mouse_simulate_input(0, 0, 0);
+        debug_printf("[ios] click release buttons=0x%02X\n", mouse_get_buttons());
+        return;
     }
 
     if (handledGesture) {

@@ -31,12 +31,47 @@ enum IosDragState {
     IOS_DRAG_DONE,
 };
 
+// The button layer only presses a button its window already counts as the
+// hovered one, and only a pass with nothing held can make a button hovered. It
+// can spend one pass letting go of the window it hovered last and another
+// letting go of this one, so the cursor stands on the finger's point for three
+// passes before the press goes in.
+#define IOS_DRAG_HOVER_PASSES 3
+
 static IosDragState iosDragState = IOS_DRAG_IDLE;
 static bool iosWaitCursorWasUp = false;
+
+// How many of those passes the cursor still has to stand through.
+static int iosDragHoverPasses;
+
+// A touch that clicks instead of dragging: INSPECT, and a tap, which has no
+// finger left on the screen to drag with.
+static bool iosDragClick;
+
+// The finger that clicked has already lifted.
+static bool iosDragClickEnds;
 
 // The finger position the press will land on, kept for the log line.
 static int iosDragX;
 static int iosDragY;
+
+static void iosDragReset()
+{
+    iosDragState = IOS_DRAG_IDLE;
+    iosDragHoverPasses = 0;
+    iosDragClick = false;
+    iosDragClickEnds = false;
+}
+
+static void iosDragBegin(int x, int y, bool click, bool clickEnds)
+{
+    iosDragX = x;
+    iosDragY = y;
+    iosDragClick = click;
+    iosDragClickEnds = clickEnds;
+    iosDragHoverPasses = IOS_DRAG_HOVER_PASSES;
+    iosDragState = IOS_DRAG_POSITIONED;
+}
 
 static void mousePrepareDefaultCursor();
 static void _mouse_anim();
@@ -457,33 +492,6 @@ void _mouse_info()
         }
     }
 
-    if (iosDragState == IOS_DRAG_POSITIONED) {
-        // The cursor has stood on the item for a whole input pass, which is
-        // what the button layer needs: a button only becomes the hovered one on
-        // a pass with nothing pressed, and a press on a button that is not
-        // hovered is dropped.
-        //
-        // The pass is also cleared of any leftover button. _mouse_simulate_input
-        // derives the event from the previous value, so a press that followed a
-        // still-held one would come out as a repeat - and the button layer only
-        // reads MOUSE_STATE_LEFT_BUTTON_DOWN as a press. Clearing first makes
-        // this press a genuine down every time, wherever the last one left off.
-        _mouse_simulate_input(0, 0, 0);
-        iosDragState = iosInspect ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
-        _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
-        debugPrint("[ios] press %d,%d state=%d\n", iosDragX, iosDragY, iosDragState);
-        return;
-    }
-
-    if (iosDragState == IOS_DRAG_CLICK_RELEASE) {
-        // One click per touch: the rest of the touch is ignored until the
-        // finger lifts, so a finger that drifts cannot click again.
-        iosDragState = IOS_DRAG_DONE;
-        _mouse_simulate_input(0, 0, 0);
-        debugPrint("[ios] click release\n");
-        return;
-    }
-
     Gesture gesture;
     bool handledGesture = false;
     static int prevx;
@@ -505,13 +513,29 @@ void _mouse_info()
                 break;
             }
 
-            if (iosMenuScreen()) {
-                mouseIosMovePointer(gesture.x, gesture.y);
+            if (!iosMenuScreen()) {
+                if (gesture.numberOfTouches == 1) {
+                    _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                } else if (gesture.numberOfTouches == 2) {
+                    _mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
+                }
+                break;
+            }
+
+            // A menu tap is the same click as a finger held down and lifted,
+            // and it needs the same passes: pressing in the pass the cursor
+            // arrives is what the button layer drops, which is why a quick tap
+            // on an item moved the cursor there and picked nothing up.
+            if (iosDragState != IOS_DRAG_IDLE) {
+                break;
             }
 
             if (gesture.numberOfTouches == 1) {
-                _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                mouseIosMovePointer(gesture.x, gesture.y);
+                iosDragBegin(gesture.x, gesture.y, true, true);
+                debugPrint("[ios] tap %d,%d screen=1\n", gesture.x, gesture.y);
             } else if (gesture.numberOfTouches == 2) {
+                mouseIosMovePointer(gesture.x, gesture.y);
                 _mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
             }
             break;
@@ -524,7 +548,15 @@ void _mouse_info()
                     mouseIosMovePointer(gesture.x, gesture.y);
                 }
 
-                iosDragState = IOS_DRAG_IDLE;
+                // The finger came up before the press went in, so what it
+                // touched is played out as the click it was meant to be.
+                if (iosDragState == IOS_DRAG_POSITIONED) {
+                    iosDragClick = true;
+                    iosDragClickEnds = true;
+                    break;
+                }
+
+                iosDragReset();
                 _mouse_simulate_input(0, 0, 0);
                 debugPrint("[ios] release %d,%d\n", gesture.x, gesture.y);
                 break;
@@ -532,21 +564,17 @@ void _mouse_info()
 
             if (iosMenuScreen() && gesture.numberOfTouches == 1) {
                 // The position goes in first, on this update; the button
-                // follows on the next one. Once it is down the finger is the
-                // cursor: every event plants it there and keeps the button
-                // down, which is what makes one touch a continuous drag.
+                // follows once the cursor has stood there long enough for the
+                // button layer to take it as the hovered one. Once it is down
+                // the finger is the cursor: every event plants it there and
+                // keeps the button down, which is what makes one touch a
+                // continuous drag.
                 mouseIosMovePointer(gesture.x, gesture.y);
                 prevx = gesture.x;
                 prevy = gesture.y;
                 if (iosDragState == IOS_DRAG_IDLE) {
-                    iosDragState = IOS_DRAG_POSITIONED;
-                    iosDragX = gesture.x;
-                    iosDragY = gesture.y;
-                    // Nothing pressed while the cursor arrives, so the button
-                    // under it can become the hovered one; a press on a button
-                    // that is not hovered yet is dropped.
-                    _mouse_simulate_input(0, 0, 0);
-                    debugPrint("[ios] position %d,%d screen=%d\n", gesture.x, gesture.y, iosMenuScreen() ? 1 : 0);
+                    iosDragBegin(gesture.x, gesture.y, iosInspect, false);
+                    debugPrint("[ios] position %d,%d screen=1\n", gesture.x, gesture.y);
                 } else if (iosDragState == IOS_DRAG_PRESSED) {
                     _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 }
@@ -582,6 +610,45 @@ void _mouse_info()
             prevy = gesture.y;
             break;
         }
+    }
+
+    if (iosDragState == IOS_DRAG_POSITIONED) {
+        // A button is only pressed if its window already counts it as hovered,
+        // and only a pass with nothing held can make it one. One pass is not
+        // enough: the first can be spent letting go of the window or the item
+        // the cursor stood on before, which is why a press on any item other
+        // than the last one hovered was dropped. The cursor stands on the
+        // finger's point for the passes it takes, and the press follows.
+        if (iosDragHoverPasses > 0) {
+            iosDragHoverPasses--;
+            _mouse_simulate_input(0, 0, 0);
+            return;
+        }
+
+        // The pass is also cleared of any leftover button. _mouse_simulate_input
+        // derives the event from the previous value, so a press that followed a
+        // still-held one would come out as a repeat - and the button layer only
+        // reads MOUSE_STATE_LEFT_BUTTON_DOWN as a press. Clearing first makes
+        // this press a genuine down every time, wherever the last one left off.
+        _mouse_simulate_input(0, 0, 0);
+        iosDragState = iosDragClick ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
+        _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+        debugPrint("[ios] press %d,%d state=%d\n", iosDragX, iosDragY, iosDragState);
+        return;
+    }
+
+    if (iosDragState == IOS_DRAG_CLICK_RELEASE) {
+        // One click per touch: the rest of the touch is ignored until the
+        // finger lifts, so a finger that drifts cannot click again. A tap has
+        // no finger left, so its click frees the state straight away.
+        if (iosDragClickEnds) {
+            iosDragReset();
+        } else {
+            iosDragState = IOS_DRAG_DONE;
+        }
+        _mouse_simulate_input(0, 0, 0);
+        debugPrint("[ios] click release\n");
+        return;
     }
 
     if (handledGesture) {
