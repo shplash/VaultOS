@@ -1052,14 +1052,14 @@ final class GameControlsOverlay: UIView {
         place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
 
-        // SAVES moves up and to the right of LOAD, and QUICK SAVE sits directly
-        // below it, so the three save controls read as one cluster.
-        savesButton.frame = savesButton.frame.offsetBy(
-            dx: loadButton.frame.width * 0.5 + 6,
-            dy: -loadButton.frame.height * 0.7
-        )
+        // SAVES moves up and to the right of LOAD, clear of it, and QUICK SAVE
+        // sits flush under LOAD the way END sits over SKILL on the right.
+        savesButton.frame = CGRect(x: loadButton.frame.maxX + 2,
+                                   y: loadButton.frame.minY - loadButton.frame.height - 2,
+                                   width: loadButton.frame.width,
+                                   height: loadButton.frame.height)
         quickSaveButton.frame = CGRect(x: loadButton.frame.minX,
-                                       y: loadButton.frame.maxY + 6,
+                                       y: loadButton.frame.maxY,
                                        width: loadButton.frame.width,
                                        height: loadButton.frame.height)
 
@@ -1092,11 +1092,13 @@ final class GameControlsOverlay: UIView {
 
         if currentScreen == .skilldex, let panel = panel {
             // The skill panel's own CANCEL button sits at 48,338 in the panel's
-            // own pixels. BACK covers that strip, dark enough to hide it, so the
-            // panel does not offer the same way out twice.
+            // own pixels. BACK covers that strip, dark enough to hide it, and
+            // stops short of the panel's right edge so it reads as part of the
+            // panel rather than hanging off it.
+            let width = min(152, panel.width - 46)
             backButton.solidBackground = true
-            backButton.frame = gameRect(CGRect(x: panel.minX + 40, y: panel.minY + 330,
-                                               width: 132, height: 46))
+            backButton.frame = gameRect(CGRect(x: panel.minX + 40, y: panel.minY + 332,
+                                               width: max(96, width), height: 34))
             return
         }
         backButton.solidBackground = false

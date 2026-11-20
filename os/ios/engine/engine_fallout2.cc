@@ -18,6 +18,7 @@
 #include "game_mouse.h"
 #include "interface.h"
 #include "item.h"
+#include "loadsave.h"
 #include "main.h"
 #include "map.h"
 #include "mouse.h"
@@ -472,6 +473,13 @@ void resume_audio()
     fallout::audioEngineResume();
 }
 
+// The engine's own quick save, into its own quick slot. The return value is the
+// game's: 1 saved, 0 nothing to save, -1 failed.
+int quick_save()
+{
+    return fallout::SaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout2",
@@ -493,7 +501,7 @@ const FalloutEngineAPI g_api = {
     in_game,
     movie_state,
     screen,
-    NULL,
+    quick_save,
     NULL,
 };
 
