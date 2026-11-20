@@ -480,6 +480,38 @@ int quick_save()
     return fallout::SaveGame(fallout::LOAD_SAVE_MODE_QUICK);
 }
 
+// The window of the menu the player is looking at, in game pixels. Fallout 2
+// has no list of windows to ask, but ids are handed out in creation order and a
+// menu is always created after the game view, so the highest visible window
+// that is not the game view is the panel on top.
+int menu_rect(int* x, int* y, int* width, int* height)
+{
+    if (screen() == 0) {
+        return 0;
+    }
+
+    for (int id = 63; id >= 1; id--) {
+        fallout::Window* window = fallout::windowGetWindow(id);
+        if (window == nullptr || window->id == fallout::gIsoWindow) {
+            continue;
+        }
+        if ((window->flags & fallout::WINDOW_HIDDEN) != 0) {
+            continue;
+        }
+        if (window->width < 8 || window->height < 8) {
+            continue;
+        }
+
+        if (x != NULL) *x = window->rect.ulx;
+        if (y != NULL) *y = window->rect.uly;
+        if (width != NULL) *width = window->width;
+        if (height != NULL) *height = window->height;
+        return 1;
+    }
+
+    return 0;
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout2",
@@ -502,7 +534,7 @@ const FalloutEngineAPI g_api = {
     movie_state,
     screen,
     quick_save,
-    NULL,
+    menu_rect,
 };
 
 } // namespace
