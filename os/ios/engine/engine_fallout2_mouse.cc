@@ -1,7 +1,6 @@
 #include "mouse.h"
 
 #include "color.h"
-#include "debug.h"
 #include "dinput.h"
 #include "game_mouse.h"
 #include "input.h"
@@ -51,10 +50,6 @@ static bool iosDragClick;
 // The finger that clicked has already lifted.
 static bool iosDragClickEnds;
 
-// The finger position the press will land on, kept for the log line.
-static int iosDragX;
-static int iosDragY;
-
 static void iosDragReset()
 {
     iosDragState = IOS_DRAG_IDLE;
@@ -63,10 +58,8 @@ static void iosDragReset()
     iosDragClickEnds = false;
 }
 
-static void iosDragBegin(int x, int y, bool click, bool clickEnds)
+static void iosDragBegin(bool click, bool clickEnds)
 {
-    iosDragX = x;
-    iosDragY = y;
     iosDragClick = click;
     iosDragClickEnds = clickEnds;
     iosDragHoverPasses = IOS_DRAG_HOVER_PASSES;
@@ -532,8 +525,7 @@ void _mouse_info()
 
             if (gesture.numberOfTouches == 1) {
                 mouseIosMovePointer(gesture.x, gesture.y);
-                iosDragBegin(gesture.x, gesture.y, true, true);
-                debugPrint("[ios] tap %d,%d screen=1\n", gesture.x, gesture.y);
+                iosDragBegin(true, true);
             } else if (gesture.numberOfTouches == 2) {
                 mouseIosMovePointer(gesture.x, gesture.y);
                 _mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
@@ -558,7 +550,6 @@ void _mouse_info()
 
                 iosDragReset();
                 _mouse_simulate_input(0, 0, 0);
-                debugPrint("[ios] release %d,%d\n", gesture.x, gesture.y);
                 break;
             }
 
@@ -573,8 +564,7 @@ void _mouse_info()
                 prevx = gesture.x;
                 prevy = gesture.y;
                 if (iosDragState == IOS_DRAG_IDLE) {
-                    iosDragBegin(gesture.x, gesture.y, iosInspect, false);
-                    debugPrint("[ios] position %d,%d screen=1\n", gesture.x, gesture.y);
+                    iosDragBegin(iosInspect, false);
                 } else if (iosDragState == IOS_DRAG_PRESSED) {
                     _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 }
@@ -633,7 +623,6 @@ void _mouse_info()
         _mouse_simulate_input(0, 0, 0);
         iosDragState = iosDragClick ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
         _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
-        debugPrint("[ios] press %d,%d state=%d\n", iosDragX, iosDragY, iosDragState);
         return;
     }
 
@@ -647,7 +636,6 @@ void _mouse_info()
             iosDragState = IOS_DRAG_DONE;
         }
         _mouse_simulate_input(0, 0, 0);
-        debugPrint("[ios] click release\n");
         return;
     }
 

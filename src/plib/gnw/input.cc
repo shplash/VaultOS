@@ -291,14 +291,6 @@ void process_bk()
         debug_printf("[bk] buttons\n");
     }
     v1 = win_check_all_buttons();
-
-    // Whether the button layer took the press the touch made. A press with no
-    // key code here never reached the game, whatever the cursor stood on.
-    // Temporary, until the inventory press is confirmed on a device.
-    if ((mouse_get_buttons() & (MOUSE_EVENT_ANY_BUTTON_DOWN | MOUSE_EVENT_ANY_BUTTON_UP)) != 0) {
-        debug_printf("[ios] buttons 0x%02X key=%d\n", mouse_get_buttons(), v1);
-    }
-
     if (v1 != -1) {
         GNW_add_input_buffer(v1);
         return;

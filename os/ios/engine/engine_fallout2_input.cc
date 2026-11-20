@@ -5,7 +5,6 @@
 #include "audio_engine.h"
 #include "color.h"
 #include "delay.h"
-#include "debug.h"
 #include "dinput.h"
 #include "draw.h"
 #include "kb.h"
@@ -191,14 +190,6 @@ void _process_bk()
     _mouse_info();
 
     v1 = _win_check_all_buttons();
-
-    // Whether the button layer took the press the touch made. A press with no
-    // key code here never reached the game, whatever the cursor stood on.
-    // Temporary, until the inventory press is confirmed on a device.
-    if ((mouseGetEvent() & 0x33) != 0) {
-        debugPrint("[ios] buttons 0x%02X key=%d\n", mouseGetEvent(), v1);
-    }
-
     if (v1 != -1) {
         enqueueInputEvent(v1);
         return;

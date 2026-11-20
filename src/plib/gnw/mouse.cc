@@ -2,7 +2,6 @@
 
 #include "game/ios_screen.h"
 #include "plib/color/color.h"
-#include "plib/gnw/debug.h"
 #include "plib/gnw/dxinput.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/input.h"
@@ -464,10 +463,6 @@ static bool ios_drag_click;
 // The finger that clicked has already lifted.
 static bool ios_drag_click_ends;
 
-// The finger position the press will land on, kept for the log line.
-static int ios_drag_x;
-static int ios_drag_y;
-
 static void ios_drag_reset()
 {
     ios_drag_state = IOS_DRAG_IDLE;
@@ -476,10 +471,8 @@ static void ios_drag_reset()
     ios_drag_click_ends = false;
 }
 
-static void ios_drag_start(int x, int y, bool click, bool clickEnds)
+static void ios_drag_start(bool click, bool clickEnds)
 {
-    ios_drag_x = x;
-    ios_drag_y = y;
     ios_drag_click = click;
     ios_drag_click_ends = clickEnds;
     ios_drag_hover_passes = IOS_DRAG_HOVER_PASSES;
@@ -515,10 +508,6 @@ void mouse_info()
         mouse_simulate_input(0, 0, 0);
         return;
     }
-
-    // Menus take the finger as the pointer, so their touches are reported as
-    // they land rather than after a move or a hold.
-    touch_set_immediate_press(ios_direct_touch_active());
 
     if (ios_drag_state == IOS_DRAG_PRESSED) {
         // The finger owns the button. A click queued by another finger on one
@@ -591,8 +580,7 @@ void mouse_info()
 
             if (gesture.numberOfTouches == 1) {
                 mouse_set_position(gesture.x, gesture.y);
-                ios_drag_start(gesture.x, gesture.y, true, true);
-                debug_printf("[ios] tap %d,%d screen=%d\n", gesture.x, gesture.y, ios_screen);
+                ios_drag_start(true, true);
             } else if (gesture.numberOfTouches == 2) {
                 mouse_set_position(gesture.x, gesture.y);
                 mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
@@ -620,8 +608,6 @@ void mouse_info()
                 // the finger lifts, otherwise Fallout keeps walking.
                 ios_drag_reset();
                 mouse_simulate_input(0, 0, 0);
-                debug_printf("[ios] release %d,%d buttons=0x%02X\n",
-                    gesture.x, gesture.y, mouse_get_buttons());
                 break;
             }
 
@@ -636,8 +622,7 @@ void mouse_info()
                 prevx = gesture.x;
                 prevy = gesture.y;
                 if (ios_drag_state == IOS_DRAG_IDLE) {
-                    ios_drag_start(gesture.x, gesture.y, ios_inspect, false);
-                    debug_printf("[ios] position %d,%d screen=%d\n", gesture.x, gesture.y, ios_screen);
+                    ios_drag_start(ios_inspect, false);
                 } else if (ios_drag_state == IOS_DRAG_PRESSED) {
                     mouse_simulate_input(0, 0, primaryButton);
                 }
@@ -699,8 +684,6 @@ void mouse_info()
         mouse_simulate_input(0, 0, 0);
         ios_drag_state = ios_drag_click ? IOS_DRAG_CLICK_RELEASE : IOS_DRAG_PRESSED;
         mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
-        debug_printf("[ios] press %d,%d buttons=0x%02X\n",
-            ios_drag_x, ios_drag_y, mouse_get_buttons());
         return;
     }
 
@@ -714,7 +697,6 @@ void mouse_info()
             ios_drag_state = IOS_DRAG_DONE;
         }
         mouse_simulate_input(0, 0, 0);
-        debug_printf("[ios] click release buttons=0x%02X\n", mouse_get_buttons());
         return;
     }
 
