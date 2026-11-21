@@ -212,6 +212,7 @@ int get_input()
         debug_printf("[input] refresh\n");
     }
     fallout_engine_refresh_controls();
+    fallout_engine_auto_save();
 #endif
 
     if (trace) {

@@ -118,6 +118,7 @@ final class LauncherModel: ObservableObject {
     /// whole screen to the game, for a session with a controller in hand.
     @Published var touchControls = true { didSet { store(touchControls, "touchControls") } }
     @Published var autoTarget = false { didSet { store(autoTarget, "autoTarget") } }
+    @Published var autoSaveMinutes = 5 { didSet { store(autoSaveMinutes, "autoSaveMinutes") } }
     /// The colour of the on-screen controls. White unless the player picks one
     /// of the others; stored per game like every other option.
     @Published var buttonColour = ControlColour.white.rawValue {
@@ -329,6 +330,7 @@ final class LauncherModel: ObservableObject {
         "controlsOpacity",
         "touchControls",
         "autoTarget",
+        "autoSaveMinutes",
         "buttonColour",
     ]
 
@@ -421,6 +423,7 @@ final class LauncherModel: ObservableObject {
         controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.10), 1)
         touchControls = storedBool("touchControls", for: game, fallback: true)
         autoTarget = storedBool("autoTarget", for: game, fallback: false)
+        autoSaveMinutes = min(max(storedInt("autoSaveMinutes", for: game, fallback: 5), 0), 10)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 
@@ -442,6 +445,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: game))
         defaults.set(touchControls, forKey: LauncherModel.optionKey("touchControls", for: game))
         defaults.set(autoTarget, forKey: LauncherModel.optionKey("autoTarget", for: game))
+        defaults.set(autoSaveMinutes, forKey: LauncherModel.optionKey("autoSaveMinutes", for: game))
         defaults.set(buttonColour, forKey: LauncherModel.optionKey("buttonColour", for: game))
     }
 

@@ -731,17 +731,21 @@ final class GameControlsOverlay: UIView {
     )
     private let helpButton = UIButton(type: .system)
     private let barterButton = LabeledControlButton(
-        title: "BARTER",
+        title: "",
         symbol: "dollarsign.circle",
-        iconPointSize: 16
+        iconPointSize: 18
     )
     private let tellAboutButton = LabeledControlButton(
-        title: "TELL ME\nABOUT",
+        title: "",
         symbol: "bubble.left",
+        iconPointSize: 18
+    )
+    private let offerButton = LabeledControlButton(
+        title: "HOLD OFFER",
+        symbol: "arrow.left.arrow.right.circle",
         iconPointSize: 16,
         labelLines: 2
     )
-    private let offerButton = MovieSkipButton()
     private let talkButton = LabeledControlButton(
         title: "TALK",
         symbol: "bubble.right",
@@ -765,6 +769,10 @@ final class GameControlsOverlay: UIView {
     private var wasInCombat = false
     private var inspectOn = false
     private var movieWasPlaying = false
+    private var lastCursorMode: Int32 = -1
+    private var modeRequested = false
+    private var keepTargeting = false
+    private var quickSaveSerial: Int32 = -1
 
     /// Refreshes the overlay that is on screen, if there is one. The engine
     /// calls this from its own input loop, on the main thread between frames,
@@ -1004,10 +1012,8 @@ final class GameControlsOverlay: UIView {
         addSubview(tellAboutButton)
 
         offerButton.isHidden = true
-        offerButton.requiresHold = true
-        offerButton.captionKey = "HOLD OFFER"
         offerButton.accessibilityLabel = "Offer"
-        offerButton.onTrigger = { [weak self] in
+        offerButton.onHold = { [weak self] in
             fallout_ios_press_action(23)
             self?.refreshControls()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -1134,6 +1140,7 @@ final class GameControlsOverlay: UIView {
 
         if currentScreen.isMenu && currentScreen != .options {
             layoutMenuControls()
+            layoutHelpButton()
         }
 
         if !helpCard.isHidden {
@@ -1150,11 +1157,14 @@ final class GameControlsOverlay: UIView {
 
     private func layoutMenuControls() {
         let panel = menuRectCache ?? engineMenuRect()
+        let surface = gameSurface()
         let box = panel.map(gameRect) ?? menuBox(for: currentScreen)
 
-        let surface = gameSurface()
-        let side = min(max(48, surface.height * 0.17), 84)
         let gap: CGFloat = 6
+        var side = min(max(48, surface.height * 0.17), 84)
+        if currentScreen == .barter {
+            side = min(side, max(40, box.height * 0.42))
+        }
 
         if currentScreen == .skilldex, let panel = panel {
             // The skill panel's own CANCEL button sits at 48,338 in the panel's
@@ -1174,20 +1184,25 @@ final class GameControlsOverlay: UIView {
         let clampTop = max(10, safeAreaInsets.top + 6)
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
 
-        let middle = min(max(box.midY, side / 2 + clampTop), clampBottom - side / 2)
-
-        // BACK hugs the left edge of the panel, with OFFER under it on the trade
-        // screen so the left pair reads as one column against the interface.
-        let leftX = min(max(box.minX - gap - side, clampLeft), clampRight)
-        backButton.frame = CGRect(x: leftX, y: middle - side / 2, width: side, height: side)
-
-        if !offerButton.isHidden {
-            let width = max(120, side * 1.6)
-            let x = min(max(leftX + side / 2 - width / 2, clampLeft), bounds.width - width - clampLeft)
-            offerButton.frame = CGRect(x: x, y: backButton.frame.maxY + gap, width: width, height: 40)
+        if currentScreen == .dialogue {
+            placeDialogueButtons(in: box)
+            return
         }
 
-        // INSPECT and TALK hug the right edge of the panel.
+        let middle = min(max(box.midY, side / 2 + clampTop), clampBottom - side / 2)
+
+        var leftColumn: [UIView] = [backButton]
+        if !offerButton.isHidden {
+            leftColumn.append(offerButton)
+        }
+        let leftHeight = CGFloat(leftColumn.count) * side + CGFloat(leftColumn.count - 1) * gap
+        var leftY = min(max(clampTop, middle - leftHeight / 2), max(clampTop, clampBottom - leftHeight))
+        let leftX = min(max(box.minX - gap - side, clampLeft), clampRight)
+        for view in leftColumn {
+            view.frame = CGRect(x: leftX, y: leftY, width: side, height: side)
+            leftY += side + gap
+        }
+
         let rightX = max(min(box.maxX + gap, clampRight), clampLeft)
         var column: [UIView] = []
         if !lookButton.isHidden {
@@ -1202,31 +1217,58 @@ final class GameControlsOverlay: UIView {
             view.frame = CGRect(x: rightX, y: y, width: side, height: side)
             y += side + gap
         }
+    }
 
-        if currentScreen == .dialogue {
-            // Fallout draws its own BARTER (and, in the first game, TELL ME
-            // ABOUT) as small red buttons at 593,41 and 593,116 inside the
-            // dialogue window. Ours sit on top of them, dark enough that the
-            // red ones cannot be seen through.
-            let unit = gameRect(CGRect(x: 0, y: 0, width: 1, height: 1)).width
-            let centreX = box.minX + 600 * unit
-            barterButton.solidBackground = true
-            tellAboutButton.solidBackground = true
-            barterButton.frame = CGRect(x: centreX - side / 2, y: box.minY + 48 * unit - side / 2,
-                                        width: side, height: side)
-            tellAboutButton.frame = CGRect(x: centreX - side / 2, y: box.minY + 123 * unit - side / 2,
-                                           width: side, height: side)
-        } else {
-            barterButton.solidBackground = false
-            tellAboutButton.solidBackground = false
+    private func placeDialogueButtons(in box: CGRect) {
+        let unit = gameRect(CGRect(x: 0, y: 0, width: 1, height: 1)).width
+        let barterSlot = actionButtonRect(20) ?? CGRect(x: box.minX + 593 * unit,
+                                                       y: box.minY + 41 * unit,
+                                                       width: 14 * unit,
+                                                       height: 14 * unit)
+        let aboutSlot = actionButtonRect(22) ?? CGRect(x: box.minX + 593 * unit,
+                                                       y: box.minY + 116 * unit,
+                                                       width: 14 * unit,
+                                                       height: 14 * unit)
+
+        var side = max(30, barterSlot.height + 20)
+        let span = abs(aboutSlot.midY - barterSlot.midY)
+        if span > 1 {
+            side = min(side, span - 6)
+        }
+        side = max(24, min(side, 44))
+
+        barterButton.solidBackground = true
+        tellAboutButton.solidBackground = true
+        place(barterButton, on: barterSlot, side: side)
+        place(tellAboutButton, on: aboutSlot, side: side)
+    }
+
+    private func place(_ button: UIView, on slot: CGRect, side: CGFloat) {
+        let x = min(max(slot.midX - side / 2, 8), bounds.width - side - 8)
+        let y = min(max(slot.midY - side / 2, 8), bounds.height - side - 8)
+        button.frame = CGRect(x: x, y: y, width: side, height: side)
+    }
+
+    private func actionButtonRect(_ action: Int32) -> CGRect? {
+        var x: Int32 = 0
+        var y: Int32 = 0
+        var width: Int32 = 0
+        var height: Int32 = 0
+
+        guard fallout_ios_action_button_rect(action, &x, &y, &width, &height) != 0,
+              width > 1, height > 1 else {
+            return nil
         }
 
-        // A third of a control, in the panel's own top right corner.
-        let helpSide = max(22, side / 3)
-        helpButton.frame = CGRect(x: min(box.maxX + gap, bounds.width - helpSide - clampLeft),
-                                  y: max(box.minY + 4, clampTop),
-                                  width: helpSide,
-                                  height: helpSide)
+        return gameRect(CGRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height)))
+    }
+
+    private func layoutHelpButton() {
+        let surface = gameSurface()
+        let helpSide = max(26, min(40, surface.height * 0.09))
+        let right = min(surface.maxX, bounds.width - safeAreaInsets.right) - 8
+        let top = max(surface.minY, safeAreaInsets.top) + 8
+        helpButton.frame = CGRect(x: right - helpSide, y: top, width: helpSide, height: helpSide)
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
     }
 
@@ -1390,6 +1432,7 @@ final class GameControlsOverlay: UIView {
         } else {
             fallout_ios_right_click()
         }
+        modeRequested = true
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
     }
@@ -1417,9 +1460,15 @@ final class GameControlsOverlay: UIView {
             return
         }
 
-        // The tick means the game was really written, the cross means it was
-        // not. Nothing in between.
-        let saved = result == 1
+        // The count has moved because of this press, so the refresh must not
+        // show the same save twice.
+        quickSaveSerial = fallout_ios_quick_save_serial()
+        showQuickSaveResult(saved: result == 1)
+    }
+
+    // The tick means the game was really written, the cross means it was not.
+    // Nothing in between, whether a finger or the launcher's own clock asked.
+    private func showQuickSaveResult(saved: Bool) {
         quickSaveButton.set(symbol: saved ? "checkmark" : "xmark",
                             title: "QUICK\nSAVE",
                             accessibilityLabel: saved ? "Saved" : "Save failed")
@@ -1552,6 +1601,7 @@ final class GameControlsOverlay: UIView {
         lookButton.controlOpacity = value
         barterButton.controlOpacity = value
         tellAboutButton.controlOpacity = value
+        offerButton.controlOpacity = value
         talkButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
@@ -1685,12 +1735,39 @@ final class GameControlsOverlay: UIView {
         let inCombat = fallout_ios_action_available(25) != 0
         if inCombat && !wasInCombat && ControlLayout.autoTarget() && fallout_ios_cursor_mode() != 2 {
             fallout_ios_press_action(12)
+            keepTargeting = true
         } else if !inCombat && wasInCombat {
             fallout_ios_press_action(13)
+            keepTargeting = false
         }
         wasInCombat = inCombat
 
         let mode = fallout_ios_cursor_mode()
+        let requested = modeRequested
+        modeRequested = false
+        if mode != lastCursorMode {
+            if requested {
+                keepTargeting = mode == 2
+                lastCursorMode = mode
+            } else if inCombat && keepTargeting && mode == 0 {
+                fallout_ios_press_action(12)
+                lastCursorMode = mode
+            } else {
+                if inCombat && mode == 2 {
+                    keepTargeting = true
+                }
+                lastCursorMode = mode
+            }
+        }
+
+        let savedSerial = fallout_ios_quick_save_serial()
+        if quickSaveSerial < 0 {
+            quickSaveSerial = savedSerial
+        } else if savedSerial > quickSaveSerial {
+            quickSaveSerial = savedSerial
+            showQuickSaveResult(saved: true)
+        }
+
         let symbol: String
         let title: String
         let accessibilityTitle: String
@@ -1851,6 +1928,7 @@ final class GameControlsOverlay: UIView {
 
 private final class LabeledControlButton: UIControl {
     private let selectionView = UIView()
+    private let holdFill = UIView()
     private let iconView = UIImageView()
     private let label = UILabel()
 
@@ -1861,6 +1939,15 @@ private final class LabeledControlButton: UIControl {
             backgroundColor = normalBackground
         }
     }
+
+    /// Set for an action that must not happen on a stray tap: the button fills
+    /// while it is held and fires only once the hold is long enough. It stays
+    /// the same button as its neighbours otherwise.
+    var onHold: (() -> Void)?
+    var holdSeconds: TimeInterval = 2
+
+    private var holdStarted: Date?
+    private var holdTimer: Timer?
 
     private var normalBackground: UIColor {
         return solidBackground ? UIColor.black : ControlTheme.panel
@@ -1888,6 +1975,12 @@ private final class LabeledControlButton: UIControl {
         selectionView.isUserInteractionEnabled = false
         selectionView.isHidden = true
         addSubview(selectionView)
+
+        // The sweep of a held control, under the wash and under the label.
+        holdFill.backgroundColor = UIColor.white.withAlphaComponent(0.24)
+        holdFill.isUserInteractionEnabled = false
+        holdFill.isHidden = true
+        insertSubview(holdFill, at: 0)
 
         iconView.contentMode = .scaleAspectFit
         iconView.isUserInteractionEnabled = false
@@ -1971,11 +2064,82 @@ private final class LabeledControlButton: UIControl {
         }
     }
 
+    // A held control fills while the finger is down, as an interpolation rather
+    // than a timer redrawing it: the engine keeps the main run loop to itself
+    // and a timer only gets a slot now and then.
+    private var holdFraction: CGFloat {
+        guard let holdStarted = holdStarted else {
+            return 0
+        }
+        return min(1, max(0, CGFloat(Date().timeIntervalSince(holdStarted) / holdSeconds)))
+    }
+
+    override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        if onHold == nil {
+            return true
+        }
+
+        holdTimer?.invalidate()
+        holdStarted = Date()
+        holdFill.isHidden = false
+        holdFill.layer.removeAllAnimations()
+        holdFill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
+        UIView.animate(withDuration: holdSeconds,
+                       delay: 0,
+                       options: [.curveLinear, .beginFromCurrentState]) {
+            self.holdFill.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: self.bounds.height)
+        }
+        CATransaction.flush()
+
+        let timer = Timer(timeInterval: holdSeconds, repeats: false) { [weak self] _ in
+            self?.fireHold()
+        }
+        holdTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+
+        return true
+    }
+
+    override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
+        if holdFraction >= 1 {
+            fireHold()
+        } else {
+            cancelHold()
+        }
+    }
+
+    override func cancelTracking(with event: UIEvent?) {
+        cancelHold()
+    }
+
+    private func fireHold() {
+        guard let onHold = onHold else {
+            return
+        }
+
+        cancelHold()
+        onHold()
+    }
+
+    private func cancelHold() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdStarted = nil
+        holdFill.layer.removeAllAnimations()
+        holdFill.isHidden = true
+        holdFill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
 
         selectionView.frame = bounds
         selectionView.layer.cornerRadius = layer.cornerRadius
+
+        holdFill.layer.cornerRadius = layer.cornerRadius
+        if holdStarted == nil {
+            holdFill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
+        }
 
         let hasLabel = !(label.text?.isEmpty ?? true)
         // A two-line label has to share the button with the pictogram, so it
@@ -2285,14 +2449,9 @@ public func fallout_ios_refresh_game_controls() {
 
 final class MovieSkipButton: UIControl {
     var onTrigger: (() -> Void)?
-    var captionKey: String? {
-        didSet {
-            caption.text = L.t(captionKey ?? (requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP"))
-        }
-    }
     var requiresHold = false {
         didSet {
-            caption.text = L.t(captionKey ?? (requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP"))
+            caption.text = L.t(requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP")
         }
     }
 

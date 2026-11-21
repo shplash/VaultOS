@@ -159,6 +159,17 @@ int screen();
 
 int action_available(int action)
 {
+    switch (action) {
+    case 5:
+        return fallout::combat_can_end_combat() ? 1 : 0;
+    case 6:
+        return fallout::combat_can_skip_turn() ? 1 : 0;
+    case 25:
+        return fallout::isInCombat() ? 1 : 0;
+    default:
+        break;
+    }
+
     if (!fallout::intface_is_enabled()) {
         return 0;
     }
@@ -166,12 +177,6 @@ int action_available(int action)
     switch (action) {
     case 3:
         return fallout::isInCombat() ? 0 : 1;
-    case 5:
-        return fallout::combat_can_end_combat() ? 1 : 0;
-    case 6:
-        return fallout::combat_can_skip_turn() ? 1 : 0;
-    case 25:
-        return fallout::isInCombat() ? 1 : 0;
     case 8:
         // Reload: needs a loaded world and a weapon that takes ammunition.
         if (fallout::obj_dude == nullptr) {
@@ -449,11 +454,73 @@ int screen()
     return fallout::dialog_active() ? fallout::IOS_SCREEN_DIALOGUE : fallout::IOS_SCREEN_GAME;
 }
 
-// The engine's own quick save, into its own quick slot. The return value is the
-// game's: 1 saved, 0 nothing to save, -1 failed.
+int g_quick_save_serial = 0;
+
 int quick_save()
 {
-    return fallout::SaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+    const int result = fallout::SaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+    if (result == 1) {
+        g_quick_save_serial++;
+    }
+
+    return result;
+}
+
+int quick_save_serial()
+{
+    return g_quick_save_serial;
+}
+
+int auto_save_ready()
+{
+    if (fallout::obj_dude == nullptr || fallout::isInCombat() || fallout::moviePlaying()) {
+        return 0;
+    }
+
+    return fallout::ios_screen == fallout::IOS_SCREEN_GAME
+            && !fallout::dialog_active()
+            && fallout::intface_is_enabled()
+        ? 1
+        : 0;
+}
+
+void auto_save()
+{
+    static int lastMinutes = -1;
+    static Uint32 lastSave = 0;
+    static Uint32 lastCheck = 0;
+    const Uint32 now = SDL_GetTicks();
+
+    if (lastCheck != 0 && now - lastCheck < 1000) {
+        return;
+    }
+    lastCheck = now;
+
+    const int minutes = fallout_engine_auto_save_minutes();
+
+    if (minutes != lastMinutes) {
+        lastMinutes = minutes;
+        lastSave = now;
+        return;
+    }
+
+    if (minutes <= 0 || lastSave == 0) {
+        lastSave = now;
+        return;
+    }
+
+    if (now - lastSave < static_cast<Uint32>(minutes) * 60000u) {
+        return;
+    }
+
+    if (auto_save_ready() == 0) {
+        return;
+    }
+
+    if (fallout::ios_quick_save_silent() == 1) {
+        lastSave = now;
+        g_quick_save_serial++;
+    }
 }
 
 // The window of the menu the player is looking at, in game pixels. Every menu
@@ -475,6 +542,11 @@ int menu_rect(int* x, int* y, int* width, int* height)
     if (width != NULL) *width = rect.lrx - rect.ulx + 1;
     if (height != NULL) *height = rect.lry - rect.uly + 1;
     return 1;
+}
+
+int action_button_rect(int action, int* x, int* y, int* width, int* height)
+{
+    return fallout::ios_dialogue_button_rect(action, x, y, width, height);
 }
 
 const FalloutEngineAPI g_api = {
@@ -500,9 +572,16 @@ const FalloutEngineAPI g_api = {
     screen,
     quick_save,
     menu_rect,
+    quick_save_serial,
+    action_button_rect,
 };
 
 } // namespace
+
+void fallout_engine_auto_save(void)
+{
+    auto_save();
+}
 
 extern "C" const FalloutEngineAPI* fallout_engine_api(void)
 {

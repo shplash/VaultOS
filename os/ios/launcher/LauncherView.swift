@@ -1144,6 +1144,34 @@ struct LauncherView: View {
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
 
+            row("Auto quick save",
+                detail: "How often the game writes its own quick save, into the slot QUICK SAVE already holds. Off, five by default, ten at most.") {
+                HStack(spacing: 8) {
+                    Button {
+                        model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.autoSaveMinutes == 0)
+
+                    Text(verbatim: model.autoSaveMinutes == 0
+                            ? L.t("OFF")
+                            : "\(model.autoSaveMinutes) " + L.t("MIN"))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
+                        .frame(width: 48)
+
+                    Button {
+                        model.autoSaveMinutes = min(10, model.autoSaveMinutes + 1)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.autoSaveMinutes == 10)
+                }
+            }
+
             row("Button colour", detail: "White, orange, green or blue") {
                 Menu {
                     ForEach(ControlColour.allCases) { colour in
@@ -1400,6 +1428,7 @@ struct LauncherView: View {
         model.controlsOpacity = 1
         model.touchControls = true
         model.autoTarget = false
+        model.autoSaveMinutes = 5
         model.buttonColour = ControlColour.white.rawValue
     }
 

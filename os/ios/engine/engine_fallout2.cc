@@ -11,6 +11,7 @@
 
 #include "audio_engine.h"
 #include "combat.h"
+#include "config.h"
 #include "debug.h"
 #include "engine_glue.h"
 #include "fallout_engine.h"
@@ -26,6 +27,7 @@
 #include "movie.h"
 #include "object.h"
 #include "proto_types.h"
+#include "sfall_config.h"
 #include "svga.h"
 #include "win32.h"
 #include "window_manager.h"
@@ -305,6 +307,17 @@ void reload_active_weapon()
 
 int action_available(int action)
 {
+    switch (action) {
+    case 5:
+        return fallout::iosCombatCanEnd() ? 1 : 0;
+    case 6:
+        return fallout::isInCombat() ? 1 : 0;
+    case 25:
+        return fallout::isInCombat() ? 1 : 0;
+    default:
+        break;
+    }
+
     if (!fallout::interfaceBarEnabled()) {
         return 0;
     }
@@ -313,10 +326,6 @@ int action_available(int action)
     case 3:
         // The pip-boy is unavailable in combat.
         return fallout::isInCombat() ? 0 : 1;
-    case 5:
-        return fallout::iosCombatCanEnd() ? 1 : 0;
-    case 6:
-        return fallout::isInCombat() ? 1 : 0;
     case 8:
         // Reload: a firearm is in hand.
         return has_firearm_in_hand();
@@ -514,11 +523,127 @@ void resume_audio()
     fallout::audioEngineResume();
 }
 
-// The engine's own quick save, into its own quick slot. The return value is the
-// game's: 1 saved, 0 nothing to save, -1 failed.
+int g_quick_save_serial = 0;
+bool g_quick_save_ready = false;
+
 int quick_save()
 {
-    return fallout::lsgSaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+    const int result = fallout::lsgSaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+    if (result == 1) {
+        g_quick_save_serial++;
+        g_quick_save_ready = true;
+    }
+
+    return result;
+}
+
+int quick_save_serial()
+{
+    return g_quick_save_serial;
+}
+
+int quick_save_slot_ready()
+{
+    if (g_quick_save_ready) {
+        return 1;
+    }
+
+    if (!fallout::gSfallConfigInitialized) {
+        return 0;
+    }
+
+    int slots = 0;
+    if (!fallout::configGetInt(&fallout::gSfallConfig,
+            SFALL_CONFIG_MISC_KEY,
+            SFALL_CONFIG_AUTO_QUICK_SAVE,
+            &slots)) {
+        return 0;
+    }
+
+    return slots > 0 ? 1 : 0;
+}
+
+int auto_save_ready()
+{
+    return in_game() != 0
+            && screen() == 0
+            && !fallout::isInCombat()
+            && quick_save_slot_ready()
+        ? 1
+        : 0;
+}
+
+void auto_save()
+{
+    static int lastMinutes = -1;
+    static Uint32 lastSave = 0;
+    static Uint32 lastCheck = 0;
+    const Uint32 now = SDL_GetTicks();
+
+    if (lastCheck != 0 && now - lastCheck < 1000) {
+        return;
+    }
+    lastCheck = now;
+
+    const int minutes = fallout_engine_auto_save_minutes();
+
+    if (minutes != lastMinutes) {
+        lastMinutes = minutes;
+        lastSave = now;
+        return;
+    }
+
+    if (minutes <= 0 || lastSave == 0) {
+        lastSave = now;
+        return;
+    }
+
+    if (now - lastSave < static_cast<Uint32>(minutes) * 60000u) {
+        return;
+    }
+
+    if (auto_save_ready() == 0) {
+        return;
+    }
+
+    if (fallout::lsgSaveGame(fallout::LOAD_SAVE_MODE_QUICK) == 1) {
+        lastSave = now;
+        g_quick_save_serial++;
+        g_quick_save_ready = true;
+    }
+}
+
+int window_rect_of(fallout::Window* window, int* x, int* y, int* width, int* height)
+{
+    if (window == nullptr || (window->flags & fallout::WINDOW_HIDDEN) != 0) {
+        return 0;
+    }
+
+    if (window->width < 8 || window->height < 8) {
+        return 0;
+    }
+
+    if (x != NULL) *x = window->rect.left;
+    if (y != NULL) *y = window->rect.top;
+    if (width != NULL) *width = window->width;
+    if (height != NULL) *height = window->height;
+    return 1;
+}
+
+int dialogue_window_rect(int* x, int* y, int* width, int* height)
+{
+    const int screenWidth = fallout::screenGetWidth();
+    const int screenHeight = fallout::screenGetHeight();
+    if (screenWidth < 40 || screenHeight < 40) {
+        return 0;
+    }
+
+    const int id = fallout::windowGetAtPoint(screenWidth - 20, (screenHeight + 480) / 2 - 5);
+    if (id < 0 || id == fallout::gIsoWindow) {
+        return 0;
+    }
+
+    return window_rect_of(fallout::windowGetWindow(id), x, y, width, height);
 }
 
 // The window of the menu the player is looking at, in game pixels. Fallout 2
@@ -529,8 +654,13 @@ int quick_save()
 // the dialogue reply are both in the bottom half - is found as well.
 int menu_rect(int* x, int* y, int* width, int* height)
 {
-    if (screen() == 0) {
+    const int current = screen();
+    if (current == 0) {
         return 0;
+    }
+
+    if (current == 4 && dialogue_window_rect(x, y, width, height)) {
+        return 1;
     }
 
     const int screenWidth = fallout::screenGetWidth();
@@ -576,6 +706,25 @@ int menu_rect(int* x, int* y, int* width, int* height)
     return 0;
 }
 
+int action_button_rect(int action, int* x, int* y, int* width, int* height)
+{
+    if (action != 20) {
+        return 0;
+    }
+
+    int windowX = 0;
+    int windowY = 0;
+    if (dialogue_window_rect(&windowX, &windowY, NULL, NULL) == 0) {
+        return 0;
+    }
+
+    if (x != NULL) *x = windowX + 593;
+    if (y != NULL) *y = windowY + 41;
+    if (width != NULL) *width = 14;
+    if (height != NULL) *height = 14;
+    return 1;
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout2",
@@ -599,6 +748,8 @@ const FalloutEngineAPI g_api = {
     screen,
     quick_save,
     menu_rect,
+    quick_save_serial,
+    action_button_rect,
 };
 
 } // namespace
@@ -627,6 +778,11 @@ bool iosMenuScreen()
 }
 
 } // namespace fallout
+
+void fallout_engine_auto_save(void)
+{
+    auto_save();
+}
 
 extern "C" const FalloutEngineAPI* fallout_engine_api(void)
 {

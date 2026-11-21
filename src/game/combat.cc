@@ -2209,18 +2209,13 @@ void combat_end_turn()
     combat_state &= ~COMBAT_STATE_0x02;
 }
 
-// iOS: whether combat_input would currently accept Space to skip the rest of
-// the player's turn. Keep this in sync with the loop guards below.
+// iOS: whether the player has a turn to hand over. Only the fight decides: the
+// interface is off while a turn resolves and while an action plays, and a Space
+// pressed outside the player's turn is dropped when that turn begins.
 bool combat_can_skip_turn()
 {
     return isInCombat()
-        && (combat_state & COMBAT_STATE_0x02) != 0
-        // The touch overlay asks this from a timer, which runs long before a
-        // game - and with it obj_dude - exists.
         && obj_dude != NULL
-        && (obj_dude->data.critter.combat.results & (DAM_KNOCKED_OUT | DAM_DEAD | DAM_LOSE_TURN)) == 0
-        && (obj_dude->data.critter.combat.ap > 0 || combat_free_move > 0)
-        && game_user_wants_to_quit == 0
         && combat_end_due_to_load == 0;
 }
 

@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 7
+#define FALLOUT_ENGINE_ABI_VERSION 8
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -53,6 +53,9 @@ typedef struct FalloutEngineHost {
     // doing, so a window whose own buttons the keyboard covers can still be
     // closed. Called by the engine when Return is pressed.
     void (*hide_keyboard)(void);
+
+    // Minutes between the launcher's timed quick saves, 0 for off.
+    int32_t (*auto_save_minutes)(void);
 } FalloutEngineHost;
 
 typedef struct FalloutEngineAPI {
@@ -113,6 +116,12 @@ typedef struct FalloutEngineAPI {
     // at, so the overlay can hang its buttons on the real window instead of a
     // table of guesses. Returns 0 on the game view or when it cannot say.
     int (*menu_rect)(int* x, int* y, int* width, int* height);
+
+    // Counts every quick save the engine has written, the launcher's own timed
+    // ones included, so the overlay can tick one nobody pressed.
+    int (*quick_save_serial)(void);
+
+    int (*action_button_rect)(int action, int* x, int* y, int* width, int* height);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

@@ -35,4 +35,7 @@ void fallout_engine_refresh_controls_now(void);
 
 void fallout_engine_hide_keyboard(void);
 
+int fallout_engine_auto_save_minutes(void);
+void fallout_engine_auto_save(void);
+
 #endif /* FALLOUT_IOS_ENGINE_GLUE_H_ */

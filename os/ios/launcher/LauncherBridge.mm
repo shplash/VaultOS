@@ -78,6 +78,31 @@ static void host_hide_keyboard(void)
     fallout_ios_hide_keyboard();
 }
 
+// How often the game writes its own quick save, in minutes, read from the
+// launcher's settings for the game that is running. Zero is off.
+static int32_t host_auto_save_minutes(void)
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSString* game = [defaults stringForKey:@"launcher.game"];
+    if (![game isEqualToString:@"fallout2"]) {
+        game = @"fallout1";
+    }
+
+    NSString* key = [NSString stringWithFormat:@"launcher.%@.autoSaveMinutes", game];
+    if ([defaults objectForKey:key] == nil) {
+        return 5;
+    }
+
+    NSInteger minutes = [defaults integerForKey:key];
+    if (minutes < 0) {
+        minutes = 0;
+    } else if (minutes > 10) {
+        minutes = 10;
+    }
+
+    return (int32_t)minutes;
+}
+
 static const FalloutEngineHost g_host = {
     FALLOUT_ENGINE_ABI_VERSION,
     host_install_controls,
@@ -85,6 +110,7 @@ static const FalloutEngineHost g_host = {
     host_menu_music_stop,
     host_refresh_controls,
     host_hide_keyboard,
+    host_auto_save_minutes,
 };
 
 void fallout_ios_hide_keyboard(void)
@@ -378,6 +404,25 @@ extern "C" int fallout_ios_menu_rect(int* x, int* y, int* width, int* height)
 
     return g_engine != NULL && g_engine->menu_rect != NULL
         ? g_engine->menu_rect(x, y, width, height)
+        : 0;
+}
+
+extern "C" int fallout_ios_quick_save_serial(void)
+{
+    return g_engine != NULL && g_engine->quick_save_serial != NULL
+        ? g_engine->quick_save_serial()
+        : 0;
+}
+
+extern "C" int fallout_ios_action_button_rect(int action, int* x, int* y, int* width, int* height)
+{
+    if (x != NULL) *x = 0;
+    if (y != NULL) *y = 0;
+    if (width != NULL) *width = 0;
+    if (height != NULL) *height = 0;
+
+    return g_engine != NULL && g_engine->action_button_rect != NULL
+        ? g_engine->action_button_rect(action, x, y, width, height)
         : 0;
 }
 

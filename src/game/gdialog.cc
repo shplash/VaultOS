@@ -4147,4 +4147,23 @@ static int about_lookup_name(const char* search)
     return 0;
 }
 
+int ios_dialogue_button_rect(int action, int* x, int* y, int* width, int* height)
+{
+    if (action != 20 && action != 22) {
+        return 0;
+    }
+
+    Window* window = NULL;
+    Button* button = GNW_find_button(dialogue_bids[action == 20 ? 0 : 1], &window);
+    if (button == NULL || window == NULL) {
+        return 0;
+    }
+
+    if (x != NULL) *x = window->rect.ulx + button->rect.ulx;
+    if (y != NULL) *y = window->rect.uly + button->rect.uly;
+    if (width != NULL) *width = button->rect.lrx - button->rect.ulx + 1;
+    if (height != NULL) *height = button->rect.lry - button->rect.uly + 1;
+    return 1;
+}
+
 } // namespace fallout

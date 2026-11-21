@@ -98,3 +98,13 @@ void fallout_engine_hide_keyboard(void)
 
     g_host->hide_keyboard();
 }
+
+int fallout_engine_auto_save_minutes(void)
+{
+    if (g_host == nullptr || g_host->auto_save_minutes == nullptr) {
+        return 0;
+    }
+
+    const int minutes = g_host->auto_save_minutes();
+    return minutes < 0 ? 0 : minutes;
+}

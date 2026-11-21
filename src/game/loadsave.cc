@@ -806,6 +806,15 @@ int SaveGame(int mode)
     return rc;
 }
 
+int ios_quick_save_silent()
+{
+    if (!quick_done) {
+        return 0;
+    }
+
+    return SaveGame(LOAD_SAVE_MODE_QUICK);
+}
+
 // 0x46E6C8
 static int QuickSnapShot()
 {

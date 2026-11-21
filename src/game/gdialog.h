@@ -44,6 +44,7 @@ void talk_to_critter_reacts(int a1);
 void gdialogSetBarterMod(int modifier);
 int gdActivateBarter(int modifier);
 void barter_end_to_talk_to();
+int ios_dialogue_button_rect(int action, int* x, int* y, int* width, int* height);
 
 } // namespace fallout
 

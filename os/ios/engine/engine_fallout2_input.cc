@@ -912,6 +912,7 @@ void _GNW95_process_message()
     // it again.
 
     fallout_engine_refresh_controls();
+    fallout_engine_auto_save();
 
     KeyboardData keyboardData;
     SDL_Event e;
