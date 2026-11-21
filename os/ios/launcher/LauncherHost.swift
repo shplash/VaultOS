@@ -1891,11 +1891,11 @@ final class GameControlsOverlay: UIView {
         swapButton.isEnabled = fallout_ios_action_available(7) != 0
         skipButton.isEnabled = fallout_ios_action_available(6) != 0
 
-        // Reload needs a firearm and the attack mode needs an item in hand; the
-        // engine answers for whichever game is running.
+        // Reload needs a firearm with room for more ammunition and the attack
+        // mode needs an item in hand; the engine answers for whichever game is
+        // running. Reload stays on screen and dims, so the button never moves.
         let canReload = fallout_ios_action_available(8) != 0
         let canChangeMode = fallout_ios_action_available(9) != 0
-        reloadButton.isHidden = !canReload
         fireModeButton.isHidden = !canChangeMode
         reloadButton.isEnabled = canReload
         fireModeButton.isEnabled = canChangeMode
