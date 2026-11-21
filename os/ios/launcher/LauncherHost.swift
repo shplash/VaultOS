@@ -1547,20 +1547,21 @@ final class GameControlsOverlay: UIView {
             }
 
             cursorPadPoint = point
-            cursorPadPending.x += point.x - last.x
-            cursorPadPending.y += point.y - last.y
+            cursorPadPending.x += (point.x - last.x) * factor
+            cursorPadPending.y += (point.y - last.y) * factor
 
             let now = CACurrentMediaTime()
             if gesture.state == .changed && now - cursorPadSentAt < 1.0 / 60.0 {
                 return
             }
 
-            let dx = Int32((cursorPadPending.x * factor).rounded())
-            let dy = Int32((cursorPadPending.y * factor).rounded())
-            cursorPadPending = .zero
+            let dx = Int32(cursorPadPending.x)
+            let dy = Int32(cursorPadPending.y)
             cursorPadSentAt = now
 
             if dx != 0 || dy != 0 {
+                cursorPadPending.x -= CGFloat(dx)
+                cursorPadPending.y -= CGFloat(dy)
                 fallout_ios_cursor_move(dx, dy)
             }
 
