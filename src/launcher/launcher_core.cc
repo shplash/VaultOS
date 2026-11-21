@@ -671,6 +671,12 @@ void ensure_save_directories(const fs::path& install_dir)
         fs::create_directories(root / name, ec);
         ec.clear();
     }
+
+    const fs::path legacy = install_dir / "SAVEGAME";
+    if (legacy != root && !folder_has_saves(legacy)) {
+        fs::remove_all(legacy, ec);
+        ec.clear();
+    }
 }
 
 bool has_save_files(const fs::path& install_dir)
@@ -1273,7 +1279,9 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
 
     // The engine reads `data` before master.dat, so a language the installation
     // does not carry has to land here to be seen.
-    const fs::path destination = fs::path(install_dir) / "data";
+    const InstallLayout layout = detect_layout(install_dir);
+    const fs::path destination = fs::path(install_dir)
+        / (layout.data_folder.empty() ? std::string("data") : layout.data_folder);
     std::error_code ec;
     fs::create_directories(destination, ec);
     if (ec) {
