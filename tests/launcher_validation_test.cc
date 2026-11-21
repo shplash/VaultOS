@@ -7,6 +7,7 @@
 // differently, that the configuration goes to the right files, and that
 // savegames are never touched.
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -46,6 +47,51 @@ static bool file_contains(const fs::path& path, const std::string& needle)
     std::string contents((std::istreambuf_iterator<char>(stream)),
         std::istreambuf_iterator<char>());
     return contents.find(needle) != std::string::npos;
+}
+
+static void check_translation_tables()
+{
+    std::ifstream stream("os/ios/launcher/LauncherText.swift");
+    if (!stream) {
+        return;
+    }
+
+    std::string contents((std::istreambuf_iterator<char>(stream)),
+        std::istreambuf_iterator<char>());
+
+    const char* markers[] = { ".french: [", ".german: [", ".italian: [", ".spanish: [" };
+    for (const char* marker : markers) {
+        const size_t start = contents.find(marker);
+        if (start == std::string::npos) {
+            continue;
+        }
+
+        const size_t end = contents.find("\n        ],", start);
+        if (end == std::string::npos) {
+            continue;
+        }
+
+        std::vector<std::string> keys;
+        size_t position = start;
+        while ((position = contents.find("\n            \"", position)) != std::string::npos
+            && position < end) {
+            position += 14;
+            const size_t close = contents.find('"', position);
+            if (close == std::string::npos) {
+                break;
+            }
+            keys.push_back(contents.substr(position, close - position));
+            position = close;
+        }
+
+        std::sort(keys.begin(), keys.end());
+        for (size_t index = 1; index < keys.size(); index++) {
+            if (keys[index] == keys[index - 1]) {
+                std::fprintf(stderr, "FAIL %s: duplicate key \"%s\"\n", marker, keys[index].c_str());
+                g_failures++;
+            }
+        }
+    }
 }
 
 static void scan(const fs::path& directory, int game, LauncherInstallInfo* info)
@@ -175,6 +221,8 @@ static void write_zip(const fs::path& path, const std::vector<ZipItem>& items)
 
 int main()
 {
+    check_translation_tables();
+
     const fs::path root = fs::temp_directory_path() / "fallout-ce-launcher-tests";
     std::error_code ec;
     fs::remove_all(root, ec);
