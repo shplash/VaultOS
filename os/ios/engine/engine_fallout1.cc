@@ -190,11 +190,13 @@ int action_available(int action)
         }
         return has_item_in_hand();
     case 20:
-        return screen() == fallout::IOS_SCREEN_DIALOGUE ? 1 : 0;
+    case 22: {
+        int width = 0;
+        int height = 0;
+        return fallout::ios_dialogue_button_rect(action, NULL, NULL, &width, &height) != 0 ? 1 : 0;
+    }
     case 21:
         return screen() == fallout::IOS_SCREEN_DIALOGUE ? 0 : 1;
-    case 22:
-        return screen() == fallout::IOS_SCREEN_DIALOGUE ? 1 : 0;
     case 23:
     case 24:
         return screen() == fallout::IOS_SCREEN_BARTER ? 1 : 0;
@@ -549,6 +551,11 @@ int action_button_rect(int action, int* x, int* y, int* width, int* height)
     return fallout::ios_dialogue_button_rect(action, x, y, width, height);
 }
 
+int cursor_mode_requests()
+{
+    return fallout_engine_mode_requests();
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout1",
@@ -574,6 +581,7 @@ const FalloutEngineAPI g_api = {
     menu_rect,
     quick_save_serial,
     action_button_rect,
+    cursor_mode_requests,
 };
 
 } // namespace

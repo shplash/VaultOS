@@ -305,6 +305,15 @@ void reload_active_weapon()
     }
 }
 
+bool dialogue_buttons_shown()
+{
+    if (screen() != 4) {
+        return false;
+    }
+
+    return (fallout::GameMode::getCurrentGameMode() & fallout::GameMode::kDialogReview) == 0;
+}
+
 int action_available(int action)
 {
     switch (action) {
@@ -335,7 +344,7 @@ int action_available(int action)
     case 25:
         return fallout::isInCombat() ? 1 : 0;
     case 20:
-        return screen() == 4 ? 1 : 0;
+        return dialogue_buttons_shown() ? 1 : 0;
     case 21:
         return screen() == 4 ? 0 : 1;
     case 22:
@@ -473,6 +482,7 @@ void camera_stop()
 // events does not reach the game's mouse state, so call the cycle directly.
 void right_click()
 {
+    fallout_engine_note_mode_request();
     fallout::gameMouseCycleMode();
 }
 
@@ -712,6 +722,10 @@ int action_button_rect(int action, int* x, int* y, int* width, int* height)
         return 0;
     }
 
+    if (!dialogue_buttons_shown()) {
+        return 0;
+    }
+
     int windowX = 0;
     int windowY = 0;
     if (dialogue_window_rect(&windowX, &windowY, NULL, NULL) == 0) {
@@ -723,6 +737,11 @@ int action_button_rect(int action, int* x, int* y, int* width, int* height)
     if (width != NULL) *width = 14;
     if (height != NULL) *height = 14;
     return 1;
+}
+
+int cursor_mode_requests()
+{
+    return fallout_engine_mode_requests();
 }
 
 const FalloutEngineAPI g_api = {
@@ -750,6 +769,7 @@ const FalloutEngineAPI g_api = {
     menu_rect,
     quick_save_serial,
     action_button_rect,
+    cursor_mode_requests,
 };
 
 } // namespace

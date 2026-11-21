@@ -2,6 +2,7 @@
 
 #include "color.h"
 #include "dinput.h"
+#include "engine_glue.h"
 #include "game_mouse.h"
 #include "input.h"
 #include "kb.h"
@@ -513,6 +514,7 @@ void _mouse_info()
                 if (gesture.numberOfTouches == 1) {
                     _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
                 } else if (gesture.numberOfTouches == 2) {
+                    fallout_engine_note_mode_request();
                     _mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
                 }
                 break;
@@ -531,6 +533,7 @@ void _mouse_info()
                 iosDragBegin(true, true);
             } else if (gesture.numberOfTouches == 2) {
                 mouseIosMovePointer(gesture.x, gesture.y);
+                fallout_engine_note_mode_request();
                 _mouse_simulate_input(0, 0, MOUSE_STATE_RIGHT_BUTTON_DOWN);
             }
             break;

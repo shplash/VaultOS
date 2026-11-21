@@ -770,7 +770,7 @@ final class GameControlsOverlay: UIView {
     private var inspectOn = false
     private var movieWasPlaying = false
     private var lastCursorMode: Int32 = -1
-    private var modeRequested = false
+    private var lastModeRequests: Int32 = 0
     private var keepTargeting = false
     private var quickSaveSerial: Int32 = -1
 
@@ -1138,9 +1138,8 @@ final class GameControlsOverlay: UIView {
         movieShield.frame = bounds
         helpBackdrop.frame = bounds
 
-        if currentScreen.isMenu && currentScreen != .options {
+        if currentScreen.isMenu {
             layoutMenuControls()
-            layoutHelpButton()
         }
 
         if !helpCard.isHidden {
@@ -1161,10 +1160,7 @@ final class GameControlsOverlay: UIView {
         let box = panel.map(gameRect) ?? menuBox(for: currentScreen)
 
         let gap: CGFloat = 6
-        var side = min(max(48, surface.height * 0.17), 84)
-        if currentScreen == .barter {
-            side = min(side, max(40, box.height * 0.42))
-        }
+        let side = min(max(48, surface.height * 0.17), 84)
 
         if currentScreen == .skilldex, let panel = panel {
             // The skill panel's own CANCEL button sits at 48,338 in the panel's
@@ -1186,6 +1182,11 @@ final class GameControlsOverlay: UIView {
 
         if currentScreen == .dialogue {
             placeDialogueButtons(in: box)
+            return
+        }
+
+        if currentScreen == .barter {
+            placeBarterControls(in: menuBox(for: .barter), gap: gap, side: side)
             return
         }
 
@@ -1217,6 +1218,38 @@ final class GameControlsOverlay: UIView {
             view.frame = CGRect(x: rightX, y: y, width: side, height: side)
             y += side + gap
         }
+
+        let helpSide = max(26, min(38, side * 0.5))
+        helpButton.frame = clampFrame(CGRect(x: rightX, y: y, width: helpSide, height: helpSide))
+        helpButton.layer.cornerRadius = max(6, helpSide / 5)
+    }
+
+    private func placeBarterControls(in table: CGRect, gap: CGFloat, side: CGFloat) {
+        let small = max(34, side * 0.72)
+        let middle = table.midY
+
+        let offerX = table.minX - gap - small
+        let backX = offerX - gap - side
+        let inspectX = table.maxX + gap
+        let talkX = inspectX + small + gap
+
+        backButton.frame = clampFrame(CGRect(x: backX, y: middle - side / 2, width: side, height: side))
+        offerButton.frame = clampFrame(CGRect(x: offerX, y: middle - small / 2, width: small, height: small))
+        lookButton.frame = clampFrame(CGRect(x: inspectX, y: middle - small / 2, width: small, height: small))
+        talkButton.frame = clampFrame(CGRect(x: talkX, y: middle - side / 2, width: side, height: side))
+
+        let helpSide = max(26, min(38, side * 0.5))
+        helpButton.frame = clampFrame(CGRect(x: talkX + (side - helpSide) / 2,
+                                             y: middle + side / 2 + gap,
+                                             width: helpSide,
+                                             height: helpSide))
+        helpButton.layer.cornerRadius = max(6, helpSide / 5)
+    }
+
+    private func clampFrame(_ frame: CGRect) -> CGRect {
+        let x = min(max(frame.minX, 8), max(8, bounds.width - frame.width - 8))
+        let y = min(max(frame.minY, 8), max(8, bounds.height - frame.height - 8))
+        return CGRect(x: x, y: y, width: frame.width, height: frame.height)
     }
 
     private func placeDialogueButtons(in box: CGRect) {
@@ -1263,15 +1296,6 @@ final class GameControlsOverlay: UIView {
         return gameRect(CGRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height)))
     }
 
-    private func layoutHelpButton() {
-        let surface = gameSurface()
-        let helpSide = max(26, min(40, surface.height * 0.09))
-        let right = min(surface.maxX, bounds.width - safeAreaInsets.right) - 8
-        let top = max(surface.minY, safeAreaInsets.top) + 8
-        helpButton.frame = CGRect(x: right - helpSide, y: top, width: helpSide, height: helpSide)
-        helpButton.layer.cornerRadius = max(6, helpSide / 5)
-    }
-
     private func updateHelpText(for screen: ScreenMode) {
         if screen == .barter {
             helpCard.text = L.t("Drag an item onto the table to offer it.")
@@ -1307,6 +1331,15 @@ final class GameControlsOverlay: UIView {
 
         guard fallout_ios_menu_rect(&x, &y, &width, &height) != 0, width > 1, height > 1 else {
             return nil
+        }
+
+        let defaults = UserDefaults.standard
+        let screenWidth = CGFloat(defaults.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0)
+        let screenHeight = CGFloat(defaults.object(forKey: LauncherModel.optionKey("height", for: game)) as? Int ?? 0)
+        if screenWidth > 1 && screenHeight > 1 {
+            if CGFloat(width) < screenWidth * 0.25 || CGFloat(height) < screenHeight * 0.25 {
+                return nil
+            }
         }
 
         return CGRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
@@ -1432,7 +1465,6 @@ final class GameControlsOverlay: UIView {
         } else {
             fallout_ios_right_click()
         }
-        modeRequested = true
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
     }
@@ -1515,7 +1547,9 @@ final class GameControlsOverlay: UIView {
             keyboardSwipe = swipe
         }
 
-        pushGameUp(by: height)
+        if currentScreen == .dialogue {
+            pushGameUp(by: height)
+        }
     }
 
     @objc private func keyboardWillHide(_ notification: Notification) {
@@ -1747,9 +1781,10 @@ final class GameControlsOverlay: UIView {
         wasInCombat = inCombat
 
         let mode = fallout_ios_cursor_mode()
-        let requested = modeRequested
-        modeRequested = false
         if mode != lastCursorMode {
+            let requests = fallout_ios_cursor_mode_requests()
+            let requested = requests != lastModeRequests
+            lastModeRequests = requests
             if requested {
                 keepTargeting = mode == 2
                 lastCursorMode = mode
@@ -1809,7 +1844,7 @@ final class GameControlsOverlay: UIView {
         let canEndCombat = fallout_ios_action_available(5) != 0
         endButton.isHidden = !canEndCombat
         endButton.isEnabled = canEndCombat
-        skipButton.isHidden = fallout_ios_action_available(6) == 0
+        skipButton.isEnabled = fallout_ios_action_available(6) != 0
 
         // Reload needs a firearm and the attack mode needs an item in hand; the
         // engine answers for whichever game is running.

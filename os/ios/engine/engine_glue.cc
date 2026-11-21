@@ -9,6 +9,7 @@ namespace {
 
 const FalloutEngineHost* g_host = nullptr;
 char g_install_dir[4096] = { 0 };
+int g_mode_requests = 0;
 
 } // namespace
 
@@ -107,4 +108,14 @@ int fallout_engine_auto_save_minutes(void)
 
     const int minutes = g_host->auto_save_minutes();
     return minutes < 0 ? 0 : minutes;
+}
+
+void fallout_engine_note_mode_request(void)
+{
+    g_mode_requests++;
+}
+
+int fallout_engine_mode_requests(void)
+{
+    return g_mode_requests;
 }

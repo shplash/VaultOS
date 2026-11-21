@@ -256,6 +256,8 @@ static int dialogueBackWindow = -1;
 // 0x505030
 static int dialogueWindow = -1;
 
+static bool dialogueReviewShown = false;
+
 // 0x505034
 static Rect backgrndRects[8] = {
     { 126, 14, 152, 40 },
@@ -2423,12 +2425,16 @@ static int gdialog_review_init(int* win)
         return -1;
     }
 
+    dialogueReviewShown = true;
+
     return 0;
 }
 
 // 0x44045C
 static int gdialog_review_exit(int* win)
 {
+    dialogueReviewShown = false;
+
     add_bk_process(head_bk);
 
     for (int index = 0; index < GAME_DIALOG_REVIEW_WINDOW_BUTTON_FRM_COUNT; index++) {
@@ -4149,6 +4155,10 @@ static int about_lookup_name(const char* search)
 
 int ios_dialogue_button_rect(int action, int* x, int* y, int* width, int* height)
 {
+    if (dialogueReviewShown) {
+        return 0;
+    }
+
     if (action != 20 && action != 22) {
         return 0;
     }

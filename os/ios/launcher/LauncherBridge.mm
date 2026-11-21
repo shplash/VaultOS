@@ -426,6 +426,13 @@ extern "C" int fallout_ios_action_button_rect(int action, int* x, int* y, int* w
         : 0;
 }
 
+extern "C" int fallout_ios_cursor_mode_requests(void)
+{
+    return g_engine != NULL && g_engine->cursor_mode_requests != NULL
+        ? g_engine->cursor_mode_requests()
+        : 0;
+}
+
 // Pause the game's SDL audio stream when the app leaves the foreground. SDL's
 // device is shared by music and sound effects, so this silences both without
 // closing the device or losing playback positions.

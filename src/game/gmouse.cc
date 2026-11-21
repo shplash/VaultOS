@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "engine_glue.h"
 #include "game/actions.h"
 #include "game/art.h"
 #include "game/combat.h"
@@ -1376,6 +1377,8 @@ int gmouse_3d_get_mode()
 // 0x444608
 void gmouse_3d_toggle_mode()
 {
+    fallout_engine_note_mode_request();
+
     int mode = (gmouse_3d_current_mode + 1) % 3;
 
     if (isInCombat()) {

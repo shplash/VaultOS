@@ -38,4 +38,7 @@ void fallout_engine_hide_keyboard(void);
 int fallout_engine_auto_save_minutes(void);
 void fallout_engine_auto_save(void);
 
+void fallout_engine_note_mode_request(void);
+int fallout_engine_mode_requests(void);
+
 #endif /* FALLOUT_IOS_ENGINE_GLUE_H_ */

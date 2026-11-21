@@ -893,7 +893,6 @@ struct LauncherView: View {
             case .touch:
                 return [
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
-                    ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
                     ("Inventory", L.t("Tap an item to inspect its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to. A conversation ends with one of its replies, not with BACK."),
                     ("Combat", "END TURN hands the turn over and END COMBAT leaves the fight. The attack mode and RELOAD only appear while a weapon is in hand."),
@@ -901,7 +900,6 @@ struct LauncherView: View {
                 ]
             case .survival:
                 return [
-                    ("Save often", "There is no autosave. Keep a save before a new area and before a fight you are unsure of."),
                     ("Skills pay", "The skilldex covers Doctor, First Aid and Lockpick. Using them beats guessing at a door or a wound."),
                     ("Talk first", "Many fights can be talked past, and quests tend to pay better than what you can loot."),
                     ("Aim", "An aimed shot costs one more action point and can cripple a limb, which often ends a fight faster than damage."),
@@ -1112,9 +1110,34 @@ struct LauncherView: View {
                       detail: "Moves at a run everywhere",
                       isOn: $model.alwaysRun)
 
-            savegamesRow
+            row("Auto quick save", detail: nil) {
+                HStack(spacing: 8) {
+                    Button {
+                        model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.autoSaveMinutes == 0)
 
-            footnote("Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.")
+                    Text(verbatim: model.autoSaveMinutes == 0
+                            ? L.t("OFF")
+                            : "\(model.autoSaveMinutes) " + L.t("MIN"))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
+                        .frame(width: 48)
+
+                    Button {
+                        model.autoSaveMinutes = min(10, model.autoSaveMinutes + 1)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.autoSaveMinutes == 10)
+                }
+            }
+
+            savegamesRow
         }
     }
 
@@ -1143,34 +1166,6 @@ struct LauncherView: View {
                       isOn: $model.autoTarget)
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
-
-            row("Auto quick save",
-                detail: "How often the game writes its own quick save, into the slot QUICK SAVE already holds. Off, five by default, ten at most.") {
-                HStack(spacing: 8) {
-                    Button {
-                        model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
-                    } label: {
-                        Image(systemName: "minus")
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent))
-                    .disabled(model.autoSaveMinutes == 0)
-
-                    Text(verbatim: model.autoSaveMinutes == 0
-                            ? L.t("OFF")
-                            : "\(model.autoSaveMinutes) " + L.t("MIN"))
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
-                        .frame(width: 48)
-
-                    Button {
-                        model.autoSaveMinutes = min(10, model.autoSaveMinutes + 1)
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent))
-                    .disabled(model.autoSaveMinutes == 10)
-                }
-            }
 
             row("Button colour", detail: "White, orange, green or blue") {
                 Menu {
@@ -1420,6 +1415,7 @@ struct LauncherView: View {
         model.language = 0
         model.subtitles = true
         model.alwaysRun = true
+        model.autoSaveMinutes = 5
     }
 
     private func resetControls() {
@@ -1428,7 +1424,6 @@ struct LauncherView: View {
         model.controlsOpacity = 1
         model.touchControls = true
         model.autoTarget = false
-        model.autoSaveMinutes = 5
         model.buttonColour = ControlColour.white.rawValue
     }
 
