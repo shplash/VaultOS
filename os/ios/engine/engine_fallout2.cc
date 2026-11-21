@@ -397,6 +397,8 @@ int action_available(int action)
     case 23:
     case 24:
         return screen() == 3 ? 1 : 0;
+    case 27:
+        return screen() == 0 && !fallout::isInCombat() ? 1 : 0;
     default:
         return 1;
     }
@@ -480,6 +482,9 @@ void press_action(int action)
     case 24:
         send_key(SDL_SCANCODE_T);
         break;
+    case 27:
+        send_key(SDL_SCANCODE_A);
+        break;
     default:
         break;
     }
@@ -488,6 +493,7 @@ void press_action(int action)
 bool cameraIsPanning = false;
 int cameraX = 0;
 int cameraY = 0;
+const int cameraSafeMargin = 5;
 
 void camera_pan(double x, double y)
 {
@@ -532,7 +538,30 @@ void camera_stop()
     }
 
     cameraIsPanning = false;
-    fallout::_mouse_set_position(cameraX, cameraY);
+
+    const int width = fallout::screenGetWidth();
+    const int height = fallout::screenGetHeight();
+
+    int x = cameraX;
+    int y = cameraY;
+
+    if (width > cameraSafeMargin * 2) {
+        if (x < cameraSafeMargin) {
+            x = cameraSafeMargin;
+        } else if (x > width - 1 - cameraSafeMargin) {
+            x = width - 1 - cameraSafeMargin;
+        }
+    }
+
+    if (height > cameraSafeMargin * 2) {
+        if (y < cameraSafeMargin) {
+            y = cameraSafeMargin;
+        } else if (y > height - 1 - cameraSafeMargin) {
+            y = height - 1 - cameraSafeMargin;
+        }
+    }
+
+    fallout::_mouse_set_position(x, y);
 }
 
 // A right click is what cycles move/action/target in the game view. The

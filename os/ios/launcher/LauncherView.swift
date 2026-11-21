@@ -2115,21 +2115,42 @@ private struct TouchControlEditor: View {
         let shortSide = min(size.width, size.height)
         let tint = model.controlColour.color
 
-        return VStack(spacing: max(1, shortSide * 0.035)) {
-            if control == .fireMode {
-                Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.alwaysTemplate))
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: max(9, min(20, shortSide * 0.26)))
-            } else {
-                Image(systemName: control.symbol)
-                    .font(.system(size: max(9, min(28, shortSide * 0.32)), weight: .semibold))
-            }
-
-            Text(control.label)
-                .font(.system(size: max(7, min(10, shortSide * 0.18)), weight: .bold, design: .monospaced))
+        return Group {
+            if control == .skip {
+                VStack(spacing: max(0, shortSide * 0.01)) {
+                    Text(L.t("START"))
+                    Text(L.t("COMBAT"))
+                    HStack(spacing: max(1, shortSide * 0.04)) {
+                        Image(systemName: "skull")
+                            .font(.system(size: max(6, min(11, shortSide * 0.16)), weight: .semibold))
+                        Text(verbatim: "-")
+                        Image(systemName: "forward.end")
+                            .font(.system(size: max(6, min(11, shortSide * 0.16)), weight: .semibold))
+                    }
+                    Text(L.t("SKIP"))
+                    Text(L.t("TURN"))
+                }
+                .font(.system(size: max(5, min(9, shortSide * 0.14)), weight: .bold, design: .monospaced))
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.5)
+            } else {
+                VStack(spacing: max(1, shortSide * 0.035)) {
+                    if control == .fireMode {
+                        Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.alwaysTemplate))
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: max(9, min(20, shortSide * 0.26)))
+                    } else {
+                        Image(systemName: control.symbol)
+                            .font(.system(size: max(9, min(28, shortSide * 0.32)), weight: .semibold))
+                    }
+
+                    Text(control.label)
+                        .font(.system(size: max(7, min(10, shortSide * 0.18)), weight: .bold, design: .monospaced))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            }
         }
         .foregroundColor(tint)
         .frame(width: size.width, height: size.height)
