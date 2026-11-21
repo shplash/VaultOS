@@ -1432,6 +1432,7 @@ struct LauncherView: View {
         model.subtitles = true
         model.alwaysRun = true
         model.autoSaveMinutes = 5
+        model.saveHaptics = true
     }
 
     private func resetControls() {
