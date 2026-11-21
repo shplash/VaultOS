@@ -893,7 +893,7 @@ struct LauncherView: View {
             case .touch:
                 return [
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
-                    ("Inventory", L.t("Tap an item to inspect its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
+                    ("Inventory", L.t("Tap an item while INSPECT is on to inspect its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to. A conversation ends with one of its replies, not with BACK."),
                     ("Combat", "END TURN hands the turn over and END COMBAT leaves the fight. The attack mode and RELOAD only appear while a weapon is in hand."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
@@ -1111,29 +1111,45 @@ struct LauncherView: View {
                       isOn: $model.alwaysRun)
 
             row("Auto quick save", detail: nil) {
-                HStack(spacing: 8) {
-                    Button {
-                        model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
-                    } label: {
-                        Image(systemName: "minus")
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent))
-                    .disabled(model.autoSaveMinutes == 0)
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button {
+                            model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
+                        } label: {
+                            Image(systemName: "minus")
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: accent))
+                        .disabled(model.autoSaveMinutes == 0)
 
-                    Text(verbatim: model.autoSaveMinutes == 0
-                            ? L.t("OFF")
-                            : "\(model.autoSaveMinutes) " + L.t("MIN"))
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
-                        .frame(width: 48)
+                        Text(verbatim: model.autoSaveMinutes == 0
+                                ? L.t("OFF")
+                                : "\(model.autoSaveMinutes) " + L.t("MIN"))
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
+                            .frame(width: 48)
 
-                    Button {
-                        model.autoSaveMinutes = min(10, model.autoSaveMinutes + 1)
-                    } label: {
-                        Image(systemName: "plus")
+                        Button {
+                            model.autoSaveMinutes = min(10, model.autoSaveMinutes + 1)
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: accent))
+                        .disabled(model.autoSaveMinutes == 10)
                     }
-                    .buttonStyle(SmallButtonStyle(accent: accent))
-                    .disabled(model.autoSaveMinutes == 10)
+
+                    HStack(spacing: 6) {
+                        Text(L.t("Haptic on save"))
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(Theme.dim)
+
+                        Button {
+                            model.saveHaptics.toggle()
+                        } label: {
+                            PillToggle(isOn: model.saveHaptics, accent: accent)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L.t("Haptic on save"))
+                    }
                 }
             }
 

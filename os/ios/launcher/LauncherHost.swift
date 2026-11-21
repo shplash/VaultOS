@@ -1260,7 +1260,8 @@ final class GameControlsOverlay: UIView {
 
     private func placeBarterControls(in table: CGRect, gap: CGFloat, side: CGFloat) {
         let small = max(34, side * 0.72)
-        let middle = table.midY
+        let middle = table.midY + 6
+        let bottom = bounds.height - max(8, safeAreaInsets.bottom + 8) - small
 
         let offerX = table.minX - gap - small
         let backX = offerX - gap - side
@@ -1268,12 +1269,12 @@ final class GameControlsOverlay: UIView {
         let outerX = innerX + small + gap
 
         backButton.frame = clampFrame(CGRect(x: backX, y: middle - side / 2, width: side, height: side))
-        offerButton.frame = clampFrame(CGRect(x: offerX, y: middle - small / 2, width: small, height: small))
-        talkButton.frame = clampFrame(CGRect(x: innerX, y: middle - small / 2, width: small, height: small))
+        offerButton.frame = clampFrame(CGRect(x: offerX, y: bottom, width: small, height: small))
+        talkButton.frame = clampFrame(CGRect(x: innerX, y: bottom, width: small, height: small))
         lookButton.frame = clampFrame(CGRect(x: outerX, y: middle - side / 2, width: side, height: side))
 
         let helpSide = max(26, min(38, side * 0.5))
-        helpButton.frame = clampFrame(CGRect(x: innerX, y: max(8, table.minY + 4),
+        helpButton.frame = clampFrame(CGRect(x: outerX, y: max(8, table.minY + 4),
                                              width: helpSide, height: helpSide))
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
     }
@@ -1537,11 +1538,18 @@ final class GameControlsOverlay: UIView {
         quickSaveButton.set(symbol: saved ? "checkmark" : "xmark",
                             title: "QUICK\nSAVE",
                             accessibilityLabel: saved ? "Saved" : "Save failed")
-        UINotificationFeedbackGenerator().notificationOccurred(saved ? .success : .error)
+        if saveHaptics {
+            UINotificationFeedbackGenerator().notificationOccurred(saved ? .success : .error)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
             self?.quickSaveButton.set(symbol: "bolt.fill", title: "QUICK\nSAVE",
                                       accessibilityLabel: "Quick save")
         }
+    }
+
+    private var saveHaptics: Bool {
+        let key = LauncherModel.optionKey("saveHaptics", for: game)
+        return UserDefaults.standard.object(forKey: key) as? Bool ?? true
     }
 
     private func showAutoSaveNotice() {
@@ -1890,7 +1898,6 @@ final class GameControlsOverlay: UIView {
         skillButton.isEnabled = fallout_ios_action_available(4) != 0
         swapButton.isEnabled = fallout_ios_action_available(7) != 0
         let canEndCombat = fallout_ios_action_available(5) != 0
-        endButton.isHidden = !canEndCombat
         endButton.isEnabled = canEndCombat
         skipButton.isEnabled = fallout_ios_action_available(6) != 0
 
