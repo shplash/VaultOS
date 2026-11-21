@@ -2121,7 +2121,7 @@ private struct TouchControlEditor: View {
                     Text(L.t("START"))
                     Text(L.t("COMBAT"))
                     HStack(spacing: max(1, shortSide * 0.04)) {
-                        Image(systemName: "burst.fill")
+                        Image(systemName: "burst")
                             .font(.system(size: max(6, min(11, shortSide * 0.16)), weight: .semibold))
                         Text(verbatim: "-")
                         Image(systemName: "forward.end")

@@ -1916,7 +1916,7 @@ final class GameControlsOverlay: UIView {
         skipButton.isEnabled = fallout_ios_action_available(startsCombat ? 27 : 6) != 0
         if startsCombat != startCombatShown {
             startCombatShown = startsCombat
-            skipButton.set(symbol: startsCombat ? "burst.fill" : "forward.end",
+            skipButton.set(symbol: startsCombat ? "burst" : "forward.end",
                            title: startsCombat ? "START\nCOMBAT" : "SKIP\nTURN",
                            accessibilityLabel: startsCombat ? "Start combat" : "Skip turn")
         }
