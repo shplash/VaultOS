@@ -691,6 +691,8 @@ final class GameControlsOverlay: UIView {
     private let joystick = CameraJoystickControl()
     private let cursorPad = UIView()
     private var cursorPadPoint: CGPoint?
+    private var cursorPadPending = CGPoint.zero
+    private var cursorPadSentAt: CFTimeInterval = 0
     private let actionButton = LabeledControlButton(
         title: "ACTION",
         symbol: "hand.tap",
@@ -1529,27 +1531,46 @@ final class GameControlsOverlay: UIView {
 
     @objc private func cursorPadPanned(_ gesture: UIPanGestureRecognizer) {
         let point = gesture.location(in: self)
+        let surface = gameSurface()
+        let gameWidth = CGFloat(UserDefaults.standard.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0)
+        let factor = surface.width > 1 && gameWidth > 1 ? gameWidth / surface.width : 1
 
         switch gesture.state {
         case .began:
             cursorPadPoint = point
+            cursorPadPending = .zero
+            cursorPadSentAt = 0
 
-        case .changed:
+        case .changed, .ended:
             guard let last = cursorPadPoint else {
-                cursorPadPoint = point
                 return
             }
 
-            let surface = gameSurface()
-            let gameWidth = CGFloat(UserDefaults.standard.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0)
-            let factor = surface.width > 1 && gameWidth > 1 ? gameWidth / surface.width : 1
-
-            fallout_ios_cursor_move(Int32((point.x - last.x) * factor),
-                                    Int32((point.y - last.y) * factor))
             cursorPadPoint = point
+            cursorPadPending.x += point.x - last.x
+            cursorPadPending.y += point.y - last.y
+
+            let now = CACurrentMediaTime()
+            if gesture.state == .changed && now - cursorPadSentAt < 1.0 / 60.0 {
+                return
+            }
+
+            let dx = Int32((cursorPadPending.x * factor).rounded())
+            let dy = Int32((cursorPadPending.y * factor).rounded())
+            cursorPadPending = .zero
+            cursorPadSentAt = now
+
+            if dx != 0 || dy != 0 {
+                fallout_ios_cursor_move(dx, dy)
+            }
+
+            if gesture.state == .ended {
+                refreshControls()
+            }
 
         default:
             cursorPadPoint = nil
+            cursorPadPending = .zero
             refreshControls()
         }
     }
