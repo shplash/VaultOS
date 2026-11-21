@@ -6851,48 +6851,15 @@ Attack* combat_get_data()
 
 bool iosCombatCanEnd()
 {
-    if (!isInCombat() || gDude == nullptr) {
-        return false;
-    }
+    return isInCombat() && gDude != nullptr && _combat_end_due_to_load == 0;
+}
 
-    if (_combat_elev != gDude->elevation) {
-        return true;
-    }
-
-    int dudeTeam = gDude->data.critter.combat.team;
-
-    for (int index = 0; index < _list_com + _list_noncom; index++) {
-        Object* critter = _combat_list[index];
-        if (critter == gDude) {
-            continue;
-        }
-
-        int critterTeam = critter->data.critter.combat.team;
-        Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
-        if (critterTeam == dudeTeam && (critterWhoHitMe == nullptr || critterWhoHitMe->data.critter.combat.team != critterTeam)) {
-            continue;
-        }
-
-        if ((critter->data.critter.combat.maneuver & CRITTER_MANEUVER_DISENGAGING) != 0) {
-            continue;
-        }
-
-        if ((critter->data.critter.combat.results & (DAM_KNOCKED_OUT | DAM_DEAD)) != 0) {
-            continue;
-        }
-
-        if ((critter->data.critter.combat.maneuver & CRITTER_MANUEVER_FLEEING) != 0) {
-            continue;
-        }
-
-        if (critter->data.critter.combat.ap == critterGetStat(critter, STAT_MAXIMUM_ACTION_POINTS)) {
-            continue;
-        }
-
-        return false;
-    }
-
-    return true;
+bool iosCombatCanSkipTurn()
+{
+    return isInCombat()
+        && gDude != nullptr
+        && _combat_end_due_to_load == 0
+        && !_combat_should_end();
 }
 
 } // namespace fallout

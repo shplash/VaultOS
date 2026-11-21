@@ -37,6 +37,7 @@ extern bool iosInspect;
 extern bool iosCalledShotOpen;
 void mouseIosClick(int state);
 bool iosCombatCanEnd();
+bool iosCombatCanSkipTurn();
 int iosQuickSaveAuto();
 }
 
@@ -359,7 +360,7 @@ int action_available(int action)
     case 5:
         return fallout::iosCombatCanEnd() ? 1 : 0;
     case 6:
-        return fallout::isInCombat() ? 1 : 0;
+        return fallout::iosCombatCanSkipTurn() ? 1 : 0;
     case 25:
         return fallout::isInCombat() ? 1 : 0;
     case 26:

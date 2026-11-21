@@ -2212,58 +2212,22 @@ void combat_end_turn()
 
 // iOS: whether the player has a turn to hand over. Only the fight decides: the
 // interface is off while a turn resolves and while an action plays, and a Space
-// pressed outside the player's turn is dropped when that turn begins.
+// pressed outside the player's turn is dropped when that turn begins. With
+// nobody else in the fight there is no next turn to hand over to, so the button
+// stays off there.
 bool combat_can_skip_turn()
 {
     return isInCombat()
         && obj_dude != NULL
-        && combat_end_due_to_load == 0;
+        && combat_end_due_to_load == 0
+        && !combat_should_end();
 }
 
 bool combat_can_end_combat()
 {
-    if (!isInCombat() || obj_dude == NULL) {
-        return false;
-    }
-
-    if (combat_elev != obj_dude->elevation) {
-        return true;
-    }
-
-    int dudeTeam = obj_dude->data.critter.combat.team;
-
-    for (int index = 0; index < list_com + list_noncom; index++) {
-        Object* critter = combat_list[index];
-        if (critter == obj_dude) {
-            continue;
-        }
-
-        int critterTeam = critter->data.critter.combat.team;
-        Object* critterWhoHitMe = critter->data.critter.combat.whoHitMe;
-        if (critterTeam == dudeTeam && (critterWhoHitMe == NULL || critterWhoHitMe->data.critter.combat.team != critterTeam)) {
-            continue;
-        }
-
-        if ((critter->data.critter.combat.maneuver & CRITTER_MANEUVER_DISENGAGING) != 0) {
-            continue;
-        }
-
-        if ((critter->data.critter.combat.results & (DAM_KNOCKED_OUT | DAM_DEAD)) != 0) {
-            continue;
-        }
-
-        if ((critter->data.critter.combat.maneuver & CRITTER_MANUEVER_FLEEING) != 0) {
-            continue;
-        }
-
-        if (critter->data.critter.combat.ap == stat_level(critter, STAT_MAXIMUM_ACTION_POINTS)) {
-            continue;
-        }
-
-        return false;
-    }
-
-    return true;
+    return isInCombat()
+        && obj_dude != NULL
+        && combat_end_due_to_load == 0;
 }
 
 // 0x420798

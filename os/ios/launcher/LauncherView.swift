@@ -907,8 +907,8 @@ struct LauncherView: View {
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
                     ("Inventory", L.t("Hold and drag an item to equip or move it.") + " " + L.t("Tap an item while INSPECT is toggled on to see its characteristics.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to."),
-                    ("Combat", "Out of combat the turn button starts a fight; in combat it ends your turn. END COMBAT leaves a fight once it is over."),
-                    ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
+                    ("Combat", "The START COMBAT button changes to SKIP TURN when combat starts."),
+                    ("Auto target", "On by default: the game switches to attack mode as a fight starts, so the first tap is an attack."),
                 ]
             case .survival:
                 return [
@@ -1452,7 +1452,7 @@ struct LauncherView: View {
         model.buttonScale = 1
         model.controlsOpacity = 1
         model.touchControls = true
-        model.autoTarget = false
+        model.autoTarget = true
         model.buttonColour = ControlColour.white.rawValue
     }
 
@@ -2121,7 +2121,7 @@ private struct TouchControlEditor: View {
                     Text(L.t("START"))
                     Text(L.t("COMBAT"))
                     HStack(spacing: max(1, shortSide * 0.04)) {
-                        Image(systemName: "skull")
+                        Image(systemName: "burst.fill")
                             .font(.system(size: max(6, min(11, shortSide * 0.16)), weight: .semibold))
                         Text(verbatim: "-")
                         Image(systemName: "forward.end")

@@ -117,7 +117,7 @@ final class LauncherModel: ObservableObject {
     /// Whether the touch controls are drawn over the game at all. Off leaves the
     /// whole screen to the game, for a session with a controller in hand.
     @Published var touchControls = true { didSet { store(touchControls, "touchControls") } }
-    @Published var autoTarget = false { didSet { store(autoTarget, "autoTarget") } }
+    @Published var autoTarget = true { didSet { store(autoTarget, "autoTarget") } }
     @Published var autoSaveMinutes = 5 { didSet { store(autoSaveMinutes, "autoSaveMinutes") } }
     @Published var saveHaptics = true { didSet { store(saveHaptics, "saveHaptics") } }
     /// The colour of the on-screen controls. White unless the player picks one
@@ -208,6 +208,7 @@ final class LauncherModel: ObservableObject {
         LauncherModel.migrateSettings()
         LauncherModel.applyDefaultResolution()
         LauncherModel.applyDefaultSubtitles()
+        LauncherModel.applyDefaultAutoTarget()
         documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         LauncherModel.prepareInstallFolders(documents: documentsDirectory)
         selectedGame = FalloutGame(rawValue: UserDefaults.standard.string(forKey: "launcher.game") ?? "") ?? .fallout1
@@ -381,6 +382,23 @@ final class LauncherModel: ObservableObject {
         defaults.set(subtitlesVersion, forKey: subtitlesVersionKey)
     }
 
+    /// Auto target ships on. Builds before this stored it off by default, so it
+    /// is switched on once here for both games.
+    private static let autoTargetVersionKey = "launcher.autoTargetVersion"
+    private static let autoTargetVersion = 1
+
+    private static func applyDefaultAutoTarget() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: autoTargetVersionKey) < autoTargetVersion else {
+            return
+        }
+
+        for game in FalloutGame.allCases {
+            defaults.set(true, forKey: optionKey("autoTarget", for: game))
+        }
+        defaults.set(autoTargetVersion, forKey: autoTargetVersionKey)
+    }
+
     /// Earlier builds stored a single set of options for the only game the app
     /// had. Those values belong to Fallout 1; Fallout 2 starts from defaults.
     private static func migrateSettings() {
@@ -424,7 +442,7 @@ final class LauncherModel: ObservableObject {
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
         controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.10), 1)
         touchControls = storedBool("touchControls", for: game, fallback: true)
-        autoTarget = storedBool("autoTarget", for: game, fallback: false)
+        autoTarget = storedBool("autoTarget", for: game, fallback: true)
         autoSaveMinutes = min(max(storedInt("autoSaveMinutes", for: game, fallback: 5), 0), 10)
         saveHaptics = storedBool("saveHaptics", for: game, fallback: true)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)

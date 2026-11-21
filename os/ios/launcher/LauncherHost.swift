@@ -518,7 +518,7 @@ enum ControlLayout {
     static func autoTarget() -> Bool {
         let value = UserDefaults.standard.object(
             forKey: LauncherModel.optionKey("autoTarget", for: activeGame())) as? Bool
-        return value ?? false
+        return value ?? true
     }
 
     /// The first build with the reference layout used saved drag positions
@@ -1916,9 +1916,9 @@ final class GameControlsOverlay: UIView {
         skipButton.isEnabled = fallout_ios_action_available(startsCombat ? 27 : 6) != 0
         if startsCombat != startCombatShown {
             startCombatShown = startsCombat
-            skipButton.set(symbol: startsCombat ? "skull" : "forward.end",
-                           title: startsCombat ? "START\nCOMBAT" : "END\nTURN",
-                           accessibilityLabel: startsCombat ? "Start combat" : "End turn")
+            skipButton.set(symbol: startsCombat ? "burst.fill" : "forward.end",
+                           title: startsCombat ? "START\nCOMBAT" : "SKIP\nTURN",
+                           accessibilityLabel: startsCombat ? "Start combat" : "Skip turn")
         }
 
         // Reload stays on screen for anything that takes ammunition and dims
