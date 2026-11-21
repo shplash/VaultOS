@@ -1877,32 +1877,37 @@ final class GameControlsOverlay: UIView {
         }
 
         let inCombat = fallout_ios_action_available(25) != 0
-        cursorPad.isHidden = !(inCombat && fallout_ios_action_available(28) == 0)
-        if inCombat && !wasInCombat && ControlLayout.autoTarget() && fallout_ios_cursor_mode() != 2 {
-            fallout_ios_press_action(12)
-            keepTargeting = true
-        } else if !inCombat && wasInCombat {
-            fallout_ios_press_action(13)
-            keepTargeting = false
-        }
-        wasInCombat = inCombat
+        let canAct = fallout_ios_action_available(28) != 0
+        cursorPad.isHidden = !(inCombat && !canAct)
 
         let mode = fallout_ios_cursor_mode()
-        if mode != lastCursorMode {
-            let requests = fallout_ios_cursor_mode_requests()
-            let requested = requests != lastModeRequests
-            lastModeRequests = requests
-            if requested {
-                keepTargeting = mode == 2
-                lastCursorMode = mode
-            } else if inCombat && keepTargeting && mode == 0 {
+
+        if canAct {
+            if inCombat && !wasInCombat && ControlLayout.autoTarget() && mode != 2 {
                 fallout_ios_press_action(12)
-                lastCursorMode = mode
-            } else {
-                if inCombat && mode == 2 {
-                    keepTargeting = true
+                keepTargeting = true
+            } else if !inCombat && wasInCombat {
+                fallout_ios_press_action(13)
+                keepTargeting = false
+            }
+            wasInCombat = inCombat
+
+            if mode != lastCursorMode {
+                let requests = fallout_ios_cursor_mode_requests()
+                let requested = requests != lastModeRequests
+                lastModeRequests = requests
+                if requested {
+                    keepTargeting = mode == 2
+                    lastCursorMode = mode
+                } else if inCombat && keepTargeting && mode == 0 {
+                    fallout_ios_press_action(12)
+                    lastCursorMode = mode
+                } else {
+                    if inCombat && mode == 2 {
+                        keepTargeting = true
+                    }
+                    lastCursorMode = mode
                 }
-                lastCursorMode = mode
             }
         }
 
