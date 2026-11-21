@@ -617,6 +617,8 @@ static int OptnEnd()
 // 0x481974
 int PauseWindow(bool is_world_map)
 {
+    IosScreenScope screenScope(IOS_SCREEN_OPTIONS);
+
     // 0x4812EC
     static const int graphicIds[PAUSE_WINDOW_FRM_COUNT] = {
         208, // charwin.frm - character editor

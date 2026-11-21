@@ -133,6 +133,7 @@ int has_item_in_hand()
 // interface loops item_w_try_reload on the active weapon when its slot is used.
 // The same two calls are made here, so the on-screen button does exactly what
 // the weapon slot does.
+// A weapon that takes ammunition and is not already full.
 int has_reloadable_weapon()
 {
     fallout::Object* item = nullptr;
@@ -140,10 +141,22 @@ int has_reloadable_weapon()
         return 0;
     }
 
-    // Same rule as Fallout 2's button: a weapon that takes ammunition and is
-    // not already full.
     return fallout::item_get_type(item) == fallout::ITEM_TYPE_WEAPON
             && fallout::item_w_max_ammo(item) > fallout::item_w_curr_ammo(item)
+        ? 1
+        : 0;
+}
+
+// A weapon that takes ammunition, full or not.
+int has_firearm_in_hand()
+{
+    fallout::Object* item = nullptr;
+    if (fallout::intface_get_current_item(&item) != 0 || !is_real_item(item)) {
+        return 0;
+    }
+
+    return fallout::item_get_type(item) == fallout::ITEM_TYPE_WEAPON
+            && fallout::item_w_max_ammo(item) > 0
         ? 1
         : 0;
 }
@@ -187,6 +200,8 @@ int action_available(int action)
         return fallout::combat_can_skip_turn() ? 1 : 0;
     case 25:
         return fallout::isInCombat() ? 1 : 0;
+    case 26:
+        return has_firearm_in_hand() ? 1 : 0;
     default:
         break;
     }

@@ -905,8 +905,8 @@ struct LauncherView: View {
             case .touch:
                 return [
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
-                    ("Inventory", L.t("Tap an item while INSPECT is toggled on to see its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
-                    ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to. A conversation ends with one of its replies, not with BACK."),
+                    ("Inventory", L.t("Hold and drag an item to equip or move it.") + " " + L.t("Tap an item while INSPECT is toggled on to see its characteristics.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
+                    ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to."),
                     ("Combat", "END TURN hands the turn over and END COMBAT leaves the fight. The attack mode and RELOAD only appear while a weapon is in hand."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
                 ]
@@ -1953,6 +1953,8 @@ private struct TouchControlEditor: View {
             }
 
             HStack(spacing: 8) {
+                Spacer(minLength: 0)
+
                 Text(L.t("OPACITY"))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(1.1)
@@ -2114,8 +2116,15 @@ private struct TouchControlEditor: View {
         let tint = model.controlColour.color
 
         return VStack(spacing: max(1, shortSide * 0.035)) {
-            Image(systemName: control.symbol)
-                .font(.system(size: max(9, min(28, shortSide * 0.32)), weight: .semibold))
+            if control == .fireMode {
+                Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.template))
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: max(9, min(20, shortSide * 0.26)))
+            } else {
+                Image(systemName: control.symbol)
+                    .font(.system(size: max(9, min(28, shortSide * 0.32)), weight: .semibold))
+            }
 
             Text(control.label)
                 .font(.system(size: max(7, min(10, shortSide * 0.18)), weight: .bold, design: .monospaced))

@@ -275,9 +275,9 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .swap: english = "SWAP"
         case .end: english = "END"
         case .reload: english = "RELOAD"
-        case .fireMode: english = "ATTACK"
+        case .fireMode: english = "ATTACK MODE"
         case .load: english = "LOAD"
-        case .saves: english = "SAVES"
+        case .saves: english = "SAVE"
         case .quickSave: english = "QUICK SAVE"
         }
         return L.t(english)
@@ -723,7 +723,7 @@ final class GameControlsOverlay: UIView {
         labelLines: 2
     )
     private let savesButton = LabeledControlButton(
-        title: "SAVES",
+        title: "SAVE",
         symbol: "tray.full",
         iconPointSize: 16
     )
@@ -1306,8 +1306,8 @@ final class GameControlsOverlay: UIView {
 
         barterButton.solidBackground = true
         tellAboutButton.solidBackground = true
-        place(barterButton, on: barterSlot, side: side, extraWidth: 4)
-        place(tellAboutButton, on: aboutSlot, side: side, extraWidth: 4)
+        place(barterButton, on: barterSlot, side: side, extraWidth: 6)
+        place(tellAboutButton, on: aboutSlot, side: side, extraWidth: 6)
     }
 
     private func place(_ button: UIView, on slot: CGRect, side: CGFloat, extraWidth: CGFloat = 0) {
@@ -1701,6 +1701,7 @@ final class GameControlsOverlay: UIView {
         let movie = fallout_ios_movie_state()
         skipMovieButton.isHidden = movie == 0
         skipMovieButton.requiresHold = movie != 1
+        skipMovieButton.holdSeconds = movie == 3 ? 1 : 2
         movieShield.isHidden = movie == 0
         if movie != 0 {
             movieWasPlaying = true
@@ -1891,12 +1892,13 @@ final class GameControlsOverlay: UIView {
         swapButton.isEnabled = fallout_ios_action_available(7) != 0
         skipButton.isEnabled = fallout_ios_action_available(6) != 0
 
-        // Reload needs a firearm with room for more ammunition and the attack
-        // mode needs an item in hand; the engine answers for whichever game is
-        // running. Reload stays on screen and dims, so the button never moves.
+        // Reload stays on screen for anything that takes ammunition and dims
+        // when it would do nothing; a melee weapon or empty hands keep it away.
+        // The attack mode is always there and dims without a usable weapon.
+        let carriesFirearm = fallout_ios_action_available(26) != 0
         let canReload = fallout_ios_action_available(8) != 0
         let canChangeMode = fallout_ios_action_available(9) != 0
-        fireModeButton.isHidden = !canChangeMode
+        reloadButton.isHidden = !carriesFirearm
         reloadButton.isEnabled = canReload
         fireModeButton.isEnabled = canChangeMode
 
@@ -1928,19 +1930,19 @@ final class GameControlsOverlay: UIView {
         // chance to hit and cost an extra action point, so the label says so
         // while one of them is selected.
         let aimed = mode == 2 || mode == 4
-        let title = aimed ? "MODE\nVATS" : "ATTACK\nMODE"
+        let title = aimed ? "VATS\nMODE" : "ATTACK\nMODE"
         switch mode {
         case 1:
-            fireModeButton.set(image: fireModeImage(mode), title: title,
+            fireModeButton.set(image: Self.fireModeImage(mode), title: title,
                                accessibilityLabel: "Attack mode: single")
         case 2:
-            fireModeButton.set(image: fireModeImage(mode), title: title,
+            fireModeButton.set(image: Self.fireModeImage(mode), title: title,
                                accessibilityLabel: "Attack mode: aimed")
         case 3:
-            fireModeButton.set(image: fireModeImage(mode), title: title,
+            fireModeButton.set(image: Self.fireModeImage(mode), title: title,
                                accessibilityLabel: "Attack mode: burst")
         case 4:
-            fireModeButton.set(image: fireModeImage(mode), title: title,
+            fireModeButton.set(image: Self.fireModeImage(mode), title: title,
                                accessibilityLabel: "Attack mode: aimed secondary")
         default:
             // No readable mode: a hollow bullet and the same label.
@@ -1952,7 +1954,7 @@ final class GameControlsOverlay: UIView {
     /// One 42x20 pictogram: one dot for the primary attack, two for the
     /// secondary (burst), and a crosshair when the mode is aimed. The whole
     /// group is centred in the canvas so all four modes line up in the button.
-    private func fireModeImage(_ mode: Int32) -> UIImage {
+    static func fireModeImage(_ mode: Int32) -> UIImage {
         let size = CGSize(width: 42, height: 20)
         let color = ControlTheme.control
 
@@ -2543,13 +2545,12 @@ final class MovieSkipButton: UIControl {
             caption.text = L.t(requiresHold ? "HOLD TO SKIP" : "TAP TO SKIP")
         }
     }
+    var holdSeconds: TimeInterval = 2
 
     private let fill = UIView()
     private let caption = UILabel()
     private var progressTimer: Timer?
     private var startedAt: Date?
-
-    private static let holdSeconds: TimeInterval = 2.0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -2610,7 +2611,7 @@ final class MovieSkipButton: UIControl {
             return 0
         }
         let elapsed = Date().timeIntervalSince(startedAt)
-        return min(1, max(0, CGFloat(elapsed / MovieSkipButton.holdSeconds)))
+        return min(1, max(0, CGFloat(elapsed / holdSeconds)))
     }
 
     private func startProgress() {
@@ -2623,7 +2624,7 @@ final class MovieSkipButton: UIControl {
         // Flushing hands it over now instead of waiting for a run loop turn.
         fill.layer.removeAllAnimations()
         fill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
-        UIView.animate(withDuration: MovieSkipButton.holdSeconds,
+        UIView.animate(withDuration: holdSeconds,
                        delay: 0,
                        options: [.curveLinear, .beginFromCurrentState]) {
             self.fill.frame = CGRect(x: 0, y: 0, width: self.bounds.width, height: self.bounds.height)
@@ -2631,7 +2632,7 @@ final class MovieSkipButton: UIControl {
         CATransaction.flush()
 
         // Only the moment the hold is long enough is timed.
-        let timer = Timer(timeInterval: MovieSkipButton.holdSeconds, repeats: false) { [weak self] _ in
+        let timer = Timer(timeInterval: holdSeconds, repeats: false) { [weak self] _ in
             self?.trigger()
         }
         progressTimer = timer

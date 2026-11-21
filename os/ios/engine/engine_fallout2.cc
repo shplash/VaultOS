@@ -29,6 +29,7 @@
 #include "svga.h"
 #include "win32.h"
 #include "window_manager.h"
+#include "worldmap.h"
 
 namespace fallout {
 extern int gMovieCurrent;
@@ -145,6 +146,19 @@ int has_firearm_in_hand()
     }
 
     return fallout::itemGetType(item) == fallout::ITEM_TYPE_WEAPON
+            && fallout::ammoGetCapacity(item) > 0
+        ? 1
+        : 0;
+}
+
+int can_reload_active_weapon()
+{
+    fallout::Object* item = active_item();
+    if (item == nullptr) {
+        return 0;
+    }
+
+    return fallout::itemGetType(item) == fallout::ITEM_TYPE_WEAPON
             && fallout::ammoGetCapacity(item) > fallout::ammoGetQuantity(item)
         ? 1
         : 0;
@@ -197,9 +211,12 @@ int movie_state()
     }
 
     if (movie == fallout::MOVIE_IPLOGO
-        || movie == fallout::MOVIE_INTRO
-        || movie == fallout::MOVIE_CREDITS) {
+        || movie == fallout::MOVIE_INTRO) {
         return 1;
+    }
+
+    if (movie == fallout::MOVIE_CREDITS) {
+        return 3;
     }
 
     return 2;
@@ -340,6 +357,8 @@ int action_available(int action)
         return fallout::isInCombat() ? 1 : 0;
     case 25:
         return fallout::isInCombat() ? 1 : 0;
+    case 26:
+        return has_firearm_in_hand() ? 1 : 0;
     default:
         break;
     }
@@ -350,11 +369,15 @@ int action_available(int action)
 
     switch (action) {
     case 3:
-        // The pip-boy is unavailable in combat.
-        return fallout::isInCombat() ? 0 : 1;
+        // The pip-boy is unavailable in combat, and Fallout 2 only carries it
+        // once the map says it has been picked up.
+        if (fallout::isInCombat()) {
+            return 0;
+        }
+        return fallout::wmMapPipboyActive() ? 1 : 0;
     case 8:
-        // Reload: a firearm is in hand.
-        return has_firearm_in_hand();
+        // Reload: a firearm with room for more ammunition.
+        return can_reload_active_weapon();
     case 9:
         // Fire mode: any weapon has attack modes to cycle.
         return has_weapon_in_hand();
