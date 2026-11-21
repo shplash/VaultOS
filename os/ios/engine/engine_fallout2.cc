@@ -11,7 +11,6 @@
 
 #include "audio_engine.h"
 #include "combat.h"
-#include "config.h"
 #include "debug.h"
 #include "engine_glue.h"
 #include "fallout_engine.h"
@@ -27,7 +26,6 @@
 #include "movie.h"
 #include "object.h"
 #include "proto_types.h"
-#include "sfall_config.h"
 #include "svga.h"
 #include "win32.h"
 #include "window_manager.h"
@@ -37,6 +35,7 @@ extern int gMovieCurrent;
 extern bool iosInspect;
 void mouseIosClick(int state);
 bool iosCombatCanEnd();
+int iosQuickSaveAuto();
 }
 
 namespace {
@@ -534,14 +533,12 @@ void resume_audio()
 }
 
 int g_quick_save_serial = 0;
-bool g_quick_save_ready = false;
 
 int quick_save()
 {
-    const int result = fallout::lsgSaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+    const int result = fallout::iosQuickSaveAuto();
     if (result == 1) {
         g_quick_save_serial++;
-        g_quick_save_ready = true;
     }
 
     return result;
@@ -552,33 +549,11 @@ int quick_save_serial()
     return g_quick_save_serial;
 }
 
-int quick_save_slot_ready()
-{
-    if (g_quick_save_ready) {
-        return 1;
-    }
-
-    if (!fallout::gSfallConfigInitialized) {
-        return 0;
-    }
-
-    int slots = 0;
-    if (!fallout::configGetInt(&fallout::gSfallConfig,
-            SFALL_CONFIG_MISC_KEY,
-            SFALL_CONFIG_AUTO_QUICK_SAVE,
-            &slots)) {
-        return 0;
-    }
-
-    return slots > 0 ? 1 : 0;
-}
-
 int auto_save_ready()
 {
     return in_game() != 0
             && screen() == 0
             && !fallout::isInCombat()
-            && quick_save_slot_ready()
         ? 1
         : 0;
 }
@@ -616,10 +591,13 @@ void auto_save()
         return;
     }
 
-    if (fallout::lsgSaveGame(fallout::LOAD_SAVE_MODE_QUICK) == 1) {
-        lastSave = now;
+    const int saved = fallout::iosQuickSaveAuto();
+    lastSave = now;
+
+    if (saved == 1) {
         g_quick_save_serial++;
-        g_quick_save_ready = true;
+    } else {
+        fallout_engine_auto_save_failed();
     }
 }
 

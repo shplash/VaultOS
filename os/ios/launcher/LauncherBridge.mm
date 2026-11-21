@@ -103,6 +103,11 @@ static int32_t host_auto_save_minutes(void)
     return (int32_t)minutes;
 }
 
+static void host_auto_save_failed(void)
+{
+    fallout_ios_auto_save_failed();
+}
+
 static const FalloutEngineHost g_host = {
     FALLOUT_ENGINE_ABI_VERSION,
     host_install_controls,
@@ -111,6 +116,7 @@ static const FalloutEngineHost g_host = {
     host_refresh_controls,
     host_hide_keyboard,
     host_auto_save_minutes,
+    host_auto_save_failed,
 };
 
 void fallout_ios_hide_keyboard(void)

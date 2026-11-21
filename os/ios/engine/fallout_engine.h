@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 9
+#define FALLOUT_ENGINE_ABI_VERSION 10
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -56,6 +56,8 @@ typedef struct FalloutEngineHost {
 
     // Minutes between the launcher's timed quick saves, 0 for off.
     int32_t (*auto_save_minutes)(void);
+
+    void (*auto_save_failed)(void);
 } FalloutEngineHost;
 
 typedef struct FalloutEngineAPI {

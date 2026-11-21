@@ -753,6 +753,9 @@ final class GameControlsOverlay: UIView {
     )
     private var menuRectCache: CGRect?
     private var menuRectScreen: ScreenMode = .game
+    private let quickSaveNotice = UIView()
+    private let quickSaveNoticeLabel = UILabel()
+    private var quickSaveNoticeTimer: Timer?
     private var keyboardIsUp = false
     private var pushedUp: CGFloat = 0
     private weak var pushedGameView: UIView?
@@ -780,6 +783,10 @@ final class GameControlsOverlay: UIView {
     /// the game what the controls can do and updates them.
     static func refreshInstalled() {
         installedOverlay?.refreshControls()
+    }
+
+    static func autoSaveFailed() {
+        installedOverlay?.showAutoSaveNotice()
     }
 
     static func install() {
@@ -991,6 +998,23 @@ final class GameControlsOverlay: UIView {
         quickSaveButton.addTarget(self, action: #selector(quickSavePressed), for: .touchUpInside)
         addSubview(quickSaveButton)
 
+        quickSaveNotice.isHidden = true
+        quickSaveNotice.backgroundColor = UIColor.black.withAlphaComponent(0.72)
+        quickSaveNotice.layer.cornerRadius = 9
+        quickSaveNotice.layer.borderWidth = 1
+        quickSaveNotice.layer.borderColor = ControlTheme.control.withAlphaComponent(0.5).cgColor
+        quickSaveNotice.isUserInteractionEnabled = false
+        addSubview(quickSaveNotice)
+
+        quickSaveNoticeLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .semibold)
+        quickSaveNoticeLabel.textColor = .white
+        quickSaveNoticeLabel.numberOfLines = 2
+        quickSaveNoticeLabel.textAlignment = .center
+        quickSaveNoticeLabel.adjustsFontSizeToFitWidth = true
+        quickSaveNoticeLabel.minimumScaleFactor = 0.7
+        quickSaveNoticeLabel.isUserInteractionEnabled = false
+        quickSaveNotice.addSubview(quickSaveNoticeLabel)
+
         movieShield.isHidden = true
         addSubview(movieShield)
 
@@ -1135,6 +1159,15 @@ final class GameControlsOverlay: UIView {
                                        width: loadButton.frame.width,
                                        height: loadButton.frame.height)
 
+        if !quickSaveNotice.isHidden {
+            let noticeWidth = min(200, bounds.width * 0.3)
+            quickSaveNotice.frame = CGRect(x: min(quickSaveButton.frame.maxX + 8, bounds.width - noticeWidth - 8),
+                                           y: quickSaveButton.frame.midY - 21,
+                                           width: noticeWidth,
+                                           height: 42)
+            quickSaveNoticeLabel.frame = quickSaveNotice.bounds.insetBy(dx: 8, dy: 4)
+        }
+
         movieShield.frame = bounds
         helpBackdrop.frame = bounds
 
@@ -1220,7 +1253,8 @@ final class GameControlsOverlay: UIView {
         }
 
         let helpSide = max(26, min(38, side * 0.5))
-        helpButton.frame = clampFrame(CGRect(x: rightX, y: y, width: helpSide, height: helpSide))
+        helpButton.frame = clampFrame(CGRect(x: rightX, y: max(clampTop, box.minY + 4),
+                                             width: helpSide, height: helpSide))
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
     }
 
@@ -1230,19 +1264,17 @@ final class GameControlsOverlay: UIView {
 
         let offerX = table.minX - gap - small
         let backX = offerX - gap - side
-        let inspectX = table.maxX + gap
-        let talkX = inspectX + small + gap
+        let innerX = table.maxX + gap
+        let outerX = innerX + small + gap
 
         backButton.frame = clampFrame(CGRect(x: backX, y: middle - side / 2, width: side, height: side))
         offerButton.frame = clampFrame(CGRect(x: offerX, y: middle - small / 2, width: small, height: small))
-        lookButton.frame = clampFrame(CGRect(x: inspectX, y: middle - small / 2, width: small, height: small))
-        talkButton.frame = clampFrame(CGRect(x: talkX, y: middle - side / 2, width: side, height: side))
+        talkButton.frame = clampFrame(CGRect(x: innerX, y: middle - small / 2, width: small, height: small))
+        lookButton.frame = clampFrame(CGRect(x: outerX, y: middle - side / 2, width: side, height: side))
 
         let helpSide = max(26, min(38, side * 0.5))
-        helpButton.frame = clampFrame(CGRect(x: talkX + (side - helpSide) / 2,
-                                             y: middle + side / 2 + gap,
-                                             width: helpSide,
-                                             height: helpSide))
+        helpButton.frame = clampFrame(CGRect(x: innerX, y: max(8, table.minY + 4),
+                                             width: helpSide, height: helpSide))
         helpButton.layer.cornerRadius = max(6, helpSide / 5)
     }
 
@@ -1501,6 +1533,7 @@ final class GameControlsOverlay: UIView {
     // The tick means the game was really written, the cross means it was not.
     // Nothing in between, whether a finger or the launcher's own clock asked.
     private func showQuickSaveResult(saved: Bool) {
+        quickSaveNotice.isHidden = true
         quickSaveButton.set(symbol: saved ? "checkmark" : "xmark",
                             title: "QUICK\nSAVE",
                             accessibilityLabel: saved ? "Saved" : "Save failed")
@@ -1509,6 +1542,20 @@ final class GameControlsOverlay: UIView {
             self?.quickSaveButton.set(symbol: "bolt.fill", title: "QUICK\nSAVE",
                                       accessibilityLabel: "Quick save")
         }
+    }
+
+    private func showAutoSaveNotice() {
+        quickSaveNoticeLabel.text = L.t("Auto save found no free slot.")
+            + "\n"
+            + L.t("Clear one in SAVES.")
+        quickSaveNotice.isHidden = false
+        setNeedsLayout()
+        quickSaveNoticeTimer?.invalidate()
+        let timer = Timer(timeInterval: 6, repeats: false) { [weak self] _ in
+            self?.quickSaveNotice.isHidden = true
+        }
+        quickSaveNoticeTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     @objc private func lookPressed() {
@@ -1668,6 +1715,7 @@ final class GameControlsOverlay: UIView {
             talkButton.isHidden = true
             helpCard.isHidden = true
             helpBackdrop.isHidden = true
+            quickSaveNotice.isHidden = true
             if isHidden {
                 isHidden = false
             }
@@ -2484,6 +2532,11 @@ public func fallout_ios_menu_music_stop() {
 @_cdecl("fallout_ios_refresh_game_controls")
 public func fallout_ios_refresh_game_controls() {
     GameControlsOverlay.refreshInstalled()
+}
+
+@_cdecl("fallout_ios_auto_save_failed")
+public func falloutIOSAutoSaveFailed() {
+    GameControlsOverlay.autoSaveFailed()
 }
 
 final class MovieSkipButton: UIControl {

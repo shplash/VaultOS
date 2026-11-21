@@ -119,3 +119,12 @@ int fallout_engine_mode_requests(void)
 {
     return g_mode_requests;
 }
+
+void fallout_engine_auto_save_failed(void)
+{
+    if (g_host == nullptr || g_host->auto_save_failed == nullptr) {
+        return;
+    }
+
+    g_host->auto_save_failed();
+}

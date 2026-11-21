@@ -150,6 +150,7 @@ int fallout_ios_menu_rect(int* x, int* y, int* width, int* height);
 int fallout_ios_quick_save_serial(void);
 int fallout_ios_action_button_rect(int action, int* x, int* y, int* width, int* height);
 int fallout_ios_cursor_mode_requests(void);
+void fallout_ios_auto_save_failed(void);
 void fallout_ios_menu_music_start(void);
 void fallout_ios_menu_music_stop(void);
 // Called from the engine's input loop, through the host callbacks, to refresh

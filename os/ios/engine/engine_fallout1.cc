@@ -460,7 +460,7 @@ int g_quick_save_serial = 0;
 
 int quick_save()
 {
-    const int result = fallout::SaveGame(fallout::LOAD_SAVE_MODE_QUICK);
+    const int result = fallout::ios_quick_save_auto();
     if (result == 1) {
         g_quick_save_serial++;
     }
@@ -519,9 +519,13 @@ void auto_save()
         return;
     }
 
-    if (fallout::ios_quick_save_silent() == 1) {
-        lastSave = now;
+    const int saved = fallout::ios_quick_save_auto();
+    lastSave = now;
+
+    if (saved == 1) {
         g_quick_save_serial++;
+    } else {
+        fallout_engine_auto_save_failed();
     }
 }
 

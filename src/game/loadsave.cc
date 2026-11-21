@@ -806,10 +806,47 @@ int SaveGame(int mode)
     return rc;
 }
 
-int ios_quick_save_silent()
+int ios_quick_save_auto()
 {
     if (!quick_done) {
-        return 0;
+        int slot = -1;
+
+        for (int index = 0; index < 10 && slot == -1; index++) {
+            snprintf(str, sizeof(str), "%s\\%s%.2d\\%s", "SAVEGAME", "SLOT", index + 1, "SAVE.DAT");
+            flptr = db_fopen(str, "rb");
+            if (flptr == NULL) {
+                continue;
+            }
+
+            if (LoadHeader(index) == 0
+                && strncmp(LSData[index].description, "Quick Save", 10) == 0) {
+                slot = index;
+            }
+
+            db_fclose(flptr);
+        }
+
+        if (slot == -1) {
+            for (int index = 0; index < 10 && slot == -1; index++) {
+                snprintf(str, sizeof(str), "%s\\%s%.2d\\%s", "SAVEGAME", "SLOT", index + 1, "SAVE.DAT");
+                flptr = db_fopen(str, "rb");
+                if (flptr == NULL) {
+                    slot = index;
+                } else {
+                    db_fclose(flptr);
+                }
+            }
+        }
+
+        if (slot == -1) {
+            return 0;
+        }
+
+        memset(LSData[slot].description, 0, sizeof(LSData[slot].description));
+        strncpy(LSData[slot].description, "Quick Save", sizeof(LSData[slot].description) - 1);
+
+        slot_cursor = slot;
+        quick_done = true;
     }
 
     return SaveGame(LOAD_SAVE_MODE_QUICK);

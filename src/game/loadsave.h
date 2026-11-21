@@ -22,7 +22,7 @@ typedef enum LoadSaveMode {
 void InitLoadSave();
 void ResetLoadSave();
 int SaveGame(int mode);
-int ios_quick_save_silent();
+int ios_quick_save_auto();
 int LoadGame(int mode);
 int isLoadingGame();
 void KillOldMaps();
