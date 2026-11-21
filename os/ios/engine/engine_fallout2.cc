@@ -309,6 +309,10 @@ void reload_active_weapon()
         action = active_item_action();
     }
 
+    if (actionBefore < 0) {
+        return;
+    }
+
     for (int attempt = 0; attempt < fallout::INTERFACE_ITEM_ACTION_COUNT; attempt++) {
         if (active_item_action() == actionBefore) {
             break;

@@ -152,12 +152,16 @@ void reload_active_weapon()
 {
     int hitModeBefore = 0;
     bool aimingBefore = false;
-    fallout::intface_get_attack(&hitModeBefore, &aimingBefore);
+    bool hadAttackBefore = fallout::intface_get_attack(&hitModeBefore, &aimingBefore) == 0;
 
     // The interface's own reload, sound included, so the on-screen button does
     // exactly what the game does when the weapon slot reloads - not a silent
     // copy of half of it.
     fallout::intface_item_reload();
+
+    if (!hadAttackBefore) {
+        return;
+    }
 
     for (int attempt = 0; attempt < fallout::INTERFACE_ITEM_ACTION_COUNT; attempt++) {
         int hitMode = 0;
