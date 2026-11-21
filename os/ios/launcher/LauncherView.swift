@@ -411,6 +411,8 @@ struct LauncherView: View {
                 footnote(model.install.has_saves == 1
                     ? "Your existing saves are kept. Re-importing replaces the game files only."
                     : "Each game keeps its own data, configuration and savegames.")
+
+                footnote("LANGUAGE FILES adds a translation pack to this game. The game files themselves are left alone.")
             }
             .padding(.horizontal, 22)
             .padding(.top, 4)
@@ -1084,7 +1086,7 @@ struct LauncherView: View {
 
     private var gameSheet: some View {
         sheet(title: "Game", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
-            row("Language", detail: "Game text, voice, the launcher and the controls. Add more languages with LANGUAGE FILES on HOME.") {
+            row("Language", detail: "Game text, voice, the launcher and the controls. This does not change the in-game language used, add more with LANGUAGE FILES on HOME to add your own.") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
@@ -1171,6 +1173,13 @@ struct LauncherView: View {
 
     private var controlsSheet: some View {
         sheet(title: "Controls", detail: "Colour and opacity of the on-screen controls", onReset: resetControls) {
+            toggleRow("On-screen controls",
+                      detail: "Draw the touch controls over the game. Off, the screen is the game alone. (not recommended)",
+                      isOn: $model.touchControls)
+
+            // The layout, colour and opacity rows are greyed, not hidden, while
+            // the controls are off: there is nothing on the screen to edit,
+            // colour or dim then.
             row("Control scheme", detail: "Where the buttons sit and how big they are. Best judged over the game screen itself.") {
                 Button {
                     showControlEditor = true
@@ -1179,21 +1188,12 @@ struct LauncherView: View {
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
             }
-            // The rows below the switch are greyed, not hidden, while the
-            // controls are off: there is nothing on the screen to edit, colour
-            // or dim then.
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
-
-            toggleRow("On-screen controls",
-                      detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
-                      isOn: $model.touchControls)
 
             toggleRow("Auto target in combat",
                       detail: "Switch to attack mode by itself when a fight starts.",
                       isOn: $model.autoTarget)
-            .disabled(!model.touchControls)
-            .opacity(model.touchControls ? 1 : 0.4)
 
             row("Button colour", detail: "White, orange, green or blue") {
                 Menu {
