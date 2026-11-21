@@ -106,7 +106,7 @@ typedef struct FalloutEngineAPI {
     // The screen the player is looking at: 0 the game view, 1 inventory, 2
     // loot, 3 barter, 4 dialogue, 5 character, 6 pip-boy, 7 skilldex, 8 automap,
     // 9 world map, 10 options, 11 save or load, 12 the use-on picker, 13 the
-    // amount picker.
+    // amount picker, 14 the called shot panel.
     int (*screen)(void);
 
     // The engine's own quick save, writing to its own quick slot: 1 when the
