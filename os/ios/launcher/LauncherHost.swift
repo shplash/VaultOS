@@ -1066,6 +1066,7 @@ final class GameControlsOverlay: UIView {
 
         offerButton.isHidden = true
         offerButton.accessibilityLabel = "Offer"
+        offerButton.backgroundOpacity = 0.9
         offerButton.onHold = { [weak self] in
             fallout_ios_press_action(23)
             self?.refreshControls()
@@ -1076,6 +1077,7 @@ final class GameControlsOverlay: UIView {
         talkButton.isHidden = true
         talkButton.tag = 24
         talkButton.accessibilityLabel = "Talk"
+        talkButton.backgroundOpacity = 0.9
         talkButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(talkButton)
 
@@ -1288,8 +1290,8 @@ final class GameControlsOverlay: UIView {
         let outerX = innerX + small + gap
 
         backButton.frame = clampFrame(CGRect(x: backX, y: middle - side / 2, width: side, height: side))
-        offerButton.frame = clampFrame(CGRect(x: offerX, y: bottom, width: small, height: small))
-        talkButton.frame = clampFrame(CGRect(x: innerX, y: bottom, width: small, height: small))
+        offerButton.frame = clampFrame(CGRect(x: offerX + 2, y: bottom + 2, width: small, height: small))
+        talkButton.frame = clampFrame(CGRect(x: innerX - 2, y: bottom + 2, width: small, height: small))
         lookButton.frame = clampFrame(CGRect(x: outerX, y: middle - side / 2, width: side, height: side))
 
         let helpSide = max(26, min(38, side * 0.5))
@@ -2065,7 +2067,13 @@ private final class LabeledControlButton: UIControl {
     private var holdTimer: Timer?
 
     private var normalBackground: UIColor {
-        return solidBackground ? UIColor.black : ControlTheme.panel
+        return solidBackground ? UIColor.black : ControlTheme.panel.withAlphaComponent(backgroundOpacity)
+    }
+
+    var backgroundOpacity: CGFloat = 0.55 {
+        didSet {
+            backgroundColor = normalBackground
+        }
     }
     private let iconPointSize: CGFloat
     private let accent: Bool
