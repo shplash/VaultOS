@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 11
+#define FALLOUT_ENGINE_ABI_VERSION 10
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -126,8 +126,6 @@ typedef struct FalloutEngineAPI {
     int (*action_button_rect)(int action, int* x, int* y, int* width, int* height);
 
     int (*cursor_mode_requests)(void);
-
-    void (*cursor_move)(int dx, int dy);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

@@ -689,10 +689,6 @@ final class GameControlsOverlay: UIView {
     private static var installedOverlay: GameControlsOverlay?
 
     private let joystick = CameraJoystickControl()
-    private let cursorPad = CursorPad()
-    private var cursorPadPoint: CGPoint?
-    private var cursorPadPending = CGPoint.zero
-    private var cursorPadSentAt: CFTimeInterval = 0
     private let actionButton = LabeledControlButton(
         title: "ACTION",
         symbol: "hand.tap",
@@ -955,13 +951,6 @@ final class GameControlsOverlay: UIView {
         isUserInteractionEnabled = true
         isMultipleTouchEnabled = true
 
-        cursorPad.isHidden = true
-        cursorPad.backgroundColor = .clear
-        let cursorPadPan = UIPanGestureRecognizer(target: self, action: #selector(cursorPadPanned(_:)))
-        cursorPadPan.cancelsTouchesInView = false
-        cursorPad.addGestureRecognizer(cursorPadPan)
-        addSubview(cursorPad)
-
         addSubview(joystick)
 
         actionButton.accessibilityLabel = "Action"
@@ -1198,7 +1187,6 @@ final class GameControlsOverlay: UIView {
             quickSaveNoticeLabel.frame = quickSaveNotice.bounds.insetBy(dx: 8, dy: 4)
         }
 
-        cursorPad.frame = bounds
         movieShield.frame = bounds
         helpBackdrop.frame = bounds
 
@@ -1505,9 +1493,6 @@ final class GameControlsOverlay: UIView {
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         // Empty parts of the overlay must not eat touches intended for SDL.
         for subview in subviews where !subview.isHidden && subview.alpha > 0.01 {
-            if subview === cursorPad && !cursorPad.takesTouches {
-                continue
-            }
             if subview.frame.contains(point) {
                 return true
             }
@@ -1532,54 +1517,6 @@ final class GameControlsOverlay: UIView {
         fallout_ios_back()
         refreshControls()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-
-    @objc private func cursorPadPanned(_ gesture: UIPanGestureRecognizer) {
-        let point = gesture.location(in: self)
-        let surface = gameSurface()
-        let gameWidth = CGFloat(UserDefaults.standard.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0)
-        let factor = surface.width > 1 && gameWidth > 1 ? gameWidth / surface.width : 1
-
-        switch gesture.state {
-        case .began:
-            let translation = gesture.translation(in: self)
-            cursorPadPoint = CGPoint(x: point.x - translation.x, y: point.y - translation.y)
-            cursorPadPending = .zero
-            cursorPadSentAt = 0
-
-        case .changed, .ended:
-            guard let last = cursorPadPoint else {
-                return
-            }
-
-            cursorPadPoint = point
-            cursorPadPending.x += (point.x - last.x) * factor
-            cursorPadPending.y += (point.y - last.y) * factor
-
-            let now = CACurrentMediaTime()
-            if gesture.state == .changed && now - cursorPadSentAt < 1.0 / 60.0 {
-                return
-            }
-
-            let dx = Int32(cursorPadPending.x)
-            let dy = Int32(cursorPadPending.y)
-            cursorPadSentAt = now
-
-            if dx != 0 || dy != 0 {
-                cursorPadPending.x -= CGFloat(dx)
-                cursorPadPending.y -= CGFloat(dy)
-                fallout_ios_cursor_move(dx, dy)
-            }
-
-            if gesture.state == .ended {
-                refreshControls()
-            }
-
-        default:
-            cursorPadPoint = nil
-            cursorPadPending = .zero
-            refreshControls()
-        }
     }
 
     @objc private func sideActionPressed(_ sender: LabeledControlButton) {
@@ -1799,7 +1736,6 @@ final class GameControlsOverlay: UIView {
             helpCard.isHidden = true
             helpBackdrop.isHidden = true
             quickSaveNotice.isHidden = true
-            cursorPad.isHidden = true
             if isHidden {
                 isHidden = false
             }
@@ -1851,8 +1787,6 @@ final class GameControlsOverlay: UIView {
         talkButton.isHidden = !(barterScreen && fallout_ios_action_available(24) != 0)
 
         if screen.isMenu {
-            cursorPad.isHidden = true
-
             if menuRectScreen != screen {
                 menuRectScreen = screen
                 menuRectCache = nil
@@ -1905,38 +1839,31 @@ final class GameControlsOverlay: UIView {
         }
 
         let inCombat = fallout_ios_action_available(25) != 0
-        let canAct = fallout_ios_action_available(28) != 0
-        cursorPad.isHidden = !inCombat
-        cursorPad.takesTouches = !canAct
+        if inCombat && !wasInCombat && ControlLayout.autoTarget() && fallout_ios_cursor_mode() != 2 {
+            fallout_ios_press_action(12)
+            keepTargeting = true
+        } else if !inCombat && wasInCombat {
+            fallout_ios_press_action(13)
+            keepTargeting = false
+        }
+        wasInCombat = inCombat
 
         let mode = fallout_ios_cursor_mode()
-
-        if canAct {
-            if inCombat && !wasInCombat && ControlLayout.autoTarget() && mode != 2 {
+        if mode != lastCursorMode {
+            let requests = fallout_ios_cursor_mode_requests()
+            let requested = requests != lastModeRequests
+            lastModeRequests = requests
+            if requested {
+                keepTargeting = mode == 2
+                lastCursorMode = mode
+            } else if inCombat && keepTargeting && mode == 0 {
                 fallout_ios_press_action(12)
-                keepTargeting = true
-            } else if !inCombat && wasInCombat {
-                fallout_ios_press_action(13)
-                keepTargeting = false
-            }
-            wasInCombat = inCombat
-
-            if mode != lastCursorMode {
-                let requests = fallout_ios_cursor_mode_requests()
-                let requested = requests != lastModeRequests
-                lastModeRequests = requests
-                if requested {
-                    keepTargeting = mode == 2
-                    lastCursorMode = mode
-                } else if inCombat && keepTargeting && mode == 0 {
-                    fallout_ios_press_action(12)
-                    lastCursorMode = mode
-                } else {
-                    if inCombat && mode == 2 {
-                        keepTargeting = true
-                    }
-                    lastCursorMode = mode
+                lastCursorMode = mode
+            } else {
+                if inCombat && mode == 2 {
+                    keepTargeting = true
                 }
+                lastCursorMode = mode
             }
         }
 
@@ -2353,18 +2280,6 @@ private final class LabeledControlButton: UIControl {
             width: bounds.width - 2,
             height: labelHeight
         )
-    }
-}
-
-private final class CursorPad: UIView {
-    var takesTouches = false
-
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard takesTouches, isUserInteractionEnabled, !isHidden, alpha > 0.01 else {
-            return nil
-        }
-
-        return super.hitTest(point, with: event)
     }
 }
 

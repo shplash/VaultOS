@@ -36,7 +36,6 @@ extern int gMovieCurrent;
 extern bool iosInspect;
 extern bool iosCalledShotOpen;
 void mouseIosClick(int state);
-void iosMovePointer(int x, int y);
 bool iosCombatCanEnd();
 bool iosCombatCanSkipTurn();
 int iosQuickSaveAuto();
@@ -401,8 +400,6 @@ int action_available(int action)
         return screen() == 3 ? 1 : 0;
     case 27:
         return screen() == 0 && !fallout::isInCombat() ? 1 : 0;
-    case 28:
-        return fallout::interfaceBarEnabled() ? 1 : 0;
     default:
         return 1;
     }
@@ -566,14 +563,6 @@ void camera_stop()
     }
 
     fallout::_mouse_set_position(x, y);
-}
-
-void cursor_move(int dx, int dy)
-{
-    int x = 0;
-    int y = 0;
-    fallout::mouseGetPosition(&x, &y);
-    fallout::iosMovePointer(x + dx, y + dy);
 }
 
 // A right click is what cycles move/action/target in the game view. The
@@ -849,7 +838,6 @@ const FalloutEngineAPI g_api = {
     quick_save_serial,
     action_button_rect,
     cursor_mode_requests,
-    cursor_move,
 };
 
 } // namespace

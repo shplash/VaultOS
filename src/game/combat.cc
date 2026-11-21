@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "engine_glue.h"
 #include "game/actions.h"
 #include "game/anim.h"
 #include "game/art.h"
@@ -2131,18 +2130,10 @@ void combat_end()
 // 0x420698
 void combat_turn_run()
 {
-    static int controlsCanAct = -1;
-
     while (combat_turn_running > 0) {
         sharedFpsLimiter.mark();
 
         process_bk();
-
-        int canAct = intface_is_enabled() ? 1 : 0;
-        if (canAct != controlsCanAct) {
-            controlsCanAct = canAct;
-            fallout_engine_refresh_controls_now();
-        }
 
         renderPresent();
         sharedFpsLimiter.throttle();
