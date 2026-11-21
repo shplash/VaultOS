@@ -200,7 +200,12 @@ int in_game()
         return 0;
     }
 
-    return fallout::interfaceBarEnabled() ? 1 : 0;
+    fallout::Window* bar = fallout::windowGetWindow(fallout::gInterfaceBarWindow);
+    if (bar == nullptr || (bar->flags & fallout::WINDOW_HIDDEN) != 0) {
+        return 0;
+    }
+
+    return 1;
 }
 
 int movie_state()
@@ -359,6 +364,8 @@ int action_available(int action)
         return fallout::isInCombat() ? 1 : 0;
     case 26:
         return has_firearm_in_hand() ? 1 : 0;
+    case 21:
+        return screen() == 4 ? 0 : 1;
     default:
         break;
     }
@@ -385,8 +392,6 @@ int action_available(int action)
         return fallout::isInCombat() ? 1 : 0;
     case 20:
         return dialogue_buttons_shown() ? 1 : 0;
-    case 21:
-        return screen() == 4 ? 0 : 1;
     case 22:
         return 0;
     case 23:
@@ -480,6 +485,10 @@ void press_action(int action)
     }
 }
 
+bool cameraIsPanning = false;
+int cameraX = 0;
+int cameraY = 0;
+
 void camera_pan(double x, double y)
 {
     const int width = fallout::screenGetWidth();
@@ -492,8 +501,16 @@ void camera_pan(double x, double y)
     const int dx = x < -deadzone ? -1 : (x > deadzone ? 1 : 0);
     const int dy = y < -deadzone ? -1 : (y > deadzone ? 1 : 0);
 
-    int targetX = width / 2;
-    int targetY = height / 2;
+    int targetX = 0;
+    int targetY = 0;
+    fallout::mouseGetPosition(&targetX, &targetY);
+
+    if (!cameraIsPanning) {
+        cameraIsPanning = true;
+        cameraX = targetX;
+        cameraY = targetY;
+    }
+
     if (dx < 0) {
         targetX = 0;
     } else if (dx > 0) {
@@ -510,11 +527,12 @@ void camera_pan(double x, double y)
 
 void camera_stop()
 {
-    const int width = fallout::screenGetWidth();
-    const int height = fallout::screenGetHeight();
-    if (width > 0 && height > 0) {
-        fallout::_mouse_set_position(width / 2, height / 2);
+    if (!cameraIsPanning) {
+        return;
     }
+
+    cameraIsPanning = false;
+    fallout::_mouse_set_position(cameraX, cameraY);
 }
 
 // A right click is what cycles move/action/target in the game view. The
@@ -667,8 +685,9 @@ int dialogue_window_rect(int* x, int* y, int* width, int* height)
         return 0;
     }
 
-    const int id = fallout::windowGetAtPoint(screenWidth - 20, (screenHeight + 480) / 2 - 5);
-    if (id < 0 || id == fallout::gIsoWindow) {
+    const int id = fallout::windowGetAtPoint((screenWidth + 640) / 2 - 10,
+        (screenHeight + 480) / 2 - 5);
+    if (id < 0 || id == fallout::gIsoWindow || id == fallout::gInterfaceBarWindow) {
         return 0;
     }
 

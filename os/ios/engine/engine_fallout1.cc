@@ -202,6 +202,8 @@ int action_available(int action)
         return fallout::isInCombat() ? 1 : 0;
     case 26:
         return has_firearm_in_hand() ? 1 : 0;
+    case 21:
+        return screen() == fallout::IOS_SCREEN_DIALOGUE ? 0 : 1;
     default:
         break;
     }
@@ -231,8 +233,6 @@ int action_available(int action)
         int height = 0;
         return fallout::ios_dialogue_button_rect(action, NULL, NULL, &width, &height) != 0 ? 1 : 0;
     }
-    case 21:
-        return screen() == fallout::IOS_SCREEN_DIALOGUE ? 0 : 1;
     case 23:
     case 24:
         return screen() == fallout::IOS_SCREEN_BARTER ? 1 : 0;
@@ -327,6 +327,10 @@ void press_action(int action)
     }
 }
 
+bool cameraIsPanning = false;
+int cameraX = 0;
+int cameraY = 0;
+
 void camera_pan(double x, double y)
 {
     const int width = fallout::screenGetWidth();
@@ -341,8 +345,16 @@ void camera_pan(double x, double y)
     const int dx = x < -deadzone ? -1 : (x > deadzone ? 1 : 0);
     const int dy = y < -deadzone ? -1 : (y > deadzone ? 1 : 0);
 
-    int targetX = width / 2;
-    int targetY = height / 2;
+    int targetX = 0;
+    int targetY = 0;
+    fallout::mouse_get_position(&targetX, &targetY);
+
+    if (!cameraIsPanning) {
+        cameraIsPanning = true;
+        cameraX = targetX;
+        cameraY = targetY;
+    }
+
     if (dx < 0) {
         targetX = 0;
     } else if (dx > 0) {
@@ -359,11 +371,12 @@ void camera_pan(double x, double y)
 
 void camera_stop()
 {
-    const int width = fallout::screenGetWidth();
-    const int height = fallout::screenGetHeight();
-    if (width > 0 && height > 0) {
-        fallout::mouse_set_position(width / 2, height / 2);
+    if (!cameraIsPanning) {
+        return;
     }
+
+    cameraIsPanning = false;
+    fallout::mouse_set_position(cameraX, cameraY);
 }
 
 void right_click()

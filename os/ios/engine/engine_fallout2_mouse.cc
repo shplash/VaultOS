@@ -481,7 +481,7 @@ void _mouse_info()
     // The globe is the game's loading cursor. Centring the pointer as it comes
     // up keeps the first click of a new map away from a corner, which the game
     // would otherwise read as "walk there" as soon as the world appears.
-    const bool waitingCursorUp = gameMouseGetCursor() >= FIRST_GAME_MOUSE_ANIMATED_CURSOR;
+    const bool waitingCursorUp = gameMouseGetCursor() == MOUSE_CURSOR_WAIT_PLANET;
     if (waitingCursorUp != iosWaitCursorWasUp) {
         iosWaitCursorWasUp = waitingCursorUp;
         if (waitingCursorUp) {

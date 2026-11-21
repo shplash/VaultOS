@@ -2259,6 +2259,7 @@ private final class CameraJoystickControl: UIControl {
     private let knob = UIView()
     private let crosshair = CAShapeLayer()
     private let caption = UILabel()
+    private let hint = UILabel()
 
     var controlOpacity: CGFloat = 1 {
         didSet {
@@ -2302,6 +2303,14 @@ private final class CameraJoystickControl: UIControl {
         caption.isUserInteractionEnabled = false
         addSubview(caption)
 
+        hint.text = L.t("or drag with\n2-fingers")
+        hint.font = UIFont.monospacedSystemFont(ofSize: 7, weight: .semibold)
+        hint.textColor = ControlTheme.dim
+        hint.textAlignment = .center
+        hint.numberOfLines = 2
+        hint.isUserInteractionEnabled = false
+        addSubview(hint)
+
         accessibilityLabel = "Camera joystick"
     }
 
@@ -2325,9 +2334,16 @@ private final class CameraJoystickControl: UIControl {
 
         caption.frame = CGRect(
             x: 0,
-            y: bounds.height - 18,
+            y: bounds.height - 38,
             width: bounds.width,
             height: 12
+        )
+
+        hint.frame = CGRect(
+            x: 0,
+            y: bounds.height - 26,
+            width: bounds.width,
+            height: 20
         )
 
         let path = UIBezierPath()
