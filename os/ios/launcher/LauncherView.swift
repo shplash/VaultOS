@@ -896,7 +896,7 @@ struct LauncherView: View {
                     ("Screens", "MAP opens the map, BACK closes a screen, SWAP changes the active hand."),
                     ("Inventory", L.t("Tap an item to inspect its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to. A conversation ends with one of its replies, not with BACK."),
-                    ("Combat", "END ends your turn, SKIP holds it. The attack mode and RELOAD only appear while a weapon is in hand."),
+                    ("Combat", "END TURN hands the turn over and END COMBAT leaves the fight. The attack mode and RELOAD only appear while a weapon is in hand."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
                 ]
             case .survival:

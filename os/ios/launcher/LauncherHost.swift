@@ -1697,6 +1697,10 @@ final class GameControlsOverlay: UIView {
                 }
             }
 
+            if screen == .dialogue {
+                setNeedsLayout()
+            }
+
             if !ControlLayout.touchControls() {
                 helpButton.isHidden = true
                 helpCard.isHidden = true
