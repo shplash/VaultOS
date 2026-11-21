@@ -689,10 +689,11 @@ final class GameControlsOverlay: UIView {
     private static var installedOverlay: GameControlsOverlay?
 
     private let joystick = CameraJoystickControl()
-    private let cursorPad = UIView()
+    private let cursorPad = CursorPad()
     private var cursorPadPoint: CGPoint?
     private var cursorPadPending = CGPoint.zero
     private var cursorPadSentAt: CFTimeInterval = 0
+    private var cursorPadHeld = false
     private let actionButton = LabeledControlButton(
         title: "ACTION",
         symbol: "hand.tap",
@@ -957,7 +958,12 @@ final class GameControlsOverlay: UIView {
 
         cursorPad.isHidden = true
         cursorPad.backgroundColor = .clear
-        cursorPad.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(cursorPadPanned(_:))))
+        cursorPad.onTouch = { [weak self] held in
+            self?.cursorPadHeld = held
+        }
+        let cursorPadPan = UIPanGestureRecognizer(target: self, action: #selector(cursorPadPanned(_:)))
+        cursorPadPan.cancelsTouchesInView = false
+        cursorPad.addGestureRecognizer(cursorPadPan)
         addSubview(cursorPad)
 
         addSubview(joystick)
@@ -1537,7 +1543,8 @@ final class GameControlsOverlay: UIView {
 
         switch gesture.state {
         case .began:
-            cursorPadPoint = point
+            let translation = gesture.translation(in: self)
+            cursorPadPoint = CGPoint(x: point.x - translation.x, y: point.y - translation.y)
             cursorPadPending = .zero
             cursorPadSentAt = 0
 
@@ -1900,7 +1907,7 @@ final class GameControlsOverlay: UIView {
 
         let inCombat = fallout_ios_action_available(25) != 0
         let canAct = fallout_ios_action_available(28) != 0
-        cursorPad.isHidden = !(inCombat && !canAct)
+        cursorPad.isHidden = !(inCombat && (!canAct || cursorPadHeld))
 
         let mode = fallout_ios_cursor_mode()
 
@@ -2346,6 +2353,30 @@ private final class LabeledControlButton: UIControl {
             width: bounds.width - 2,
             height: labelHeight
         )
+    }
+}
+
+private final class CursorPad: UIView {
+    var onTouch: ((Bool) -> Void)?
+
+    private var touchCount = 0
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesBegan(touches, with: event)
+        touchCount += touches.count
+        onTouch?(touchCount > 0)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        touchCount = max(0, touchCount - touches.count)
+        onTouch?(touchCount > 0)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesCancelled(touches, with: event)
+        touchCount = max(0, touchCount - touches.count)
+        onTouch?(touchCount > 0)
     }
 }
 
