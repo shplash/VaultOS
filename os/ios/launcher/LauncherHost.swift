@@ -1261,7 +1261,7 @@ final class GameControlsOverlay: UIView {
     private func placeBarterControls(in table: CGRect, gap: CGFloat, side: CGFloat) {
         let small = max(34, side * 0.72)
         let middle = table.midY + 6
-        let bottom = bounds.height - max(8, safeAreaInsets.bottom + 8) - small
+        let bottom = bounds.height - small - 8
 
         let offerX = table.minX - gap - small
         let backX = offerX - gap - side
