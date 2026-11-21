@@ -147,6 +147,7 @@ final class LauncherModel: ObservableObject {
             }
 
             defaults.set(selectedGame.rawValue, forKey: "launcher.game")
+            savesNotice = nil
 
             if settingsLoaded {
                 saveSettings(for: oldValue)
@@ -645,7 +646,8 @@ final class LauncherModel: ObservableObject {
         }
     }
 
-    /// A short confirmation under the Savegames row, cleared by itself.
+    /// A confirmation under the Savegames row, kept until the page or the game
+    /// changes.
     @Published var savesNotice: String?
 
     /// The backup just written, offered to the share sheet so a copy can be
@@ -757,11 +759,6 @@ final class LauncherModel: ObservableObject {
 
     private func notice(_ text: String) {
         savesNotice = text
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            if self?.savesNotice == text {
-                self?.savesNotice = nil
-            }
-        }
     }
 
     private func startProgressUpdates() {

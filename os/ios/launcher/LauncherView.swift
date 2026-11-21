@@ -106,6 +106,9 @@ struct LauncherView: View {
         .onDisappear {
             model.saveSettingsNow()
         }
+        .onChange(of: page) { _ in
+            model.savesNotice = nil
+        }
         .onChange(of: model.install.installed) { installed in
             if installed == 1 {
                 LauncherMusic.shared.playIfAvailable()
@@ -1174,7 +1177,7 @@ struct LauncherView: View {
     private var controlsSheet: some View {
         sheet(title: "Controls", detail: "Colour and opacity of the on-screen controls", onReset: resetControls) {
             toggleRow("On-screen controls",
-                      detail: "Draw the touch controls over the game. Off, the screen is the game alone. (not recommended)",
+                      detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
                       isOn: $model.touchControls)
 
             // The layout, colour and opacity rows are greyed, not hidden, while
