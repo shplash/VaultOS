@@ -693,7 +693,6 @@ final class GameControlsOverlay: UIView {
     private var cursorPadPoint: CGPoint?
     private var cursorPadPending = CGPoint.zero
     private var cursorPadSentAt: CFTimeInterval = 0
-    private var cursorPadHeld = false
     private let actionButton = LabeledControlButton(
         title: "ACTION",
         symbol: "hand.tap",
@@ -958,9 +957,6 @@ final class GameControlsOverlay: UIView {
 
         cursorPad.isHidden = true
         cursorPad.backgroundColor = .clear
-        cursorPad.onTouch = { [weak self] held in
-            self?.cursorPadHeld = held
-        }
         let cursorPadPan = UIPanGestureRecognizer(target: self, action: #selector(cursorPadPanned(_:)))
         cursorPadPan.cancelsTouchesInView = false
         cursorPad.addGestureRecognizer(cursorPadPan)
@@ -1509,6 +1505,9 @@ final class GameControlsOverlay: UIView {
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         // Empty parts of the overlay must not eat touches intended for SDL.
         for subview in subviews where !subview.isHidden && subview.alpha > 0.01 {
+            if subview === cursorPad && !cursorPad.takesTouches {
+                continue
+            }
             if subview.frame.contains(point) {
                 return true
             }
@@ -1907,7 +1906,8 @@ final class GameControlsOverlay: UIView {
 
         let inCombat = fallout_ios_action_available(25) != 0
         let canAct = fallout_ios_action_available(28) != 0
-        cursorPad.isHidden = !(inCombat && (!canAct || cursorPadHeld))
+        cursorPad.isHidden = !inCombat
+        cursorPad.takesTouches = !canAct
 
         let mode = fallout_ios_cursor_mode()
 
@@ -2357,26 +2357,14 @@ private final class LabeledControlButton: UIControl {
 }
 
 private final class CursorPad: UIView {
-    var onTouch: ((Bool) -> Void)?
+    var takesTouches = false
 
-    private var touchCount = 0
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard takesTouches, isUserInteractionEnabled, !isHidden, alpha > 0.01 else {
+            return nil
+        }
 
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesBegan(touches, with: event)
-        touchCount += touches.count
-        onTouch?(touchCount > 0)
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesEnded(touches, with: event)
-        touchCount = max(0, touchCount - touches.count)
-        onTouch?(touchCount > 0)
-    }
-
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesCancelled(touches, with: event)
-        touchCount = max(0, touchCount - touches.count)
-        onTouch?(touchCount > 0)
+        return super.hitTest(point, with: event)
     }
 }
 
