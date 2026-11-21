@@ -907,7 +907,7 @@ struct LauncherView: View {
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
                     ("Inventory", L.t("Hold and drag an item to equip or move it.") + " " + L.t("Tap an item while INSPECT is toggled on to see its characteristics.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to."),
-                    ("Combat", "END TURN hands the turn over and END COMBAT leaves the fight. The attack mode and RELOAD only appear while a weapon is in hand."),
+                    ("Combat", "Out of combat the turn button starts a fight; in combat it ends your turn. END COMBAT leaves a fight once it is over."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
                 ]
             case .survival:
