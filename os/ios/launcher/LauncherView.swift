@@ -2117,7 +2117,7 @@ private struct TouchControlEditor: View {
 
         return VStack(spacing: max(1, shortSide * 0.035)) {
             if control == .fireMode {
-                Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.template))
+                Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.alwaysTemplate))
                     .resizable()
                     .scaledToFit()
                     .frame(height: max(9, min(20, shortSide * 0.26)))
