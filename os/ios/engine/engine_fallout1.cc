@@ -238,6 +238,8 @@ int action_available(int action)
         return screen() == fallout::IOS_SCREEN_BARTER ? 1 : 0;
     case 27:
         return screen() == fallout::IOS_SCREEN_GAME && !fallout::isInCombat() ? 1 : 0;
+    case 28:
+        return fallout::intface_is_enabled() ? 1 : 0;
     default:
         return 1;
     }
@@ -406,6 +408,14 @@ void camera_stop()
     }
 
     fallout::mouse_set_position(x, y);
+}
+
+void cursor_move(int dx, int dy)
+{
+    int x = 0;
+    int y = 0;
+    fallout::mouse_get_position(&x, &y);
+    fallout::mouse_set_position(x + dx, y + dy);
 }
 
 void right_click()
@@ -664,6 +674,7 @@ const FalloutEngineAPI g_api = {
     quick_save_serial,
     action_button_rect,
     cursor_mode_requests,
+    cursor_move,
 };
 
 } // namespace

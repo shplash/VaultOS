@@ -438,6 +438,11 @@ static void mouseIosMovePointer(int x, int y)
     mouseShowCursor();
 }
 
+void iosMovePointer(int x, int y)
+{
+    mouseIosMovePointer(x, y);
+}
+
 // 0x4CA59C
 void _mouse_info()
 {

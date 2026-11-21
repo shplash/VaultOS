@@ -308,6 +308,13 @@ extern "C" void fallout_ios_camera_stop(void)
     }
 }
 
+extern "C" void fallout_ios_cursor_move(int dx, int dy)
+{
+    if (g_engine != NULL && g_engine->cursor_move != NULL) {
+        g_engine->cursor_move(dx, dy);
+    }
+}
+
 extern "C" void fallout_ios_right_click(void)
 {
     if (g_engine != NULL && g_engine->right_click != NULL) {

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "engine_glue.h"
 #include "game/actions.h"
 #include "game/anim.h"
 #include "game/art.h"
@@ -2134,6 +2135,7 @@ void combat_turn_run()
         sharedFpsLimiter.mark();
 
         process_bk();
+        fallout_engine_refresh_controls();
 
         renderPresent();
         sharedFpsLimiter.throttle();

@@ -128,6 +128,7 @@ int launcher_import_saves(const char* zip_path, const char* install_dir);
 void fallout_ios_install_game_controls(void);
 void fallout_ios_camera_pan(double x, double y);
 void fallout_ios_camera_stop(void);
+void fallout_ios_cursor_move(int dx, int dy);
 void fallout_ios_right_click(void);
 void fallout_ios_back(void);
 void fallout_ios_set_cursor_speed(double value);
