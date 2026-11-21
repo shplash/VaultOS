@@ -615,23 +615,33 @@ InstallLayout detect_layout(const fs::path& install_dir)
     return layout;
 }
 
-// The engine writes saves to SAVEGAME/SLOTnn; the original installation ships
-// these folders, but minimal archives often don't, so make sure they exist.
-void ensure_save_directories(const fs::path& install_dir)
+fs::path savegame_root(const fs::path& install_dir)
 {
-    std::error_code ec;
-    for (int slot = 1; slot <= 10; slot++) {
-        char name[16];
-        std::snprintf(name, sizeof(name), "SLOT%02d", slot);
-        fs::create_directories(install_dir / "SAVEGAME" / name, ec);
-        ec.clear();
+    InstallLayout layout = detect_layout(install_dir);
+    if (!layout.data_folder.empty()) {
+        return install_dir / layout.data_folder / "SAVEGAME";
     }
+
+    return install_dir / "SAVEGAME";
 }
 
-bool has_save_files(const fs::path& install_dir)
+std::vector<fs::path> savegame_roots(const fs::path& install_dir)
+{
+    std::vector<fs::path> roots;
+    roots.push_back(savegame_root(install_dir));
+
+    const fs::path legacy = install_dir / "SAVEGAME";
+    if (roots.front() != legacy) {
+        roots.push_back(legacy);
+    }
+
+    return roots;
+}
+
+bool folder_has_saves(const fs::path& root)
 {
     std::error_code ec;
-    fs::directory_iterator iterator(install_dir / "SAVEGAME", ec);
+    fs::directory_iterator iterator(root, ec);
     if (ec) {
         return false;
     }
@@ -646,6 +656,44 @@ bool has_save_files(const fs::path& install_dir)
     }
 
     return false;
+}
+
+// Both engines write saves to SAVEGAME/SLOTnn under the patches directory, which
+// is the game's own data folder; the original installation ships these folders,
+// but minimal archives often don't, so make sure they exist.
+void ensure_save_directories(const fs::path& install_dir)
+{
+    std::error_code ec;
+    const fs::path root = savegame_root(install_dir);
+    for (int slot = 1; slot <= 10; slot++) {
+        char name[16];
+        std::snprintf(name, sizeof(name), "SLOT%02d", slot);
+        fs::create_directories(root / name, ec);
+        ec.clear();
+    }
+}
+
+bool has_save_files(const fs::path& install_dir)
+{
+    for (const fs::path& root : savegame_roots(install_dir)) {
+        if (folder_has_saves(root)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+fs::path savegame_folder(const fs::path& install_dir)
+{
+    const std::vector<fs::path> roots = savegame_roots(install_dir);
+    for (const fs::path& root : roots) {
+        if (folder_has_saves(root)) {
+            return root;
+        }
+    }
+
+    return roots.front();
 }
 
 // Fallout 1 needs master.dat, critter.dat and the data folder.
@@ -1022,8 +1070,11 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
         }
 
         // Savegames are the player's data, never installation data. Ignore any
-        // archive entry that tries to replace them.
-        if (lower_ascii(relative).rfind("savegame/", 0) == 0) {
+        // archive entry that tries to replace them, in either folder a game keeps
+        // them in.
+        const std::string lower_relative = lower_ascii(relative);
+        if (lower_relative.rfind("savegame/", 0) == 0
+            || lower_relative.rfind("data/savegame/", 0) == 0) {
             continue;
         }
 
@@ -1285,13 +1336,12 @@ static std::string backup_stamp()
     return stamp;
 }
 
-// Every file under SAVEGAME, as a path relative to the installation.
-static std::vector<std::string> savegame_files(const fs::path& install_dir)
+// Every file under a SAVEGAME folder, as a path relative to that folder.
+static std::vector<std::string> savegame_files(const fs::path& root)
 {
     std::vector<std::string> names;
 
     std::error_code ec;
-    const fs::path root = install_dir / "SAVEGAME";
     if (!fs::is_directory(root, ec)) {
         return names;
     }
@@ -1306,7 +1356,7 @@ static std::vector<std::string> savegame_files(const fs::path& install_dir)
             continue;
         }
 
-        const std::string name = fs::relative(path, install_dir, ec).generic_string();
+        const std::string name = fs::relative(path, root, ec).generic_string();
         if (ec || name.empty()) {
             continue;
         }
@@ -1332,7 +1382,8 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
     }
 
     const fs::path root(install_dir);
-    const std::vector<std::string> names = savegame_files(root);
+    const fs::path saves = savegame_folder(root);
+    const std::vector<std::string> names = savegame_files(saves);
     if (names.empty()) {
         fail("No saved games to back up.");
         return LAUNCHER_ERROR;
@@ -1349,7 +1400,8 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
     std::vector<CentralEntry> central;
 
     for (const std::string& name : names) {
-        const fs::path source = root / fs::path(name);
+        const fs::path source = saves / fs::path(name);
+        const std::string entry_name = "SAVEGAME/" + name;
 
         std::error_code size_ec;
         const auto file_size = fs::file_size(source, size_ec);
@@ -1377,7 +1429,7 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
             static_cast<uInt>(data.size()));
 
         CentralEntry entry;
-        entry.name = name;
+        entry.name = entry_name;
         entry.crc = static_cast<uint32_t>(crc);
         entry.size = static_cast<uint32_t>(data.size());
         entry.offset = static_cast<uint32_t>(archive.size());
@@ -1391,9 +1443,9 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
         write_u32(archive, entry.crc);
         write_u32(archive, entry.size); // compressed
         write_u32(archive, entry.size); // uncompressed
-        write_u16(archive, static_cast<uint16_t>(name.size()));
+        write_u16(archive, static_cast<uint16_t>(entry_name.size()));
         write_u16(archive, 0);          // extra field length
-        archive += name;
+        archive += entry_name;
         archive += data;
 
         central.push_back(entry);
@@ -1517,17 +1569,31 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     }
 
     const fs::path destination(install_dir);
+    const fs::path saves = savegame_root(destination);
 
     // The import replaces rather than merges: a slot left behind by newer saves
     // would otherwise look like part of the backup. The launcher warns first.
     std::error_code ec;
-    fs::remove_all(destination / "SAVEGAME", ec);
+    for (const fs::path& root : savegame_roots(destination)) {
+        fs::remove_all(root, ec);
+        ec.clear();
+    }
 
     g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
     set_status("Restoring saves...");
 
     for (const SaveFile& file : files) {
-        if (!extract_entry(archive, *file.entry, destination / fs::path(file.relative))) {
+        const size_t slash = file.relative.find('/');
+        if (slash == std::string::npos) {
+            continue;
+        }
+
+        const std::string name = file.relative.substr(slash + 1);
+        if (name.empty()) {
+            continue;
+        }
+
+        if (!extract_entry(archive, *file.entry, saves / fs::path(name))) {
             return LAUNCHER_ERROR;
         }
     }

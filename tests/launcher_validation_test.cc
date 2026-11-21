@@ -250,16 +250,16 @@ int main()
 
     // Savegames belong to the player: rewriting settings must not touch them,
     // and the installation scan must report them.
-    write_file(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data");
-    write_file(fallout2 / "SAVEGAME" / "SLOT03" / "save.dat", "other-save-data");
+    write_file(fallout1 / "data" / "SAVEGAME" / "SLOT01" / "save.dat", "save-data");
+    write_file(fallout2 / "data" / "SAVEGAME" / "SLOT03" / "save.dat", "other-save-data");
     {
         LauncherOptions fallout1Options = options_for(LAUNCHER_GAME_FALLOUT1);
         LauncherOptions fallout2Options = options_for(LAUNCHER_GAME_FALLOUT2);
         CHECK(launcher_write_options(fallout1.string().c_str(), &fallout1Options) == LAUNCHER_OK);
         CHECK(launcher_write_options(fallout2.string().c_str(), &fallout2Options) == LAUNCHER_OK);
 
-        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
-        CHECK(file_contains(fallout2 / "SAVEGAME" / "SLOT03" / "save.dat", "other-save-data"));
+        CHECK(file_contains(fallout1 / "data" / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+        CHECK(file_contains(fallout2 / "data" / "SAVEGAME" / "SLOT03" / "save.dat", "other-save-data"));
 
         scan(fallout1, LAUNCHER_GAME_FALLOUT1, &info);
         CHECK(info.has_saves == 1);
@@ -285,7 +285,7 @@ int main()
         CHECK(std::string(launcher_last_error()).find("master.dat") != std::string::npos);
         CHECK(!fs::exists(fallout1 / "readme.txt"));
         CHECK(file_contains(fallout1 / "master.dat", "test"));
-        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+        CHECK(file_contains(fallout1 / "data" / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
 
         scan(fallout1, LAUNCHER_GAME_FALLOUT1, &info);
         CHECK(info.installed == 1);
@@ -366,7 +366,7 @@ int main()
     // A backup carries the savegames and nothing else, and putting one back
     // replaces what is there.
     {
-        write_file(fallout1 / "SAVEGAME" / "SLOT02" / "SAVE.DAT", "slot-two");
+        write_file(fallout1 / "data" / "SAVEGAME" / "SLOT02" / "SAVE.DAT", "slot-two");
 
         char backup[1024] = { 0 };
         CHECK(launcher_backup_saves(fallout1.string().c_str(), LAUNCHER_GAME_FALLOUT1, backup,
@@ -377,12 +377,12 @@ int main()
 
         // The newer saves are replaced by the ones in the backup, so a slot that
         // is not in it must be gone afterwards.
-        write_file(fallout1 / "SAVEGAME" / "SLOT07" / "SAVE.DAT", "newer");
+        write_file(fallout1 / "data" / "SAVEGAME" / "SLOT07" / "SAVE.DAT", "newer");
 
         CHECK(launcher_import_saves(backup, fallout1.string().c_str()) == LAUNCHER_OK);
-        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
-        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT02" / "SAVE.DAT", "slot-two"));
-        CHECK(!fs::exists(fallout1 / "SAVEGAME" / "SLOT07" / "SAVE.DAT"));
+        CHECK(file_contains(fallout1 / "data" / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+        CHECK(file_contains(fallout1 / "data" / "SAVEGAME" / "SLOT02" / "SAVE.DAT", "slot-two"));
+        CHECK(!fs::exists(fallout1 / "data" / "SAVEGAME" / "SLOT07" / "SAVE.DAT"));
     }
 
     // An archive that is not a backup is refused, and the saves stay put.
@@ -393,7 +393,7 @@ int main()
         CHECK(launcher_import_saves(wrong.string().c_str(), fallout1.string().c_str())
             == LAUNCHER_ERROR);
         CHECK(std::string(launcher_last_error()).find("SAVEGAME") != std::string::npos);
-        CHECK(file_contains(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+        CHECK(file_contains(fallout1 / "data" / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
     }
 
     // A game ZIP offered as a language pack is refused before anything is
