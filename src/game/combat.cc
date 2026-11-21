@@ -16,6 +16,7 @@
 #include "game/gmouse.h"
 #include "game/gsound.h"
 #include "game/intface.h"
+#include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/loadsave.h"
 #include "game/map.h"
@@ -4274,6 +4275,8 @@ static void draw_loc(int input, int color)
 // 0x42382C
 static int get_called_shot_location(Object* critter, int* hit_location, int hit_mode)
 {
+    IosScreenScope screenScope(IOS_SCREEN_CALLED_SHOT);
+
     call_target = critter;
 
     int calledShotWindowX = (screenGetWidth() - CALLED_SHOT_WINDOW_WIDTH) / 2;

@@ -5473,6 +5473,8 @@ static void _draw_loc_(int eventCode, int color)
     }
 }
 
+bool iosCalledShotOpen = false;
+
 // 0x426218
 static int calledShotSelectHitLocation(Object* critter, int* hitLocation, int hitMode)
 {
@@ -5596,6 +5598,8 @@ static int calledShotSelectHitLocation(Object* critter, int* hitLocation, int hi
     _gmouse_disable(0);
     gameMouseSetCursor(MOUSE_CURSOR_ARROW);
 
+    iosCalledShotOpen = true;
+
     int eventCode;
     while (true) {
         sharedFpsLimiter.mark();
@@ -5617,6 +5621,8 @@ static int calledShotSelectHitLocation(Object* critter, int* hitLocation, int hi
         renderPresent();
         sharedFpsLimiter.throttle();
     }
+
+    iosCalledShotOpen = false;
 
     _gmouse_enable();
 

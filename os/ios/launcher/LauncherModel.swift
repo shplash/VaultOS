@@ -630,6 +630,10 @@ final class LauncherModel: ObservableObject {
     /// A short confirmation under the Savegames row, cleared by itself.
     @Published var savesNotice: String?
 
+    /// The backup just written, offered to the share sheet so a copy can be
+    /// dropped into Files, iCloud or anywhere else that takes a file.
+    @Published var shareFile: URL?
+
     /// Zips this game's SAVEGAME folder into a file beside the game data, so it
     /// can be copied out of the app, kept, or brought back later.
     func backupSaves() {
@@ -662,6 +666,11 @@ final class LauncherModel: ObservableObject {
 
                 if result == 0 {
                     self.notice("Saves backed up.")
+
+                    let created = String(cString: path)
+                    if !created.isEmpty {
+                        self.shareFile = URL(fileURLWithPath: created)
+                    }
                 } else {
                     self.errorMessage = failure.isEmpty ? "Installation failed." : failure
                 }

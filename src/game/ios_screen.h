@@ -20,6 +20,9 @@ typedef enum IosScreen {
     // inventory but has a cursor of its own, so it keeps the trackpad.
     IOS_SCREEN_USE_ON = 12,
     IOS_SCREEN_PICK_AMOUNT = 13,
+    // The called shot panel, which is drawn over the game view and takes the
+    // keyboard back to the game when it closes.
+    IOS_SCREEN_CALLED_SHOT = 14,
 } IosScreen;
 
 extern int ios_screen;

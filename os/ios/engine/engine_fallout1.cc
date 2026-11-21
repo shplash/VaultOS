@@ -140,19 +140,36 @@ int has_reloadable_weapon()
         return 0;
     }
 
-    // Same rule as Fallout 2's button: a weapon that takes ammunition.
+    // Same rule as Fallout 2's button: a weapon that takes ammunition and is
+    // not already full.
     return fallout::item_get_type(item) == fallout::ITEM_TYPE_WEAPON
-            && fallout::item_w_max_ammo(item) > 0
+            && fallout::item_w_max_ammo(item) > fallout::item_w_curr_ammo(item)
         ? 1
         : 0;
 }
 
 void reload_active_weapon()
 {
+    int hitModeBefore = 0;
+    bool aimingBefore = false;
+    fallout::intface_get_attack(&hitModeBefore, &aimingBefore);
+
     // The interface's own reload, sound included, so the on-screen button does
     // exactly what the game does when the weapon slot reloads - not a silent
     // copy of half of it.
     fallout::intface_item_reload();
+
+    for (int attempt = 0; attempt < fallout::INTERFACE_ITEM_ACTION_COUNT; attempt++) {
+        int hitMode = 0;
+        bool aiming = false;
+        if (fallout::intface_get_attack(&hitMode, &aiming) == 0
+            && hitMode == hitModeBefore
+            && aiming == aimingBefore) {
+            break;
+        }
+
+        fallout::intface_toggle_item_state();
+    }
 }
 
 int screen();

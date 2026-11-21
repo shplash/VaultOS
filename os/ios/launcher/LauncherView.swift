@@ -85,6 +85,18 @@ struct LauncherView: View {
         .fullScreenCover(isPresented: $showControlEditor) {
             TouchControlEditor(model: model)
         }
+        .sheet(isPresented: Binding(
+            get: { model.shareFile != nil },
+            set: { shown in
+                if !shown {
+                    model.shareFile = nil
+                }
+            }
+        )) {
+            if let url = model.shareFile {
+                ShareSheet(items: [url])
+            }
+        }
         .onAppear {
             model.refreshInstall()
             if !musicMuted {
@@ -893,7 +905,7 @@ struct LauncherView: View {
             case .touch:
                 return [
                     ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
-                    ("Inventory", L.t("Tap an item while INSPECT is on to inspect its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
+                    ("Inventory", L.t("Tap an item while INSPECT is toggled on to see its characteristics.") + " " + L.t("Hold and drag an item to equip or move it.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to. A conversation ends with one of its replies, not with BACK."),
                     ("Combat", "END TURN hands the turn over and END COMBAT leaves the fight. The attack mode and RELOAD only appear while a weapon is in hand."),
                     ("Auto target", "Off by default. On, the game switches to attack mode as a fight starts, so the first tap is an attack."),
@@ -1777,6 +1789,18 @@ private struct SmallButtonStyle: ButtonStyle {
             )
             .opacity(configuration.isPressed ? 0.85 : 1)
     }
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        controller.popoverPresentationController?.sourceView = UIApplication.shared.windows.first
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Touchscreen control editor

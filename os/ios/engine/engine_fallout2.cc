@@ -33,6 +33,7 @@
 namespace fallout {
 extern int gMovieCurrent;
 extern bool iosInspect;
+extern bool iosCalledShotOpen;
 void mouseIosClick(int state);
 bool iosCombatCanEnd();
 int iosQuickSaveAuto();
@@ -144,7 +145,7 @@ int has_firearm_in_hand()
     }
 
     return fallout::itemGetType(item) == fallout::ITEM_TYPE_WEAPON
-            && fallout::ammoGetCapacity(item) > 0
+            && fallout::ammoGetCapacity(item) > fallout::ammoGetQuantity(item)
         ? 1
         : 0;
 }
@@ -206,6 +207,10 @@ int movie_state()
 
 int screen()
 {
+    if (fallout::iosCalledShotOpen) {
+        return 14;
+    }
+
     const int mode = fallout::GameMode::getCurrentGameMode();
 
     if ((mode & fallout::GameMode::kCounter) != 0) {
@@ -292,15 +297,24 @@ void reload_active_weapon()
         return;
     }
 
-    int action = active_item_action();
+    const int actionBefore = active_item_action();
+    int action = actionBefore;
     for (int attempt = 0; attempt < fallout::INTERFACE_ITEM_ACTION_COUNT; attempt++) {
         if (action == fallout::INTERFACE_ITEM_ACTION_RELOAD) {
             fallout::_intface_use_item();
-            return;
+            break;
         }
 
         fallout::interfaceCycleItemAction();
         action = active_item_action();
+    }
+
+    for (int attempt = 0; attempt < fallout::INTERFACE_ITEM_ACTION_COUNT; attempt++) {
+        if (active_item_action() == actionBefore) {
+            break;
+        }
+
+        fallout::interfaceCycleItemAction();
     }
 }
 

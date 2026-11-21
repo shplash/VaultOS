@@ -256,6 +256,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     case fireMode
     case load
     case saves
+    case quickSave
 
     var id: String { rawValue }
 
@@ -265,7 +266,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .joystick: english = "LOOK"
         case .back: english = "BACK"
         case .action: english = "ACTION"
-        case .skip: english = "SKIP"
+        case .skip: english = "END TURN"
         case .inv: english = "INV"
         case .map: english = "MAP"
         case .cha: english = "CHA"
@@ -274,9 +275,10 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .swap: english = "SWAP"
         case .end: english = "END"
         case .reload: english = "RELOAD"
-        case .fireMode: english = "MODE"
+        case .fireMode: english = "ATTACK"
         case .load: english = "LOAD"
         case .saves: english = "SAVES"
+        case .quickSave: english = "QUICK SAVE"
         }
         return L.t(english)
     }
@@ -298,14 +300,16 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .fireMode: return "scope"
         case .load: return "tray.and.arrow.down"
         case .saves: return "tray.full"
+        case .quickSave: return "bolt.fill"
         }
     }
 
     /// Both games keep independent control sets and layouts. The reload and
     /// attack-mode buttons are in both sets; they show themselves only when the
-    /// running engine reports the action as available.
+    /// running engine reports the action as available. END COMBAT is gone: the
+    /// attack-mode button took its place, so it is not offered for editing.
     static func controls(for game: FalloutGame) -> [TouchControl] {
-        return allCases
+        return allCases.filter { $0 != .end }
     }
 
     static func bottomRow(for profile: LayoutProfile) -> [TouchControl] {
@@ -331,22 +335,27 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .cha: return CGPoint(x: 0.8386, y: 0.9215)
             case .inv: return CGPoint(x: 0.8977, y: 0.9215)
             case .pip: return CGPoint(x: 0.9567, y: 0.9215)
-            // Three equal squares in the top-right corner: END, SKILL, SWAP.
+            // SKILL and SWAP under the attack mode, which took END COMBAT's
+            // corner when that button was dropped.
             case .skill: return CGPoint(x: 0.9594, y: 0.2000)
             case .swap: return CGPoint(x: 0.9594, y: 0.3250)
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
-            // Fallout 2 adds RELOAD next to ACTION and MODE left of END.
+            // Fallout 2 adds RELOAD next to ACTION; the attack mode sits in
+            // the top corner.
             case .reload: return CGPoint(x: 0.8550, y: 0.6900)
             case .fireMode:
-                // Same size as END, sitting directly to its left.
-                let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-                let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
-                let gap = max(3.0, side * 0.12)
-                return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
+                // The attack mode took END COMBAT's place.
+                return TouchControl.end.defaultCenter(for: profile, in: bounds)
             case .load:
                 return topLeftCenter(for: profile, in: bounds, row: 0)
             case .saves:
-                return topLeftCenter(for: profile, in: bounds, row: 1)
+                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
+                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
+                return CGPoint(x: load.x + loadSize.width / max(bounds.width, 1), y: load.y)
+            case .quickSave:
+                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
+                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
+                return CGPoint(x: load.x, y: load.y + loadSize.height / max(bounds.height, 1))
             }
         case .half:
             switch self {
@@ -365,23 +374,27 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .end: return CGPoint(x: 0.9594, y: 0.0750)
             case .reload: return CGPoint(x: 0.8550, y: 0.6900)
             case .fireMode:
-                // Same size as END, sitting directly to its left.
-                let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-                let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
-                let gap = max(3.0, side * 0.12)
-                return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
+                // The attack mode took END COMBAT's place.
+                return TouchControl.end.defaultCenter(for: profile, in: bounds)
             case .load:
                 return topLeftCenter(for: profile, in: bounds, row: 0)
             case .saves:
-                return topLeftCenter(for: profile, in: bounds, row: 1)
+                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
+                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
+                return CGPoint(x: load.x + loadSize.width / max(bounds.width, 1), y: load.y)
+            case .quickSave:
+                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
+                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
+                return CGPoint(x: load.x, y: load.y + loadSize.height / max(bounds.height, 1))
             }
         }
     }
 
-    /// The load and save buttons, mirrored from the END column onto the top left,
-    /// where they are out of the way of the HUD and the thumb that drives the
-    /// cursor. LOAD takes the top row and SAVES the row below it, and each
-    /// layout's switch names them because every control has to be covered.
+    /// The load and save buttons, mirrored from the attack mode's corner onto
+    /// the top left, where they are out of the way of the HUD and the thumb that
+    /// drives the cursor. LOAD takes the top row; SAVES sits to its right and
+    /// QUICK SAVE under it, and each layout's switch names LOAD because every
+    /// control has to be covered.
     private func topLeftCenter(for profile: LayoutProfile, in bounds: CGSize, row: CGFloat) -> CGPoint {
         let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
         return CGPoint(x: 1 - end.x, y: 0.0750 + row * 0.1250)
@@ -406,7 +419,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
                 return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
             case .inv, .map, .cha, .pip:
                 return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
-            case .skill, .swap, .end, .fireMode, .load, .saves:
+            case .skill, .swap, .end, .fireMode, .load, .saves, .quickSave:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
@@ -430,7 +443,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             case .pip:
                 let side = min(bounds.width * 0.0644, bounds.height * 0.143)
                 return CGSize(width: side, height: side)
-            case .skill, .swap, .end, .fireMode, .load, .saves:
+            case .skill, .swap, .end, .fireMode, .load, .saves, .quickSave:
                 let side = min(bounds.width * 0.05625, bounds.height * 0.130)
                 return CGSize(width: side, height: side)
             case .reload:
@@ -448,7 +461,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 13
+    private static let layoutVersion = 14
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -550,13 +563,18 @@ enum ControlLayout {
         // Version 12 moved the attack mode control out from under SWAP to the
         // row with END, and version 13 moved the save button down to make room
         // for the load button above it, so a position saved for either old place
-        // no longer fits the square button. Their sizes are kept.
+        // no longer fits the square button. Their sizes are kept. Version 14
+        // drops END COMBAT and moves the attack mode onto its corner, so both
+        // of those positions are cleared.
         for game in FalloutGame.allCases {
             for profile in [LayoutProfile.full, .half] {
                 defaults.removeObject(forKey: key(.fireMode, xSuffix, profile: profile, game: game))
                 defaults.removeObject(forKey: key(.fireMode, ySuffix, profile: profile, game: game))
                 defaults.removeObject(forKey: key(.saves, xSuffix, profile: profile, game: game))
                 defaults.removeObject(forKey: key(.saves, ySuffix, profile: profile, game: game))
+                defaults.removeObject(forKey: key(.end, xSuffix, profile: profile, game: game))
+                defaults.removeObject(forKey: key(.end, ySuffix, profile: profile, game: game))
+                defaults.removeObject(forKey: key(.end, scaleSuffix, profile: profile, game: game))
             }
         }
 
@@ -633,6 +651,10 @@ enum ScreenMode: Int {
 
     case pickAmount = 13
 
+    /// The called shot panel drawn over the game view; it is a menu for the
+    /// overlay's purposes, so the HUD steps aside and only BACK stays.
+    case calledShot = 14
+
     var isMenu: Bool {
         return self != .game
     }
@@ -688,12 +710,6 @@ final class GameControlsOverlay: UIView {
         title: "SWAP",
         symbol: "arrow.left.arrow.right",
         iconPointSize: 18
-    )
-    private let endButton = LabeledControlButton(
-        title: "END\nCOMBAT",
-        symbol: "xmark",
-        iconPointSize: 18,
-        labelLines: 2
     )
     private let reloadButton = LabeledControlButton(
         title: "RELOAD",
@@ -962,10 +978,6 @@ final class GameControlsOverlay: UIView {
         swapButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(swapButton)
 
-        endButton.tag = 5
-        endButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
-        addSubview(endButton)
-
         skipButton.tag = 6
         skipButton.isHidden = true
         skipButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
@@ -1140,24 +1152,13 @@ final class GameControlsOverlay: UIView {
 
         place(skillButton, at: .skill, profile: profile, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(swapButton, at: .swap, profile: profile, size: scaledSize(for: .swap, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(endButton, at: .end, profile: profile, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale, profile: profile))
 
         place(reloadButton, at: .reload, profile: profile, size: scaledSize(for: .reload, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, globalScale: buttonScale, profile: profile))
 
         place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
-
-        // SAVES sits to the right of LOAD, in line with it, and QUICK SAVE
-        // flush under LOAD the way END sits over SKILL on the right.
-        savesButton.frame = CGRect(x: loadButton.frame.maxX,
-                                   y: loadButton.frame.minY,
-                                   width: loadButton.frame.width,
-                                   height: loadButton.frame.height)
-        quickSaveButton.frame = CGRect(x: loadButton.frame.minX,
-                                       y: loadButton.frame.maxY,
-                                       width: loadButton.frame.width,
-                                       height: loadButton.frame.height)
+        place(quickSaveButton, at: .quickSave, profile: profile, size: scaledSize(for: .quickSave, in: bounds.size, globalScale: buttonScale, profile: profile))
 
         if !quickSaveNotice.isHidden {
             let noticeWidth = min(200, bounds.width * 0.3)
@@ -1261,7 +1262,7 @@ final class GameControlsOverlay: UIView {
     private func placeBarterControls(in table: CGRect, gap: CGFloat, side: CGFloat) {
         let small = max(34, side * 0.72)
         let middle = table.midY + 6
-        let bottom = bounds.height - small - 8
+        let bottom = bounds.height - small - 7
 
         let offerX = table.minX - gap - small
         let backX = offerX - gap - side
@@ -1305,14 +1306,15 @@ final class GameControlsOverlay: UIView {
 
         barterButton.solidBackground = true
         tellAboutButton.solidBackground = true
-        place(barterButton, on: barterSlot, side: side)
-        place(tellAboutButton, on: aboutSlot, side: side)
+        place(barterButton, on: barterSlot, side: side, extraWidth: 4)
+        place(tellAboutButton, on: aboutSlot, side: side, extraWidth: 4)
     }
 
-    private func place(_ button: UIView, on slot: CGRect, side: CGFloat) {
-        let x = min(max(slot.midX - side / 2, 8), bounds.width - side - 8)
+    private func place(_ button: UIView, on slot: CGRect, side: CGFloat, extraWidth: CGFloat = 0) {
+        let width = side + extraWidth
+        let x = min(max(slot.midX - width / 2, 8), bounds.width - width - 8)
         let y = min(max(slot.midY - side / 2, 8), bounds.height - side - 8)
-        button.frame = CGRect(x: x, y: y, width: side, height: side)
+        button.frame = CGRect(x: x, y: y, width: width, height: side)
     }
 
     private func actionButtonRect(_ action: Int32) -> CGRect? {
@@ -1341,7 +1343,7 @@ final class GameControlsOverlay: UIView {
 
         helpCard.text = L.t("Hold and drag an item to equip or move it.")
             + "\n\n"
-            + L.t("Tap an item to inspect its characteristics.")
+            + L.t("Tap an item while INSPECT is toggled on to see its characteristics.")
             + "\n\n"
             + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")
     }
@@ -1364,15 +1366,6 @@ final class GameControlsOverlay: UIView {
 
         guard fallout_ios_menu_rect(&x, &y, &width, &height) != 0, width > 1, height > 1 else {
             return nil
-        }
-
-        let defaults = UserDefaults.standard
-        let screenWidth = CGFloat(defaults.object(forKey: LauncherModel.optionKey("width", for: game)) as? Int ?? 0)
-        let screenHeight = CGFloat(defaults.object(forKey: LauncherModel.optionKey("height", for: game)) as? Int ?? 0)
-        if screenWidth > 1 && screenHeight > 1 {
-            if CGFloat(width) < screenWidth * 0.25 || CGFloat(height) < screenHeight * 0.25 {
-                return nil
-            }
         }
 
         return CGRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
@@ -1681,7 +1674,6 @@ final class GameControlsOverlay: UIView {
         skipButton.controlOpacity = value
         skillButton.controlOpacity = value
         swapButton.controlOpacity = value
-        endButton.controlOpacity = value
         reloadButton.controlOpacity = value
         fireModeButton.controlOpacity = value
         savesButton.controlOpacity = value
@@ -1703,7 +1695,7 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton]
+        var controls: [UIView] = [joystick, actionButton, backButton, skipButton, skillButton, swapButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton]
         controls.append(contentsOf: sideButtons as [UIView])
 
         let movie = fallout_ios_movie_state()
@@ -1897,8 +1889,6 @@ final class GameControlsOverlay: UIView {
         }
         skillButton.isEnabled = fallout_ios_action_available(4) != 0
         swapButton.isEnabled = fallout_ios_action_available(7) != 0
-        let canEndCombat = fallout_ios_action_available(5) != 0
-        endButton.isEnabled = canEndCombat
         skipButton.isEnabled = fallout_ios_action_available(6) != 0
 
         // Reload needs a firearm and the attack mode needs an item in hand; the
