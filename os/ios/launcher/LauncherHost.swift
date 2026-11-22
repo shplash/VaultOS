@@ -210,43 +210,50 @@ final class LauncherHost {
 // the rest of the screen keeps working exactly as before.
 
 private enum ControlTheme {
-    /// The colour the player picked for the on-screen controls.
+    /// The colour the player picked for the controls. It only ever shows where a
+    /// control answers to a touch - the wash of a held or selected button - so
+    /// the outlines, the glyphs and the labels stay neutral and never tint the
+    /// game underneath them.
     static var control: UIColor {
         let key = LauncherModel.optionKey("buttonColour", for: ControlLayout.activeGame())
         let index = UserDefaults.standard.integer(forKey: key)
         return ControlColour(rawValue: index)?.uiColor ?? .white
     }
 
-    static var game: FalloutGame {
-        ControlLayout.activeGame()
-    }
-
     static var panel: UIColor {
-        return VaultUI.hull.withAlphaComponent(0.62)
+        return VaultUI.controlFill.withAlphaComponent(0.78)
     }
 
-    static var highlight: UIColor {
-        return control.withAlphaComponent(0.22)
+    static var solidPanel: UIColor {
+        return VaultUI.controlFill
     }
 
-    static var dim: UIColor {
-        let key = LauncherModel.optionKey("buttonColour", for: ControlLayout.activeGame())
-        if UserDefaults.standard.integer(forKey: key) == ControlColour.white.rawValue {
-            return UIColor.white.withAlphaComponent(0.68)
-        }
-        return control.withAlphaComponent(0.85)
+    static var border: UIColor {
+        return VaultUI.controlBorder
+    }
+
+    static var content: UIColor {
+        return VaultUI.controlContent
+    }
+
+    static var pressed: UIColor {
+        return VaultUI.controlPressed
+    }
+
+    static var wash: UIColor {
+        return control.withAlphaComponent(0.20)
     }
 }
 
 enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     case joystick
     case back
+    case pip
     case action
     case skip
     case inv
     case map
     case cha
-    case pip
     case skill
     case swap
     case end
@@ -255,20 +262,21 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     case load
     case saves
     case quickSave
+    case tray
 
     var id: String { rawValue }
 
     var label: String {
         let english: String
         switch self {
-        case .joystick: english = "LOOK"
+        case .joystick: english = "CAMERA"
         case .back: english = "BACK"
+        case .pip: english = "PIP"
         case .action: english = "ACTION"
         case .skip: english = "END TURN"
         case .inv: english = "INV"
         case .map: english = "MAP"
         case .cha: english = "CHA"
-        case .pip: english = "PIP"
         case .skill: english = "SKILL"
         case .swap: english = "SWAP"
         case .end: english = "END"
@@ -277,6 +285,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .load: english = "LOAD"
         case .saves: english = "SAVE"
         case .quickSave: english = "QUICK SAVE"
+        case .tray: english = "TRAY"
         }
         return L.t(english)
     }
@@ -285,12 +294,12 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .joystick: return "circle.dashed"
         case .back: return "chevron.backward"
+        case .pip: return "book.closed"
         case .action: return "hand.tap"
         case .skip: return "forward.end"
         case .inv: return "bag"
         case .map: return "map"
         case .cha: return "person"
-        case .pip: return "book.closed"
         case .skill: return "star"
         case .swap: return "arrow.left.arrow.right"
         case .end: return "xmark"
@@ -299,160 +308,112 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .load: return "tray.and.arrow.down"
         case .saves: return "tray.full"
         case .quickSave: return "bolt.fill"
+        case .tray: return "chevron.right"
         }
     }
 
     /// Both games keep independent control sets and layouts. The reload and
-    /// attack-mode buttons are in both sets; they show themselves only when the
-    /// running engine reports the action as available.
+    /// attack-mode buttons show themselves only when the running engine reports
+    /// the action as available.
     static func controls(for game: FalloutGame) -> [TouchControl] {
         return allCases
     }
 
+    /// MAP, CHA and INV, in that order, along the bottom right corner.
     static func bottomRow(for profile: LayoutProfile) -> [TouchControl] {
-        switch profile {
-        case .full: return [.map, .cha, .inv, .pip]
-        case .half: return [.map, .cha, .inv]
-        }
+        return [.map, .cha, .inv]
     }
 
-    /// Normalized center of the control on the game view. The editor stores
-    /// the same coordinates, so layouts survive resolution and orientation
-    /// changes.
+    /// The space between two neighbouring controls at their own size.
+    static func gap(in bounds: CGSize) -> CGFloat {
+        return max(5, bounds.height * 0.025)
+    }
+
+    /// Normalized center of the control on the game view. The editor stores the
+    /// same coordinates, so layouts survive resolution and orientation changes.
     func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds.size) -> CGPoint {
-        switch profile {
-        case .full:
-            switch self {
-            case .joystick: return CGPoint(x: 0.18125, y: 0.8110)
-            case .back: return CGPoint(x: 0.1160, y: 0.5725)
-            case .action: return CGPoint(x: 0.9415, y: 0.6900)
-            case .skip: return CGPoint(x: 0.9444, y: 0.5320)
-            // Four equal cells filling the strip to the right of the HUD.
-            case .map: return CGPoint(x: 0.7795, y: 0.9215)
-            case .cha: return CGPoint(x: 0.8386, y: 0.9215)
-            case .inv: return CGPoint(x: 0.8977, y: 0.9215)
-            case .pip: return CGPoint(x: 0.9567, y: 0.9215)
-            // SKILL and SWAP under the attack mode, which took END COMBAT's
-            // corner when that button was dropped.
-            case .skill: return CGPoint(x: 0.9594, y: 0.2000)
-            case .swap: return CGPoint(x: 0.9594, y: 0.3250)
-            case .end: return CGPoint(x: 0.9594, y: 0.0750)
-            // Fallout 2 adds RELOAD next to ACTION; the attack mode sits in
-            // the top corner.
-            case .reload: return CGPoint(x: 0.8550, y: 0.6900)
-            case .fireMode:
-                // Same size as END COMBAT, sitting directly to its left.
-                let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-                let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
-                let gap = max(3.0, side * 0.12)
-                return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
-            case .load:
-                return topLeftCenter(for: profile, in: bounds, row: 0)
-            case .saves:
-                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
-                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
-                return CGPoint(x: load.x + loadSize.width / max(bounds.width, 1), y: load.y)
-            case .quickSave:
-                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
-                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
-                return CGPoint(x: load.x, y: load.y + loadSize.height / max(bounds.height, 1))
-            }
-        case .half:
-            switch self {
-            // Keep the HUD clear at half resolution: PIP moves above BACK,
-            // the other three HUD buttons slide together, and LOOK shifts left.
-            case .joystick: return CGPoint(x: 0.1170, y: 0.8110)
-            case .back: return CGPoint(x: 0.1160, y: 0.5725)
-            case .action: return CGPoint(x: 0.9415, y: 0.6900)
-            case .skip: return CGPoint(x: 0.9444, y: 0.5320)
-            case .map: return CGPoint(x: 0.8347, y: 0.9215)
-            case .cha: return CGPoint(x: 0.8953, y: 0.9215)
-            case .inv: return CGPoint(x: 0.9559, y: 0.9215)
-            case .pip: return CGPoint(x: 0.1080, y: 0.4250)
-            case .skill: return CGPoint(x: 0.9594, y: 0.2000)
-            case .swap: return CGPoint(x: 0.9594, y: 0.3250)
-            case .end: return CGPoint(x: 0.9594, y: 0.0750)
-            case .reload: return CGPoint(x: 0.8550, y: 0.6900)
-            case .fireMode:
-                // Same size as END COMBAT, sitting directly to its left.
-                let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-                let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
-                let gap = max(3.0, side * 0.12)
-                return CGPoint(x: end.x - (side + gap) / max(bounds.width, 1), y: end.y)
-            case .load:
-                return topLeftCenter(for: profile, in: bounds, row: 0)
-            case .saves:
-                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
-                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
-                return CGPoint(x: load.x + loadSize.width / max(bounds.width, 1), y: load.y)
-            case .quickSave:
-                let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
-                let loadSize = TouchControl.load.defaultSize(in: bounds, profile: profile)
-                return CGPoint(x: load.x, y: load.y + loadSize.height / max(bounds.height, 1))
-            }
+        switch self {
+        case .quickSave:
+            return CGPoint(x: 0.072, y: 0.080)
+        case .tray:
+            let save = TouchControl.quickSave.defaultCenter(for: profile, in: bounds)
+            let size = TouchControl.quickSave.defaultSize(in: bounds, profile: profile)
+            let side = TouchControl.tray.defaultSize(in: bounds, profile: profile).width
+            let step = size.width / 2 + TouchControl.gap(in: bounds) + side / 2
+            return CGPoint(x: save.x + step / max(bounds.width, 1), y: save.y)
+        case .load:
+            let tray = TouchControl.tray.defaultCenter(for: profile, in: bounds)
+            let side = TouchControl.tray.defaultSize(in: bounds, profile: profile).width
+            let width = TouchControl.load.defaultSize(in: bounds, profile: profile).width
+            let step = side / 2 + TouchControl.gap(in: bounds) + width / 2
+            return CGPoint(x: tray.x + step / max(bounds.width, 1), y: tray.y)
+        case .saves:
+            let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
+            let width = TouchControl.load.defaultSize(in: bounds, profile: profile).width
+            let step = width + TouchControl.gap(in: bounds)
+            return CGPoint(x: load.x + step / max(bounds.width, 1), y: load.y)
+        case .pip:
+            return CGPoint(x: 0.058, y: 0.350)
+        case .back:
+            return CGPoint(x: 0.058, y: 0.510)
+        case .joystick:
+            return CGPoint(x: 0.104, y: 0.772)
+        case .end:
+            return CGPoint(x: 0.948, y: 0.080)
+        case .fireMode:
+            let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
+            let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
+            let step = side + TouchControl.gap(in: bounds)
+            return CGPoint(x: end.x - step / max(bounds.width, 1), y: end.y)
+        case .skill:
+            return CGPoint(x: 0.952, y: 0.228)
+        case .swap:
+            return CGPoint(x: 0.952, y: 0.378)
+        case .skip:
+            return CGPoint(x: 0.944, y: 0.528)
+        case .action:
+            return CGPoint(x: 0.944, y: 0.712)
+        case .reload:
+            return CGPoint(x: 0.858, y: 0.528)
+        case .map:
+            return CGPoint(x: 0.834, y: 0.905)
+        case .cha:
+            return CGPoint(x: 0.898, y: 0.905)
+        case .inv:
+            return CGPoint(x: 0.962, y: 0.905)
         }
     }
 
-    /// The load and save buttons, mirrored from the attack mode's corner onto
-    /// the top left, where they are out of the way of the HUD and the thumb that
-    /// drives the cursor. LOAD takes the top row; SAVES sits to its right and
-    /// QUICK SAVE under it, and each layout's switch names LOAD because every
-    /// control has to be covered.
-    private func topLeftCenter(for profile: LayoutProfile, in bounds: CGSize, row: CGFloat) -> CGPoint {
-        let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-        return CGPoint(x: 1 - end.x, y: 0.0750 + row * 0.1250)
-    }
-
-    /// Base size in points before the global and per-control scale settings.
-    /// The HUD-row buttons are intentionally rectangles so they fill the side
-    /// strip in the same way as the proposed layout.
+    /// Base size in points before the global and per-control scale settings. The
+    /// controls are measured against the screen's height so they keep the
+    /// reference's proportions whatever the aspect ratio of the device.
     func defaultSize(in bounds: CGSize, profile: LayoutProfile = .full) -> CGSize {
-        switch profile {
-        case .full:
-            switch self {
-            case .joystick:
-                let side = bounds.height * 0.318
-                return CGSize(width: side, height: side)
-            case .back:
-                let side = min(bounds.width * 0.0670, bounds.height * 0.149)
-                return CGSize(width: side, height: side)
-            case .action:
-                return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.171)
-            case .skip:
-                return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
-            case .inv, .map, .cha, .pip:
-                return CGSize(width: bounds.width * 0.0591, height: bounds.height * 0.1375)
-            case .skill, .swap, .end, .fireMode, .load, .saves, .quickSave:
-                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
-                return CGSize(width: side, height: side)
-            case .reload:
-                let side = min(bounds.width * 0.055, bounds.height * 0.125)
-                return CGSize(width: side, height: side)
-            }
-        case .half:
-            switch self {
-            case .joystick:
-                let side = bounds.height * 0.318
-                return CGSize(width: side, height: side)
-            case .back:
-                let side = min(bounds.width * 0.0670, bounds.height * 0.149)
-                return CGSize(width: side, height: side)
-            case .action:
-                return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.171)
-            case .skip:
-                return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
-            case .map, .cha, .inv:
-                return CGSize(width: bounds.width * 0.0606, height: bounds.height * 0.1375)
-            case .pip:
-                let side = min(bounds.width * 0.0644, bounds.height * 0.143)
-                return CGSize(width: side, height: side)
-            case .skill, .swap, .end, .fireMode, .load, .saves, .quickSave:
-                let side = min(bounds.width * 0.05625, bounds.height * 0.130)
-                return CGSize(width: side, height: side)
-            case .reload:
-                let side = min(bounds.width * 0.055, bounds.height * 0.125)
-                return CGSize(width: side, height: side)
-            }
+        switch self {
+        case .quickSave:
+            return CGSize(width: bounds.height * 0.260, height: bounds.height * 0.108)
+        case .tray:
+            return CGSize(width: bounds.height * 0.108, height: bounds.height * 0.108)
+        case .load, .saves:
+            return CGSize(width: bounds.height * 0.125, height: bounds.height * 0.108)
+        case .pip:
+            return CGSize(width: bounds.height * 0.155, height: bounds.height * 0.095)
+        case .back:
+            return CGSize(width: bounds.height * 0.150, height: bounds.height * 0.170)
+        case .joystick:
+            let side = bounds.height * 0.339
+            return CGSize(width: side, height: side)
+        case .end, .fireMode:
+            return CGSize(width: bounds.height * 0.165, height: bounds.height * 0.108)
+        case .skill, .swap:
+            return CGSize(width: bounds.height * 0.165, height: bounds.height * 0.118)
+        case .skip:
+            return CGSize(width: bounds.height * 0.215, height: bounds.height * 0.118)
+        case .action:
+            return CGSize(width: bounds.height * 0.215, height: bounds.height * 0.165)
+        case .reload:
+            return CGSize(width: bounds.height * 0.125, height: bounds.height * 0.095)
+        case .map, .cha, .inv:
+            return CGSize(width: bounds.height * 0.115, height: bounds.height * 0.108)
         }
     }
 }
@@ -464,7 +425,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 15
+    private static let layoutVersion = 16
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -563,21 +524,16 @@ enum ControlLayout {
             }
         }
 
-        // Version 12 moved the attack mode control out from under SWAP to the
-        // row with END, and version 13 moved the save button down to make room
-        // for the load button above it, so a position saved for either old place
-        // no longer fits the square button. Their sizes are kept. Version 15
-        // puts END COMBAT back in the corner with the attack mode to its left,
-        // so both of those positions are cleared again.
+        // Version 16 is the redesigned touch HUD: every control has a new place
+        // and a new shape, so the stored positions are cleared and each one
+        // comes back where the new layout puts it. The player's own sizes are
+        // kept, since those still mean what they meant.
         for game in FalloutGame.allCases {
             for profile in [LayoutProfile.full, .half] {
-                defaults.removeObject(forKey: key(.fireMode, xSuffix, profile: profile, game: game))
-                defaults.removeObject(forKey: key(.fireMode, ySuffix, profile: profile, game: game))
-                defaults.removeObject(forKey: key(.saves, xSuffix, profile: profile, game: game))
-                defaults.removeObject(forKey: key(.saves, ySuffix, profile: profile, game: game))
-                defaults.removeObject(forKey: key(.end, xSuffix, profile: profile, game: game))
-                defaults.removeObject(forKey: key(.end, ySuffix, profile: profile, game: game))
-                defaults.removeObject(forKey: key(.end, scaleSuffix, profile: profile, game: game))
+                for control in TouchControl.allCases {
+                    defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
+                    defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
+                }
             }
         }
 
@@ -748,8 +704,19 @@ final class GameControlsOverlay: UIView {
     private let quickSaveButton = LabeledControlButton(
         title: "QUICK\nSAVE",
         symbol: "bolt.fill",
-        iconPointSize: 16,
-        labelLines: 2
+        iconPointSize: 17,
+        labelLines: 2,
+        layout: .horizontal
+    )
+    private let trayButton = LabeledControlButton(
+        title: "",
+        symbol: "chevron.right",
+        iconPointSize: 15
+    )
+    private let pipButton = LabeledControlButton(
+        title: "PIP",
+        symbol: "book.closed",
+        iconPointSize: 14
     )
     private let movieShield = UIView()
     private let skipMovieButton = MovieSkipButton()
@@ -807,6 +774,7 @@ final class GameControlsOverlay: UIView {
     private var lastModeRequests: Int32 = 0
     private var keepTargeting = false
     private var quickSaveSerial: Int32 = -1
+    private var trayOpen = false
 
     /// Refreshes the overlay that is on screen, if there is one. The engine
     /// calls this from its own input loop, on the main thread between frames,
@@ -968,7 +936,6 @@ final class GameControlsOverlay: UIView {
             ("MAP", "map", 1),
             ("CHA", "person", 2),
             ("INV", "bag", 0),
-            ("PIP", "book.closed", 3),
         ]
         for item in sideActions {
             let button = LabeledControlButton(
@@ -977,12 +944,15 @@ final class GameControlsOverlay: UIView {
                 iconPointSize: 14
             )
             button.tag = item.2
-            // The four HUD buttons sit edge-to-edge as one strip.
-            button.layer.cornerRadius = 3
             button.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
             sideButtons.append(button)
             addSubview(button)
         }
+
+        pipButton.tag = 3
+        pipButton.accessibilityLabel = "Pip boy"
+        pipButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(pipButton)
 
         skillButton.tag = 4
         skillButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
@@ -1030,16 +1000,22 @@ final class GameControlsOverlay: UIView {
         quickSaveButton.addTarget(self, action: #selector(quickSavePressed), for: .touchUpInside)
         addSubview(quickSaveButton)
 
+        // The chevron beside QUICK SAVE opens the tray that holds LOAD and
+        // SAVE, which stay out of the way until they are asked for.
+        trayButton.accessibilityLabel = "Save options"
+        trayButton.addTarget(self, action: #selector(trayPressed), for: .touchUpInside)
+        addSubview(trayButton)
+
         quickSaveNotice.isHidden = true
-        quickSaveNotice.backgroundColor = VaultUI.hull.withAlphaComponent(0.82)
+        quickSaveNotice.backgroundColor = VaultUI.controlFill.withAlphaComponent(0.92)
         quickSaveNotice.layer.cornerRadius = 9
         quickSaveNotice.layer.borderWidth = 1
-        quickSaveNotice.layer.borderColor = ControlTheme.control.withAlphaComponent(0.5).cgColor
+        quickSaveNotice.layer.borderColor = ControlTheme.border.cgColor
         quickSaveNotice.isUserInteractionEnabled = false
         addSubview(quickSaveNotice)
 
         quickSaveNoticeLabel.font = VaultUI.label(10, weight: .semibold)
-        quickSaveNoticeLabel.textColor = VaultUI.text
+        quickSaveNoticeLabel.textColor = VaultUI.controlContent
         quickSaveNoticeLabel.numberOfLines = 2
         quickSaveNoticeLabel.textAlignment = .center
         quickSaveNoticeLabel.adjustsFontSizeToFitWidth = true
@@ -1100,12 +1076,12 @@ final class GameControlsOverlay: UIView {
         helpButton.isHidden = true
         helpButton.backgroundColor = ControlTheme.panel
         helpButton.layer.cornerRadius = 10
-        helpButton.layer.borderWidth = 1.5
-        helpButton.layer.borderColor = ControlTheme.control.withAlphaComponent(0.6).cgColor
+        helpButton.layer.borderWidth = 1.2
+        helpButton.layer.borderColor = ControlTheme.border.cgColor
         helpButton.setImage(UIImage(systemName: "info",
                                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)),
                             for: .normal)
-        helpButton.tintColor = ControlTheme.control
+        helpButton.tintColor = ControlTheme.content
         helpButton.accessibilityLabel = "Inventory help"
         helpButton.addTarget(self, action: #selector(helpPressed), for: .touchUpInside)
         addSubview(helpButton)
@@ -1162,6 +1138,7 @@ final class GameControlsOverlay: UIView {
 
         place(joystick, at: .joystick, profile: profile, size: scaledSize(for: .joystick, in: bounds.size, globalScale: joystickScale, profile: profile))
         place(backButton, at: .back, profile: profile, size: scaledSize(for: .back, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(pipButton, at: .pip, profile: profile, size: scaledSize(for: .pip, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(actionButton, at: .action, profile: profile, size: scaledSize(for: .action, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(skipButton, at: .skip, profile: profile, size: scaledSize(for: .skip, in: bounds.size, globalScale: buttonScale, profile: profile))
 
@@ -1169,12 +1146,6 @@ final class GameControlsOverlay: UIView {
         for (index, control) in row.enumerated() where index < sideButtons.count {
             place(sideButtons[index], at: control, profile: profile,
                   size: scaledSize(for: control, in: bounds.size, globalScale: buttonScale, profile: profile))
-        }
-        // At half resolution PIP leaves the row and sits above BACK.
-        if row.count < sideButtons.count {
-            let pip = sideButtons[row.count]
-            place(pip, at: .pip, profile: profile,
-                  size: scaledSize(for: .pip, in: bounds.size, globalScale: buttonScale, profile: profile))
         }
 
         place(skillButton, at: .skill, profile: profile, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale, profile: profile))
@@ -1187,12 +1158,13 @@ final class GameControlsOverlay: UIView {
         place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(quickSaveButton, at: .quickSave, profile: profile, size: scaledSize(for: .quickSave, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(trayButton, at: .tray, profile: profile, size: scaledSize(for: .tray, in: bounds.size, globalScale: buttonScale, profile: profile))
 
         if !quickSaveNotice.isHidden {
-            let noticeWidth = min(200, bounds.width * 0.3)
-            quickSaveNotice.frame = CGRect(x: min(quickSaveButton.frame.maxX + 8, bounds.width - noticeWidth - 8),
-                                           y: quickSaveButton.frame.midY - 21,
-                                           width: noticeWidth,
+            let noticeWidth = min(220, bounds.width * 0.32)
+            quickSaveNotice.frame = CGRect(x: quickSaveButton.frame.minX,
+                                           y: quickSaveButton.frame.maxY + 6,
+                                           width: max(120, noticeWidth),
                                            height: 42)
             quickSaveNoticeLabel.frame = quickSaveNotice.bounds.insetBy(dx: 8, dy: 4)
         }
@@ -1538,8 +1510,53 @@ final class GameControlsOverlay: UIView {
         if sender.tag == 6 {
             skipPressedAt = Date()
         }
+        if sender === loadButton || sender === savesButton {
+            setTray(open: false)
+        }
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    /// The chevron beside QUICK SAVE. Tapping it slides LOAD and SAVE out of the
+    /// tray, and tapping it again puts them away; the button keeps QUICK SAVE
+    /// as its neighbour and never moves.
+    @objc private func trayPressed() {
+        setTray(open: !trayOpen)
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func setTray(open: Bool) {
+        let wasOpen = trayOpen
+        trayOpen = open
+        trayButton.set(symbol: open ? "chevron.left" : "chevron.right",
+                       title: "",
+                       accessibilityLabel: open ? "Close the save tray" : "Open the save tray")
+
+        let views: [UIView] = [loadButton, savesButton]
+        for view in views {
+            view.layer.removeAllAnimations()
+            view.alpha = 1
+            view.transform = .identity
+            view.isHidden = !open
+        }
+
+        guard open, !wasOpen, !UIAccessibility.isReduceMotionEnabled else {
+            return
+        }
+
+        for view in views {
+            view.alpha = 0
+            view.transform = CGAffineTransform(translationX: -12, y: 0)
+                .scaledBy(x: 0.9, y: 0.9)
+        }
+        UIView.animate(withDuration: 0.20,
+                       delay: 0,
+                       options: [.beginFromCurrentState, .curveEaseOut]) {
+            for view in views {
+                view.alpha = 1
+                view.transform = .identity
+            }
+        }
     }
 
     @objc private func quickSavePressed() {
@@ -1597,9 +1614,9 @@ final class GameControlsOverlay: UIView {
     @objc private func lookPressed() {
         fallout_ios_press_action(16)
         // The game keeps this mode to itself, so the button carries it, and a
-        // wash of white shows when the inventory is in look mode. The engine is
-        // told as well: in look mode a touch clicks an item instead of dragging
-        // it, and that click is what shows the item's description.
+        // wash shows when the inventory is in look mode. The engine is told as
+        // well: in look mode a touch clicks an item instead of dragging it, and
+        // that click is what shows the item's description.
         inspectOn.toggle()
         fallout_ios_press_action(inspectOn ? 17 : 18)
         lookButton.showsSelection = inspectOn
@@ -1706,6 +1723,7 @@ final class GameControlsOverlay: UIView {
         joystick.controlOpacity = value
         actionButton.controlOpacity = value
         backButton.controlOpacity = value
+        pipButton.controlOpacity = value
         skipButton.controlOpacity = value
         skillButton.controlOpacity = value
         swapButton.controlOpacity = value
@@ -1715,6 +1733,7 @@ final class GameControlsOverlay: UIView {
         savesButton.controlOpacity = value
         loadButton.controlOpacity = value
         quickSaveButton.controlOpacity = value
+        trayButton.controlOpacity = value
         lookButton.controlOpacity = value
         barterButton.controlOpacity = value
         tellAboutButton.controlOpacity = value
@@ -1731,7 +1750,7 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton]
+        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton]
         controls.append(contentsOf: sideButtons as [UIView])
 
         let movie = fallout_ios_movie_state()
@@ -1776,9 +1795,14 @@ final class GameControlsOverlay: UIView {
             control.isHidden = false
         }
 
+        // LOAD and SAVE only exist while the tray beside QUICK SAVE is open.
+        loadButton.isHidden = !trayOpen
+        savesButton.isHidden = !trayOpen
+
         let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
         if screen != currentScreen {
             currentScreen = screen
+            setTray(open: false)
             if inspectOn {
                 inspectOn = false
                 fallout_ios_press_action(18)
@@ -1937,9 +1961,10 @@ final class GameControlsOverlay: UIView {
         }
         actionButton.accessibilityLabel = accessibilityTitle
 
-        for (index, button) in sideButtons.enumerated() {
-            button.isEnabled = fallout_ios_action_available(Int32(index)) != 0
+        for button in sideButtons {
+            button.isEnabled = fallout_ios_action_available(Int32(button.tag)) != 0
         }
+        pipButton.isEnabled = fallout_ios_action_available(3) != 0
         skillButton.isEnabled = fallout_ios_action_available(4) != 0
         swapButton.isEnabled = fallout_ios_action_available(7) != 0
         endButton.isEnabled = fallout_ios_action_available(5) != 0
@@ -2026,7 +2051,7 @@ final class GameControlsOverlay: UIView {
     /// group is centred in the canvas so all four modes line up in the button.
     static func fireModeImage(_ mode: Int32) -> UIImage {
         let size = CGSize(width: 42, height: 20)
-        let color = ControlTheme.control
+        let color = ControlTheme.content
 
         return UIGraphicsImageRenderer(size: size).image { context in
             let cg = context.cgContext
@@ -2083,6 +2108,13 @@ final class GameControlsOverlay: UIView {
 }
 
 private final class LabeledControlButton: UIControl {
+    /// A stacked control carries its glyph above its label. The horizontal one,
+    /// used by QUICK SAVE, puts the glyph beside the label instead.
+    enum Layout {
+        case stacked
+        case horizontal
+    }
+
     private let plate = VaultPanelView()
     private let selectionView = UIView()
     private let holdFill = UIView()
@@ -2107,7 +2139,7 @@ private final class LabeledControlButton: UIControl {
     private var holdTimer: Timer?
 
     private var normalBackground: UIColor {
-        return solidBackground ? UIColor.black : ControlTheme.panel.withAlphaComponent(backgroundOpacity)
+        return solidBackground ? ControlTheme.solidPanel : ControlTheme.panel.withAlphaComponent(backgroundOpacity)
     }
 
     var backgroundOpacity: CGFloat = 0.55 {
@@ -2118,29 +2150,32 @@ private final class LabeledControlButton: UIControl {
     private let iconPointSize: CGFloat
     private let accent: Bool
     private let labelLines: Int
+    private let layout: Layout
 
-    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false, labelLines: Int = 1) {
+    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false, labelLines: Int = 1, layout: Layout = .stacked) {
         self.iconPointSize = iconPointSize
         self.accent = accent
         self.labelLines = max(1, labelLines)
+        self.layout = layout
         super.init(frame: .zero)
 
         backgroundColor = .clear
         plate.fill = normalBackground
-        plate.edge = ControlTheme.control.withAlphaComponent(0.55)
+        plate.edge = ControlTheme.border
         plate.corner = 10
         insertSubview(plate, at: 0)
-        tintColor = ControlTheme.control
+        tintColor = ControlTheme.content
 
         // A translucent wash over the panel, for a control that is switched on
-        // rather than pressed.
-        selectionView.backgroundColor = ControlTheme.control.withAlphaComponent(0.26)
+        // rather than pressed. It is the only place the player's own colour
+        // shows: the outline and the glyphs stay neutral.
+        selectionView.backgroundColor = ControlTheme.wash
         selectionView.isUserInteractionEnabled = false
         selectionView.isHidden = true
         addSubview(selectionView)
 
         // The sweep of a held control, under the wash and under the label.
-        holdFill.backgroundColor = ControlTheme.control.withAlphaComponent(0.30)
+        holdFill.backgroundColor = ControlTheme.wash
         holdFill.isUserInteractionEnabled = false
         holdFill.isHidden = true
         insertSubview(holdFill, at: 1)
@@ -2149,12 +2184,12 @@ private final class LabeledControlButton: UIControl {
         iconView.isUserInteractionEnabled = false
         addSubview(iconView)
 
-        label.font = VaultUI.label(9, weight: .bold)
-        label.textAlignment = .center
+        label.font = VaultUI.display(11)
+        label.textAlignment = layout == .horizontal ? .left : .center
         label.numberOfLines = self.labelLines
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.6
-        label.textColor = accent ? ControlTheme.control : ControlTheme.control
+        label.textColor = ControlTheme.content
         label.isUserInteractionEnabled = false
         addSubview(label)
 
@@ -2218,12 +2253,10 @@ private final class LabeledControlButton: UIControl {
 
     override var isHighlighted: Bool {
         didSet {
-            plate.fill = isHighlighted ? ControlTheme.highlight : normalBackground
-            plate.edge = isHighlighted
-                ? ControlTheme.control.withAlphaComponent(0.9)
-                : ControlTheme.control.withAlphaComponent(0.55)
-            tintColor = isHighlighted ? .white : ControlTheme.control
-            label.textColor = isHighlighted ? .white : ControlTheme.control
+            plate.fill = isHighlighted ? ControlTheme.pressed : normalBackground
+            plate.edge = ControlTheme.border
+            tintColor = ControlTheme.content
+            label.textColor = ControlTheme.content
         }
     }
 
@@ -2307,29 +2340,51 @@ private final class LabeledControlButton: UIControl {
         }
 
         let hasLabel = !(label.text?.isEmpty ?? true)
-        // A two-line label has to share the button with the pictogram, so it
-        // gets a smaller font and two line heights instead of one.
-        let fontSize = labelLines > 1
-            ? max(7, min(9, bounds.height * 0.17))
-            : max(8, min(10, bounds.height * 0.19))
-        label.font = VaultUI.label(fontSize, weight: .bold)
 
-        let lineHeight = ceil(label.font.lineHeight)
-        let labelHeight = hasLabel ? lineHeight * CGFloat(labelLines) + (labelLines > 1 ? 1 : 0) : 0
+        switch layout {
+        case .stacked:
+            // A two-line label has to share the button with the pictogram, so
+            // it gets a smaller font and two line heights instead of one.
+            let fontSize = labelLines > 1
+                ? max(7, min(11, bounds.height * 0.19))
+                : max(8, min(12, bounds.height * 0.21))
+            label.font = VaultUI.display(fontSize)
 
-        iconView.frame = CGRect(
-            x: 3,
-            y: 2,
-            width: bounds.width - 6,
-            height: max(0, bounds.height - labelHeight - 4)
-        )
-        label.isHidden = !hasLabel
-        label.frame = CGRect(
-            x: 1,
-            y: bounds.height - labelHeight - 1,
-            width: bounds.width - 2,
-            height: labelHeight
-        )
+            let lineHeight = ceil(label.font.lineHeight)
+            let labelHeight = hasLabel ? lineHeight * CGFloat(labelLines) + (labelLines > 1 ? 1 : 0) : 0
+
+            iconView.frame = CGRect(
+                x: 3,
+                y: 2,
+                width: bounds.width - 6,
+                height: max(0, bounds.height - labelHeight - 4)
+            )
+            label.isHidden = !hasLabel
+            label.frame = CGRect(
+                x: 1,
+                y: bounds.height - labelHeight - 1,
+                width: bounds.width - 2,
+                height: labelHeight
+            )
+        case .horizontal:
+            let fontSize = labelLines > 1
+                ? max(8, min(13, bounds.height * 0.24))
+                : max(8, min(13, bounds.height * 0.30))
+            label.font = VaultUI.display(fontSize)
+
+            let iconSide = min(bounds.height * 0.46, bounds.width * 0.28)
+            let inset = max(6, bounds.height * 0.12)
+            iconView.frame = CGRect(x: inset,
+                                    y: (bounds.height - iconSide) / 2,
+                                    width: iconSide,
+                                    height: iconSide)
+            label.isHidden = !hasLabel
+            let textX = iconView.frame.maxX + 7
+            label.frame = CGRect(x: textX,
+                                 y: 0,
+                                 width: max(0, bounds.width - textX - inset),
+                                 height: bounds.height)
+        }
     }
 }
 
@@ -2337,8 +2392,6 @@ private final class CameraJoystickControl: UIControl {
     private let ring = CAShapeLayer()
     private let knob = UIView()
     private let crosshair = CAShapeLayer()
-    private let caption = UILabel()
-    private let hint = UILabel()
 
     var controlOpacity: CGFloat = 1 {
         didSet {
@@ -2353,42 +2406,27 @@ private final class CameraJoystickControl: UIControl {
         isMultipleTouchEnabled = false
         isExclusiveTouch = true
 
-        ring.fillColor = VaultUI.hull.withAlphaComponent(0.45).cgColor
-        ring.strokeColor = ControlTheme.control.withAlphaComponent(0.45).cgColor
-        ring.lineWidth = 1.4
+        ring.fillColor = VaultUI.controlFill.withAlphaComponent(0.62).cgColor
+        ring.strokeColor = ControlTheme.border.cgColor
+        ring.lineWidth = 1.2
         ring.shadowOpacity = 0
         layer.addSublayer(ring)
 
         crosshair.fillColor = UIColor.clear.cgColor
-        crosshair.strokeColor = ControlTheme.control.withAlphaComponent(0.26).cgColor
+        crosshair.strokeColor = ControlTheme.content.withAlphaComponent(0.22).cgColor
         crosshair.lineWidth = 1
         crosshair.lineCap = .round
         layer.addSublayer(crosshair)
 
         knob.isUserInteractionEnabled = false
-        knob.backgroundColor = VaultUI.hull.withAlphaComponent(0.35)
-        knob.layer.borderWidth = 1.4
-        knob.layer.borderColor = ControlTheme.control.withAlphaComponent(0.75).cgColor
-        knob.layer.shadowColor = ControlTheme.control.cgColor
-        knob.layer.shadowOpacity = 0
-        knob.layer.shadowRadius = 0
-        knob.layer.shadowOffset = .zero
+        knob.backgroundColor = VaultUI.controlKnob.withAlphaComponent(0.95)
+        knob.layer.borderWidth = 1.2
+        knob.layer.borderColor = ControlTheme.border.withAlphaComponent(0.9).cgColor
+        knob.layer.shadowColor = UIColor.black.cgColor
+        knob.layer.shadowOpacity = 0.25
+        knob.layer.shadowRadius = 4
+        knob.layer.shadowOffset = CGSize(width: 0, height: 2)
         addSubview(knob)
-
-        caption.text = L.t("LOOK")
-        caption.font = VaultUI.label(8, weight: .bold)
-        caption.textColor = ControlTheme.dim
-        caption.textAlignment = .center
-        caption.isUserInteractionEnabled = false
-        addSubview(caption)
-
-        hint.text = L.t("or drag with\n2-fingers")
-        hint.font = VaultUI.label(7, weight: .semibold)
-        hint.textColor = ControlTheme.dim
-        hint.textAlignment = .center
-        hint.numberOfLines = 2
-        hint.isUserInteractionEnabled = false
-        addSubview(hint)
 
         accessibilityLabel = "Camera joystick"
     }
@@ -2410,20 +2448,6 @@ private final class CameraJoystickControl: UIControl {
         knob.center = CGPoint(x: bounds.midX, y: bounds.midY)
         knob.layer.cornerRadius = knobSize / 2
         knob.layer.shadowPath = UIBezierPath(ovalIn: knob.bounds).cgPath
-
-        caption.frame = CGRect(
-            x: 0,
-            y: bounds.height - 38,
-            width: bounds.width,
-            height: 12
-        )
-
-        hint.frame = CGRect(
-            x: 0,
-            y: bounds.height - 26,
-            width: bounds.width,
-            height: 20
-        )
 
         let path = UIBezierPath()
         path.move(to: CGPoint(x: bounds.midX, y: bounds.midY - bounds.height * 0.28))
@@ -2650,19 +2674,19 @@ final class MovieSkipButton: UIControl {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        backgroundColor = VaultUI.hull.withAlphaComponent(0.55)
+        backgroundColor = VaultUI.controlFill.withAlphaComponent(0.78)
         layer.cornerRadius = 9
         layer.masksToBounds = true
         layer.borderWidth = 1
-        layer.borderColor = ControlTheme.control.withAlphaComponent(0.55).cgColor
+        layer.borderColor = ControlTheme.border.cgColor
 
-        fill.backgroundColor = ControlTheme.control.withAlphaComponent(0.30)
+        fill.backgroundColor = ControlTheme.wash
         fill.isUserInteractionEnabled = false
         addSubview(fill)
 
         caption.text = L.t("TAP TO SKIP")
-        caption.font = VaultUI.label(9, weight: .bold)
-        caption.textColor = VaultUI.text.withAlphaComponent(0.9)
+        caption.font = VaultUI.display(11)
+        caption.textColor = VaultUI.controlContent
         caption.textAlignment = .center
         caption.numberOfLines = 2
         caption.adjustsFontSizeToFitWidth = true
@@ -2787,13 +2811,13 @@ final class InventoryHelpCard: UIView {
 
         backgroundColor = .clear
 
-        plate.fill = VaultUI.hull.withAlphaComponent(0.88)
-        plate.edge = UIColor.white.withAlphaComponent(0.22)
+        plate.fill = VaultUI.controlFill.withAlphaComponent(0.92)
+        plate.edge = VaultUI.controlBorder
         plate.corner = 14
         addSubview(plate)
 
         label.font = VaultUI.label(14, weight: .medium)
-        label.textColor = VaultUI.text
+        label.textColor = VaultUI.controlContent
         label.numberOfLines = 0
         label.isUserInteractionEnabled = false
         addSubview(label)

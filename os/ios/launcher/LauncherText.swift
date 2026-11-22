@@ -267,6 +267,9 @@ enum L {
             "Backing up saves...": "Sauvegarde des parties…",
             "Opening backup...": "Ouverture de la sauvegarde…",
             "Restoring saves...": "Restauration des parties…",
+            // Touch HUD
+            "TRAY": "TIROIR",
+            "CAMERA": "CAMÉRA",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "Les archives ZIP64 ne sont pas prises en charge. Recréez le ZIP sans ZIP64.",
             // Controls
             "LOOK": "VISÉE",
@@ -551,6 +554,9 @@ enum L {
             "Backing up saves...": "Spielstände werden gesichert…",
             "Opening backup...": "Sicherung wird geöffnet…",
             "Restoring saves...": "Spielstände werden wiederhergestellt…",
+            // Touch HUD
+            "TRAY": "ABLAGE",
+            "CAMERA": "KAMERA",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "ZIP64-Archive werden nicht unterstützt. Erstelle das ZIP ohne ZIP64 neu.",
             "LOOK": "BLICK",
             "or drag with\n2-fingers": "oder ziehen mit\n2 Fingern",
@@ -829,6 +835,9 @@ enum L {
             "Backing up saves...": "Backup dei salvataggi…",
             "Opening backup...": "Apertura del backup…",
             "Restoring saves...": "Ripristino dei salvataggi…",
+            // Touch HUD
+            "TRAY": "VASSOIO",
+            "CAMERA": "TELECAMERA",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "Gli archivi ZIP64 non sono supportati. Ricrea lo ZIP senza ZIP64.",
             "LOOK": "GUARDA",
             "or drag with\n2-fingers": "o trascina con\n2 dita",
@@ -1107,6 +1116,9 @@ enum L {
             "Backing up saves...": "Copiando las partidas…",
             "Opening backup...": "Abriendo la copia de seguridad…",
             "Restoring saves...": "Restaurando las partidas…",
+            // Touch HUD
+            "TRAY": "BANDEJA",
+            "CAMERA": "CÁMARA",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "No se admiten archivos ZIP64. Vuelve a crear el ZIP sin ZIP64.",
             "LOOK": "MIRAR",
             "or drag with\n2-fingers": "o arrastra con\n2 dedos",

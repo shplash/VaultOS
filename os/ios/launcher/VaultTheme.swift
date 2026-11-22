@@ -15,6 +15,11 @@ enum Vault {
     static let amber = Color(red: 0.898, green: 0.663, blue: 0.208)
     static let teal = Color(red: 0.373, green: 0.702, blue: 0.659)
 
+    /// The touch HUD: near-black plates, one neutral outline, white glyphs.
+    static let controlFill = Color(white: 0.063)
+    static let controlBorder = Color(white: 0.333)
+    static let controlContent = Color(white: 0.949)
+
     static func display(_ size: CGFloat) -> Font {
         if UIFont(name: VaultUI.displayName, size: size) != nil {
             return Font.custom(VaultUI.displayName, fixedSize: size)
@@ -57,6 +62,12 @@ enum VaultUI {
     static let faint = UIColor(red: 0.420, green: 0.447, blue: 0.478, alpha: 1)
     static let ink = UIColor(red: 0.043, green: 0.043, blue: 0.047, alpha: 1)
     static let edgeLight = UIColor(white: 1, alpha: 0.16)
+
+    static let controlFill = UIColor(white: 0.063, alpha: 1)
+    static let controlBorder = UIColor(white: 0.333, alpha: 1)
+    static let controlContent = UIColor(white: 0.949, alpha: 1)
+    static let controlPressed = UIColor(white: 0.161, alpha: 1)
+    static let controlKnob = UIColor(white: 0.22, alpha: 1)
 
     static func display(_ size: CGFloat) -> UIFont {
         return UIFont(name: displayName, size: size)

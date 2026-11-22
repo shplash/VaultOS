@@ -31,8 +31,12 @@ recolours the whole launcher from amber to teal and back. Nothing is allowed to
 hard-code one of the two accents.
 
 The in-game controls are the exception: they use the control colour the player
-picked in CONTROLS (white, orange, green or blue), because they sit over the
-game rather than marking it.
+picked in CONTROLS (white, orange, green or blue) only where a control answers
+to a touch - the wash of a held or selected button. Their plates, outlines,
+glyphs and labels are neutral: near-black `#101010`, one charcoal outline
+`#555555`, off-white content `#F2F2F2`, a lighter charcoal for a press. They sit
+over the game rather than marking it, so nothing coloured is allowed on their
+borders.
 
 ## Type
 
@@ -64,9 +68,11 @@ game rather than marking it.
 - **Row**: title and detail on the left, control on the right, hairline under.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
-- **Touch control** (`LabeledControlButton`): rounded plate in the player's
-  control colour, icon above a mono label; a held control fills with that
-  colour, a selected one washes with it.
+- **Touch control** (`LabeledControlButton`): a dark plate with one charcoal
+  outline, a white glyph above an Anton label; QUICK SAVE lays its glyph beside
+  its label. A held control washes with the player's control colour, a selected
+  one keeps that wash. The chevron beside QUICK SAVE opens a tray with LOAD and
+  SAVE, closed by default.
 - **Camera pad** (`CameraJoystickControl`): a thin ring and crosshair over the
   hull, with a plain knob; no glow.
 - **Help card**: hull plate with a hairline edge and mono body text.

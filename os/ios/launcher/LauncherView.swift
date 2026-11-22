@@ -2118,7 +2118,7 @@ private struct TouchControlEditor: View {
 
     private func editorControl(_ control: TouchControl, size: CGSize, selected: Bool) -> some View {
         let shortSide = min(size.width, size.height)
-        let tint = model.controlColour.color
+        let shape = RoundedRectangle(cornerRadius: min(10, shortSide * 0.16), style: .continuous)
 
         return Group {
             if control == .skip {
@@ -2135,9 +2135,21 @@ private struct TouchControlEditor: View {
                     Text(L.t("SKIP"))
                     Text(L.t("TURN"))
                 }
-                .font(.system(size: max(5, min(9, shortSide * 0.14)), weight: .bold, design: .monospaced))
+                .font(Vault.display(max(5, min(9, shortSide * 0.14))))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
+            } else if control == .quickSave {
+                HStack(spacing: max(2, shortSide * 0.05)) {
+                    Image(systemName: control.symbol)
+                        .font(.system(size: max(9, min(20, shortSide * 0.34)), weight: .semibold))
+
+                    Text(control.label)
+                        .font(Vault.display(max(7, min(11, shortSide * 0.19))))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .minimumScaleFactor(0.5)
+                }
+                .padding(.horizontal, max(3, shortSide * 0.08))
             } else {
                 VStack(spacing: max(1, shortSide * 0.035)) {
                     if control == .fireMode {
@@ -2151,33 +2163,31 @@ private struct TouchControlEditor: View {
                     }
 
                     Text(control.label)
-                        .font(.system(size: max(7, min(10, shortSide * 0.18)), weight: .bold, design: .monospaced))
+                        .font(Vault.display(max(7, min(10, shortSide * 0.18))))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
             }
         }
-        .foregroundColor(tint)
+        .foregroundColor(Vault.controlContent)
         .frame(width: size.width, height: size.height)
         .background(
             Group {
                 if control == .joystick {
-                    Circle().fill(Theme.panel)
+                    Circle().fill(Vault.controlFill.opacity(0.8))
                 } else {
-                    RoundedRectangle(cornerRadius: min(10, shortSide * 0.16), style: .continuous)
-                        .fill(Theme.panel)
+                    shape.fill(Vault.controlFill.opacity(0.8))
                 }
             }
         )
         .overlay(
             Group {
                 if control == .joystick {
-                    Circle().stroke(selected ? Color.white : tint.opacity(0.5),
+                    Circle().stroke(selected ? Color.white : Vault.controlBorder,
                                     lineWidth: selected ? 2.2 : 1.2)
                 } else {
-                    RoundedRectangle(cornerRadius: min(10, shortSide * 0.16), style: .continuous)
-                        .stroke(selected ? Color.white : tint.opacity(0.5),
-                                lineWidth: selected ? 2.2 : 1.2)
+                    shape.stroke(selected ? Color.white : Vault.controlBorder,
+                                 lineWidth: selected ? 2.2 : 1.2)
                 }
             }
         )
