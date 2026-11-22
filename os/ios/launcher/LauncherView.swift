@@ -210,6 +210,7 @@ struct LauncherView: View {
                     }
                 }
             }
+            .padding(.top, 8)
             .padding(.bottom, 8)
 
             Rectangle()
@@ -305,17 +306,13 @@ struct LauncherView: View {
             }
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Rectangle()
-                    .fill(game == .fallout2 && selected ? game.accent : Color.clear)
-                    .frame(height: 2)
-
                 HStack(spacing: 7) {
                     Circle()
-                        .fill(installed(game) ? game.accent : Theme.faint)
+                        .fill(game.accent)
                         .frame(width: 6, height: 6)
 
                     Text(game.title.uppercased())
-                        .font(Vault.display(26))
+                        .font(Vault.display(32))
                         .kerning(0.4)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -323,7 +320,7 @@ struct LauncherView: View {
                 }
 
                 Rectangle()
-                    .fill(game != .fallout2 && selected ? game.accent : Color.clear)
+                    .fill(selected ? game.accent : Color.clear)
                     .frame(height: 2)
             }
             .contentShape(Rectangle())
@@ -464,9 +461,15 @@ struct LauncherView: View {
                     .transition(.opacity)
                     .allowsHitTesting(false)
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true, expanded: true)
+                        aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true, expanded: true)
+                    }
+                    .frame(width: heroTitleWidth(54))
+
                     Text(model.selectedGame.title.uppercased())
-                        .font(Vault.display(44))
+                        .font(Vault.display(54))
                         .kerning(1.4)
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
@@ -484,17 +487,15 @@ struct LauncherView: View {
                 }
                 .padding(.leading, 22)
                 .frame(maxWidth: geometry.size.width * 0.60, alignment: .leading)
-
-                HStack(spacing: 8) {
-                    aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
-                    aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
-                }
-                .padding(.leading, 22)
-                .padding(.top, 12)
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             }
         }
         .frame(height: 172)
+    }
+
+    private func heroTitleWidth(_ size: CGFloat) -> CGFloat {
+        let text = model.selectedGame.title.uppercased()
+        let width = (text as NSString).size(withAttributes: [.font: VaultUI.display(size)]).width
+        return width + CGFloat(text.count) * 1.4
     }
 
     private func heroArt(width: CGFloat, height: CGFloat) -> some View {
@@ -606,7 +607,7 @@ struct LauncherView: View {
         .accessibilityLabel(group.title)
     }
 
-    private func wikiLink(_ title: String, address: String, primary: Bool) -> some View {
+    private func wikiLink(_ title: String, address: String, primary: Bool, expanded: Bool = false) -> some View {
         Button {
             if let url = URL(string: address) {
                 UIApplication.shared.open(url)
@@ -623,6 +624,7 @@ struct LauncherView: View {
             .foregroundColor(primary ? Color.black.opacity(0.8) : Theme.faint)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
+            .frame(maxWidth: expanded ? CGFloat.infinity : nil)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(primary ? accent : Color.white.opacity(0.04))
@@ -720,8 +722,8 @@ struct LauncherView: View {
         return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
     }
 
-    private func aboutLink(_ title: String, address: String, primary: Bool) -> some View {
-        wikiLink(title, address: address, primary: primary)
+    private func aboutLink(_ title: String, address: String, primary: Bool, expanded: Bool = false) -> some View {
+        wikiLink(title, address: address, primary: primary, expanded: expanded)
     }
 
     /// What the update check came back with: one line, and the release page when
@@ -1562,10 +1564,6 @@ struct LauncherView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 8)
     }
-
-    private func installed(_ game: FalloutGame) -> Bool {
-        return model.installedGames.contains(game)
-    }
 }
 
 // MARK: - Pages
@@ -1781,6 +1779,15 @@ private struct SmallButtonStyle: ButtonStyle {
             )
             .overlay(shape.stroke(accent.opacity(configuration.isPressed ? 0.85 : 0.45), lineWidth: 1))
             .opacity(configuration.isPressed ? 0.9 : 1)
+            .modifier(DisabledDim())
+    }
+}
+
+private struct DisabledDim: ViewModifier {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func body(content: Content) -> some View {
+        content.opacity(isEnabled ? 1 : 0.4)
     }
 }
 
