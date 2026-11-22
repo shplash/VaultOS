@@ -355,6 +355,16 @@ struct LauncherView: View {
 
     private var homeSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
+                aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 16)
+            .padding(.bottom, 2)
+
             hero
 
             Rectangle()
@@ -629,10 +639,10 @@ struct LauncherView: View {
 
     /// Where to report things, and who to credit for the rest.
     ///
-    /// The links sit in the header, outside the scroll view: the way to GitHub
-    /// or to a bug report can never scroll out of reach, and only the credits -
-    /// text nobody taps, in a fixed order - move. This is the launcher's only
-    /// scroll view, and it holds static rows only.
+    /// The links sit in the header, outside the scroll view: the way to a bug
+    /// report can never scroll out of reach, and only the credits - text nobody
+    /// taps, in a fixed order - move. This is the launcher's only scroll view,
+    /// and it holds static rows only.
     private var aboutSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
@@ -665,15 +675,13 @@ struct LauncherView: View {
             .padding(.bottom, 10)
 
             HStack(spacing: 8) {
-                aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
-                aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
                 aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=feature_request.yml", primary: true)
                 aboutLink(L.t("BUG"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=bug_report.yml", primary: true)
+                checkForUpdatesButton
 
                 Spacer(minLength: 0)
 
                 resetAllButton
-                checkForUpdatesButton
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 10)
@@ -729,9 +737,8 @@ struct LauncherView: View {
         let address: String?
     }
 
-    /// Asks GitHub for the newest release. It is drawn in the launcher's neutral
-    /// colours rather than the game's accent, because it reports on the app and
-    /// not on the game.
+    /// Asks GitHub for the newest release. It sits with the other page links and
+    /// takes the game's accent like them.
     private var checkForUpdatesButton: some View {
         Button {
             checkForUpdates()
@@ -744,16 +751,12 @@ struct LauncherView: View {
                 Image(systemName: isCheckingForUpdates ? "hourglass" : "arrow.triangle.2.circlepath")
                     .font(.system(size: 8, weight: .bold))
             }
-            .foregroundColor(Theme.dim)
+            .foregroundColor(Color.black.opacity(0.8))
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Theme.hairline, lineWidth: 1)
+                    .fill(accent)
             )
             .contentShape(Rectangle())
         }
