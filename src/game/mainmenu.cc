@@ -352,8 +352,6 @@ int main_menu_loop()
     unsigned int tick = get_time();
     debug_printf("[menu] tick\n");
 
-    unsigned int tick = get_time();
-
     int rc = -1;
     while (rc == -1) {
         sharedFpsLimiter.mark();
