@@ -1232,7 +1232,7 @@ final class GameControlsOverlay: UIView {
         }
         backButton.solidBackground = false
 
-        let clampLeft = max(10, safeAreaInsets.left + 6)
+        let clampLeft = currentScreen == .options ? 8 : max(10, safeAreaInsets.left + 6)
         let clampRight = bounds.width - max(10, safeAreaInsets.right + 6) - side
         let clampTop = max(10, safeAreaInsets.top + 6)
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
