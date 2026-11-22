@@ -1363,6 +1363,8 @@ final class GameControlsOverlay: UIView {
                 + L.t("Hold OFFER to make the trade.")
                 + "\n\n"
                 + L.t("TALK goes back to the conversation.")
+                + "\n\n"
+                + L.t("Drag your finger to scroll the inventory.")
             return
         }
 
@@ -1371,6 +1373,8 @@ final class GameControlsOverlay: UIView {
             + L.t("Tap an item while INSPECT is toggled on to see its characteristics.")
             + "\n\n"
             + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")
+            + "\n\n"
+            + L.t("Drag your finger to scroll the inventory.")
     }
 
     private func layoutHelpCard() {

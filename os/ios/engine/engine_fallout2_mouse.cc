@@ -450,6 +450,8 @@ static void iosListReset();
 
 #define IOS_LIST_HOLD_MS 280
 #define IOS_LIST_SLOP_POINTS 6
+#define IOS_LIST_SLOT_WIDTH 64
+#define IOS_LIST_SLOT_HEIGHT 48
 
 extern int iosScreenValue();
 extern "C" void fallout_ios_pickup_feedback(void);
@@ -472,10 +474,53 @@ static void iosListReset()
     iosListAccum = 0;
 }
 
+static bool iosListHit(int x, int y, int left, int top, int rows, int* slotHeight)
+{
+    if (x < left || x >= left + IOS_LIST_SLOT_WIDTH) {
+        return false;
+    }
+
+    if (y < top || y >= top + IOS_LIST_SLOT_HEIGHT * rows) {
+        return false;
+    }
+
+    *slotHeight = IOS_LIST_SLOT_HEIGHT;
+    return true;
+}
+
 static bool iosListPoint(int x, int y, int* slotHeight)
 {
-    if (!iosDirectTouchScreen() || iosScreenValue() == 7) {
+    const int current = iosScreenValue();
+    if (!iosDirectTouchScreen() || current == 7) {
         return false;
+    }
+
+    const int screenWidth = screenGetWidth();
+    const int screenHeight = screenGetHeight();
+
+    if (current == 3) {
+        const int left = (screenWidth - 640) / 2 + 80;
+        const int top = (screenHeight - 480) / 2 + 290;
+
+        return iosListHit(x, y, left, top + 10, 3, slotHeight)
+            || iosListHit(x, y, left + 165, top + 10, 3, slotHeight)
+            || iosListHit(x, y, left + 250, top + 10, 3, slotHeight)
+            || iosListHit(x, y, left + 395, top + 10, 3, slotHeight);
+    }
+
+    if (current == 2) {
+        const int left = screenWidth != 640 ? (screenWidth - 537) / 2 : 80;
+        const int top = screenHeight != 480 ? (screenHeight - 376) / 2 : 0;
+
+        return iosListHit(x, y, left + 180, top + 37, 6, slotHeight)
+            || iosListHit(x, y, left + 297, top + 37, 6, slotHeight);
+    }
+
+    if (current == 1) {
+        const int left = screenWidth != 640 ? (screenWidth - 499) / 2 : 80;
+        const int top = screenHeight != 480 ? (screenHeight - 377) / 2 : 0;
+
+        return iosListHit(x, y, left + 46, top + 35, 6, slotHeight);
     }
 
     int left = 0;
@@ -490,7 +535,7 @@ static bool iosListPoint(int x, int y, int* slotHeight)
         return false;
     }
 
-    *slotHeight = 48;
+    *slotHeight = IOS_LIST_SLOT_HEIGHT;
     return true;
 }
 
