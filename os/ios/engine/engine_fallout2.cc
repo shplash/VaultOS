@@ -236,7 +236,7 @@ int screen()
 
     const int mode = fallout::GameMode::getCurrentGameMode();
 
-    if (mode == 0 && fallout::gameGetState() == fallout::GAME_STATE_0) {
+    if (mode == 0 && !in_game()) {
         return 16;
     }
 
