@@ -236,6 +236,10 @@ int screen()
 
     const int mode = fallout::GameMode::getCurrentGameMode();
 
+    if (mode == 0 && fallout::gameGetState() == fallout::GAME_STATE_0) {
+        return 16;
+    }
+
     if ((mode & fallout::GameMode::kCounter) != 0) {
         return 13;
     }
