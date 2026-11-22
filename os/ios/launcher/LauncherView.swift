@@ -151,7 +151,7 @@ struct LauncherView: View {
         ) {
             Alert(
                 title: Text(model.selectedGame.title),
-                message: Text(L.t(model.errorMessage ?? "")),
+                message: Text(L.message(model.errorMessage ?? "")),
                 dismissButton: .default(Text("OK"))
             )
         }
@@ -411,7 +411,7 @@ struct LauncherView: View {
                         .accentColor(accent)
                         .padding(.vertical, 10)
 
-                    Text(L.t(model.statusText))
+                    Text(L.message(model.statusText))
                         .font(.system(size: 10, weight: .regular, design: .monospaced))
                         .foregroundColor(Theme.faint)
                         .lineLimit(1)
@@ -1262,7 +1262,7 @@ struct LauncherView: View {
     /// Backing the saves up is harmless; putting a backup back replaces them, so
     /// that one waits out a countdown with the warning on screen.
     private var savegamesRow: some View {
-        row("Saved games", detail: model.savesNotice) {
+        row("Saved games", detail: model.savesNotice.map { L.message($0) }) {
             HStack(spacing: 8) {
                 Button {
                     model.backupSaves()

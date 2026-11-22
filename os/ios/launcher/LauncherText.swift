@@ -46,6 +46,84 @@ enum L {
         return table[language]?[english] ?? english
     }
 
+    /// Text that comes from the installer, which reports some of its problems
+    /// with a file name or a folder in the middle. Those are matched on their
+    /// fixed head and tail so the names stay as they are and the sentence
+    /// around them is translated. Anything not matched stays as it was sent.
+    static func message(_ english: String) -> String {
+        let language = LauncherLanguage.selected
+        if language == .english {
+            return english
+        }
+        if let exact = table[language]?[english] {
+            return exact
+        }
+
+        for rule in messageRules {
+            let fixed = rule.prefix.count + rule.suffix.count
+            guard english.count > fixed,
+                  english.hasPrefix(rule.prefix),
+                  english.hasSuffix(rule.suffix),
+                  let template = rule.templates[language] else {
+                continue
+            }
+
+            let middle = String(english.dropFirst(rule.prefix.count).dropLast(rule.suffix.count))
+            return template.replacingOccurrences(of: "{part}", with: middle)
+        }
+
+        return english
+    }
+
+    private struct MessageRule {
+        let prefix: String
+        let suffix: String
+        let templates: [LauncherLanguage: String]
+    }
+
+    private static let messageRules: [MessageRule] = [
+        MessageRule(
+            prefix: "Some game files are missing after extraction: ",
+            suffix: ".",
+            templates: [
+                .french: "Il manque des fichiers de jeu après l'extraction : {part}.",
+                .german: "Nach dem Entpacken fehlen Spieldateien: {part}.",
+                .italian: "Dopo l'estrazione mancano file di gioco: {part}.",
+                .spanish: "Faltan archivos de juego tras la extracción: {part}.",
+            ]
+        ),
+        MessageRule(
+            prefix: "Install the game data first (",
+            suffix: " missing).",
+            templates: [
+                .french: "Installez d'abord les données du jeu ({part} manquant).",
+                .german: "Installiere zuerst die Spieldaten ({part} fehlt).",
+                .italian: "Installa prima i dati di gioco (manca {part}).",
+                .spanish: "Instala primero los datos del juego (falta {part}).",
+            ]
+        ),
+        MessageRule(
+            prefix: "Cannot write ",
+            suffix: ". The device may be out of storage.",
+            templates: [
+                .french: "Impossible d'écrire {part}. L'appareil n'a peut-être plus de place.",
+                .german: "Schreiben von {part} nicht möglich. Möglicherweise ist kein Speicher mehr frei.",
+                .italian: "Impossibile scrivere {part}. Il dispositivo potrebbe non avere più spazio.",
+                .spanish: "No se puede escribir {part}. Puede que el dispositivo no tenga espacio.",
+            ]
+        ),
+        MessageRule(
+            prefix: "Installing ",
+            suffix: "...",
+            templates: [
+                .french: "Installation de {part}…",
+                .german: "{part} wird installiert…",
+                .italian: "Installazione di {part}…",
+                .spanish: "Instalando {part}…",
+            ]
+        ),
+    ]
+
     private static let table: [LauncherLanguage: [String: String]] = [
         .french: [
             // Pages
@@ -173,6 +251,22 @@ enum L {
             "The ZIP archive contains no usable files.": "L'archive ZIP ne contient aucun fichier utilisable.",
             "The ZIP didn't contain any game files to install.": "L'archive ne contenait aucun fichier de jeu à installer.",
             "Password protected ZIP archives are not supported.": "Les archives ZIP protégées par mot de passe ne sont pas prises en charge.",
+            "Cannot open the game ZIP. Make sure the file is still available.": "Impossible d'ouvrir l'archive du jeu. Vérifiez que le fichier est toujours disponible.",
+            "Cannot read the ZIP archive.": "Impossible de lire l'archive ZIP.",
+            "Cannot read the ZIP archive directory.": "Impossible de lire le répertoire de l'archive ZIP.",
+            "This ZIP archive is damaged (bad central directory).": "Cette archive ZIP est endommagée (répertoire central invalide).",
+            "This ZIP archive is damaged (truncated directory).": "Cette archive ZIP est endommagée (répertoire tronqué).",
+            "This ZIP archive is damaged (bad directory entry).": "Cette archive ZIP est endommagée (entrée de répertoire invalide).",
+            "This ZIP archive is damaged (truncated directory entry).": "Cette archive ZIP est endommagée (entrée de répertoire tronquée).",
+            "This ZIP archive is too large to index.": "Cette archive ZIP est trop volumineuse pour être indexée.",
+            "The ZIP uses an unsupported compression method (only stored and deflate are supported).": "Le ZIP utilise une compression non prise en charge (seules « stored » et « deflate » le sont).",
+            "Cannot initialize the decompressor.": "Impossible d'initialiser le décompresseur.",
+            "No game ZIP was selected.": "Aucun ZIP de jeu sélectionné.",
+            "No install folder was provided.": "Aucun dossier d'installation fourni.",
+            "No backup was selected.": "Aucune sauvegarde sélectionnée.",
+            "Backing up saves...": "Sauvegarde des parties…",
+            "Opening backup...": "Ouverture de la sauvegarde…",
+            "Restoring saves...": "Restauration des parties…",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "Les archives ZIP64 ne sont pas prises en charge. Recréez le ZIP sans ZIP64.",
             // Controls
             "LOOK": "VISÉE",
@@ -441,6 +535,22 @@ enum L {
             "The ZIP archive contains no usable files.": "Das ZIP-Archiv enthält keine nutzbaren Dateien.",
             "The ZIP didn't contain any game files to install.": "Das Archiv enthielt keine Spieldateien zum Installieren.",
             "Password protected ZIP archives are not supported.": "Passwortgeschützte ZIP-Archive werden nicht unterstützt.",
+            "Cannot open the game ZIP. Make sure the file is still available.": "Das Spiel-Archiv lässt sich nicht öffnen. Prüfe, ob die Datei noch vorhanden ist.",
+            "Cannot read the ZIP archive.": "Das ZIP-Archiv lässt sich nicht lesen.",
+            "Cannot read the ZIP archive directory.": "Das Verzeichnis des ZIP-Archivs lässt sich nicht lesen.",
+            "This ZIP archive is damaged (bad central directory).": "Dieses ZIP-Archiv ist beschädigt (fehlerhaftes zentrales Verzeichnis).",
+            "This ZIP archive is damaged (truncated directory).": "Dieses ZIP-Archiv ist beschädigt (abgeschnittenes Verzeichnis).",
+            "This ZIP archive is damaged (bad directory entry).": "Dieses ZIP-Archiv ist beschädigt (fehlerhafter Verzeichniseintrag).",
+            "This ZIP archive is damaged (truncated directory entry).": "Dieses ZIP-Archiv ist beschädigt (abgeschnittener Verzeichniseintrag).",
+            "This ZIP archive is too large to index.": "Dieses ZIP-Archiv ist zu groß zum Indexieren.",
+            "The ZIP uses an unsupported compression method (only stored and deflate are supported).": "Das ZIP nutzt eine nicht unterstützte Kompression (unterstützt werden nur „stored“ und „deflate“).",
+            "Cannot initialize the decompressor.": "Der Dekompressor lässt sich nicht starten.",
+            "No game ZIP was selected.": "Kein Spiel-ZIP ausgewählt.",
+            "No install folder was provided.": "Kein Installationsordner angegeben.",
+            "No backup was selected.": "Keine Sicherung ausgewählt.",
+            "Backing up saves...": "Spielstände werden gesichert…",
+            "Opening backup...": "Sicherung wird geöffnet…",
+            "Restoring saves...": "Spielstände werden wiederhergestellt…",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "ZIP64-Archive werden nicht unterstützt. Erstelle das ZIP ohne ZIP64 neu.",
             "LOOK": "BLICK",
             "or drag with\n2-fingers": "oder ziehen mit\n2 Fingern",
@@ -703,6 +813,22 @@ enum L {
             "The ZIP archive contains no usable files.": "L'archivio ZIP non contiene file utilizzabili.",
             "The ZIP didn't contain any game files to install.": "L'archivio non conteneva file di gioco da installare.",
             "Password protected ZIP archives are not supported.": "Gli archivi ZIP protetti da password non sono supportati.",
+            "Cannot open the game ZIP. Make sure the file is still available.": "Impossibile aprire l'archivio del gioco. Verifica che il file sia ancora disponibile.",
+            "Cannot read the ZIP archive.": "Impossibile leggere l'archivio ZIP.",
+            "Cannot read the ZIP archive directory.": "Impossibile leggere la directory dell'archivio ZIP.",
+            "This ZIP archive is damaged (bad central directory).": "Questo archivio ZIP è danneggiato (directory centrale non valida).",
+            "This ZIP archive is damaged (truncated directory).": "Questo archivio ZIP è danneggiato (directory troncata).",
+            "This ZIP archive is damaged (bad directory entry).": "Questo archivio ZIP è danneggiato (voce di directory non valida).",
+            "This ZIP archive is damaged (truncated directory entry).": "Questo archivio ZIP è danneggiato (voce di directory troncata).",
+            "This ZIP archive is too large to index.": "Questo archivio ZIP è troppo grande da indicizzare.",
+            "The ZIP uses an unsupported compression method (only stored and deflate are supported).": "Il ZIP usa una compressione non supportata (sono supportate solo «stored» e «deflate»).",
+            "Cannot initialize the decompressor.": "Impossibile avviare il decompressore.",
+            "No game ZIP was selected.": "Nessun ZIP di gioco selezionato.",
+            "No install folder was provided.": "Nessuna cartella di installazione fornita.",
+            "No backup was selected.": "Nessun backup selezionato.",
+            "Backing up saves...": "Backup dei salvataggi…",
+            "Opening backup...": "Apertura del backup…",
+            "Restoring saves...": "Ripristino dei salvataggi…",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "Gli archivi ZIP64 non sono supportati. Ricrea lo ZIP senza ZIP64.",
             "LOOK": "GUARDA",
             "or drag with\n2-fingers": "o trascina con\n2 dita",
@@ -965,6 +1091,22 @@ enum L {
             "The ZIP archive contains no usable files.": "El archivo ZIP no contiene archivos utilizables.",
             "The ZIP didn't contain any game files to install.": "El archivo no contenía archivos de juego que instalar.",
             "Password protected ZIP archives are not supported.": "No se admiten archivos ZIP con contraseña.",
+            "Cannot open the game ZIP. Make sure the file is still available.": "No se puede abrir el archivo del juego. Comprueba que el archivo siga disponible.",
+            "Cannot read the ZIP archive.": "No se puede leer el archivo ZIP.",
+            "Cannot read the ZIP archive directory.": "No se puede leer el directorio del archivo ZIP.",
+            "This ZIP archive is damaged (bad central directory).": "Este archivo ZIP está dañado (directorio central no válido).",
+            "This ZIP archive is damaged (truncated directory).": "Este archivo ZIP está dañado (directorio truncado).",
+            "This ZIP archive is damaged (bad directory entry).": "Este archivo ZIP está dañado (entrada de directorio no válida).",
+            "This ZIP archive is damaged (truncated directory entry).": "Este archivo ZIP está dañado (entrada de directorio truncada).",
+            "This ZIP archive is too large to index.": "Este archivo ZIP es demasiado grande para indexarlo.",
+            "The ZIP uses an unsupported compression method (only stored and deflate are supported).": "El ZIP usa una compresión no admitida (solo se admiten «stored» y «deflate»).",
+            "Cannot initialize the decompressor.": "No se puede iniciar el descompresor.",
+            "No game ZIP was selected.": "No se ha seleccionado ningún ZIP del juego.",
+            "No install folder was provided.": "No se ha indicado ninguna carpeta de instalación.",
+            "No backup was selected.": "No se ha seleccionado ninguna copia de seguridad.",
+            "Backing up saves...": "Copiando las partidas…",
+            "Opening backup...": "Abriendo la copia de seguridad…",
+            "Restoring saves...": "Restaurando las partidas…",
             "ZIP64 archives are not supported. Re-create the ZIP without ZIP64.": "No se admiten archivos ZIP64. Vuelve a crear el ZIP sin ZIP64.",
             "LOOK": "MIRAR",
             "or drag with\n2-fingers": "o arrastra con\n2 dedos",
