@@ -660,6 +660,8 @@ enum ScreenMode: Int {
     /// overlay's purposes, so the HUD steps aside and only BACK stays.
     case calledShot = 14
 
+    case death = 15
+
     var isMenu: Bool {
         return self != .game
     }
@@ -798,6 +800,7 @@ final class GameControlsOverlay: UIView {
     private var fireModeValue: Int32 = -2
     private var wasInCombat = false
     private var startCombatShown = false
+    private var skipPressedAt: Date?
     private var inspectOn = false
     private var movieWasPlaying = false
     private var lastCursorMode: Int32 = -1
@@ -1523,6 +1526,9 @@ final class GameControlsOverlay: UIView {
 
     @objc private func sideActionPressed(_ sender: LabeledControlButton) {
         fallout_ios_press_action(Int32(sender.tag))
+        if sender.tag == 6 {
+            skipPressedAt = Date()
+        }
         refreshControls()
         UISelectionFeedbackGenerator().selectionChanged()
     }
@@ -1773,6 +1779,22 @@ final class GameControlsOverlay: UIView {
             setNeedsLayout()
         }
 
+        if screen == .death {
+            for control in controls {
+                control.isHidden = true
+            }
+            lookButton.isHidden = true
+            helpButton.isHidden = true
+            barterButton.isHidden = true
+            tellAboutButton.isHidden = true
+            offerButton.isHidden = true
+            talkButton.isHidden = true
+            helpCard.isHidden = true
+            helpBackdrop.isHidden = true
+            CATransaction.flush()
+            return
+        }
+
         let itemScreen = screen.listsItems
         lookButton.isHidden = !itemScreen
         helpButton.isHidden = !itemScreen
@@ -1915,7 +1937,15 @@ final class GameControlsOverlay: UIView {
 
         let startsCombat = !inCombat
         skipButton.tag = startsCombat ? 27 : 6
-        skipButton.isEnabled = fallout_ios_action_available(startsCombat ? 27 : 6) != 0
+        var skipReady = true
+        if let pressed = skipPressedAt {
+            if Date().timeIntervalSince(pressed) < 0.45 {
+                skipReady = false
+            } else {
+                skipPressedAt = nil
+            }
+        }
+        skipButton.isEnabled = skipReady && fallout_ios_action_available(startsCombat ? 27 : 6) != 0
         if startsCombat != startCombatShown {
             startCombatShown = startsCombat
             skipButton.set(symbol: startsCombat ? "burst" : "forward.end",

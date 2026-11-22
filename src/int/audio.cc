@@ -120,6 +120,14 @@ int audioOpen(const char* fname, int flags)
     if (compression == 2) {
         audioFile->flags |= AUDIO_FILE_COMPRESSED;
         audioFile->audioDecoder = Create_AudioDecoder(decodeRead, audioFile->stream, &(audioFile->channels), &(audioFile->sampleRate), &(audioFile->fileSize));
+
+        if (audioFile->audioDecoder == NULL) {
+            debug_printf("AudioOpen: Couldn't decode %s\n", path);
+            db_fclose(stream);
+            memset(audioFile, 0, sizeof(Audio));
+            return -1;
+        }
+
         audioFile->fileSize *= 2;
     } else {
         audioFile->fileSize = db_filelength(stream);

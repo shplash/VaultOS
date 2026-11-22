@@ -24,6 +24,7 @@
 #endif
 
 #include "game/amutex.h"
+#include "game/ios_screen.h"
 #include "game/art.h"
 #include "game/credits.h"
 #include "game/cycle.h"
@@ -514,6 +515,8 @@ static void main_selfrun_play()
 static void main_death_scene()
 {
     debug_printf("[death] scene start\n");
+
+    IosScreenScope screenScope(IOS_SCREEN_DEATH);
 
     // 0x4725B0
     static const char* deathFileNameList[] = {

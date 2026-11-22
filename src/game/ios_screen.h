@@ -23,6 +23,8 @@ typedef enum IosScreen {
     // The called shot panel, which is drawn over the game view and takes the
     // keyboard back to the game when it closes.
     IOS_SCREEN_CALLED_SHOT = 14,
+    // The death scene, which is drawn over the game view and takes no overlay.
+    IOS_SCREEN_DEATH = 15,
 } IosScreen;
 
 extern int ios_screen;
