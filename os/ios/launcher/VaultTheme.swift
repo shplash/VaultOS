@@ -81,6 +81,8 @@ enum VaultUI {
 
 final class VaultPanelView: UIView {
     private let fillLayer = CAShapeLayer()
+    private let shadeLayer = CAGradientLayer()
+    private let shadeMask = CAShapeLayer()
     private let edgeLayer = CAShapeLayer()
     private let innerLayer = CAShapeLayer()
 
@@ -127,9 +129,16 @@ final class VaultPanelView: UIView {
         fillLayer.fillColor = fill.cgColor
         fillLayer.shadowColor = UIColor.black.cgColor
         fillLayer.shadowOffset = CGSize(width: 0, height: 2)
-        fillLayer.shadowRadius = 6
+        fillLayer.shadowRadius = 5
         fillLayer.shadowOpacity = 0
         layer.addSublayer(fillLayer)
+
+        shadeLayer.colors = [UIColor(white: 1, alpha: 0.045).cgColor,
+                             UIColor(white: 0, alpha: 0.10).cgColor]
+        shadeLayer.startPoint = CGPoint(x: 0.5, y: 0)
+        shadeLayer.endPoint = CGPoint(x: 0.5, y: 1)
+        shadeLayer.mask = shadeMask
+        layer.addSublayer(shadeLayer)
 
         edgeLayer.fillColor = UIColor.clear.cgColor
         edgeLayer.strokeColor = edge.cgColor
@@ -139,6 +148,7 @@ final class VaultPanelView: UIView {
         innerLayer.fillColor = UIColor.clear.cgColor
         innerLayer.strokeColor = UIColor.clear.cgColor
         innerLayer.lineWidth = 1
+        innerLayer.lineCap = .round
         innerLayer.isHidden = true
         layer.addSublayer(innerLayer)
     }
@@ -155,11 +165,18 @@ final class VaultPanelView: UIView {
         fillLayer.path = shape.cgPath
         fillLayer.shadowPath = shape.cgPath
 
+        shadeLayer.frame = bounds
+        shadeMask.frame = bounds
+        shadeMask.path = shape.cgPath
+
         edgeLayer.frame = bounds
         edgeLayer.path = shape.cgPath
 
+        let topY = max(1, innerInset - 0.5)
+        let highlight = UIBezierPath()
+        highlight.move(to: CGPoint(x: min(bounds.midX, corner + 2), y: topY))
+        highlight.addLine(to: CGPoint(x: max(bounds.midX, bounds.width - corner - 2), y: topY))
         innerLayer.frame = bounds
-        innerLayer.path = UIBezierPath(roundedRect: bounds.insetBy(dx: innerInset, dy: innerInset),
-                                       cornerRadius: max(0, corner - innerInset)).cgPath
+        innerLayer.path = highlight.cgPath
     }
 }

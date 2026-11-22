@@ -68,12 +68,13 @@ borders.
 - **Row**: title and detail on the left, control on the right, hairline under.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
-- **Touch control** (`LabeledControlButton`): a dark plate at 80%, one 1.5pt
-  charcoal outline with a faint lit line inside it, a white glyph above a mono
-  label; QUICK SAVE lays its glyph beside its label. A held control brightens
-  its plate and outline and washes with the player's control colour, a selected
-  one keeps that wash. The chevron beside QUICK SAVE opens a tray with LOAD and
-  SAVE, closed by default.
+- **Touch control** (`LabeledControlButton`): a dark plate at 80% with a faint
+  top-down shade, one 1.25pt charcoal outline, a thin lit line along its top
+  edge and a small shadow, a white glyph above a mono label; QUICK SAVE centres
+  its glyph and label together. A held control brightens its plate and outline
+  and washes with the player's control colour, a selected one keeps that wash,
+  and one that cannot be used fades to 35%. The chevron beside QUICK SAVE opens
+  a tray with LOAD and SAVE, closed by default.
 - **Camera pad** (`CameraJoystickControl`): a thin ring and crosshair over the
   hull, with a plain knob; no glow.
 - **Help card**: hull plate with a hairline edge and mono body text.

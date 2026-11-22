@@ -389,11 +389,11 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .reload:
             return CGPoint(x: 0.8550, y: 0.6900)
         case .map:
-            return CGPoint(x: 0.8347, y: 0.9153)
+            return CGPoint(x: 0.8347, y: 0.9071)
         case .cha:
-            return CGPoint(x: 0.8953, y: 0.9153)
+            return CGPoint(x: 0.8953, y: 0.9071)
         case .inv:
-            return CGPoint(x: 0.9559, y: 0.9153)
+            return CGPoint(x: 0.9559, y: 0.9071)
         }
     }
 
@@ -430,7 +430,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let side = min(bounds.width * 0.055, bounds.height * 0.125)
             return CGSize(width: side, height: side)
         case .map, .cha, .inv:
-            return CGSize(width: bounds.width * 0.0606, height: bounds.height * 0.150)
+            return CGSize(width: bounds.width * 0.0606, height: bounds.height * 0.1665)
         }
     }
 }
@@ -1094,7 +1094,7 @@ final class GameControlsOverlay: UIView {
         helpButton.isHidden = true
         helpButton.backgroundColor = ControlTheme.panel
         helpButton.layer.cornerRadius = 10
-        helpButton.layer.borderWidth = 1.5
+        helpButton.layer.borderWidth = 1.25
         helpButton.layer.borderColor = ControlTheme.border.cgColor
         helpButton.layer.shadowColor = UIColor.black.cgColor
         helpButton.layer.shadowOpacity = 0.4
@@ -2186,10 +2186,10 @@ private final class LabeledControlButton: UIControl {
         backgroundColor = .clear
         plate.fill = normalBackground
         plate.edge = ControlTheme.border
-        plate.lineWidth = 1.5
+        plate.lineWidth = 1.25
         plate.innerEdge = ControlTheme.innerEdge
         plate.innerInset = 2
-        plate.shadowOpacity = 0.4
+        plate.shadowOpacity = 0.25
         plate.corner = 10
         insertSubview(plate, at: 0)
         tintColor = ControlTheme.content
@@ -2272,7 +2272,7 @@ private final class LabeledControlButton: UIControl {
     /// A control that cannot be used right now is dimmed, but never below the
     /// player's own opacity setting: the two only move together once the
     /// slider goes under the dimming, so the unusable ones do not fade first.
-    private static let disabledOpacity: CGFloat = 0.5
+    private static let disabledOpacity: CGFloat = 0.35
     private var baseOpacity: CGFloat = 1
 
     var showsSelection: Bool = false {
@@ -2418,7 +2418,7 @@ private final class LabeledControlButton: UIControl {
                 width: bounds.width - 2,
                 height: labelHeight
             )
-            applyGlyph(max(11, min(iconView.frame.height * 0.92, bounds.height * 0.55)))
+            applyGlyph(max(11, min(min(iconView.frame.height * 0.92, bounds.width * 0.60), bounds.height * 0.55)))
         case .horizontal:
             let fontSize = labelLines > 1
                 ? max(10, min(16, bounds.height * 0.26))
@@ -2426,15 +2426,21 @@ private final class LabeledControlButton: UIControl {
             label.font = VaultUI.label(fontSize, weight: .bold)
 
             let iconSide = min(bounds.height * 0.52, bounds.width * 0.22)
-            let inset = max(6, bounds.height * 0.12)
-            iconView.frame = CGRect(x: inset,
+            let space = max(4, bounds.height * 0.14)
+            let textRoom = max(0, bounds.width - iconSide - space - 6)
+            let textWidth = hasLabel
+                ? min(textRoom, ceil(label.sizeThatFits(CGSize(width: textRoom, height: bounds.height)).width))
+                : 0
+            let groupWidth = hasLabel ? iconSide + space + textWidth : iconSide
+            let originX = max(2, (bounds.width - groupWidth) / 2)
+
+            iconView.frame = CGRect(x: originX,
                                     y: (bounds.height - iconSide) / 2,
                                     width: iconSide,
                                     height: iconSide)
-            let textX = iconView.frame.maxX + 7
-            label.frame = CGRect(x: textX,
+            label.frame = CGRect(x: originX + iconSide + space,
                                  y: 0,
-                                 width: max(0, bounds.width - textX - inset * 0.6),
+                                 width: textWidth,
                                  height: bounds.height)
             applyGlyph(max(11, min(iconSide * 0.92, bounds.height * 0.52)))
         }
