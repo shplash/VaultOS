@@ -419,11 +419,13 @@ struct LauncherView: View {
                         .padding(.vertical, 8)
                 }
 
-                footnote(model.install.has_saves == 1
-                    ? "Your existing saves are kept. Re-importing replaces the game files only."
-                    : "Each game keeps its own data, configuration and savegames.")
+                if model.importSummary == nil {
+                    footnote(model.install.has_saves == 1
+                        ? "Your existing saves are kept. Re-importing replaces the game files only."
+                        : "Each game keeps its own data, configuration and savegames.")
 
-                footnote("LANGUAGE FILES adds a translation pack to this game. The game files themselves are left alone.")
+                    footnote("LANGUAGE FILES adds a translation pack to this game. The game files themselves are left alone.")
+                }
             }
             .padding(.horizontal, 22)
             .padding(.top, 4)
