@@ -10,9 +10,9 @@
 #include "svga.h"
 #include "touch.h"
 
-namespace fallout {
+int ios_menu_panel_rect(int* x, int* y, int* width, int* height);
 
-int menu_rect(int* x, int* y, int* width, int* height);
+namespace fallout {
 
 bool iosItemScreen();
 bool iosMenuScreen();
@@ -482,7 +482,7 @@ static bool iosListPoint(int x, int y, int* slotHeight)
     int top = 0;
     int width = 0;
     int height = 0;
-    if (menu_rect(&left, &top, &width, &height) == 0) {
+    if (ios_menu_panel_rect(&left, &top, &width, &height) == 0) {
         return false;
     }
 

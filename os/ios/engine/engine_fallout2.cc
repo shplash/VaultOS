@@ -846,6 +846,11 @@ const FalloutEngineAPI g_api = {
 
 } // namespace
 
+int ios_menu_panel_rect(int* x, int* y, int* width, int* height)
+{
+    return menu_rect(x, y, width, height);
+}
+
 namespace fallout {
 
 bool iosItemScreen()
