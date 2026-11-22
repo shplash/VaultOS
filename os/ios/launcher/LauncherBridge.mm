@@ -387,6 +387,15 @@ extern "C" int fallout_ios_movie_state(void)
         : 0;
 }
 
+extern "C" void fallout_ios_pickup_feedback(void)
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIImpactFeedbackGenerator* generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+        [generator prepare];
+        [generator impactOccurred];
+    });
+}
+
 extern "C" int fallout_ios_screen(void)
 {
     return g_engine != NULL && g_engine->screen != NULL

@@ -44,6 +44,16 @@ typedef enum InventoryWindowType {
     INVENTORY_WINDOW_TYPE_COUNT,
 } InventoryWindowType;
 
+typedef struct IosListRect {
+    int x;
+    int y;
+    int width;
+    int height;
+} IosListRect;
+
+int ios_list_rects(IosListRect* rects, int capacity);
+int ios_list_slot_height();
+
 extern CacheEntry* ikey[OFF_59E7BC_COUNT];
 
 void inven_set_dude(Object* obj, int pid);

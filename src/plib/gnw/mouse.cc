@@ -1,5 +1,6 @@
 #include "plib/gnw/mouse.h"
 
+#include "game/inventry.h"
 #include "game/ios_screen.h"
 #include "plib/color/color.h"
 #include "plib/gnw/dxinput.h"
@@ -404,6 +405,8 @@ void mouse_show()
     mouse_buf = v2;
 }
 
+static void ios_list_reset();
+
 // 0x4B4D70
 void mouse_hide()
 {
@@ -411,6 +414,7 @@ void mouse_hide()
 
     mouse_ios_right_click_pending = false;
     mouse_ios_left_click_pending = false;
+    ios_list_reset();
 
     if (have_mouse) {
         if (!mouse_is_hidden) {
@@ -435,6 +439,47 @@ static bool ios_direct_touch_active()
         || ios_screen == IOS_SCREEN_LOOT
         || ios_screen == IOS_SCREEN_BARTER
         || ios_screen == IOS_SCREEN_SKILLDEX;
+}
+
+#define IOS_LIST_HOLD_MS 220
+#define IOS_LIST_SLOP_PX 10
+
+extern "C" void fallout_ios_pickup_feedback(void);
+
+static bool ios_list_pending;
+static bool ios_list_scrolled;
+static int ios_list_start_x;
+static int ios_list_start_y;
+static int ios_list_last_y;
+static unsigned int ios_list_start_ms;
+static int ios_list_step;
+static int ios_list_accum;
+static int ios_list_screen = -1;
+
+static void ios_list_reset()
+{
+    ios_list_pending = false;
+    ios_list_scrolled = false;
+    ios_list_accum = 0;
+}
+
+static bool ios_list_point(int x, int y, int* slotHeight)
+{
+    if (!ios_direct_touch_active() || ios_screen == IOS_SCREEN_SKILLDEX) {
+        return false;
+    }
+
+    IosListRect rects[4];
+    const int count = ios_list_rects(rects, 4);
+    for (int index = 0; index < count; index++) {
+        if (x >= rects[index].x && x < rects[index].x + rects[index].width
+            && y >= rects[index].y && y < rects[index].y + rects[index].height) {
+            *slotHeight = ios_list_slot_height();
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // The direct-touch press, in the order the game has to see it: the position
@@ -494,6 +539,11 @@ void mouse_info()
     // they land rather than after a move or a hold.
     touch_set_immediate_press(ios_direct_touch_active());
 
+    if (ios_list_screen != ios_screen) {
+        ios_list_screen = ios_screen;
+        ios_list_reset();
+    }
+
     if (!have_mouse) {
         return;
     }
@@ -552,6 +602,10 @@ void mouse_info()
     while (touch_get_gesture(&gesture)) {
         handledGesture = true;
 
+        if (gesture.numberOfTouches != 1) {
+            ios_list_reset();
+        }
+
         const int primaryButton = MOUSE_STATE_LEFT_BUTTON_DOWN;
 
         switch (gesture.type) {
@@ -587,6 +641,7 @@ void mouse_info()
             }
 
             if (gesture.numberOfTouches == 1) {
+                ios_list_reset();
                 mouse_set_position(gesture.x, gesture.y);
                 ios_drag_start(true, true);
             } else if (gesture.numberOfTouches == 2) {
@@ -602,6 +657,17 @@ void mouse_info()
                 // is put there before the button comes up.
                 if (ios_direct_touch_active() && gesture.numberOfTouches == 1) {
                     mouse_set_position(gesture.x, gesture.y);
+                }
+
+                if (ios_list_pending) {
+                    const bool scrolled = ios_list_scrolled;
+                    ios_list_reset();
+
+                    if (!scrolled) {
+                        mouse_set_position(gesture.x, gesture.y);
+                        ios_drag_start(true, true);
+                        break;
+                    }
                 }
 
                 // The finger came up before the press went in, so what it
@@ -620,20 +686,79 @@ void mouse_info()
             }
 
             if (ios_direct_touch_active() && gesture.numberOfTouches == 1) {
+                mouse_set_position(gesture.x, gesture.y);
+                prevx = gesture.x;
+                prevy = gesture.y;
+
+                if (ios_drag_state == IOS_DRAG_PRESSED) {
+                    mouse_simulate_input(0, 0, primaryButton);
+                    break;
+                }
+
+                if (ios_drag_state != IOS_DRAG_IDLE) {
+                    break;
+                }
+
+                if (ios_list_pending) {
+                    const unsigned int now = SDL_GetTicks();
+                    const int movedX = abs(gesture.x - ios_list_start_x);
+                    const int movedY = abs(gesture.y - ios_list_start_y);
+
+                    if (movedX > IOS_LIST_SLOP_PX || movedY > IOS_LIST_SLOP_PX) {
+                        if (ios_list_step > 0) {
+                            ios_list_accum += gesture.y - ios_list_last_y;
+
+                            while (ios_list_accum >= ios_list_step) {
+                                gMouseWheelX = 0;
+                                gMouseWheelY = 1;
+                                mouse_buttons |= MOUSE_EVENT_WHEEL;
+                                raw_buttons |= MOUSE_EVENT_WHEEL;
+                                ios_list_accum -= ios_list_step;
+                                ios_list_scrolled = true;
+                            }
+
+                            while (ios_list_accum <= -ios_list_step) {
+                                gMouseWheelX = 0;
+                                gMouseWheelY = -1;
+                                mouse_buttons |= MOUSE_EVENT_WHEEL;
+                                raw_buttons |= MOUSE_EVENT_WHEEL;
+                                ios_list_accum += ios_list_step;
+                                ios_list_scrolled = true;
+                            }
+                        }
+
+                        ios_list_last_y = gesture.y;
+                        break;
+                    }
+
+                    if (now - ios_list_start_ms >= IOS_LIST_HOLD_MS) {
+                        ios_list_pending = false;
+                        fallout_ios_pickup_feedback();
+                        ios_drag_start(ios_inspect, false);
+                    }
+                    break;
+                }
+
+                int step = 0;
+                if (ios_list_point(gesture.x, gesture.y, &step)) {
+                    ios_list_pending = true;
+                    ios_list_scrolled = false;
+                    ios_list_accum = 0;
+                    ios_list_step = step;
+                    ios_list_start_x = gesture.x;
+                    ios_list_start_y = gesture.y;
+                    ios_list_last_y = gesture.y;
+                    ios_list_start_ms = SDL_GetTicks();
+                    break;
+                }
+
                 // The position goes in first, on this update; the button
                 // follows once the cursor has stood there long enough for the
                 // button layer to take it as the hovered one. Once it is down
                 // the finger is the cursor: every event plants it there and
                 // keeps the button down, which is what makes one touch a
                 // continuous drag.
-                mouse_set_position(gesture.x, gesture.y);
-                prevx = gesture.x;
-                prevy = gesture.y;
-                if (ios_drag_state == IOS_DRAG_IDLE) {
-                    ios_drag_start(ios_inspect, false);
-                } else if (ios_drag_state == IOS_DRAG_PRESSED) {
-                    mouse_simulate_input(0, 0, primaryButton);
-                }
+                ios_drag_start(ios_inspect, false);
                 break;
             }
 

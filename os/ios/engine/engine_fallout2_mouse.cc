@@ -438,12 +438,65 @@ static void mouseIosMovePointer(int x, int y)
     mouseShowCursor();
 }
 
+static void iosListReset();
+
+#define IOS_LIST_HOLD_MS 220
+#define IOS_LIST_SLOP_PX 10
+
+extern int menu_rect(int* x, int* y, int* width, int* height);
+extern int iosScreenValue();
+extern "C" void fallout_ios_pickup_feedback(void);
+
+static bool iosListPending;
+static bool iosListScrolled;
+static int iosListStartX;
+static int iosListStartY;
+static int iosListLastY;
+static unsigned int iosListStartMs;
+static int iosListStep;
+static int iosListAccum;
+static int iosListScreen = -1;
+
+static void iosListReset()
+{
+    iosListPending = false;
+    iosListScrolled = false;
+    iosListAccum = 0;
+}
+
+static bool iosListPoint(int x, int y, int* slotHeight)
+{
+    if (!iosDirectTouchScreen() || iosScreenValue() == 7) {
+        return false;
+    }
+
+    int left = 0;
+    int top = 0;
+    int width = 0;
+    int height = 0;
+    if (menu_rect(&left, &top, &width, &height) == 0) {
+        return false;
+    }
+
+    if (x < left || x >= left + width || y < top || y >= top + height) {
+        return false;
+    }
+
+    *slotHeight = 48;
+    return true;
+}
+
 // 0x4CA59C
 void _mouse_info()
 {
     // Menus take the finger as the pointer, so their touches are reported as
     // they land rather than after a move or a hold.
     touch_set_immediate_press(iosDirectTouchScreen());
+
+    if (iosListScreen != iosScreenValue()) {
+        iosListScreen = iosScreenValue();
+        iosListReset();
+    }
 
     if (!gMouseInitialized) {
         return;
@@ -501,6 +554,10 @@ void _mouse_info()
     while (touch_get_gesture(&gesture)) {
         handledGesture = true;
 
+        if (gesture.numberOfTouches != 1) {
+            iosListReset();
+        }
+
         switch (gesture.type) {
         case kTap:
             if (iosDragState == IOS_DRAG_PRESSED) {
@@ -529,6 +586,7 @@ void _mouse_info()
             }
 
             if (gesture.numberOfTouches == 1) {
+                iosListReset();
                 mouseIosMovePointer(gesture.x, gesture.y);
                 iosDragBegin(true, true);
             } else if (gesture.numberOfTouches == 2) {
@@ -546,6 +604,17 @@ void _mouse_info()
                     mouseIosMovePointer(gesture.x, gesture.y);
                 }
 
+                if (iosListPending) {
+                    const bool scrolled = iosListScrolled;
+                    iosListReset();
+
+                    if (!scrolled) {
+                        mouseIosMovePointer(gesture.x, gesture.y);
+                        iosDragBegin(true, true);
+                        break;
+                    }
+                }
+
                 // The finger came up before the press went in, so what it
                 // touched is played out as the click it was meant to be.
                 if (iosDragState == IOS_DRAG_POSITIONED) {
@@ -560,20 +629,79 @@ void _mouse_info()
             }
 
             if (iosDirectTouchScreen() && gesture.numberOfTouches == 1) {
+                mouseIosMovePointer(gesture.x, gesture.y);
+                prevx = gesture.x;
+                prevy = gesture.y;
+
+                if (iosDragState == IOS_DRAG_PRESSED) {
+                    _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
+                    break;
+                }
+
+                if (iosDragState != IOS_DRAG_IDLE) {
+                    break;
+                }
+
+                if (iosListPending) {
+                    const unsigned int now = SDL_GetTicks();
+                    const int movedX = abs(gesture.x - iosListStartX);
+                    const int movedY = abs(gesture.y - iosListStartY);
+
+                    if (movedX > IOS_LIST_SLOP_PX || movedY > IOS_LIST_SLOP_PX) {
+                        if (iosListStep > 0) {
+                            iosListAccum += gesture.y - iosListLastY;
+
+                            while (iosListAccum >= iosListStep) {
+                                gMouseWheelX = 0;
+                                gMouseWheelY = 1;
+                                gMouseEvent |= MOUSE_EVENT_WHEEL;
+                                _raw_buttons |= MOUSE_EVENT_WHEEL;
+                                iosListAccum -= iosListStep;
+                                iosListScrolled = true;
+                            }
+
+                            while (iosListAccum <= -iosListStep) {
+                                gMouseWheelX = 0;
+                                gMouseWheelY = -1;
+                                gMouseEvent |= MOUSE_EVENT_WHEEL;
+                                _raw_buttons |= MOUSE_EVENT_WHEEL;
+                                iosListAccum += iosListStep;
+                                iosListScrolled = true;
+                            }
+                        }
+
+                        iosListLastY = gesture.y;
+                        break;
+                    }
+
+                    if (now - iosListStartMs >= IOS_LIST_HOLD_MS) {
+                        iosListPending = false;
+                        fallout_ios_pickup_feedback();
+                        iosDragBegin(iosInspect, false);
+                    }
+                    break;
+                }
+
+                int step = 0;
+                if (iosListPoint(gesture.x, gesture.y, &step)) {
+                    iosListPending = true;
+                    iosListScrolled = false;
+                    iosListAccum = 0;
+                    iosListStep = step;
+                    iosListStartX = gesture.x;
+                    iosListStartY = gesture.y;
+                    iosListLastY = gesture.y;
+                    iosListStartMs = SDL_GetTicks();
+                    break;
+                }
+
                 // The position goes in first, on this update; the button
                 // follows once the cursor has stood there long enough for the
                 // button layer to take it as the hovered one. Once it is down
                 // the finger is the cursor: every event plants it there and
                 // keeps the button down, which is what makes one touch a
                 // continuous drag.
-                mouseIosMovePointer(gesture.x, gesture.y);
-                prevx = gesture.x;
-                prevy = gesture.y;
-                if (iosDragState == IOS_DRAG_IDLE) {
-                    iosDragBegin(iosInspect, false);
-                } else if (iosDragState == IOS_DRAG_PRESSED) {
-                    _mouse_simulate_input(0, 0, MOUSE_STATE_LEFT_BUTTON_DOWN);
-                }
+                iosDragBegin(iosInspect, false);
                 break;
             }
 

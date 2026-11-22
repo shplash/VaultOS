@@ -385,6 +385,90 @@ static int inventry_msg_unload()
     return 0;
 }
 
+static void ios_add_list_rect(IosListRect* rects, int capacity, int* count, int x, int y, int width, int height)
+{
+    if (*count >= capacity) {
+        return;
+    }
+
+    rects[*count].x = x;
+    rects[*count].y = y;
+    rects[*count].width = width;
+    rects[*count].height = height;
+    (*count)++;
+}
+
+int ios_list_rects(IosListRect* rects, int capacity)
+{
+    if (rects == NULL || capacity <= 0 || i_wid == -1) {
+        return 0;
+    }
+
+    Window* window = GNW_find(i_wid);
+    if (window == NULL || (window->flags & WINDOW_HIDDEN) != 0) {
+        return 0;
+    }
+
+    const int left = window->rect.ulx;
+    const int top = window->rect.uly;
+    const int listHeight = INVENTORY_SLOT_HEIGHT * inven_cur_disp;
+    int count = 0;
+
+    switch (ios_screen) {
+    case IOS_SCREEN_INVENTORY:
+    case IOS_SCREEN_USE_ON:
+        ios_add_list_rect(rects, capacity, &count,
+            left + INVENTORY_SCROLLER_X,
+            top + INVENTORY_SCROLLER_Y,
+            INVENTORY_SLOT_WIDTH,
+            listHeight);
+        break;
+    case IOS_SCREEN_LOOT:
+        ios_add_list_rect(rects, capacity, &count,
+            left + INVENTORY_LOOT_LEFT_SCROLLER_X,
+            top + INVENTORY_LOOT_LEFT_SCROLLER_Y,
+            INVENTORY_SLOT_WIDTH,
+            listHeight);
+        ios_add_list_rect(rects, capacity, &count,
+            left + INVENTORY_LOOT_RIGHT_SCROLLER_X,
+            top + INVENTORY_LOOT_RIGHT_SCROLLER_Y,
+            INVENTORY_SLOT_WIDTH,
+            INVENTORY_SLOT_HEIGHT * 6);
+        break;
+    case IOS_SCREEN_BARTER:
+        ios_add_list_rect(rects, capacity, &count,
+            left + INVENTORY_TRADE_LEFT_SCROLLER_TRACKING_X,
+            top + INVENTORY_TRADE_LEFT_SCROLLER_TRACKING_Y,
+            INVENTORY_TRADE_LEFT_SCROLLER_TRACKING_MAX_X - INVENTORY_TRADE_LEFT_SCROLLER_TRACKING_X,
+            listHeight);
+        ios_add_list_rect(rects, capacity, &count,
+            left + INVENTORY_TRADE_INNER_LEFT_SCROLLER_TRACKING_X,
+            top + INVENTORY_TRADE_INNER_LEFT_SCROLLER_TRACKING_Y,
+            INVENTORY_TRADE_INNER_LEFT_SCROLLER_TRACKING_MAX_X - INVENTORY_TRADE_INNER_LEFT_SCROLLER_TRACKING_X,
+            listHeight);
+        ios_add_list_rect(rects, capacity, &count,
+            left + INVENTORY_TRADE_RIGHT_SCROLLER_TRACKING_X,
+            top + INVENTORY_TRADE_RIGHT_SCROLLER_TRACKING_Y,
+            INVENTORY_TRADE_RIGHT_SCROLLER_TRACKING_MAX_X - INVENTORY_TRADE_RIGHT_SCROLLER_TRACKING_X,
+            listHeight);
+        ios_add_list_rect(rects, capacity, &count,
+            left + INVENTORY_TRADE_INNER_RIGHT_SCROLLER_TRACKING_X,
+            top + INVENTORY_TRADE_INNER_RIGHT_SCROLLER_TRACKING_Y,
+            INVENTORY_TRADE_INNER_RIGHT_SCROLLER_TRACKING_MAX_X - INVENTORY_TRADE_INNER_RIGHT_SCROLLER_TRACKING_X,
+            listHeight);
+        break;
+    default:
+        return 0;
+    }
+
+    return count;
+}
+
+int ios_list_slot_height()
+{
+    return INVENTORY_SLOT_HEIGHT;
+}
+
 // 0x462480
 void handle_inventory()
 {
