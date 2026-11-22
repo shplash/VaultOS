@@ -336,11 +336,14 @@ unsigned int main_menu_get_timeout()
 int main_menu_loop()
 {
     in_main_menu = true;
+    debug_printf("[menu] loop begin\n");
 
     bool oldCursorIsHidden = mouse_hidden();
     if (oldCursorIsHidden) {
         mouse_show();
     }
+
+    debug_printf("[menu] cursor hidden %d\n", oldCursorIsHidden ? 1 : 0);
 
     unsigned int tick = get_time();
 

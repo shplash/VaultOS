@@ -357,6 +357,12 @@ void mouseShowCursor()
     int v3;
 
     v2 = gMouseCursorData;
+
+    if (gMouseCursorData == NULL || _mouse_shape == NULL) {
+        gCursorIsHidden = true;
+        return;
+    }
+
     if (gMouseInitialized) {
         if (!_mouse_blit_trans || !gCursorIsHidden) {
             _win_get_mouse_buf(gMouseCursorData);

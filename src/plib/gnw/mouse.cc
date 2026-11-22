@@ -349,6 +349,12 @@ void mouse_show()
     int v3;
 
     v2 = mouse_buf;
+
+    if (mouse_buf == NULL || mouse_shape == NULL) {
+        mouse_is_hidden = true;
+        return;
+    }
+
     if (have_mouse) {
         if (!mouse_blit_trans || !mouse_is_hidden) {
             win_get_mouse_buf(mouse_buf);
