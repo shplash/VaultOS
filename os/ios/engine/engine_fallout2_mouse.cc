@@ -10,9 +10,9 @@
 #include "svga.h"
 #include "touch.h"
 
-int menu_rect(int* x, int* y, int* width, int* height);
-
 namespace fallout {
+
+int menu_rect(int* x, int* y, int* width, int* height);
 
 bool iosItemScreen();
 bool iosMenuScreen();
