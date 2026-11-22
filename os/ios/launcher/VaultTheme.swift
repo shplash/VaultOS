@@ -82,6 +82,7 @@ enum VaultUI {
 final class VaultPanelView: UIView {
     private let fillLayer = CAShapeLayer()
     private let edgeLayer = CAShapeLayer()
+    private let innerLayer = CAShapeLayer()
 
     var corner: CGFloat = 10 {
         didSet { setNeedsLayout() }
@@ -95,6 +96,28 @@ final class VaultPanelView: UIView {
         didSet { edgeLayer.strokeColor = edge.cgColor }
     }
 
+    var lineWidth: CGFloat = 1 {
+        didSet {
+            edgeLayer.lineWidth = lineWidth
+            setNeedsLayout()
+        }
+    }
+
+    var innerEdge: UIColor = .clear {
+        didSet {
+            innerLayer.strokeColor = innerEdge.cgColor
+            innerLayer.isHidden = innerEdge.cgColor.alpha <= 0
+        }
+    }
+
+    var innerInset: CGFloat = 2 {
+        didSet { setNeedsLayout() }
+    }
+
+    var shadowOpacity: Float = 0 {
+        didSet { fillLayer.shadowOpacity = shadowOpacity }
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
 
@@ -102,12 +125,22 @@ final class VaultPanelView: UIView {
         isUserInteractionEnabled = false
 
         fillLayer.fillColor = fill.cgColor
+        fillLayer.shadowColor = UIColor.black.cgColor
+        fillLayer.shadowOffset = CGSize(width: 0, height: 2)
+        fillLayer.shadowRadius = 6
+        fillLayer.shadowOpacity = 0
         layer.addSublayer(fillLayer)
 
         edgeLayer.fillColor = UIColor.clear.cgColor
         edgeLayer.strokeColor = edge.cgColor
-        edgeLayer.lineWidth = 1
+        edgeLayer.lineWidth = lineWidth
         layer.addSublayer(edgeLayer)
+
+        innerLayer.fillColor = UIColor.clear.cgColor
+        innerLayer.strokeColor = UIColor.clear.cgColor
+        innerLayer.lineWidth = 1
+        innerLayer.isHidden = true
+        layer.addSublayer(innerLayer)
     }
 
     required init?(coder: NSCoder) {
@@ -120,8 +153,13 @@ final class VaultPanelView: UIView {
         let shape = UIBezierPath(roundedRect: bounds, cornerRadius: corner)
         fillLayer.frame = bounds
         fillLayer.path = shape.cgPath
+        fillLayer.shadowPath = shape.cgPath
 
         edgeLayer.frame = bounds
         edgeLayer.path = shape.cgPath
+
+        innerLayer.frame = bounds
+        innerLayer.path = UIBezierPath(roundedRect: bounds.insetBy(dx: innerInset, dy: innerInset),
+                                       cornerRadius: max(0, corner - innerInset)).cgPath
     }
 }

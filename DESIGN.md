@@ -68,9 +68,10 @@ borders.
 - **Row**: title and detail on the left, control on the right, hairline under.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
-- **Touch control** (`LabeledControlButton`): a dark plate with one charcoal
-  outline, a white glyph above an Anton label; QUICK SAVE lays its glyph beside
-  its label. A held control washes with the player's control colour, a selected
+- **Touch control** (`LabeledControlButton`): a dark plate at 80%, one 1.5pt
+  charcoal outline with a faint lit line inside it, a white glyph above a mono
+  label; QUICK SAVE lays its glyph beside its label. A held control brightens
+  its plate and outline and washes with the player's control colour, a selected
   one keeps that wash. The chevron beside QUICK SAVE opens a tray with LOAD and
   SAVE, closed by default.
 - **Camera pad** (`CameraJoystickControl`): a thin ring and crosshair over the

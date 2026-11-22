@@ -240,6 +240,14 @@ private enum ControlTheme {
         return VaultUI.controlPressed
     }
 
+    static var pressedEdge: UIColor {
+        return UIColor(white: 0.55, alpha: 1)
+    }
+
+    static var innerEdge: UIColor {
+        return UIColor(white: 1, alpha: 0.10)
+    }
+
     static var wash: UIColor {
         return control.withAlphaComponent(0.20)
     }
@@ -326,7 +334,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
     /// The space between two neighbouring controls at their own size.
     static func gap(in bounds: CGSize) -> CGFloat {
-        return max(5, bounds.height * 0.025)
+        return max(3, min(bounds.width * 0.05625, bounds.height * 0.130) * 0.12)
     }
 
     /// Normalized center of the control on the game view. The editor stores the
@@ -334,7 +342,10 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds.size) -> CGPoint {
         switch self {
         case .quickSave:
-            return CGPoint(x: 0.072, y: 0.080)
+            let width = TouchControl.quickSave.defaultSize(in: bounds, profile: profile).width
+            let side = min(bounds.width * 0.05625, bounds.height * 0.130)
+            let left = (1 - 0.9594) * bounds.width - side / 2
+            return CGPoint(x: (left + width / 2) / max(bounds.width, 1), y: 0.0750)
         case .tray:
             let save = TouchControl.quickSave.defaultCenter(for: profile, in: bounds)
             let size = TouchControl.quickSave.defaultSize(in: bounds, profile: profile)
@@ -353,67 +364,70 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let step = width + TouchControl.gap(in: bounds)
             return CGPoint(x: load.x + step / max(bounds.width, 1), y: load.y)
         case .pip:
-            return CGPoint(x: 0.058, y: 0.350)
+            return CGPoint(x: 0.1080, y: 0.4250)
         case .back:
-            return CGPoint(x: 0.058, y: 0.510)
+            let side = min(bounds.width * 0.0670, bounds.height * 0.149)
+            return CGPoint(x: 0.1160, y: 0.5725 + side * 0.075 / max(bounds.height, 1))
         case .joystick:
-            return CGPoint(x: 0.104, y: 0.772)
+            return CGPoint(x: 0.1170, y: 0.8110)
         case .end:
-            return CGPoint(x: 0.948, y: 0.080)
+            return CGPoint(x: 0.9594, y: 0.0750)
         case .fireMode:
             let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
             let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
             let step = side + TouchControl.gap(in: bounds)
             return CGPoint(x: end.x - step / max(bounds.width, 1), y: end.y)
         case .skill:
-            return CGPoint(x: 0.952, y: 0.228)
+            return CGPoint(x: 0.9594, y: 0.2000)
         case .swap:
-            return CGPoint(x: 0.952, y: 0.378)
+            return CGPoint(x: 0.9594, y: 0.3250)
         case .skip:
-            return CGPoint(x: 0.944, y: 0.528)
+            return CGPoint(x: 0.9444, y: 0.5320)
         case .action:
-            return CGPoint(x: 0.944, y: 0.712)
+            return CGPoint(x: 0.9415, y: 0.6900)
         case .reload:
-            return CGPoint(x: 0.858, y: 0.528)
+            return CGPoint(x: 0.8550, y: 0.6900)
         case .map:
-            return CGPoint(x: 0.834, y: 0.905)
+            return CGPoint(x: 0.8347, y: 0.9215)
         case .cha:
-            return CGPoint(x: 0.898, y: 0.905)
+            return CGPoint(x: 0.8953, y: 0.9215)
         case .inv:
-            return CGPoint(x: 0.962, y: 0.905)
+            return CGPoint(x: 0.9559, y: 0.9215)
         }
     }
 
-    /// Base size in points before the global and per-control scale settings. The
-    /// controls are measured against the screen's height so they keep the
-    /// reference's proportions whatever the aspect ratio of the device.
+    /// Base size in points before the global and per-control scale settings.
+    /// The HUD-row buttons are intentionally rectangles so they fill the side
+    /// strip in the same way as the proposed layout.
     func defaultSize(in bounds: CGSize, profile: LayoutProfile = .full) -> CGSize {
+        let square = min(bounds.width * 0.05625, bounds.height * 0.130)
         switch self {
         case .quickSave:
-            return CGSize(width: bounds.height * 0.260, height: bounds.height * 0.108)
+            return CGSize(width: square * 2.8, height: square)
         case .tray:
-            return CGSize(width: bounds.height * 0.108, height: bounds.height * 0.108)
+            return CGSize(width: square, height: square)
         case .load, .saves:
-            return CGSize(width: bounds.height * 0.125, height: bounds.height * 0.108)
+            return CGSize(width: square * 1.25, height: square)
         case .pip:
-            return CGSize(width: bounds.height * 0.155, height: bounds.height * 0.095)
-        case .back:
-            return CGSize(width: bounds.height * 0.150, height: bounds.height * 0.170)
-        case .joystick:
-            let side = bounds.height * 0.339
+            let side = min(bounds.width * 0.0644, bounds.height * 0.143)
             return CGSize(width: side, height: side)
-        case .end, .fireMode:
-            return CGSize(width: bounds.height * 0.165, height: bounds.height * 0.108)
-        case .skill, .swap:
-            return CGSize(width: bounds.height * 0.165, height: bounds.height * 0.118)
+        case .back:
+            let side = min(bounds.width * 0.0670, bounds.height * 0.149)
+            return CGSize(width: side, height: side * 1.15)
+        case .joystick:
+            let side = bounds.height * 0.318
+            return CGSize(width: side, height: side)
+        case .end, .fireMode, .skill, .swap:
+            return CGSize(width: square, height: square)
         case .skip:
-            return CGSize(width: bounds.height * 0.215, height: bounds.height * 0.118)
+            return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
         case .action:
-            return CGSize(width: bounds.height * 0.215, height: bounds.height * 0.165)
+            return CGSize(width: bounds.width * 0.0925, height: bounds.height * 0.171)
         case .reload:
-            return CGSize(width: bounds.height * 0.125, height: bounds.height * 0.095)
+            let side = min(bounds.width * 0.055, bounds.height * 0.125)
+            return CGSize(width: side, height: side)
         case .map, .cha, .inv:
-            return CGSize(width: bounds.height * 0.115, height: bounds.height * 0.108)
+            return CGSize(width: bounds.width * 0.0606, height: bounds.height * 0.1375)
         }
     }
 }
@@ -425,7 +439,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 16
+    private static let layoutVersion = 17
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -524,10 +538,10 @@ enum ControlLayout {
             }
         }
 
-        // Version 16 is the redesigned touch HUD: every control has a new place
-        // and a new shape, so the stored positions are cleared and each one
-        // comes back where the new layout puts it. The player's own sizes are
-        // kept, since those still mean what they meant.
+        // Version 17 puts every control back on the original layout with the
+        // neutral faces, so the stored positions are cleared and each one comes
+        // back where the layout puts it. The player's own sizes are kept, since
+        // those still mean what they meant.
         for game in FalloutGame.allCases {
             for profile in [LayoutProfile.full, .half] {
                 for control in TouchControl.allCases {
@@ -1009,7 +1023,7 @@ final class GameControlsOverlay: UIView {
         quickSaveNotice.isHidden = true
         quickSaveNotice.backgroundColor = VaultUI.controlFill.withAlphaComponent(0.92)
         quickSaveNotice.layer.cornerRadius = 9
-        quickSaveNotice.layer.borderWidth = 1
+        quickSaveNotice.layer.borderWidth = 1.5
         quickSaveNotice.layer.borderColor = ControlTheme.border.cgColor
         quickSaveNotice.isUserInteractionEnabled = false
         addSubview(quickSaveNotice)
@@ -1076,8 +1090,12 @@ final class GameControlsOverlay: UIView {
         helpButton.isHidden = true
         helpButton.backgroundColor = ControlTheme.panel
         helpButton.layer.cornerRadius = 10
-        helpButton.layer.borderWidth = 1.2
+        helpButton.layer.borderWidth = 1.5
         helpButton.layer.borderColor = ControlTheme.border.cgColor
+        helpButton.layer.shadowColor = UIColor.black.cgColor
+        helpButton.layer.shadowOpacity = 0.4
+        helpButton.layer.shadowRadius = 5
+        helpButton.layer.shadowOffset = CGSize(width: 0, height: 2)
         helpButton.setImage(UIImage(systemName: "info",
                                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)),
                             for: .normal)
@@ -1256,7 +1274,7 @@ final class GameControlsOverlay: UIView {
         let helpSide = max(26, min(38, side * 0.5))
         helpButton.frame = clampFrame(CGRect(x: rightX, y: max(clampTop, box.minY + 4),
                                              width: helpSide, height: helpSide))
-        helpButton.layer.cornerRadius = max(6, helpSide / 5)
+        helpButton.layer.cornerRadius = max(6, helpSide * 0.20)
     }
 
     private func placeBarterControls(in table: CGRect, gap: CGFloat, side: CGFloat) {
@@ -1277,7 +1295,7 @@ final class GameControlsOverlay: UIView {
         let helpSide = max(26, min(38, side * 0.5))
         helpButton.frame = clampFrame(CGRect(x: outerX, y: max(8, table.minY + 4),
                                              width: helpSide, height: helpSide))
-        helpButton.layer.cornerRadius = max(6, helpSide / 5)
+        helpButton.layer.cornerRadius = max(6, helpSide * 0.20)
     }
 
     private func clampFrame(_ frame: CGRect) -> CGRect {
@@ -2142,7 +2160,7 @@ private final class LabeledControlButton: UIControl {
         return solidBackground ? ControlTheme.solidPanel : ControlTheme.panel.withAlphaComponent(backgroundOpacity)
     }
 
-    var backgroundOpacity: CGFloat = 0.55 {
+    var backgroundOpacity: CGFloat = 0.80 {
         didSet {
             plate.fill = normalBackground
         }
@@ -2162,6 +2180,10 @@ private final class LabeledControlButton: UIControl {
         backgroundColor = .clear
         plate.fill = normalBackground
         plate.edge = ControlTheme.border
+        plate.lineWidth = 1.5
+        plate.innerEdge = ControlTheme.innerEdge
+        plate.innerInset = 2
+        plate.shadowOpacity = 0.4
         plate.corner = 10
         insertSubview(plate, at: 0)
         tintColor = ControlTheme.content
@@ -2184,7 +2206,7 @@ private final class LabeledControlButton: UIControl {
         iconView.isUserInteractionEnabled = false
         addSubview(iconView)
 
-        label.font = VaultUI.display(11)
+        label.font = VaultUI.label(11, weight: .bold)
         label.textAlignment = layout == .horizontal ? .left : .center
         label.numberOfLines = self.labelLines
         label.adjustsFontSizeToFitWidth = true
@@ -2203,26 +2225,47 @@ private final class LabeledControlButton: UIControl {
     }
 
     func set(symbol: String, title: String, accessibilityLabel: String? = nil) {
-        iconView.image = UIImage(
-            systemName: symbol,
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: iconPointSize, weight: .semibold)
-        )
+        setGlyph(symbol)
         label.text = L.t(title)
         self.accessibilityLabel = accessibilityLabel ?? title
         setNeedsLayout()
     }
 
     func set(image: UIImage, title: String, accessibilityLabel: String? = nil) {
+        symbolName = nil
         iconView.image = image.withRenderingMode(.alwaysOriginal)
         label.text = L.t(title)
         self.accessibilityLabel = accessibilityLabel ?? title
         setNeedsLayout()
     }
 
+    private var symbolName: String?
+    private var symbolPoint: CGFloat = 0
+
+    private func setGlyph(_ name: String) {
+        symbolName = name
+        symbolPoint = 0
+        applyGlyph(iconPointSize)
+    }
+
+    private func applyGlyph(_ point: CGFloat) {
+        guard let name = symbolName else {
+            return
+        }
+        if iconView.image != nil && abs(point - symbolPoint) < 0.5 {
+            return
+        }
+        symbolPoint = point
+        iconView.image = UIImage(
+            systemName: name,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: point, weight: .semibold)
+        )
+    }
+
     /// A control that cannot be used right now is dimmed, but never below the
     /// player's own opacity setting: the two only move together once the
     /// slider goes under the dimming, so the unusable ones do not fade first.
-    private static let disabledOpacity: CGFloat = 0.35
+    private static let disabledOpacity: CGFloat = 0.5
     private var baseOpacity: CGFloat = 1
 
     var showsSelection: Bool = false {
@@ -2254,7 +2297,7 @@ private final class LabeledControlButton: UIControl {
     override var isHighlighted: Bool {
         didSet {
             plate.fill = isHighlighted ? ControlTheme.pressed : normalBackground
-            plate.edge = ControlTheme.border
+            plate.edge = isHighlighted ? ControlTheme.pressedEdge : ControlTheme.border
             tintColor = ControlTheme.content
             label.textColor = ControlTheme.content
         }
@@ -2329,26 +2372,29 @@ private final class LabeledControlButton: UIControl {
     override func layoutSubviews() {
         super.layoutSubviews()
 
+        let radius = max(6, min(min(18, bounds.height * 0.20), bounds.width * 0.28))
         plate.frame = bounds
+        plate.corner = radius
 
         selectionView.frame = bounds
-        selectionView.layer.cornerRadius = 10
+        selectionView.layer.cornerRadius = radius
 
-        holdFill.layer.cornerRadius = 10
+        holdFill.layer.cornerRadius = radius
         if holdStarted == nil {
             holdFill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
         }
 
         let hasLabel = !(label.text?.isEmpty ?? true)
+        label.isHidden = !hasLabel
 
         switch layout {
         case .stacked:
             // A two-line label has to share the button with the pictogram, so
             // it gets a smaller font and two line heights instead of one.
             let fontSize = labelLines > 1
-                ? max(7, min(11, bounds.height * 0.19))
-                : max(8, min(12, bounds.height * 0.21))
-            label.font = VaultUI.display(fontSize)
+                ? max(9, min(13, bounds.height * 0.19))
+                : max(10, min(15, bounds.height * 0.22))
+            label.font = VaultUI.label(fontSize, weight: .bold)
 
             let lineHeight = ceil(label.font.lineHeight)
             let labelHeight = hasLabel ? lineHeight * CGFloat(labelLines) + (labelLines > 1 ? 1 : 0) : 0
@@ -2359,38 +2405,40 @@ private final class LabeledControlButton: UIControl {
                 width: bounds.width - 6,
                 height: max(0, bounds.height - labelHeight - 4)
             )
-            label.isHidden = !hasLabel
             label.frame = CGRect(
                 x: 1,
                 y: bounds.height - labelHeight - 1,
                 width: bounds.width - 2,
                 height: labelHeight
             )
+            applyGlyph(max(11, min(iconView.frame.height * 0.92, bounds.height * 0.55)))
         case .horizontal:
             let fontSize = labelLines > 1
-                ? max(8, min(13, bounds.height * 0.24))
-                : max(8, min(13, bounds.height * 0.30))
-            label.font = VaultUI.display(fontSize)
+                ? max(10, min(15, bounds.height * 0.24))
+                : max(10, min(16, bounds.height * 0.30))
+            label.font = VaultUI.label(fontSize, weight: .bold)
 
-            let iconSide = min(bounds.height * 0.46, bounds.width * 0.28)
+            let iconSide = min(bounds.height * 0.52, bounds.width * 0.22)
             let inset = max(6, bounds.height * 0.12)
             iconView.frame = CGRect(x: inset,
                                     y: (bounds.height - iconSide) / 2,
                                     width: iconSide,
                                     height: iconSide)
-            label.isHidden = !hasLabel
             let textX = iconView.frame.maxX + 7
             label.frame = CGRect(x: textX,
                                  y: 0,
-                                 width: max(0, bounds.width - textX - inset),
+                                 width: max(0, bounds.width - textX - inset * 0.6),
                                  height: bounds.height)
+            applyGlyph(max(11, min(iconSide * 0.92, bounds.height * 0.52)))
         }
     }
 }
 
 private final class CameraJoystickControl: UIControl {
     private let ring = CAShapeLayer()
+    private let rim = CAShapeLayer()
     private let knob = UIView()
+    private let shade = CAGradientLayer()
     private let crosshair = CAShapeLayer()
 
     var controlOpacity: CGFloat = 1 {
@@ -2406,11 +2454,19 @@ private final class CameraJoystickControl: UIControl {
         isMultipleTouchEnabled = false
         isExclusiveTouch = true
 
-        ring.fillColor = VaultUI.controlFill.withAlphaComponent(0.62).cgColor
+        ring.fillColor = VaultUI.controlFill.withAlphaComponent(0.72).cgColor
         ring.strokeColor = ControlTheme.border.cgColor
-        ring.lineWidth = 1.2
-        ring.shadowOpacity = 0
+        ring.lineWidth = 1.6
+        ring.shadowColor = UIColor.black.cgColor
+        ring.shadowOpacity = 0.4
+        ring.shadowRadius = 7
+        ring.shadowOffset = CGSize(width: 0, height: 2)
         layer.addSublayer(ring)
+
+        rim.fillColor = UIColor.clear.cgColor
+        rim.strokeColor = ControlTheme.innerEdge.cgColor
+        rim.lineWidth = 1
+        layer.addSublayer(rim)
 
         crosshair.fillColor = UIColor.clear.cgColor
         crosshair.strokeColor = ControlTheme.content.withAlphaComponent(0.22).cgColor
@@ -2420,13 +2476,19 @@ private final class CameraJoystickControl: UIControl {
 
         knob.isUserInteractionEnabled = false
         knob.backgroundColor = VaultUI.controlKnob.withAlphaComponent(0.95)
-        knob.layer.borderWidth = 1.2
+        knob.layer.borderWidth = 1.6
         knob.layer.borderColor = ControlTheme.border.withAlphaComponent(0.9).cgColor
         knob.layer.shadowColor = UIColor.black.cgColor
         knob.layer.shadowOpacity = 0.25
         knob.layer.shadowRadius = 4
         knob.layer.shadowOffset = CGSize(width: 0, height: 2)
         addSubview(knob)
+
+        shade.colors = [UIColor(white: 1, alpha: 0.12).cgColor,
+                        UIColor(white: 0, alpha: 0.20).cgColor]
+        shade.locations = [0, 1]
+        shade.masksToBounds = true
+        knob.layer.insertSublayer(shade, at: 0)
 
         accessibilityLabel = "Camera joystick"
     }
@@ -2443,11 +2505,17 @@ private final class CameraJoystickControl: UIControl {
         ring.path = UIBezierPath(ovalIn: bounds.insetBy(dx: ringInset, dy: ringInset)).cgPath
         ring.shadowPath = ring.path
 
+        rim.frame = bounds
+        rim.path = UIBezierPath(ovalIn: bounds.insetBy(dx: 3.5, dy: 3.5)).cgPath
+
         let knobSize = max(38, bounds.width * 0.36)
         knob.bounds = CGRect(x: 0, y: 0, width: knobSize, height: knobSize)
         knob.center = CGPoint(x: bounds.midX, y: bounds.midY)
         knob.layer.cornerRadius = knobSize / 2
         knob.layer.shadowPath = UIBezierPath(ovalIn: knob.bounds).cgPath
+
+        shade.frame = knob.bounds
+        shade.cornerRadius = knobSize / 2
 
         let path = UIBezierPath()
         path.move(to: CGPoint(x: bounds.midX, y: bounds.midY - bounds.height * 0.28))
@@ -2677,7 +2745,7 @@ final class MovieSkipButton: UIControl {
         backgroundColor = VaultUI.controlFill.withAlphaComponent(0.78)
         layer.cornerRadius = 9
         layer.masksToBounds = true
-        layer.borderWidth = 1
+        layer.borderWidth = 1.5
         layer.borderColor = ControlTheme.border.cgColor
 
         fill.backgroundColor = ControlTheme.wash
@@ -2685,7 +2753,7 @@ final class MovieSkipButton: UIControl {
         addSubview(fill)
 
         caption.text = L.t("TAP TO SKIP")
-        caption.font = VaultUI.display(11)
+        caption.font = VaultUI.label(11, weight: .bold)
         caption.textColor = VaultUI.controlContent
         caption.textAlignment = .center
         caption.numberOfLines = 2

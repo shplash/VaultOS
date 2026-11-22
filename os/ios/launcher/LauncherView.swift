@@ -2118,7 +2118,7 @@ private struct TouchControlEditor: View {
 
     private func editorControl(_ control: TouchControl, size: CGSize, selected: Bool) -> some View {
         let shortSide = min(size.width, size.height)
-        let shape = RoundedRectangle(cornerRadius: min(10, shortSide * 0.16), style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: min(18, min(shortSide * 0.20, size.width * 0.28)), style: .continuous)
 
         return Group {
             if control == .skip {
@@ -2135,16 +2135,16 @@ private struct TouchControlEditor: View {
                     Text(L.t("SKIP"))
                     Text(L.t("TURN"))
                 }
-                .font(Vault.display(max(5, min(9, shortSide * 0.14))))
+                .font(Vault.label(max(8, min(12, shortSide * 0.17)), weight: .bold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             } else if control == .quickSave {
                 HStack(spacing: max(2, shortSide * 0.05)) {
                     Image(systemName: control.symbol)
-                        .font(.system(size: max(9, min(20, shortSide * 0.34)), weight: .semibold))
+                        .font(.system(size: max(9, min(24, shortSide * 0.5)), weight: .semibold))
 
                     Text(control.label)
-                        .font(Vault.display(max(7, min(11, shortSide * 0.19))))
+                        .font(Vault.label(max(9, min(14, shortSide * 0.24)), weight: .bold))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .minimumScaleFactor(0.5)
@@ -2156,14 +2156,14 @@ private struct TouchControlEditor: View {
                         Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.alwaysTemplate))
                             .resizable()
                             .scaledToFit()
-                            .frame(height: max(9, min(20, shortSide * 0.26)))
+                            .frame(height: max(9, min(24, shortSide * 0.32)))
                     } else {
                         Image(systemName: control.symbol)
-                            .font(.system(size: max(9, min(28, shortSide * 0.32)), weight: .semibold))
+                            .font(.system(size: max(9, min(32, shortSide * 0.46)), weight: .semibold))
                     }
 
                     Text(control.label)
-                        .font(Vault.display(max(7, min(10, shortSide * 0.18))))
+                        .font(Vault.label(max(9, min(13, shortSide * 0.19)), weight: .bold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
@@ -2184,10 +2184,10 @@ private struct TouchControlEditor: View {
             Group {
                 if control == .joystick {
                     Circle().stroke(selected ? Color.white : Vault.controlBorder,
-                                    lineWidth: selected ? 2.2 : 1.2)
+                                    lineWidth: selected ? 2.4 : 1.5)
                 } else {
                     shape.stroke(selected ? Color.white : Vault.controlBorder,
-                                 lineWidth: selected ? 2.2 : 1.2)
+                                 lineWidth: selected ? 2.4 : 1.5)
                 }
             }
         )
