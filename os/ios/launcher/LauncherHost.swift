@@ -334,7 +334,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
     /// The space between two neighbouring controls at their own size.
     static func gap(in bounds: CGSize) -> CGFloat {
-        return max(3, min(bounds.width * 0.05625, bounds.height * 0.130) * 0.12)
+        return max(2, min(bounds.width * 0.05625, bounds.height * 0.130) * 0.08)
     }
 
     /// Normalized center of the control on the game view. The editor stores the
@@ -366,12 +366,13 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .pip:
             return CGPoint(x: 0.1080, y: 0.4250)
         case .back:
-            let side = min(bounds.width * 0.0670, bounds.height * 0.149)
-            return CGPoint(x: 0.1160, y: 0.5725 + side * 0.075 / max(bounds.height, 1))
+            return CGPoint(x: 0.1160, y: 0.5725)
         case .joystick:
             return CGPoint(x: 0.1170, y: 0.8110)
         case .end:
-            return CGPoint(x: 0.9594, y: 0.0750)
+            let width = TouchControl.end.defaultSize(in: bounds, profile: profile).width
+            let square = min(bounds.width * 0.05625, bounds.height * 0.130)
+            return CGPoint(x: 0.9594 - (width - square) / 2 / max(bounds.width, 1), y: 0.0750)
         case .fireMode:
             let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
             let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
@@ -388,11 +389,11 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .reload:
             return CGPoint(x: 0.8550, y: 0.6900)
         case .map:
-            return CGPoint(x: 0.8347, y: 0.9215)
+            return CGPoint(x: 0.8347, y: 0.9153)
         case .cha:
-            return CGPoint(x: 0.8953, y: 0.9215)
+            return CGPoint(x: 0.8953, y: 0.9153)
         case .inv:
-            return CGPoint(x: 0.9559, y: 0.9215)
+            return CGPoint(x: 0.9559, y: 0.9153)
         }
     }
 
@@ -403,9 +404,9 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         let square = min(bounds.width * 0.05625, bounds.height * 0.130)
         switch self {
         case .quickSave:
-            return CGSize(width: square * 2.8, height: square)
+            return CGSize(width: square * 2.2, height: square)
         case .tray:
-            return CGSize(width: square, height: square)
+            return CGSize(width: square * 0.78, height: square)
         case .load, .saves:
             return CGSize(width: square * 1.25, height: square)
         case .pip:
@@ -413,11 +414,13 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             return CGSize(width: side, height: side)
         case .back:
             let side = min(bounds.width * 0.0670, bounds.height * 0.149)
-            return CGSize(width: side, height: side * 1.15)
+            return CGSize(width: side, height: side)
         case .joystick:
             let side = bounds.height * 0.318
             return CGSize(width: side, height: side)
-        case .end, .fireMode, .skill, .swap:
+        case .end, .fireMode:
+            return CGSize(width: square * 1.28, height: square)
+        case .skill, .swap:
             return CGSize(width: square, height: square)
         case .skip:
             return CGSize(width: bounds.width * 0.0838, height: bounds.height * 0.135)
@@ -427,7 +430,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let side = min(bounds.width * 0.055, bounds.height * 0.125)
             return CGSize(width: side, height: side)
         case .map, .cha, .inv:
-            return CGSize(width: bounds.width * 0.0606, height: bounds.height * 0.1375)
+            return CGSize(width: bounds.width * 0.0606, height: bounds.height * 0.150)
         }
     }
 }
@@ -725,7 +728,8 @@ final class GameControlsOverlay: UIView {
     private let trayButton = LabeledControlButton(
         title: "",
         symbol: "chevron.right",
-        iconPointSize: 15
+        iconPointSize: 15,
+        iconScale: 0.75
     )
     private let pipButton = LabeledControlButton(
         title: "PIP",
@@ -2169,12 +2173,14 @@ private final class LabeledControlButton: UIControl {
     private let accent: Bool
     private let labelLines: Int
     private let layout: Layout
+    private let iconScale: CGFloat
 
-    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false, labelLines: Int = 1, layout: Layout = .stacked) {
+    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false, labelLines: Int = 1, layout: Layout = .stacked, iconScale: CGFloat = 1) {
         self.iconPointSize = iconPointSize
         self.accent = accent
         self.labelLines = max(1, labelLines)
         self.layout = layout
+        self.iconScale = iconScale
         super.init(frame: .zero)
 
         backgroundColor = .clear
@@ -2252,13 +2258,14 @@ private final class LabeledControlButton: UIControl {
         guard let name = symbolName else {
             return
         }
-        if iconView.image != nil && abs(point - symbolPoint) < 0.5 {
+        let size = point * iconScale
+        if iconView.image != nil && abs(size - symbolPoint) < 0.5 {
             return
         }
-        symbolPoint = point
+        symbolPoint = size
         iconView.image = UIImage(
             systemName: name,
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: point, weight: .semibold)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: size, weight: .semibold)
         )
     }
 
@@ -2392,8 +2399,8 @@ private final class LabeledControlButton: UIControl {
             // A two-line label has to share the button with the pictogram, so
             // it gets a smaller font and two line heights instead of one.
             let fontSize = labelLines > 1
-                ? max(9, min(13, bounds.height * 0.19))
-                : max(10, min(15, bounds.height * 0.22))
+                ? max(9, min(15, min(bounds.width * 0.30, bounds.height * 0.235)))
+                : max(10, min(16, min(bounds.width * 0.26, bounds.height * 0.24)))
             label.font = VaultUI.label(fontSize, weight: .bold)
 
             let lineHeight = ceil(label.font.lineHeight)
@@ -2414,7 +2421,7 @@ private final class LabeledControlButton: UIControl {
             applyGlyph(max(11, min(iconView.frame.height * 0.92, bounds.height * 0.55)))
         case .horizontal:
             let fontSize = labelLines > 1
-                ? max(10, min(15, bounds.height * 0.24))
+                ? max(10, min(16, bounds.height * 0.26))
                 : max(10, min(16, bounds.height * 0.30))
             label.font = VaultUI.label(fontSize, weight: .bold)
 
