@@ -10,6 +10,8 @@
 #include "svga.h"
 #include "touch.h"
 
+int menu_rect(int* x, int* y, int* width, int* height);
+
 namespace fallout {
 
 bool iosItemScreen();
@@ -443,7 +445,6 @@ static void iosListReset();
 #define IOS_LIST_HOLD_MS 220
 #define IOS_LIST_SLOP_PX 10
 
-extern int menu_rect(int* x, int* y, int* width, int* height);
 extern int iosScreenValue();
 extern "C" void fallout_ios_pickup_feedback(void);
 
