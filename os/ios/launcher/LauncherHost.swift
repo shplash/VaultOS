@@ -1147,6 +1147,11 @@ final class GameControlsOverlay: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func safeAreaInsetsDidChange() {
+        super.safeAreaInsetsDidChange()
+        setNeedsLayout()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
 

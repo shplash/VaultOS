@@ -17,7 +17,7 @@ enum Vault {
 
     static func display(_ size: CGFloat) -> Font {
         if UIFont(name: VaultUI.displayName, size: size) != nil {
-            return Font.custom(VaultUI.displayName, size: size)
+            return Font.custom(VaultUI.displayName, fixedSize: size)
         }
         return .system(size: size * 0.86, weight: .heavy, design: .monospaced)
     }

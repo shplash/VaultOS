@@ -377,7 +377,7 @@ struct LauncherView: View {
                             Text(L.t("LANGUAGE FILES"))
                         }
                         .buttonStyle(SmallButtonStyle(accent: accent))
-                        .disabled(model.isInstalling)
+                        .disabled(model.isInstalling || model.install.installed == 0)
 
                         Button {
                             pendingImport = .game
@@ -1793,7 +1793,14 @@ private struct ShareSheet: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        controller.popoverPresentationController?.sourceView = UIApplication.shared.windows.first
+        let source = UIApplication.shared.windows.first
+        controller.popoverPresentationController?.sourceView = source
+        if let source = source {
+            controller.popoverPresentationController?.sourceRect = CGRect(x: source.bounds.midX,
+                                                                          y: source.bounds.midY,
+                                                                          width: 1,
+                                                                          height: 1)
+        }
         return controller
     }
 
