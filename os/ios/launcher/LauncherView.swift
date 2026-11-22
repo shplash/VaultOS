@@ -304,14 +304,18 @@ struct LauncherView: View {
                 }
             }
         } label: {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 2) {
+                Rectangle()
+                    .fill(game == .fallout2 && selected ? game.accent : Color.clear)
+                    .frame(height: 2)
+
                 HStack(spacing: 7) {
                     Circle()
                         .fill(installed(game) ? game.accent : Theme.faint)
                         .frame(width: 6, height: 6)
 
                     Text(game.title.uppercased())
-                        .font(Vault.display(22))
+                        .font(Vault.display(26))
                         .kerning(0.4)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -319,7 +323,7 @@ struct LauncherView: View {
                 }
 
                 Rectangle()
-                    .fill(selected ? game.accent : Color.clear)
+                    .fill(game != .fallout2 && selected ? game.accent : Color.clear)
                     .frame(height: 2)
             }
             .contentShape(Rectangle())
@@ -462,7 +466,7 @@ struct LauncherView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(model.selectedGame.title.uppercased())
-                        .font(Vault.display(36))
+                        .font(Vault.display(44))
                         .kerning(1.4)
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
@@ -1267,7 +1271,7 @@ struct LauncherView: View {
                     Text(L.t("BACK UP"))
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling || model.install.has_saves == 0)
+                .disabled(model.isInstalling || model.install.installed == 0 || model.install.has_saves == 0)
 
                 Button {
                     saveImportCountdown = 5
@@ -1276,7 +1280,7 @@ struct LauncherView: View {
                     Text(L.t("IMPORT"))
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling)
+                .disabled(model.isInstalling || model.install.installed == 0)
             }
         }
     }
@@ -1581,7 +1585,7 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .home: return L.t("Home")
+        case .home: return L.t("Home").uppercased()
         case .display: return L.t("VIDEO")
         case .audio: return L.t("AUDIO")
         case .game: return L.t("SYSTEM")
