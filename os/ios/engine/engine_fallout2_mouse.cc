@@ -465,6 +465,7 @@ static int iosListLastY;
 static unsigned int iosListStartMs;
 static int iosListStep;
 static int iosListAccum;
+static int iosListScrollX = -1;
 static int iosListScreen = -1;
 
 static void iosListReset()
@@ -472,9 +473,10 @@ static void iosListReset()
     iosListPending = false;
     iosListScrolled = false;
     iosListAccum = 0;
+    iosListScrollX = -1;
 }
 
-static bool iosListHit(int x, int y, int left, int top, int rows, int* slotHeight)
+static bool iosListHit(int x, int y, int left, int top, int rows, int scrollX, int* slotHeight)
 {
     if (x < left || x >= left + IOS_LIST_SLOT_WIDTH) {
         return false;
@@ -484,6 +486,7 @@ static bool iosListHit(int x, int y, int left, int top, int rows, int* slotHeigh
         return false;
     }
 
+    iosListScrollX = scrollX;
     *slotHeight = IOS_LIST_SLOT_HEIGHT;
     return true;
 }
@@ -502,25 +505,25 @@ static bool iosListPoint(int x, int y, int* slotHeight)
         const int left = (screenWidth - 640) / 2 + 80;
         const int top = (screenHeight - 480) / 2 + 290;
 
-        return iosListHit(x, y, left, top + 10, 3, slotHeight)
-            || iosListHit(x, y, left + 165, top + 10, 3, slotHeight)
-            || iosListHit(x, y, left + 250, top + 10, 3, slotHeight)
-            || iosListHit(x, y, left + 395, top + 10, 3, slotHeight);
+        return iosListHit(x, y, left + 29, top + 10, 3, left + 32, slotHeight)
+            || iosListHit(x, y, left + 165, top + 10, 3, -1, slotHeight)
+            || iosListHit(x, y, left + 250, top + 10, 3, -1, slotHeight)
+            || iosListHit(x, y, left + 388, top + 10, 3, left + 427, slotHeight);
     }
 
     if (current == 2) {
         const int left = screenWidth != 640 ? (screenWidth - 537) / 2 : 80;
         const int top = screenHeight != 480 ? (screenHeight - 376) / 2 : 0;
 
-        return iosListHit(x, y, left + 180, top + 37, 6, slotHeight)
-            || iosListHit(x, y, left + 297, top + 37, 6, slotHeight);
+        return iosListHit(x, y, left + 180, top + 37, 6, -1, slotHeight)
+            || iosListHit(x, y, left + 297, top + 37, 6, -1, slotHeight);
     }
 
     if (current == 1) {
         const int left = screenWidth != 640 ? (screenWidth - 499) / 2 : 80;
         const int top = screenHeight != 480 ? (screenHeight - 377) / 2 : 0;
 
-        return iosListHit(x, y, left + 46, top + 35, 6, slotHeight);
+        return iosListHit(x, y, left + 46, top + 35, 6, -1, slotHeight);
     }
 
     int left = 0;
@@ -535,6 +538,7 @@ static bool iosListPoint(int x, int y, int* slotHeight)
         return false;
     }
 
+    iosListScrollX = -1;
     *slotHeight = IOS_LIST_SLOT_HEIGHT;
     return true;
 }
@@ -555,6 +559,15 @@ static int iosListSlop()
 
     const int slop = IOS_LIST_SLOP_POINTS * screenWidth / width;
     return slop < 1 ? 1 : slop;
+}
+
+static void iosListFollow(int x, int y)
+{
+    if (iosListPending && iosListScrollX >= 0) {
+        x = iosListScrollX;
+    }
+
+    mouseIosMovePointer(x, y);
 }
 
 // 0x4CA59C
@@ -711,7 +724,7 @@ void _mouse_info()
             }
 
             if (iosDirectTouchScreen() && gesture.numberOfTouches == 1) {
-                mouseIosMovePointer(gesture.x, gesture.y);
+                iosListFollow(gesture.x, gesture.y);
                 prevx = gesture.x;
                 prevy = gesture.y;
 
