@@ -666,7 +666,7 @@ struct LauncherView: View {
 
             HStack(spacing: 8) {
                 aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
-                aboutLink(L.t("SUPPORT"), address: "https://ko-fi.com/shplash", primary: true)
+                aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
                 aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=feature_request.yml", primary: true)
                 aboutLink(L.t("BUG"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=bug_report.yml", primary: true)
 
