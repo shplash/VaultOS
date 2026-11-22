@@ -350,7 +350,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let save = TouchControl.quickSave.defaultCenter(for: profile, in: bounds)
             let size = TouchControl.quickSave.defaultSize(in: bounds, profile: profile)
             let side = TouchControl.tray.defaultSize(in: bounds, profile: profile).width
-            let step = size.width / 2 + TouchControl.gap(in: bounds) + side / 2
+            let step = size.width / 2 + side / 2
             return CGPoint(x: save.x + step / max(bounds.width, 1), y: save.y)
         case .load:
             let tray = TouchControl.tray.defaultCenter(for: profile, in: bounds)
@@ -404,9 +404,9 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         let square = min(bounds.width * 0.05625, bounds.height * 0.130)
         switch self {
         case .quickSave:
-            return CGSize(width: square * 2.2, height: square)
+            return CGSize(width: square * 1.51, height: square)
         case .tray:
-            return CGSize(width: square * 0.78, height: square)
+            return CGSize(width: square * 0.56, height: square)
         case .load, .saves:
             return CGSize(width: square * 1.25, height: square)
         case .pip:
@@ -442,7 +442,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 17
+    private static let layoutVersion = 18
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -541,15 +541,34 @@ enum ControlLayout {
             }
         }
 
-        // Version 17 puts every control back on the original layout with the
+        let previous = defaults.integer(forKey: layoutVersionKey)
+
+        // Version 17 put every control back on the original layout with the
         // neutral faces, so the stored positions are cleared and each one comes
         // back where the layout puts it. The player's own sizes are kept, since
         // those still mean what they meant.
-        for game in FalloutGame.allCases {
-            for profile in [LayoutProfile.full, .half] {
-                for control in TouchControl.allCases {
-                    defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
-                    defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
+        if previous < 17 {
+            for game in FalloutGame.allCases {
+                for profile in [LayoutProfile.full, .half] {
+                    for control in TouchControl.allCases {
+                        defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
+                        defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
+                    }
+                }
+            }
+        }
+
+        // Version 18 joins QUICK SAVE and its chevron into one assembly, which
+        // only reads as one control when the two sit flush. Their stored
+        // positions are cleared so they come back joined; the other controls,
+        // and every size, keep what the player set.
+        if previous < 18 {
+            for game in FalloutGame.allCases {
+                for profile in [LayoutProfile.full, .half] {
+                    for control in [TouchControl.quickSave, .tray] {
+                        defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
+                        defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
+                    }
                 }
             }
         }
@@ -728,9 +747,10 @@ final class GameControlsOverlay: UIView {
     private let trayButton = LabeledControlButton(
         title: "",
         symbol: "chevron.right",
-        iconPointSize: 15,
-        iconScale: 0.75
+        iconPointSize: 15
     )
+    private let saveAssembly = VaultPanelView()
+    private let saveDivider = UIView()
     private let pipButton = LabeledControlButton(
         title: "PIP",
         symbol: "book.closed",
@@ -743,7 +763,11 @@ final class GameControlsOverlay: UIView {
         symbol: "eye",
         iconPointSize: 16
     )
-    private let helpButton = UIButton(type: .system)
+    private let helpButton = LabeledControlButton(
+        title: "",
+        symbol: "info",
+        iconPointSize: 22
+    )
     private let barterButton = LabeledControlButton(
         title: "",
         symbol: "dollarsign.circle",
@@ -1012,16 +1036,34 @@ final class GameControlsOverlay: UIView {
         addSubview(loadButton)
 
         // The engine's own quick save, with a tick for confirmation when it has
-        // been asked for.
+        // been asked for. QUICK SAVE and the chevron share one plate, drawn
+        // under both, so the pair reads as one control with a divider.
+        saveAssembly.isHidden = true
+        saveAssembly.fill = ControlTheme.panel
+        saveAssembly.edge = ControlTheme.border
+        saveAssembly.lineWidth = 1.25
+        saveAssembly.innerEdge = ControlTheme.innerEdge
+        saveAssembly.innerInset = 2
+        saveAssembly.shadowOpacity = 0.25
+        saveAssembly.corner = 10
+        addSubview(saveAssembly)
+
+        saveDivider.isHidden = true
+        saveDivider.isUserInteractionEnabled = false
+        saveDivider.backgroundColor = ControlTheme.border.withAlphaComponent(0.7)
+        addSubview(saveDivider)
+
         quickSaveButton.tag = 19
         quickSaveButton.accessibilityLabel = "Quick save"
         quickSaveButton.addTarget(self, action: #selector(quickSavePressed), for: .touchUpInside)
+        quickSaveButton.drawsOwnPlate = false
         addSubview(quickSaveButton)
 
         // The chevron beside QUICK SAVE opens the tray that holds LOAD and
         // SAVE, which stay out of the way until they are asked for.
         trayButton.accessibilityLabel = "Save options"
         trayButton.addTarget(self, action: #selector(trayPressed), for: .touchUpInside)
+        trayButton.drawsOwnPlate = false
         addSubview(trayButton)
 
         quickSaveNotice.isHidden = true
@@ -1092,18 +1134,6 @@ final class GameControlsOverlay: UIView {
         // The help button is the same square as INSPECT, in the same panel, so
         // the two read as one column against the menu's edge.
         helpButton.isHidden = true
-        helpButton.backgroundColor = ControlTheme.panel
-        helpButton.layer.cornerRadius = 10
-        helpButton.layer.borderWidth = 1.25
-        helpButton.layer.borderColor = ControlTheme.border.cgColor
-        helpButton.layer.shadowColor = UIColor.black.cgColor
-        helpButton.layer.shadowOpacity = 0.4
-        helpButton.layer.shadowRadius = 5
-        helpButton.layer.shadowOffset = CGSize(width: 0, height: 2)
-        helpButton.setImage(UIImage(systemName: "info",
-                                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)),
-                            for: .normal)
-        helpButton.tintColor = ControlTheme.content
         helpButton.accessibilityLabel = "Inventory help"
         helpButton.addTarget(self, action: #selector(helpPressed), for: .touchUpInside)
         addSubview(helpButton)
@@ -1181,6 +1211,7 @@ final class GameControlsOverlay: UIView {
         place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(quickSaveButton, at: .quickSave, profile: profile, size: scaledSize(for: .quickSave, in: bounds.size, globalScale: buttonScale, profile: profile))
         place(trayButton, at: .tray, profile: profile, size: scaledSize(for: .tray, in: bounds.size, globalScale: buttonScale, profile: profile))
+        placeSaveAssembly()
 
         if !quickSaveNotice.isHidden {
             let noticeWidth = min(220, bounds.width * 0.32)
@@ -1279,6 +1310,23 @@ final class GameControlsOverlay: UIView {
         helpButton.frame = clampFrame(CGRect(x: rightX, y: max(clampTop, box.minY + 4),
                                              width: helpSide, height: helpSide))
         helpButton.layer.cornerRadius = max(6, helpSide * 0.20)
+    }
+
+    private func placeSaveAssembly() {
+        let quick = quickSaveButton.frame
+        let tray = trayButton.frame
+        let height = max(quick.height, tray.height)
+        let top = min(quick.minY, tray.minY)
+        let left = min(quick.minX, tray.minX)
+        let right = max(quick.maxX, tray.maxX)
+        saveAssembly.frame = CGRect(x: left, y: top, width: right - left, height: height)
+        saveAssembly.corner = max(6, min(min(18, height * 0.20), (right - left) * 0.28))
+
+        let dividerHeight = height * 0.62
+        saveDivider.frame = CGRect(x: tray.minX - 0.5,
+                                   y: saveAssembly.frame.midY - dividerHeight / 2,
+                                   width: 1,
+                                   height: dividerHeight)
     }
 
     private func placeBarterControls(in table: CGRect, gap: CGFloat, side: CGFloat) {
@@ -1772,7 +1820,7 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton]
+        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider]
         controls.append(contentsOf: sideButtons as [UIView])
 
         let movie = fallout_ios_movie_state()
@@ -1972,8 +2020,8 @@ final class GameControlsOverlay: UIView {
             accessibilityTitle = "Use skill"
         default:
             symbol = "hand.tap"
-            title = "ACTIONS"
-            accessibilityTitle = "Actions"
+            title = "ACTION"
+            accessibilityTitle = "Action"
         }
 
         if cursorModeIcon != symbol || cursorModeTitle != title {
@@ -2138,6 +2186,7 @@ private final class LabeledControlButton: UIControl {
     }
 
     private let plate = VaultPanelView()
+    private let pressWash = UIView()
     private let selectionView = UIView()
     private let holdFill = UIView()
     private let iconView = UIImageView()
@@ -2164,6 +2213,15 @@ private final class LabeledControlButton: UIControl {
         return solidBackground ? ControlTheme.solidPanel : ControlTheme.panel.withAlphaComponent(backgroundOpacity)
     }
 
+    /// A control that is one half of a joined assembly draws no plate of its
+    /// own: the assembly behind it supplies the outline and the fill, while the
+    /// glyph, label, press state and touch area stay its own.
+    var drawsOwnPlate = true {
+        didSet {
+            plate.isHidden = !drawsOwnPlate
+        }
+    }
+
     var backgroundOpacity: CGFloat = 0.80 {
         didSet {
             plate.fill = normalBackground
@@ -2173,14 +2231,12 @@ private final class LabeledControlButton: UIControl {
     private let accent: Bool
     private let labelLines: Int
     private let layout: Layout
-    private let iconScale: CGFloat
 
-    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false, labelLines: Int = 1, layout: Layout = .stacked, iconScale: CGFloat = 1) {
+    init(title: String, symbol: String, iconPointSize: CGFloat, accent: Bool = false, labelLines: Int = 1, layout: Layout = .stacked) {
         self.iconPointSize = iconPointSize
         self.accent = accent
         self.labelLines = max(1, labelLines)
         self.layout = layout
-        self.iconScale = iconScale
         super.init(frame: .zero)
 
         backgroundColor = .clear
@@ -2211,6 +2267,11 @@ private final class LabeledControlButton: UIControl {
         iconView.contentMode = .scaleAspectFit
         iconView.isUserInteractionEnabled = false
         addSubview(iconView)
+
+        pressWash.backgroundColor = ControlTheme.pressed
+        pressWash.isUserInteractionEnabled = false
+        pressWash.isHidden = true
+        insertSubview(pressWash, aboveSubview: plate)
 
         label.font = VaultUI.label(11, weight: .bold)
         label.textAlignment = layout == .horizontal ? .left : .center
@@ -2258,14 +2319,13 @@ private final class LabeledControlButton: UIControl {
         guard let name = symbolName else {
             return
         }
-        let size = point * iconScale
-        if iconView.image != nil && abs(size - symbolPoint) < 0.5 {
+        if iconView.image != nil && abs(point - symbolPoint) < 0.5 {
             return
         }
-        symbolPoint = size
+        symbolPoint = point
         iconView.image = UIImage(
             systemName: name,
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: size, weight: .semibold)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: point, weight: .semibold)
         )
     }
 
@@ -2307,6 +2367,9 @@ private final class LabeledControlButton: UIControl {
             plate.edge = isHighlighted ? ControlTheme.pressedEdge : ControlTheme.border
             tintColor = ControlTheme.content
             label.textColor = ControlTheme.content
+            if !drawsOwnPlate {
+                pressWash.isHidden = !isHighlighted
+            }
         }
     }
 
@@ -2383,6 +2446,9 @@ private final class LabeledControlButton: UIControl {
         plate.frame = bounds
         plate.corner = radius
 
+        pressWash.frame = bounds
+        pressWash.layer.cornerRadius = radius
+
         selectionView.frame = bounds
         selectionView.layer.cornerRadius = radius
 
@@ -2418,14 +2484,16 @@ private final class LabeledControlButton: UIControl {
                 width: bounds.width - 2,
                 height: labelHeight
             )
-            applyGlyph(max(11, min(min(iconView.frame.height * 0.92, bounds.width * 0.60), bounds.height * 0.55)))
+            let widthCap = hasLabel ? bounds.width * 0.60 : bounds.width * 0.95
+            let heightCap = hasLabel ? bounds.height * 0.55 : bounds.height * 0.70
+            applyGlyph(max(11, min(min(iconView.frame.height * 0.92, widthCap), heightCap)))
         case .horizontal:
             let fontSize = labelLines > 1
                 ? max(10, min(16, bounds.height * 0.26))
                 : max(10, min(16, bounds.height * 0.30))
             label.font = VaultUI.label(fontSize, weight: .bold)
 
-            let iconSide = min(bounds.height * 0.52, bounds.width * 0.22)
+            let iconSide = min(bounds.height * 0.52, bounds.width * 0.34)
             let space = max(4, bounds.height * 0.14)
             let textRoom = max(0, bounds.width - iconSide - space - 6)
             let textWidth = hasLabel

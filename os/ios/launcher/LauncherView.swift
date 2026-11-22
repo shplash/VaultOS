@@ -230,7 +230,7 @@ struct LauncherView: View {
         .padding(.top, 14)
         .padding(.bottom, 14 + bottom)
         .frame(width: 152 + leading, alignment: .leading)
-        .background(Vault.plate.opacity(0.55))
+        .background(Theme.rail)
         .overlay(
             Rectangle()
                 .fill(Theme.line)
@@ -317,6 +317,7 @@ struct LauncherView: View {
                         .minimumScaleFactor(0.6)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
 
                 Rectangle()
                     .fill(selected ? game.accent : Color.clear)
@@ -438,7 +439,7 @@ struct LauncherView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .vaultPlate(corner: 20, fill: Theme.sheet)
+        .vaultPlate(corner: 20, fill: Theme.rail)
         .padding(.horizontal, 18)
         .padding(.top, 12)
         .padding(.bottom, 16 + screenInsets.bottom)
@@ -506,7 +507,7 @@ struct LauncherView: View {
                     )
                     .overlay(
                         LinearGradient(
-                            colors: [Color.clear, Theme.sheet.opacity(0.92)],
+                            colors: [Color.clear, Theme.rail.opacity(0.92)],
                             startPoint: .center,
                             endPoint: .bottom
                         )
@@ -1680,6 +1681,9 @@ private extension FalloutGame {
 private enum Theme {
     static let background = Vault.hull
     static let sheet = Vault.plate
+    /// The rail's own fill. The home sheet uses it too, so the panel and the
+    /// bar are one surface instead of a blue-grey plate over a darker one.
+    static let rail = Vault.plate.opacity(0.55)
     static let panel = Vault.panel
     static let line = Vault.hairline
     static let hairline = Vault.hairline

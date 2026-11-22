@@ -73,8 +73,15 @@ borders.
   edge and a small shadow, a white glyph above a mono label; QUICK SAVE centres
   its glyph and label together. A held control brightens its plate and outline
   and washes with the player's control colour, a selected one keeps that wash,
-  and one that cannot be used fades to 35%. The chevron beside QUICK SAVE opens
-  a tray with LOAD and SAVE, closed by default.
+  and one that cannot be used fades to 35%. Every custom in-game button is one
+  of these, so the item screens, the trading screens and the dialogues wear the
+  same face as the HUD.
+- **Save assembly**: QUICK SAVE and its chevron are two halves of one control.
+  A single plate, outline and top highlight sit under both (`drawsOwnPlate` is
+  off for the halves), the two sit flush, and a short 62% divider at 70% of the
+  outline colour separates them. QUICK SAVE takes 73% of the width, the chevron
+  the rest; each keeps its own action, press state and touch area. The chevron
+  opens a tray with LOAD and SAVE, closed by default.
 - **Camera pad** (`CameraJoystickControl`): a thin ring and crosshair over the
   hull, with a plain knob; no glow.
 - **Help card**: hull plate with a hairline edge and mono body text.
