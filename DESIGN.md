@@ -1,7 +1,7 @@
 # VaultOS design system
 
-VaultOS looks like a maintenance deck: cold steel plates, cut corners, stencil
-lettering and hazard tape used as a warning, not decoration. The launcher, the
+VaultOS looks like a deck panel: cold steel plates, stencil lettering and one
+accent colour that belongs to the game you are looking at. The launcher, the
 in-game touch overlay, the inventory help card and the control editor all draw
 from these tokens; nothing takes a colour or a font of its own.
 
@@ -20,14 +20,19 @@ and every surface follows.
 | `faint` | `#6B727A` | captions, footnotes, inactive icons |
 | `hairline` | white 9% | every divider and panel outline |
 | `edgeLight` | white 16% | the lit top edge of a plate |
-| `hazard` | `#F0A32A` | hazard tape, the selected tick, a held control |
-| `hazardInk` | `#0B0B0C` | text on top of hazard |
+| `ink` | `#0B0B0C` | text sitting on an accent fill |
 | `amber` | `#E5A935` | Fallout's accent |
 | `teal` | `#5FB3A8` | Fallout 2's accent |
 
-The two game accents are identity only: they colour the game's tab, its hero
-rule and its primary actions. Hazard amber is the app's own warning colour and
-never means a game.
+**The accent is the selected game.** The rail bar, the game tabs, the line under
+each page header, the switches, the preset tiles, the buttons, the hero copy and
+the glow behind the launcher all read `FalloutGame.accent`, so switching game
+recolours the whole launcher from amber to teal and back. Nothing is allowed to
+hard-code one of the two accents.
+
+The in-game controls are the exception: they use the control colour the player
+picked in CONTROLS (white, orange, green or blue), because they sit over the
+game rather than marking it.
 
 ## Type
 
@@ -42,44 +47,30 @@ never means a game.
 
 ## Shape
 
-- Corner radius 3–8pt. Nothing rounder except the joystick and the switches.
-- Plates carry one chamfered corner: a 7–16pt straight cut on the top-trailing
-  corner, plus a 1pt hairline outline and a 1pt light line along the top edge.
-  That bevel is the whole "steel" effect; no gradients, no shadows, no glass.
-- The rail is a plate, not a card: no rounding, a hairline on its trailing edge.
-
-## Hazard tape
-
-A 45° amber and black band, drawn by `VaultHazard`/`HazardStripView`. Use it
-only where something is a warning, a commitment or a selection:
-
-- the selected rail item's tick,
-- the rule under a page header,
-- the fill of a control that must be held,
-- the top edge of the help card and the destructive dialogs,
-- faint tape across the PLAY button and behind the rail.
-
-Never as a background for text, never for a whole panel, never in more than one
-place in the same block.
+- Plain rounded rectangles. Sheets and the launcher cards 20pt, dialogs 18pt,
+  tiles and PLAY 12pt, on-screen controls 10pt, small buttons 8pt.
+- A plate is a fill, a 1pt hairline outline and a 1pt light line along its top
+  edge. No cut corners, no stripes, no gradients, no shadows.
 
 ## Components
 
-- **Primary action** (`PrimaryButtonStyle`): chamfered accent plate, hazard ink
-  label in the display face, faint tape across it, 82% while pressed.
+- **Primary action** (`PrimaryButtonStyle`): accent plate, ink label in the
+  display face, 82% while pressed.
 - **Secondary action** (`SmallButtonStyle`): inset plate, accent outline and
   accent mono label; pressed fills with 18% accent.
 - **Row**: title and detail on the left, control on the right, hairline under.
-- **Toggle** (`PillToggle`): hazard when on with an ink knob, near-black when
+- **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
-- **Touch control** (`LabeledControlButton`): chamfered plate at the player's
-  chosen colour, icon above a mono label; a held control fills with hazard, a
-  selected one washes with it.
+- **Touch control** (`LabeledControlButton`): rounded plate in the player's
+  control colour, icon above a mono label; a held control fills with that
+  colour, a selected one washes with it.
 - **Camera pad** (`CameraJoystickControl`): a thin ring and crosshair over the
   hull, with a plain knob; no glow.
-- **Help card**: hull plate, hazard strip along its top, mono body text.
+- **Help card**: hull plate with a hairline edge and mono body text.
 
 ## Checking a change
 
 Read it at the launcher's smallest layout (560×320, which it scales from) and at
 tablet landscape. Then check the overlay over both games, in play and in the
-inventory, and the editor with the bars shown and hidden.
+inventory, and the editor with the bars shown and hidden. Switch games on every
+page and confirm nothing keeps the other game's accent.

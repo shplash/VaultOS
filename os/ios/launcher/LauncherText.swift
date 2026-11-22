@@ -50,7 +50,6 @@ enum L {
         .french: [
             // Pages
             "Home": "Accueil",
-            "DECK": "PONT",
             "VIDEO": "VIDÉO",
             "SYSTEM": "SYSTÈME",
             "MANUAL": "MANUEL",
@@ -324,7 +323,6 @@ enum L {
 
         .german: [
             "Home": "Start",
-            "DECK": "DECK",
             "VIDEO": "VIDEO",
             "SYSTEM": "SYSTEM",
             "MANUAL": "HANDBUCH",
@@ -586,7 +584,6 @@ enum L {
 
         .italian: [
             "Home": "Home",
-            "DECK": "PONTE",
             "VIDEO": "VIDEO",
             "SYSTEM": "SISTEMA",
             "MANUAL": "MANUALE",
@@ -848,7 +845,6 @@ enum L {
 
         .spanish: [
             "Home": "Inicio",
-            "DECK": "CUBIERTA",
             "VIDEO": "VÍDEO",
             "SYSTEM": "SISTEMA",
             "MANUAL": "MANUAL",

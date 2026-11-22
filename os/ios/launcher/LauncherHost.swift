@@ -225,7 +225,9 @@ private enum ControlTheme {
         return VaultUI.hull.withAlphaComponent(0.62)
     }
 
-    static let highlight = VaultUI.hazard.withAlphaComponent(0.22)
+    static var highlight: UIColor {
+        return control.withAlphaComponent(0.22)
+    }
 
     static var dim: UIColor {
         let key = LauncherModel.optionKey("buttonColour", for: ControlLayout.activeGame())
@@ -1030,9 +1032,9 @@ final class GameControlsOverlay: UIView {
 
         quickSaveNotice.isHidden = true
         quickSaveNotice.backgroundColor = VaultUI.hull.withAlphaComponent(0.82)
-        quickSaveNotice.layer.cornerRadius = 3
+        quickSaveNotice.layer.cornerRadius = 9
         quickSaveNotice.layer.borderWidth = 1
-        quickSaveNotice.layer.borderColor = VaultUI.hazard.withAlphaComponent(0.55).cgColor
+        quickSaveNotice.layer.borderColor = ControlTheme.control.withAlphaComponent(0.5).cgColor
         quickSaveNotice.isUserInteractionEnabled = false
         addSubview(quickSaveNotice)
 
@@ -1097,9 +1099,9 @@ final class GameControlsOverlay: UIView {
         // the two read as one column against the menu's edge.
         helpButton.isHidden = true
         helpButton.backgroundColor = ControlTheme.panel
-        helpButton.layer.cornerRadius = 4
-        helpButton.layer.borderWidth = 1.2
-        helpButton.layer.borderColor = ControlTheme.control.withAlphaComponent(0.7).cgColor
+        helpButton.layer.cornerRadius = 10
+        helpButton.layer.borderWidth = 1.5
+        helpButton.layer.borderColor = ControlTheme.control.withAlphaComponent(0.6).cgColor
         helpButton.setImage(UIImage(systemName: "info",
                                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)),
                             for: .normal)
@@ -2121,20 +2123,19 @@ private final class LabeledControlButton: UIControl {
         backgroundColor = .clear
         plate.fill = normalBackground
         plate.edge = ControlTheme.control.withAlphaComponent(0.55)
-        plate.corner = 4
-        plate.cut = 10
+        plate.corner = 10
         insertSubview(plate, at: 0)
         tintColor = ControlTheme.control
 
-        // A translucent white wash over the panel, for a control that is
-        // switched on rather than pressed.
-        selectionView.backgroundColor = VaultUI.hazard.withAlphaComponent(0.26)
+        // A translucent wash over the panel, for a control that is switched on
+        // rather than pressed.
+        selectionView.backgroundColor = ControlTheme.control.withAlphaComponent(0.26)
         selectionView.isUserInteractionEnabled = false
         selectionView.isHidden = true
         addSubview(selectionView)
 
         // The sweep of a held control, under the wash and under the label.
-        holdFill.backgroundColor = VaultUI.hazard.withAlphaComponent(0.30)
+        holdFill.backgroundColor = ControlTheme.control.withAlphaComponent(0.30)
         holdFill.isUserInteractionEnabled = false
         holdFill.isHidden = true
         insertSubview(holdFill, at: 1)
@@ -2214,7 +2215,7 @@ private final class LabeledControlButton: UIControl {
         didSet {
             plate.fill = isHighlighted ? ControlTheme.highlight : normalBackground
             plate.edge = isHighlighted
-                ? VaultUI.hazard.withAlphaComponent(0.9)
+                ? ControlTheme.control.withAlphaComponent(0.9)
                 : ControlTheme.control.withAlphaComponent(0.55)
             tintColor = isHighlighted ? .white : ControlTheme.control
             label.textColor = isHighlighted ? .white : ControlTheme.control
@@ -2293,9 +2294,9 @@ private final class LabeledControlButton: UIControl {
         plate.frame = bounds
 
         selectionView.frame = bounds
-        selectionView.layer.cornerRadius = 4
+        selectionView.layer.cornerRadius = 10
 
-        holdFill.layer.cornerRadius = 4
+        holdFill.layer.cornerRadius = 10
         if holdStarted == nil {
             holdFill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
         }
@@ -2645,12 +2646,12 @@ final class MovieSkipButton: UIControl {
         super.init(frame: frame)
 
         backgroundColor = VaultUI.hull.withAlphaComponent(0.55)
-        layer.cornerRadius = 4
+        layer.cornerRadius = 9
         layer.masksToBounds = true
         layer.borderWidth = 1
-        layer.borderColor = VaultUI.hazard.withAlphaComponent(0.55).cgColor
+        layer.borderColor = ControlTheme.control.withAlphaComponent(0.55).cgColor
 
-        fill.backgroundColor = VaultUI.hazard.withAlphaComponent(0.35)
+        fill.backgroundColor = ControlTheme.control.withAlphaComponent(0.30)
         fill.isUserInteractionEnabled = false
         addSubview(fill)
 
@@ -2757,8 +2758,6 @@ final class InventoryHelpCard: UIView {
     static let green = UIColor(red: 0.30, green: 1.0, blue: 0.40, alpha: 1)
 
     private let plate = VaultPanelView()
-    private let hazard = HazardStripView()
-    private let hazardMask = CAShapeLayer()
     private let label = UILabel()
     private let closeButton = UIButton(type: .system)
 
@@ -2784,13 +2783,9 @@ final class InventoryHelpCard: UIView {
         backgroundColor = .clear
 
         plate.fill = VaultUI.hull.withAlphaComponent(0.88)
-        plate.edge = VaultUI.hazard.withAlphaComponent(0.45)
-        plate.corner = 6
-        plate.cut = 14
+        plate.edge = UIColor.white.withAlphaComponent(0.22)
+        plate.corner = 14
         addSubview(plate)
-
-        hazard.layer.mask = hazardMask
-        addSubview(hazard)
 
         label.font = VaultUI.label(14, weight: .medium)
         label.textColor = VaultUI.text
@@ -2821,10 +2816,6 @@ final class InventoryHelpCard: UIView {
         super.layoutSubviews()
 
         plate.frame = bounds
-
-        hazard.frame = CGRect(x: 0, y: 0, width: bounds.width, height: 6)
-        hazardMask.frame = hazard.bounds
-        hazardMask.path = VaultUI.chamfer(in: hazard.bounds, corner: 6, cut: 14).cgPath
 
         label.frame = CGRect(x: inset,
                              y: inset + header,
