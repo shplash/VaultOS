@@ -210,7 +210,7 @@ struct LauncherView: View {
                     }
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, 16)
             .padding(.bottom, 8)
 
             Rectangle()
@@ -461,12 +461,12 @@ struct LauncherView: View {
                     .transition(.opacity)
                     .allowsHitTesting(false)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true, expanded: true)
                         aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true, expanded: true)
                     }
-                    .frame(width: heroTitleWidth(54))
+                    .frame(width: min(heroTitleWidth(54), geometry.size.width * 0.60 - 22))
 
                     Text(model.selectedGame.title.uppercased())
                         .font(Vault.display(54))
@@ -494,7 +494,8 @@ struct LauncherView: View {
 
     private func heroTitleWidth(_ size: CGFloat) -> CGFloat {
         let text = model.selectedGame.title.uppercased()
-        let width = (text as NSString).size(withAttributes: [.font: VaultUI.display(size)]).width
+        let font = UIFontMetrics(forTextStyle: .body).scaledFont(for: VaultUI.display(size))
+        let width = (text as NSString).size(withAttributes: [.font: font]).width
         return width + CGFloat(text.count) * 1.4
     }
 
@@ -617,6 +618,8 @@ struct LauncherView: View {
                 Text(title)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(0.6)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
 
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 8, weight: .bold))
