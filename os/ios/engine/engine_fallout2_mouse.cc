@@ -442,8 +442,8 @@ static void mouseIosMovePointer(int x, int y)
 
 static void iosListReset();
 
-#define IOS_LIST_HOLD_MS 220
-#define IOS_LIST_SLOP_PX 10
+#define IOS_LIST_HOLD_MS 280
+#define IOS_LIST_SLOP_POINTS 6
 
 extern int iosScreenValue();
 extern "C" void fallout_ios_pickup_feedback(void);
@@ -485,6 +485,24 @@ static bool iosListPoint(int x, int y, int* slotHeight)
 
     *slotHeight = 48;
     return true;
+}
+
+static int iosListSlop()
+{
+    SDL_Window* window = SDL_GetWindowFromID(1);
+    int width = 0;
+    int height = 0;
+    if (window != NULL) {
+        SDL_GetWindowSize(window, &width, &height);
+    }
+
+    const int screenWidth = screenGetWidth();
+    if (width <= 0 || screenWidth <= 0) {
+        return IOS_LIST_SLOP_POINTS;
+    }
+
+    const int slop = IOS_LIST_SLOP_POINTS * screenWidth / width;
+    return slop < 1 ? 1 : slop;
 }
 
 // 0x4CA59C
@@ -645,10 +663,11 @@ void _mouse_info()
 
                 if (iosListPending) {
                     const unsigned int now = SDL_GetTicks();
+                    const int slop = iosListSlop();
                     const int movedX = abs(gesture.x - iosListStartX);
                     const int movedY = abs(gesture.y - iosListStartY);
 
-                    if (movedX > IOS_LIST_SLOP_PX || movedY > IOS_LIST_SLOP_PX) {
+                    if (movedX > slop || movedY > slop) {
                         if (iosListStep > 0) {
                             iosListAccum += gesture.y - iosListLastY;
 

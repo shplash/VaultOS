@@ -441,8 +441,8 @@ static bool ios_direct_touch_active()
         || ios_screen == IOS_SCREEN_SKILLDEX;
 }
 
-#define IOS_LIST_HOLD_MS 220
-#define IOS_LIST_SLOP_PX 10
+#define IOS_LIST_HOLD_MS 280
+#define IOS_LIST_SLOP_POINTS 6
 
 extern "C" void fallout_ios_pickup_feedback(void);
 
@@ -480,6 +480,24 @@ static bool ios_list_point(int x, int y, int* slotHeight)
     }
 
     return false;
+}
+
+static int ios_list_slop()
+{
+    SDL_Window* window = SDL_GetWindowFromID(1);
+    int width = 0;
+    int height = 0;
+    if (window != NULL) {
+        SDL_GetWindowSize(window, &width, &height);
+    }
+
+    const int screenWidth = screenGetWidth();
+    if (width <= 0 || screenWidth <= 0) {
+        return IOS_LIST_SLOP_POINTS;
+    }
+
+    const int slop = IOS_LIST_SLOP_POINTS * screenWidth / width;
+    return slop < 1 ? 1 : slop;
 }
 
 // The direct-touch press, in the order the game has to see it: the position
@@ -701,10 +719,11 @@ void mouse_info()
 
                 if (ios_list_pending) {
                     const unsigned int now = SDL_GetTicks();
+                    const int slop = ios_list_slop();
                     const int movedX = abs(gesture.x - ios_list_start_x);
                     const int movedY = abs(gesture.y - ios_list_start_y);
 
-                    if (movedX > IOS_LIST_SLOP_PX || movedY > IOS_LIST_SLOP_PX) {
+                    if (movedX > slop || movedY > slop) {
                         if (ios_list_step > 0) {
                             ios_list_accum += gesture.y - ios_list_last_y;
 
