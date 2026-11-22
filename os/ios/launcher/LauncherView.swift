@@ -318,6 +318,7 @@ struct LauncherView: View {
                         .minimumScaleFactor(0.6)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
+                .frame(maxWidth: .infinity)
 
                 Rectangle()
                     .fill(selected ? game.accent : Color.clear)
@@ -463,10 +464,9 @@ struct LauncherView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
-                        aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true, expanded: true)
-                        aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true, expanded: true)
+                        aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
+                        aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
                     }
-                    .frame(width: min(heroTitleWidth(54), geometry.size.width * 0.60 - 22))
 
                     Text(model.selectedGame.title.uppercased())
                         .font(Vault.display(54))
@@ -490,13 +490,6 @@ struct LauncherView: View {
             }
         }
         .frame(height: 172)
-    }
-
-    private func heroTitleWidth(_ size: CGFloat) -> CGFloat {
-        let text = model.selectedGame.title.uppercased()
-        let font = UIFontMetrics(forTextStyle: .body).scaledFont(for: VaultUI.display(size))
-        let width = (text as NSString).size(withAttributes: [.font: font]).width
-        return width + CGFloat(text.count) * 1.4
     }
 
     private func heroArt(width: CGFloat, height: CGFloat) -> some View {
@@ -608,7 +601,7 @@ struct LauncherView: View {
         .accessibilityLabel(group.title)
     }
 
-    private func wikiLink(_ title: String, address: String, primary: Bool, expanded: Bool = false) -> some View {
+    private func wikiLink(_ title: String, address: String, primary: Bool) -> some View {
         Button {
             if let url = URL(string: address) {
                 UIApplication.shared.open(url)
@@ -627,7 +620,6 @@ struct LauncherView: View {
             .foregroundColor(primary ? Color.black.opacity(0.8) : Theme.faint)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
-            .frame(maxWidth: expanded ? CGFloat.infinity : nil)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(primary ? accent : Color.white.opacity(0.04))
@@ -725,8 +717,8 @@ struct LauncherView: View {
         return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
     }
 
-    private func aboutLink(_ title: String, address: String, primary: Bool, expanded: Bool = false) -> some View {
-        wikiLink(title, address: address, primary: primary, expanded: expanded)
+    private func aboutLink(_ title: String, address: String, primary: Bool) -> some View {
+        wikiLink(title, address: address, primary: primary)
     }
 
     /// What the update check came back with: one line, and the release page when
