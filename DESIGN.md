@@ -36,10 +36,13 @@ game rather than marking it.
 
 ## Type
 
-- **Display**: Black Ops One, bundled (`assets/fonts/`, OFL licence beside it),
-  always upper case, tracking 1–2.4. Page titles, the game wordmark, PLAY, the
-  editor title and the confirmation dialogs. If the font is missing the same
-  style falls back to the heaviest monospaced system face.
+- **Display**: Anton, bundled (`assets/fonts/`, OFL licence beside it), always
+  upper case, tracking 0.4–2.4. The game names in the rail, page titles, the
+  hero wordmark, PLAY, the editor title and the confirmation dialogs. It is the
+  closest free match to the condensed caps of the Fallout title card; the games'
+  own faces (Univers 59 Condensed, Gothic 821 Condensed) are proprietary and
+  cannot ship. If the font is missing the same style falls back to the heaviest
+  monospaced system face.
 - **Label**: SF Mono semibold or bold, 8–10pt, tracking 0.2–1.3, upper case.
   Rail items, button faces, row details, field chips, footnotes.
 - **Body**: SF regular, 12–14pt. Taglines and sentences the player reads.

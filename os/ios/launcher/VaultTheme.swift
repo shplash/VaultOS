@@ -48,7 +48,7 @@ extension View {
 }
 
 enum VaultUI {
-    static let displayName = "BlackOpsOne-Regular"
+    static let displayName = "Anton-Regular"
 
     static let hull = UIColor(red: 0.039, green: 0.043, blue: 0.047, alpha: 1)
     static let plate = UIColor(red: 0.078, green: 0.086, blue: 0.102, alpha: 1)

@@ -304,15 +304,17 @@ struct LauncherView: View {
                 }
             }
         } label: {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 7) {
                     Circle()
                         .fill(installed(game) ? game.accent : Theme.faint)
-                        .frame(width: 5, height: 5)
+                        .frame(width: 6, height: 6)
 
                     Text(game.title.uppercased())
-                        .font(Vault.display(16))
-                        .kerning(1.2)
+                        .font(Vault.display(22))
+                        .kerning(0.4)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
 
