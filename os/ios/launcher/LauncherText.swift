@@ -50,6 +50,13 @@ enum L {
         .french: [
             // Pages
             "Home": "Accueil",
+            "DECK": "PONT",
+            "VIDEO": "VIDÉO",
+            "SYSTEM": "SYSTÈME",
+            "MANUAL": "MANUEL",
+            "INFO": "INFOS",
+            "AUDIO": "AUDIO",
+            "CONTROLS": "COMMANDES",
             "Display": "Affichage",
             "Audio": "Audio",
             "Game": "Jeu",
@@ -317,6 +324,13 @@ enum L {
 
         .german: [
             "Home": "Start",
+            "DECK": "DECK",
+            "VIDEO": "VIDEO",
+            "SYSTEM": "SYSTEM",
+            "MANUAL": "HANDBUCH",
+            "INFO": "INFO",
+            "AUDIO": "AUDIO",
+            "CONTROLS": "STEUERUNG",
             "Display": "Anzeige",
             "Audio": "Audio",
             "Game": "Spiel",
@@ -572,6 +586,13 @@ enum L {
 
         .italian: [
             "Home": "Home",
+            "DECK": "PONTE",
+            "VIDEO": "VIDEO",
+            "SYSTEM": "SISTEMA",
+            "MANUAL": "MANUALE",
+            "INFO": "INFO",
+            "AUDIO": "AUDIO",
+            "CONTROLS": "COMANDI",
             "Display": "Schermo",
             "Audio": "Audio",
             "Game": "Gioco",
@@ -827,6 +848,13 @@ enum L {
 
         .spanish: [
             "Home": "Inicio",
+            "DECK": "CUBIERTA",
+            "VIDEO": "VÍDEO",
+            "SYSTEM": "SISTEMA",
+            "MANUAL": "MANUAL",
+            "INFO": "INFO",
+            "AUDIO": "AUDIO",
+            "CONTROLS": "CONTROLES",
             "Display": "Pantalla",
             "Audio": "Audio",
             "Game": "Juego",

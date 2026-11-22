@@ -318,6 +318,7 @@ if(IOS)
         "os/ios/launcher/LauncherModel.swift"
         "os/ios/launcher/LauncherText.swift"
         "os/ios/launcher/LauncherView.swift"
+        "os/ios/launcher/VaultTheme.swift"
     )
 
     target_include_directories(${EXECUTABLE_NAME} PRIVATE
@@ -335,6 +336,7 @@ if(APPLE)
         # for Fallout, "blue moon" for Fallout 2, and "intro music" as the shared
         # fallback used by any game without a theme of its own.
         file(GLOB MUSIC_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/assets/audio/*.mp3")
+        file(GLOB FONT_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/assets/fonts/*")
 
         set(RESOURCES
             "os/ios/AppIcon.xcassets"
@@ -345,6 +347,7 @@ if(APPLE)
             "${CMAKE_SOURCE_DIR}/assets/artwork/fallout1.webp"
             "${CMAKE_SOURCE_DIR}/assets/artwork/fallout2.jpeg"
             ${MUSIC_RESOURCES}
+            ${FONT_RESOURCES}
         )
 
         target_sources(${EXECUTABLE_NAME} PUBLIC ${RESOURCES})
