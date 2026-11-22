@@ -28,6 +28,9 @@ namespace {
 std::atomic<uint64_t> g_progress_done { 0 };
 std::atomic<uint64_t> g_progress_total { 0 };
 
+int64_t g_pack_bytes[LAUNCHER_LANGUAGE_SPANISH + 1];
+int64_t g_pack_largest;
+
 std::mutex g_message_mutex;
 std::string g_status;
 std::string g_error;
@@ -1204,6 +1207,27 @@ static std::string canonical_text_path(const std::string& relative, int32_t& lan
     return relative;
 }
 
+static int canonical_language_index(const std::string& canonical)
+{
+    if (canonical == "english") {
+        return LAUNCHER_LANGUAGE_ENGLISH;
+    }
+    if (canonical == "french") {
+        return LAUNCHER_LANGUAGE_FRENCH;
+    }
+    if (canonical == "german") {
+        return LAUNCHER_LANGUAGE_GERMAN;
+    }
+    if (canonical == "italian") {
+        return LAUNCHER_LANGUAGE_ITALIAN;
+    }
+    if (canonical == "spanish") {
+        return LAUNCHER_LANGUAGE_SPANISH;
+    }
+
+    return -1;
+}
+
 int launcher_install_language_pack(const char* zip_path, const char* install_dir, int32_t* out_languages)
 {
     clear_messages();
@@ -1275,6 +1299,29 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
     if (files.empty()) {
         fail("This ZIP has no text folder. A language pack is the game's own data/text folder, zipped.");
         return LAUNCHER_ERROR;
+    }
+
+    for (int index = 0; index <= LAUNCHER_LANGUAGE_SPANISH; index++) {
+        g_pack_bytes[index] = 0;
+    }
+    g_pack_largest = 0;
+
+    for (const PackFile& file : files) {
+        const size_t start = sizeof("text/") - 1;
+        const size_t slash = file.relative.find('/', start);
+        if (slash == std::string::npos) {
+            continue;
+        }
+
+        const int index = canonical_language_index(lower_ascii(file.relative.substr(start, slash - start)));
+        if (index < 0) {
+            continue;
+        }
+
+        g_pack_bytes[index] += static_cast<int64_t>(file.entry->uncompressed_size);
+        if (g_pack_bytes[index] > g_pack_largest) {
+            g_pack_largest = g_pack_bytes[index];
+        }
     }
 
     // The engine reads `data` before master.dat, so a language the installation
@@ -1645,6 +1692,20 @@ int launcher_write_options(const char* install_dir, const LauncherOptions* optio
 
     set_status("Settings saved.");
     return LAUNCHER_OK;
+}
+
+int64_t launcher_language_pack_bytes(int32_t language)
+{
+    if (language < 0 || language > LAUNCHER_LANGUAGE_SPANISH) {
+        return 0;
+    }
+
+    return g_pack_bytes[language];
+}
+
+int64_t launcher_language_pack_largest(void)
+{
+    return g_pack_largest;
 }
 
 double launcher_progress(void)

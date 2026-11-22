@@ -148,6 +148,7 @@ final class LauncherModel: ObservableObject {
 
             defaults.set(selectedGame.rawValue, forKey: "launcher.game")
             savesNotice = nil
+            importSummary = nil
 
             if settingsLoaded {
                 saveSettings(for: oldValue)
@@ -612,6 +613,7 @@ final class LauncherModel: ObservableObject {
                     self.progress = 1
                     self.statusText = "Language files added."
                     self.selectInstalledLanguage(mask: languages)
+                    self.importSummary = LauncherModel.languagePackSummary(language: self.language)
                 } else {
                     self.errorMessage = failure.isEmpty ? "Installation failed." : failure
                     self.statusText = ""
@@ -649,6 +651,8 @@ final class LauncherModel: ObservableObject {
     /// A confirmation under the Savegames row, kept until the page or the game
     /// changes.
     @Published var savesNotice: String?
+
+    @Published var importSummary: String?
 
     /// The backup just written, offered to the share sheet so a copy can be
     /// dropped into Files, iCloud or anywhere else that takes a file.
@@ -761,6 +765,32 @@ final class LauncherModel: ObservableObject {
         savesNotice = text
     }
 
+    private static func languagePackSummary(language: Int) -> String {
+        let names = LauncherModel.languageNames
+        let name = names.indices.contains(language) ? names[language] : "ENGLISH"
+        let bytes = launcher_language_pack_bytes(Int32(language))
+        let largest = max(launcher_language_pack_largest(), bytes)
+
+        let actual = String(format: "%.1f", Double(bytes) / 1_000_000)
+        let full = String(format: "%.1f", Double(largest) / 1_000_000)
+
+        var line = L.t("Text in the pack: {size} MB. A full language is about {full} MB.")
+        line = line.replacingOccurrences(of: "{size}", with: actual)
+        line = line.replacingOccurrences(of: "{full}", with: full)
+
+        let share = largest > 0 ? Double(bytes) / Double(largest) : 0
+        let verdict: String
+        if share >= 0.75 {
+            verdict = "Looks like a complete language pack."
+        } else if share >= 0.35 {
+            verdict = "Only part of a language pack: some text will stay English."
+        } else {
+            verdict = "Very little text in this pack: most of it will stay English."
+        }
+
+        return name + " — " + line + "\n" + L.t(verdict)
+    }
+
     private func startProgressUpdates() {
         stopProgressUpdates()
         progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -828,6 +858,7 @@ final class LauncherModel: ObservableObject {
         guard install.installed == 1, !isInstalling else {
             return
         }
+        importSummary = nil
         if applyOptions() {
             stopProgressUpdates()
             onPlay()

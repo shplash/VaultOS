@@ -108,6 +108,7 @@ struct LauncherView: View {
         }
         .onChange(of: page) { _ in
             model.savesNotice = nil
+            model.importSummary = nil
         }
         .onChange(of: model.install.installed) { installed in
             if installed == 1 {
@@ -409,6 +410,13 @@ struct LauncherView: View {
                         .font(.system(size: 10, weight: .regular, design: .monospaced))
                         .foregroundColor(Theme.faint)
                         .lineLimit(1)
+                } else if let summary = model.importSummary {
+                    Text(summary)
+                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .foregroundColor(Theme.faint)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 8)
                 }
 
                 footnote(model.install.has_saves == 1
