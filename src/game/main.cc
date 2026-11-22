@@ -513,6 +513,8 @@ static void main_selfrun_play()
 // 0x472D90
 static void main_death_scene()
 {
+    debug_printf("[death] scene start\n");
+
     // 0x4725B0
     static const char* deathFileNameList[] = {
         "narrator\\nar_3",
@@ -570,11 +572,14 @@ static void main_death_scene()
 
                 loadColorTable("art\\intrface\\death.pal");
                 palette_fade_to(cmap);
+                debug_printf("[death] palette faded\n");
 
                 int deathFileNameIndex = roll_random(1, sizeof(deathFileNameList) / sizeof(*deathFileNameList)) - 1;
 
                 main_death_voiceover_done = false;
                 gsound_speech_callback_set(main_death_voiceover_callback);
+
+                debug_printf("[death] speech %d\n", deathFileNameIndex);
 
                 unsigned int delay;
                 if (gsound_speech_play(deathFileNameList[deathFileNameIndex], 10, 14, 15) == -1) {
@@ -602,6 +607,8 @@ static void main_death_scene()
                     renderPresent();
                     sharedFpsLimiter.throttle();
                 } while (elapsed_time(time) < delay);
+
+                debug_printf("[death] loop done, key %d\n", keyCode);
 
                 gsound_speech_callback_set(NULL);
 
@@ -633,6 +640,8 @@ static void main_death_scene()
     }
 
     gmouse_set_cursor(MOUSE_CURSOR_ARROW);
+
+    debug_printf("[death] scene end\n");
 
     cycle_enable();
 }

@@ -516,6 +516,11 @@ void _mouse_info()
     if (iosListScreen != iosScreenValue()) {
         iosListScreen = iosScreenValue();
         iosListReset();
+
+        if (iosDragState != IOS_DRAG_IDLE) {
+            iosDragReset();
+            _mouse_simulate_input(0, 0, 0);
+        }
     }
 
     if (iosListWheel) {

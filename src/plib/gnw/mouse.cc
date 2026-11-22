@@ -561,6 +561,11 @@ void mouse_info()
     if (ios_list_screen != ios_screen) {
         ios_list_screen = ios_screen;
         ios_list_reset();
+
+        if (ios_drag_state != IOS_DRAG_IDLE) {
+            ios_drag_reset();
+            mouse_simulate_input(0, 0, 0);
+        }
     }
 
     if (ios_list_wheel) {
