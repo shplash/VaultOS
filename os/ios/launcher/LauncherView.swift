@@ -1204,7 +1204,7 @@ struct LauncherView: View {
                       detail: "Switch to attack mode by itself when a fight starts.",
                       isOn: $model.autoTarget)
 
-            row("Button colour", detail: "White, orange, green or blue") {
+            row("Button colour", detail: "The tint a control takes while you hold it") {
                 Menu {
                     ForEach(ControlColour.allCases) { colour in
                         Button(L.t(colour.title)) {
