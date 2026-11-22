@@ -210,8 +210,7 @@ struct LauncherView: View {
                     }
                 }
             }
-            .padding(.top, 16)
-            .padding(.bottom, 8)
+            .padding(.bottom, 11)
 
             Rectangle()
                 .fill(Theme.line)
@@ -318,7 +317,6 @@ struct LauncherView: View {
                         .minimumScaleFactor(0.6)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
-                .frame(maxWidth: .infinity)
 
                 Rectangle()
                     .fill(selected ? game.accent : Color.clear)
