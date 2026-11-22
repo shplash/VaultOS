@@ -355,16 +355,6 @@ struct LauncherView: View {
 
     private var homeSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
-                aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 22)
-            .padding(.top, 16)
-            .padding(.bottom, 2)
-
             hero
 
             Rectangle()
@@ -492,6 +482,14 @@ struct LauncherView: View {
                 }
                 .padding(.leading, 22)
                 .frame(maxWidth: geometry.size.width * 0.60, alignment: .leading)
+
+                HStack(spacing: 8) {
+                    aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
+                    aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
+                }
+                .padding(.leading, 22)
+                .padding(.top, 14)
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             }
         }
         .frame(height: 190)
