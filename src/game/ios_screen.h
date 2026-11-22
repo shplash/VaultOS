@@ -25,6 +25,8 @@ typedef enum IosScreen {
     IOS_SCREEN_CALLED_SHOT = 14,
     // The death scene, which is drawn over the game view and takes no overlay.
     IOS_SCREEN_DEATH = 15,
+    // The main menu, which is drawn without any touch controls over it.
+    IOS_SCREEN_MENU = 16,
 } IosScreen;
 
 extern int ios_screen;

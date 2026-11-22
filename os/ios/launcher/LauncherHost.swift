@@ -662,6 +662,8 @@ enum ScreenMode: Int {
 
     case death = 15
 
+    case menu = 16
+
     var isMenu: Bool {
         return self != .game
     }
@@ -1779,7 +1781,7 @@ final class GameControlsOverlay: UIView {
             setNeedsLayout()
         }
 
-        if screen == .death {
+        if screen == .death || screen == .menu {
             for control in controls {
                 control.isHidden = true
             }

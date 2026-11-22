@@ -1,5 +1,7 @@
 #include "game/mainmenu.h"
 
+#include "game/ios_screen.h"
+
 #include <ctype.h>
 #include <limits.h>
 #include <string.h>
@@ -335,6 +337,8 @@ unsigned int main_menu_get_timeout()
 // 0x47341C
 int main_menu_loop()
 {
+    IosScreenScope screenScope(IOS_SCREEN_MENU);
+
     in_main_menu = true;
     debug_printf("[menu] loop begin\n");
 
@@ -344,6 +348,9 @@ int main_menu_loop()
     }
 
     debug_printf("[menu] cursor hidden %d\n", oldCursorIsHidden ? 1 : 0);
+
+    unsigned int tick = get_time();
+    debug_printf("[menu] tick\n");
 
     unsigned int tick = get_time();
 
