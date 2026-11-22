@@ -1016,6 +1016,10 @@ struct LauncherView: View {
                             Text(L.t("(recommended)"))
                                 .font(.system(size: 8, weight: .regular, design: .monospaced))
                                 .foregroundColor(Theme.faint)
+                        } else if preset.id == "full" {
+                            Text(L.t("(experimental)"))
+                                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                                .foregroundColor(Theme.faint)
                         }
                     }
 
