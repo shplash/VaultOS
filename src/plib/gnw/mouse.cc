@@ -448,6 +448,7 @@ extern "C" void fallout_ios_pickup_feedback(void);
 
 static bool ios_list_pending;
 static bool ios_list_scrolled;
+static bool ios_list_wheel;
 static int ios_list_start_x;
 static int ios_list_start_y;
 static int ios_list_last_y;
@@ -560,6 +561,12 @@ void mouse_info()
     if (ios_list_screen != ios_screen) {
         ios_list_screen = ios_screen;
         ios_list_reset();
+    }
+
+    if (ios_list_wheel) {
+        ios_list_wheel = false;
+        mouse_buttons &= ~MOUSE_EVENT_WHEEL;
+        raw_buttons &= ~MOUSE_EVENT_WHEEL;
     }
 
     if (!have_mouse) {
@@ -724,24 +731,17 @@ void mouse_info()
                     const int movedY = abs(gesture.y - ios_list_start_y);
 
                     if (movedX > slop || movedY > slop) {
-                        if (ios_list_step > 0) {
+                        if (ios_list_step > 0 && !ios_list_wheel) {
                             ios_list_accum += gesture.y - ios_list_last_y;
 
-                            while (ios_list_accum >= ios_list_step) {
+                            if (ios_list_accum >= ios_list_step || ios_list_accum <= -ios_list_step) {
+                                const int direction = ios_list_accum >= ios_list_step ? 1 : -1;
                                 gMouseWheelX = 0;
-                                gMouseWheelY = 1;
+                                gMouseWheelY = direction;
                                 mouse_buttons |= MOUSE_EVENT_WHEEL;
                                 raw_buttons |= MOUSE_EVENT_WHEEL;
-                                ios_list_accum -= ios_list_step;
-                                ios_list_scrolled = true;
-                            }
-
-                            while (ios_list_accum <= -ios_list_step) {
-                                gMouseWheelX = 0;
-                                gMouseWheelY = -1;
-                                mouse_buttons |= MOUSE_EVENT_WHEEL;
-                                raw_buttons |= MOUSE_EVENT_WHEEL;
-                                ios_list_accum += ios_list_step;
+                                ios_list_accum -= direction * ios_list_step;
+                                ios_list_wheel = true;
                                 ios_list_scrolled = true;
                             }
                         }

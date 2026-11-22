@@ -450,6 +450,7 @@ extern "C" void fallout_ios_pickup_feedback(void);
 
 static bool iosListPending;
 static bool iosListScrolled;
+static bool iosListWheel;
 static int iosListStartX;
 static int iosListStartY;
 static int iosListLastY;
@@ -515,6 +516,12 @@ void _mouse_info()
     if (iosListScreen != iosScreenValue()) {
         iosListScreen = iosScreenValue();
         iosListReset();
+    }
+
+    if (iosListWheel) {
+        iosListWheel = false;
+        gMouseEvent &= ~MOUSE_EVENT_WHEEL;
+        _raw_buttons &= ~MOUSE_EVENT_WHEEL;
     }
 
     if (!gMouseInitialized) {
@@ -668,24 +675,17 @@ void _mouse_info()
                     const int movedY = abs(gesture.y - iosListStartY);
 
                     if (movedX > slop || movedY > slop) {
-                        if (iosListStep > 0) {
+                        if (iosListStep > 0 && !iosListWheel) {
                             iosListAccum += gesture.y - iosListLastY;
 
-                            while (iosListAccum >= iosListStep) {
+                            if (iosListAccum >= iosListStep || iosListAccum <= -iosListStep) {
+                                const int direction = iosListAccum >= iosListStep ? 1 : -1;
                                 gMouseWheelX = 0;
-                                gMouseWheelY = 1;
+                                gMouseWheelY = direction;
                                 gMouseEvent |= MOUSE_EVENT_WHEEL;
                                 _raw_buttons |= MOUSE_EVENT_WHEEL;
-                                iosListAccum -= iosListStep;
-                                iosListScrolled = true;
-                            }
-
-                            while (iosListAccum <= -iosListStep) {
-                                gMouseWheelX = 0;
-                                gMouseWheelY = -1;
-                                gMouseEvent |= MOUSE_EVENT_WHEEL;
-                                _raw_buttons |= MOUSE_EVENT_WHEEL;
-                                iosListAccum += iosListStep;
+                                iosListAccum -= direction * iosListStep;
+                                iosListWheel = true;
                                 iosListScrolled = true;
                             }
                         }
