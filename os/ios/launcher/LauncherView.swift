@@ -692,7 +692,7 @@ struct LauncherView: View {
 
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 0) {
-                    tip("shplash", "Launcher interface and touch controls.")
+                    tip("shplash", "The iOS app, its launcher and touch controls.")
                     tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
                     tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
                     tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
@@ -973,20 +973,24 @@ struct LauncherView: View {
 
     private var displaySheet: some View {
         sheet(title: "VIDEO", detail: "Resolution, image scaling and frame rate", onReset: resetDisplay) {
-            HStack(spacing: 12) {
-                ForEach(model.presets) { preset in
-                    presetTile(preset)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 12) {
+                    ForEach(model.presets) { preset in
+                        presetTile(preset)
+                    }
                 }
+                .padding(.top, 12)
+                .padding(.bottom, 2)
+
+                footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
+                    .padding(.bottom, 10)
             }
-            .padding(.vertical, 12)
             .overlay(
                 Rectangle()
                     .fill(Theme.hairline)
                     .frame(height: 1),
                 alignment: .bottom
             )
-
-            footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
 
             row("Custom size", detail: "Written to the game's resolution file on Play") {
                 HStack(spacing: 10) {
@@ -2287,6 +2291,11 @@ private struct TouchControlEditor: View {
                 VStack(spacing: max(1, shortSide * 0.035)) {
                     if control == .fireMode {
                         Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.alwaysTemplate))
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: max(9, min(24, shortSide * 0.32)))
+                    } else if control == .swap, let hands = GameControlsOverlay.swapHandsImage() {
+                        Image(uiImage: hands.withRenderingMode(.alwaysTemplate))
                             .resizable()
                             .scaledToFit()
                             .frame(height: max(9, min(24, shortSide * 0.32)))

@@ -80,7 +80,8 @@ than marking it, so nothing coloured is allowed on their borders.
   selected one keeps the wash, and one that cannot be used fades to 35%. Every
   custom in-game button is one of these, so the item screens, the trading
   screens and the dialogues wear the same face as the HUD. The control editor
-  draws these faces at the size the game draws them.
+  draws these faces at the size the game draws them. The hand switcher carries
+  its own glyph: two hands with a double arrow between them.
 - **Save assembly**: QUICK SAVE and its chevron are two halves of one control.
   A single plate, outline and top highlight sit under both (`drawsOwnPlate` is
   off for the halves), the two sit flush, and a short 62% divider at 70% of the
