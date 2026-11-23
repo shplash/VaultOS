@@ -68,6 +68,10 @@ than marking it, so nothing coloured is allowed on their borders.
   except on the last row of a page.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
+- **Game selector**: two stacked tiles at the top of the rail. The selected
+  game is an accent-tinted plate with an accent outline and its name in white,
+  the other a 4% plate with a hairline and its name faint. The name is centred
+  in both tiles, so switching game never moves it.
 - **Touch control** (`LabeledControlButton`): a dark plate at 80% with a faint
   top-down shade, one 1.25pt charcoal outline, a thin lit line along its top
   edge and a small shadow, a glyph above a mono label, both in the player's

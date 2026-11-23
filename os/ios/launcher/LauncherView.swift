@@ -203,7 +203,7 @@ struct LauncherView: View {
 
     private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            VStack(spacing: 3) {
+            VStack(spacing: 2) {
                 ForEach(FalloutGame.allCases) { game in
                     gameTab(game)
                 }
@@ -296,6 +296,7 @@ struct LauncherView: View {
     /// The game switcher used at the top of the rail.
     private func gameTab(_ game: FalloutGame) -> some View {
         let selected = model.selectedGame == game
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
 
         return Button {
             if model.selectedGame != game {
@@ -304,22 +305,21 @@ struct LauncherView: View {
                 }
             }
         } label: {
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(game.accent)
-                    .frame(width: 6, height: 6)
-
-                Text(game.title.uppercased())
-                    .font(Vault.display(32))
-                    .kerning(0.4)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .foregroundColor(selected ? Theme.text : Theme.faint)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .contentShape(Rectangle())
+            Text(game.title.uppercased())
+                .font(Vault.display(22))
+                .kerning(0.4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .foregroundColor(selected ? Theme.text : Theme.faint)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 6)
+                .background(shape.fill(selected ? game.accent.opacity(0.16) : Color.white.opacity(0.04)))
+                .overlay(shape.stroke(selected ? game.accent.opacity(0.8) : Theme.hairline, lineWidth: 1))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(game.title)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private var statusText: String {
@@ -972,7 +972,7 @@ struct LauncherView: View {
     }
 
     private var displaySheet: some View {
-        sheet(title: "VIDEO", detail: "How large the game world and its interface are drawn", onReset: resetDisplay) {
+        sheet(title: "VIDEO", detail: "Resolution, image scaling and frame rate", onReset: resetDisplay) {
             HStack(spacing: 12) {
                 ForEach(model.presets) { preset in
                     presetTile(preset)
@@ -1069,7 +1069,7 @@ struct LauncherView: View {
             model.apply(preset: preset)
         } label: {
             HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(L.t(preset.id.uppercased()))
                             .font(.system(size: 9, weight: .semibold, design: .monospaced))
@@ -1088,7 +1088,7 @@ struct LauncherView: View {
                     }
 
                     Text(verbatim: "\(preset.width) × \(preset.height)")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(Vault.label(15, weight: .bold))
                         .foregroundColor(selected ? Theme.text : Theme.dim)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -1096,20 +1096,22 @@ struct LauncherView: View {
 
                 Spacer(minLength: 0)
 
-                Text(selected ? L.t("IN USE") : L.t("USE"))
-                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                    .foregroundColor(selected ? accent : Theme.faint)
+                if selected {
+                    Text(L.t("IN USE"))
+                        .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                        .foregroundColor(accent)
+                }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(selected ? accent.opacity(0.12) : Color.white.opacity(0.04))
+                    .fill(selected ? accent.opacity(0.16) : Color.white.opacity(0.04))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(selected ? accent.opacity(0.6) : Theme.hairline, lineWidth: 1)
+                    .stroke(selected ? accent.opacity(0.8) : Theme.hairline, lineWidth: 1)
             )
             .contentShape(Rectangle())
         }
@@ -1238,7 +1240,7 @@ struct LauncherView: View {
     }
 
     private var controlsSheet: some View {
-        sheet(title: "CONTROLS", detail: "Colour and opacity of the on-screen controls", onReset: resetControls) {
+        sheet(title: "CONTROLS", detail: "Size, colour and opacity of the on-screen controls", onReset: resetControls) {
             toggleRow("On-screen controls",
                       detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
                       isOn: $model.touchControls)
@@ -1690,17 +1692,17 @@ private struct DimensionField: View {
 
             TextField("", text: $text)
                 .keyboardType(.numberPad)
-                .font(.system(size: 15, weight: .medium))
+                .font(Vault.label(15, weight: .semibold))
                 .foregroundColor(Theme.text)
                 .accentColor(accent)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color.white.opacity(0.04))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Theme.hairline, lineWidth: 1)
                 )
                 .onChange(of: text) { newValue in
