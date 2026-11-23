@@ -210,6 +210,7 @@ struct LauncherView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 11)
 
             Rectangle()
@@ -227,7 +228,7 @@ struct LauncherView: View {
         }
         .padding(.leading, 10 + leading)
         .padding(.trailing, 10)
-        .padding(.top, 14)
+        .padding(.top, 11)
         .padding(.bottom, 14 + bottom)
         .frame(width: 152 + leading, alignment: .leading)
         .background(Theme.rail)
@@ -317,7 +318,6 @@ struct LauncherView: View {
                         .minimumScaleFactor(0.6)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
 
                 Rectangle()
                     .fill(selected ? game.accent : Color.clear)
@@ -701,7 +701,7 @@ struct LauncherView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .vaultPlate(corner: 20, fill: Theme.sheet)
+        .vaultPlate(corner: 20, fill: Theme.rail)
         .padding(.horizontal, 18)
         .padding(.top, 12)
         .padding(.bottom, 16 + screenInsets.bottom)
@@ -1205,7 +1205,7 @@ struct LauncherView: View {
                       detail: "Switch to attack mode by itself when a fight starts.",
                       isOn: $model.autoTarget)
 
-            row("Button colour", detail: "The tint a control takes while you hold it") {
+            row("Button colour", detail: "The colour of a control's label and the wash while you hold it") {
                 Menu {
                     ForEach(ControlColour.allCases) { colour in
                         Button(L.t(colour.title)) {
@@ -1518,7 +1518,7 @@ struct LauncherView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .vaultPlate(corner: 20, fill: Theme.sheet)
+        .vaultPlate(corner: 20, fill: Theme.rail)
         .padding(.horizontal, 18)
         .padding(.top, 12)
         .padding(.bottom, 16 + screenInsets.bottom)
@@ -1849,6 +1849,8 @@ private struct TouchControlEditor: View {
 
                 previewSurface(geometry.size)
 
+                saveAssemblyPreview(in: geometry.size)
+
                 ForEach(TouchControl.controls(for: game)) { control in
                     let controlSize = editorSize(for: control, in: geometry.size)
                     editorControl(control, size: controlSize, selected: selected == control)
@@ -1935,8 +1937,8 @@ private struct TouchControlEditor: View {
 
                 Spacer(minLength: 14)
 
-                presetButton("FULL LAYOUT", profile: .full)
-                presetButton("HALF LAYOUT", profile: .half)
+                presetButton("PRESET 1", profile: .half)
+                presetButton("PRESET 2", profile: .full)
 
                 Button(L.t("RESET")) {
                     ControlLayout.reset(profile: profile, game: game)
@@ -2018,9 +2020,6 @@ private struct TouchControlEditor: View {
     private func presetButton(_ title: String, profile target: LayoutProfile) -> some View {
         Button(L.t(title)) {
             profile = target
-            if let preset = model.presets.first(where: { $0.id == target.rawValue }) {
-                model.apply(preset: preset)
-            }
             centers = ControlLayout.allCenters(profile: target, game: game)
             scales = ControlLayout.allScales(profile: target, game: game)
             dragOrigins.removeAll()
@@ -2064,10 +2063,20 @@ private struct TouchControlEditor: View {
 
             // A plain opaque red rectangle for the in-game HUD: the exact
             // footprint the controls have to avoid. No fake interface.
-            Rectangle()
-                .fill(Color.red.opacity(0.85))
-                .frame(width: bar.width, height: bar.height)
-                .offset(x: bar.minX, y: bar.minY)
+            ZStack {
+                Rectangle()
+                    .fill(Color.red.opacity(0.85))
+
+                Text(verbatim: "HUD")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .kerning(1.4)
+                    .foregroundColor(Color.white.opacity(0.9))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.horizontal, 2)
+            }
+            .frame(width: bar.width, height: bar.height)
+            .offset(x: bar.minX, y: bar.minY)
         }
         .clipped()
         .allowsHitTesting(false)
@@ -2093,7 +2102,16 @@ private struct TouchControlEditor: View {
         let screen = gameScreen(in: size)
         let scale = screen.width / max(CGFloat(model.width), 1)
         let barWidth = min(screen.width, TouchControlEditor.interfaceBarSize.width * scale)
-        let barHeight = min(screen.height, TouchControlEditor.interfaceBarSize.height * scale)
+
+        // The bar is 100 game pixels tall at every resolution, so past the HALF
+        // default it becomes a thin sliver of a bigger game screen. The marker
+        // keeps the height it has at that default, which is the room the
+        // controls need to keep clear of the HUD however large the game is set.
+        let half = LauncherModel.displayResolution(divisor: 3)
+        let height = min(CGFloat(model.height), CGFloat(half.1))
+        let barHeight = min(screen.height,
+                            TouchControlEditor.interfaceBarSize.height * screen.height / max(height, 1))
+
         return CGRect(x: screen.minX + (screen.width - barWidth) / 2,
                       y: screen.maxY - barHeight,
                       width: barWidth,
@@ -2101,12 +2119,7 @@ private struct TouchControlEditor: View {
     }
 
     private func editorSize(for control: TouchControl, in size: CGSize) -> CGSize {
-        let base = control.defaultSize(in: size, profile: profile)
-        let factor = scales[control] ?? 1
-        return CGSize(
-            width: max(24, base.width * factor),
-            height: max(24, base.height * factor)
-        )
+        return ControlLayout.displaySize(for: control, in: size, profile: profile, game: game)
     }
 
     private func editorCenter(for control: TouchControl, in size: CGSize) -> CGPoint {
@@ -2120,9 +2133,55 @@ private struct TouchControlEditor: View {
         )
     }
 
+    /// QUICK SAVE and the chevron share one plate in the game, with a divider
+    /// between them, so the editor draws the pair the same way rather than as
+    /// two buttons that are not what the player will see.
+    private func saveAssembly(in size: CGSize) -> (frame: CGRect, dividerX: CGFloat) {
+        let quickSize = editorSize(for: .quickSave, in: size)
+        let quickCenter = editorCenter(for: .quickSave, in: size)
+        let traySize = editorSize(for: .tray, in: size)
+        let trayCenter = editorCenter(for: .tray, in: size)
+
+        let quick = CGRect(x: quickCenter.x - quickSize.width / 2,
+                           y: quickCenter.y - quickSize.height / 2,
+                           width: quickSize.width,
+                           height: quickSize.height)
+        let tray = CGRect(x: trayCenter.x - traySize.width / 2,
+                          y: trayCenter.y - traySize.height / 2,
+                          width: traySize.width,
+                          height: traySize.height)
+        return (quick.union(tray), tray.minX)
+    }
+
+    private func saveAssemblyPreview(in size: CGSize) -> some View {
+        let assembly = saveAssembly(in: size)
+        let radius = max(6, min(min(18, assembly.frame.height * 0.20), assembly.frame.width * 0.28))
+        let dividerHeight = assembly.frame.height * 0.62
+
+        return ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(Vault.controlFill.opacity(0.8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .stroke(Vault.controlBorder, lineWidth: 1.5)
+                )
+                .frame(width: assembly.frame.width, height: assembly.frame.height)
+
+            Rectangle()
+                .fill(Vault.controlBorder.opacity(0.7))
+                .frame(width: 1, height: dividerHeight)
+                .offset(x: assembly.dividerX - assembly.frame.minX,
+                        y: (assembly.frame.height - dividerHeight) / 2)
+        }
+        .frame(width: assembly.frame.width, height: assembly.frame.height, alignment: .topLeading)
+        .position(x: assembly.frame.midX, y: assembly.frame.midY)
+        .allowsHitTesting(false)
+    }
+
     private func editorControl(_ control: TouchControl, size: CGSize, selected: Bool) -> some View {
         let shortSide = min(size.width, size.height)
         let shape = RoundedRectangle(cornerRadius: min(18, min(shortSide * 0.20, size.width * 0.28)), style: .continuous)
+        let joined = control == .quickSave || control == .tray
 
         return Group {
             if control == .skip {
@@ -2166,18 +2225,22 @@ private struct TouchControlEditor: View {
                             .font(.system(size: max(9, min(32, shortSide * 0.46)), weight: .semibold))
                     }
 
-                    Text(control.label)
-                        .font(Vault.label(max(9, min(13, shortSide * 0.19)), weight: .bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                    if control != .tray {
+                        Text(control.label)
+                            .font(Vault.label(max(9, min(13, shortSide * 0.19)), weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
                 }
             }
         }
-        .foregroundColor(Vault.controlContent)
+        .foregroundColor(accent)
         .frame(width: size.width, height: size.height)
         .background(
             Group {
-                if control == .joystick {
+                if joined {
+                    Color.clear
+                } else if control == .joystick {
                     Circle().fill(Vault.controlFill.opacity(0.8))
                 } else {
                     shape.fill(Vault.controlFill.opacity(0.8))
@@ -2186,7 +2249,11 @@ private struct TouchControlEditor: View {
         )
         .overlay(
             Group {
-                if control == .joystick {
+                if joined {
+                    if selected {
+                        shape.stroke(Color.white, lineWidth: 2.4)
+                    }
+                } else if control == .joystick {
                     Circle().stroke(selected ? Color.white : Vault.controlBorder,
                                     lineWidth: selected ? 2.4 : 1.5)
                 } else {

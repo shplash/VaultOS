@@ -210,10 +210,10 @@ final class LauncherHost {
 // the rest of the screen keeps working exactly as before.
 
 private enum ControlTheme {
-    /// The colour the player picked for the controls. It only ever shows where a
-    /// control answers to a touch - the wash of a held or selected button - so
-    /// the outlines, the glyphs and the labels stay neutral and never tint the
-    /// game underneath them.
+    /// The colour the player picked for the controls. It tints the glyphs, the
+    /// labels and the wash of a held or selected button; the plates, their
+    /// outlines and their shadows stay neutral, so nothing here tints the game
+    /// underneath them.
     static var control: UIColor {
         let key = LauncherModel.optionKey("buttonColour", for: ControlLayout.activeGame())
         let index = UserDefaults.standard.integer(forKey: key)
@@ -598,6 +598,18 @@ enum ControlLayout {
 
     static func setScale(_ scale: CGFloat, for control: TouchControl, profile: LayoutProfile, game: FalloutGame) {
         UserDefaults.standard.set(Double(min(max(scale, 0.55), 2.0)), forKey: key(control, scaleSuffix, profile: profile, game: game))
+    }
+
+    static func displaySize(for control: TouchControl, in bounds: CGSize, profile: LayoutProfile, game: FalloutGame) -> CGSize {
+        let defaults = UserDefaults.standard
+        let name = control == .joystick ? "joystickScale" : "buttonScale"
+        let global = CGFloat(defaults.object(forKey: LauncherModel.optionKey(name, for: game)) as? Double ?? 1.0)
+        let base = control.defaultSize(in: bounds, profile: profile)
+        let factor = max(0.55, global) * scale(for: control, profile: profile, game: game)
+        return CGSize(
+            width: max(22, min(bounds.width * 0.45, base.width * factor)),
+            height: max(22, min(bounds.height * 0.45, base.height * factor))
+        )
     }
 
     static func reset(profile: LayoutProfile, game: FalloutGame) {
@@ -1183,34 +1195,31 @@ final class GameControlsOverlay: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
 
-        let defaults = UserDefaults.standard
-        let joystickScale = CGFloat(defaults.object(forKey: LauncherModel.optionKey("joystickScale", for: game)) as? Double ?? 1.0)
-        let buttonScale = CGFloat(defaults.object(forKey: LauncherModel.optionKey("buttonScale", for: game)) as? Double ?? 1.0)
         let profile = ControlLayout.profileForCurrentResolution()
 
-        place(joystick, at: .joystick, profile: profile, size: scaledSize(for: .joystick, in: bounds.size, globalScale: joystickScale, profile: profile))
-        place(backButton, at: .back, profile: profile, size: scaledSize(for: .back, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(pipButton, at: .pip, profile: profile, size: scaledSize(for: .pip, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(actionButton, at: .action, profile: profile, size: scaledSize(for: .action, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(skipButton, at: .skip, profile: profile, size: scaledSize(for: .skip, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(joystick, at: .joystick, profile: profile, size: scaledSize(for: .joystick, in: bounds.size, profile: profile))
+        place(backButton, at: .back, profile: profile, size: scaledSize(for: .back, in: bounds.size, profile: profile))
+        place(pipButton, at: .pip, profile: profile, size: scaledSize(for: .pip, in: bounds.size, profile: profile))
+        place(actionButton, at: .action, profile: profile, size: scaledSize(for: .action, in: bounds.size, profile: profile))
+        place(skipButton, at: .skip, profile: profile, size: scaledSize(for: .skip, in: bounds.size, profile: profile))
 
         let row = TouchControl.bottomRow(for: profile)
         for (index, control) in row.enumerated() where index < sideButtons.count {
             place(sideButtons[index], at: control, profile: profile,
-                  size: scaledSize(for: control, in: bounds.size, globalScale: buttonScale, profile: profile))
+                  size: scaledSize(for: control, in: bounds.size, profile: profile))
         }
 
-        place(skillButton, at: .skill, profile: profile, size: scaledSize(for: .skill, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(swapButton, at: .swap, profile: profile, size: scaledSize(for: .swap, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(endButton, at: .end, profile: profile, size: scaledSize(for: .end, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(skillButton, at: .skill, profile: profile, size: scaledSize(for: .skill, in: bounds.size, profile: profile))
+        place(swapButton, at: .swap, profile: profile, size: scaledSize(for: .swap, in: bounds.size, profile: profile))
+        place(endButton, at: .end, profile: profile, size: scaledSize(for: .end, in: bounds.size, profile: profile))
 
-        place(reloadButton, at: .reload, profile: profile, size: scaledSize(for: .reload, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(reloadButton, at: .reload, profile: profile, size: scaledSize(for: .reload, in: bounds.size, profile: profile))
+        place(fireModeButton, at: .fireMode, profile: profile, size: scaledSize(for: .fireMode, in: bounds.size, profile: profile))
 
-        place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(quickSaveButton, at: .quickSave, profile: profile, size: scaledSize(for: .quickSave, in: bounds.size, globalScale: buttonScale, profile: profile))
-        place(trayButton, at: .tray, profile: profile, size: scaledSize(for: .tray, in: bounds.size, globalScale: buttonScale, profile: profile))
+        place(savesButton, at: .saves, profile: profile, size: scaledSize(for: .saves, in: bounds.size, profile: profile))
+        place(loadButton, at: .load, profile: profile, size: scaledSize(for: .load, in: bounds.size, profile: profile))
+        place(quickSaveButton, at: .quickSave, profile: profile, size: scaledSize(for: .quickSave, in: bounds.size, profile: profile))
+        place(trayButton, at: .tray, profile: profile, size: scaledSize(for: .tray, in: bounds.size, profile: profile))
         placeSaveAssembly()
 
         if !quickSaveNotice.isHidden {
@@ -1526,13 +1535,8 @@ final class GameControlsOverlay: UIView {
                       height: shown.height)
     }
 
-    private func scaledSize(for control: TouchControl, in bounds: CGSize, globalScale: CGFloat, profile: LayoutProfile) -> CGSize {
-        let base = control.defaultSize(in: bounds, profile: profile)
-        let factor = max(0.55, globalScale) * ControlLayout.scale(for: control, profile: profile, game: game)
-        return CGSize(
-            width: max(22, min(bounds.width * 0.45, base.width * factor)),
-            height: max(22, min(bounds.height * 0.45, base.height * factor))
-        )
+    private func scaledSize(for control: TouchControl, in bounds: CGSize, profile: LayoutProfile) -> CGSize {
+        return ControlLayout.displaySize(for: control, in: bounds, profile: profile, game: game)
     }
 
     private func place(_ view: UIView, at control: TouchControl, profile: LayoutProfile, size: CGSize) {
@@ -2121,7 +2125,7 @@ final class GameControlsOverlay: UIView {
     /// group is centred in the canvas so all four modes line up in the button.
     static func fireModeImage(_ mode: Int32) -> UIImage {
         let size = CGSize(width: 42, height: 20)
-        let color = ControlTheme.content
+        let color = ControlTheme.control
 
         return UIGraphicsImageRenderer(size: size).image { context in
             let cg = context.cgContext
@@ -2248,11 +2252,11 @@ private final class LabeledControlButton: UIControl {
         plate.shadowOpacity = 0.25
         plate.corner = 10
         insertSubview(plate, at: 0)
-        tintColor = ControlTheme.content
+        tintColor = ControlTheme.control
 
         // A translucent wash over the panel, for a control that is switched on
-        // rather than pressed. It is the only place the player's own colour
-        // shows: the outline and the glyphs stay neutral.
+        // rather than pressed. The player's colour shows here and in the labels;
+        // the plate and its outline stay neutral.
         selectionView.backgroundColor = ControlTheme.wash
         selectionView.isUserInteractionEnabled = false
         selectionView.isHidden = true
@@ -2278,7 +2282,7 @@ private final class LabeledControlButton: UIControl {
         label.numberOfLines = self.labelLines
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.6
-        label.textColor = ControlTheme.content
+        label.textColor = ControlTheme.control
         label.isUserInteractionEnabled = false
         addSubview(label)
 
@@ -2365,8 +2369,8 @@ private final class LabeledControlButton: UIControl {
         didSet {
             plate.fill = isHighlighted ? ControlTheme.pressed : normalBackground
             plate.edge = isHighlighted ? ControlTheme.pressedEdge : ControlTheme.border
-            tintColor = ControlTheme.content
-            label.textColor = ControlTheme.content
+            tintColor = ControlTheme.control
+            label.textColor = ControlTheme.control
             if !drawsOwnPlate {
                 pressWash.isHidden = !isHighlighted
             }

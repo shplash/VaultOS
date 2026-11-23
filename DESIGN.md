@@ -31,12 +31,11 @@ recolours the whole launcher from amber to teal and back. Nothing is allowed to
 hard-code one of the two accents.
 
 The in-game controls are the exception: they use the control colour the player
-picked in CONTROLS (white, orange, green or blue) only where a control answers
-to a touch - the wash of a held or selected button. Their plates, outlines,
-glyphs and labels are neutral: near-black `#101010`, one charcoal outline
-`#555555`, off-white content `#F2F2F2`, a lighter charcoal for a press. They sit
-over the game rather than marking it, so nothing coloured is allowed on their
-borders.
+picked in CONTROLS (white, orange, green or blue) on what a control says - its
+glyph and its label - and on the wash of a held or selected button. Their
+plates, outlines and shadows are neutral: near-black `#101010`, one charcoal
+outline `#555555`, a lighter charcoal for a press. They sit over the game rather
+than marking it, so nothing coloured is allowed on their borders.
 
 ## Type
 
@@ -70,12 +69,13 @@ borders.
   off.
 - **Touch control** (`LabeledControlButton`): a dark plate at 80% with a faint
   top-down shade, one 1.25pt charcoal outline, a thin lit line along its top
-  edge and a small shadow, a white glyph above a mono label; QUICK SAVE centres
-  its glyph and label together. A held control brightens its plate and outline
-  and washes with the player's control colour, a selected one keeps that wash,
-  and one that cannot be used fades to 35%. Every custom in-game button is one
-  of these, so the item screens, the trading screens and the dialogues wear the
-  same face as the HUD.
+  edge and a small shadow, a glyph above a mono label, both in the player's
+  control colour; QUICK SAVE centres its glyph and label together. A held
+  control brightens its plate and outline and washes with that colour, a
+  selected one keeps the wash, and one that cannot be used fades to 35%. Every
+  custom in-game button is one of these, so the item screens, the trading
+  screens and the dialogues wear the same face as the HUD. The control editor
+  draws these faces at the size the game draws them.
 - **Save assembly**: QUICK SAVE and its chevron are two halves of one control.
   A single plate, outline and top highlight sit under both (`drawsOwnPlate` is
   off for the halves), the two sit flush, and a short 62% divider at 70% of the
