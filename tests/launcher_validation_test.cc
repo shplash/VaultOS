@@ -462,6 +462,24 @@ int main()
         CHECK(!fs::exists(fallout1 / "data" / "text" / "english"));
     }
 
+    {
+        const fs::path withSaves = root / "Fallout with saves.zip";
+        write_zip(withSaves, {
+            { "master.dat", "installed-master" },
+            { "critter.dat", "installed-critter" },
+            { "data/art/tiles.trx", "installed-tiles" },
+            { "data/SAVEGAME/SLOT01/save.dat", "archive-save" },
+            { "SAVEGAME/SLOT01/save.dat", "archive-save" },
+        });
+
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(withSaves.string().c_str(), fallout1.string().c_str(), &options)
+            == LAUNCHER_OK);
+        CHECK(file_contains(fallout1 / "data" / "art" / "tiles.trx", "installed-tiles"));
+        CHECK(file_contains(fallout1 / "data" / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
+        CHECK(!fs::exists(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat"));
+    }
+
     // Uppercase installations (CD-era copies) are detected as well.
     const fs::path uppercase = root / "FALLOUT2";
     write_file(uppercase / "MASTER.DAT");

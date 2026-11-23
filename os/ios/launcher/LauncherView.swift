@@ -203,13 +203,13 @@ struct LauncherView: View {
 
     private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            VStack(spacing: 1) {
+            VStack(spacing: 3) {
                 ForEach(FalloutGame.allCases) { game in
                     gameTab(game)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 3)
+            .padding(.top, 6)
             .padding(.bottom, 11)
 
             Rectangle()
@@ -603,15 +603,15 @@ struct LauncherView: View {
             HStack(spacing: 4) {
                 Text(title)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .kerning(0.6)
+                    .kerning(0.8)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
             }
+            .fixedSize()
             .foregroundColor(primary ? Color.black.opacity(0.8) : Theme.faint)
-            .padding(.horizontal, 9)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -906,7 +906,7 @@ struct LauncherView: View {
             switch self {
             case .touch:
                 return [
-                    ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches move, action and target."),
+                    ("Cursor", "One finger moves it, a tap clicks. Two-finger tap or ACTION switches between move, action and target."),
                     ("Inventory", L.t("Hold and drag an item to equip or move it.") + " " + L.t("Tap an item while INSPECT is toggled on to see its characteristics.") + " " + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")),
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to."),
                     ("Combat", "The START COMBAT button changes to SKIP TURN when combat starts."),
@@ -1048,7 +1048,7 @@ struct LauncherView: View {
     }
 
     private var audioSheet: some View {
-        sheet(title: "Audio", detail: "Volumes, kept per game", onReset: resetAudio) {
+        sheet(title: "AUDIO", detail: "Volumes, kept per game", onReset: resetAudio) {
             volumeRow("Master", value: $model.masterVolume)
             volumeRow("Music", value: $model.musicVolume)
             volumeRow("Effects", value: $model.sfxVolume)
@@ -1092,7 +1092,7 @@ struct LauncherView: View {
 
     private var gameSheet: some View {
         sheet(title: "SYSTEM", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
-            row("Language", detail: "Game text, voice, the launcher and the controls. This does not change the in-game language used, add more with LANGUAGE FILES on HOME to add your own.") {
+            row("Language", detail: "Game text, voice, the launcher and the controls. Add more languages with LANGUAGE FILES on HOME.") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
