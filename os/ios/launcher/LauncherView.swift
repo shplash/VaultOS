@@ -203,14 +203,12 @@ struct LauncherView: View {
 
     private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .top, spacing: 6) {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(FalloutGame.allCases) { game in
-                        gameTab(game)
-                    }
+            VStack(spacing: 1) {
+                ForEach(FalloutGame.allCases) { game in
+                    gameTab(game)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
             .padding(.bottom, 11)
 
             Rectangle()
@@ -228,7 +226,7 @@ struct LauncherView: View {
         }
         .padding(.leading, 10 + leading)
         .padding(.trailing, 10)
-        .padding(.top, 11)
+        .padding(.top, 14)
         .padding(.bottom, 14 + bottom)
         .frame(width: 152 + leading, alignment: .leading)
         .background(Theme.rail)
@@ -305,7 +303,11 @@ struct LauncherView: View {
                 }
             }
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(spacing: 3) {
+                if game == .fallout1 {
+                    gameTabRule(game, selected: selected)
+                }
+
                 HStack(spacing: 7) {
                     Circle()
                         .fill(game.accent)
@@ -318,14 +320,21 @@ struct LauncherView: View {
                         .minimumScaleFactor(0.6)
                         .foregroundColor(selected ? Theme.text : Theme.faint)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
 
-                Rectangle()
-                    .fill(selected ? game.accent : Color.clear)
-                    .frame(height: 2)
+                if game == .fallout2 {
+                    gameTabRule(game, selected: selected)
+                }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func gameTabRule(_ game: FalloutGame, selected: Bool) -> some View {
+        return Rectangle()
+            .fill(selected ? game.accent : Color.clear)
+            .frame(height: 2)
     }
 
     private var statusText: String {
@@ -1042,7 +1051,7 @@ struct LauncherView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(selected ? accent.opacity(0.12) : Vault.inset)
+                    .fill(selected ? accent.opacity(0.12) : Color.white.opacity(0.04))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1337,7 +1346,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.sheet)
+            .vaultPlate(corner: 18, fill: Theme.rail)
             .padding(24)
         }
     }
@@ -1389,7 +1398,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.sheet)
+            .vaultPlate(corner: 18, fill: Theme.rail)
             .padding(24)
         }
     }
@@ -1776,7 +1785,7 @@ private struct SmallButtonStyle: ButtonStyle {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
-                shape.fill(configuration.isPressed ? accent.opacity(0.18) : Vault.inset)
+                shape.fill(configuration.isPressed ? accent.opacity(0.18) : Color.white.opacity(0.04))
             )
             .overlay(shape.stroke(accent.opacity(configuration.isPressed ? 0.85 : 0.45), lineWidth: 1))
             .opacity(configuration.isPressed ? 0.9 : 1)
@@ -1824,6 +1833,7 @@ private struct TouchControlEditor: View {
     @State private var dragOrigins: [TouchControl: CGPoint] = [:]
     @State private var selected: TouchControl?
     @State private var barsHidden = false
+    @State private var revision = 0
 
     init(model: LauncherModel) {
         self.model = model
@@ -1842,8 +1852,13 @@ private struct TouchControlEditor: View {
         return model.controlColour.color
     }
 
+    private var traySymbol: String {
+        return ControlLayout.traySide(profile: profile, game: game) == .left ? "chevron.left" : "chevron.right"
+    }
+
     var body: some View {
         GeometryReader { geometry in
+            let _ = revision
             ZStack {
                 Theme.background.ignoresSafeArea()
 
@@ -1986,7 +2001,7 @@ private struct TouchControlEditor: View {
                 Text(L.t("SIZE"))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(1.1)
-                    .foregroundColor(selected == nil ? Theme.faint : accent)
+                    .foregroundColor(Theme.faint)
 
                 Slider(value: scaleBinding(for: selected), in: 0.55...1.8)
                     .accentColor(accent)
@@ -2123,34 +2138,41 @@ private struct TouchControlEditor: View {
     }
 
     private func editorCenter(for control: TouchControl, in size: CGSize) -> CGPoint {
-        let point = centers[control] ?? control.defaultCenter(for: profile)
+        let point: CGPoint
+        switch control {
+        case .tray, .load, .saves:
+            point = ControlLayout.centerPoint(for: control, profile: profile, game: game, in: size)
+            return point
+        default:
+            let stored = centers[control] ?? control.defaultCenter(for: profile)
+            point = CGPoint(x: stored.x * size.width, y: stored.y * size.height)
+        }
+
         let controlSize = editorSize(for: control, in: size)
         let halfWidth = controlSize.width / 2
         let halfHeight = controlSize.height / 2
         return CGPoint(
-            x: min(max(point.x * size.width, halfWidth), size.width - halfWidth),
-            y: min(max(point.y * size.height, halfHeight), size.height - halfHeight)
+            x: min(max(point.x, halfWidth), size.width - halfWidth),
+            y: min(max(point.y, halfHeight), size.height - halfHeight)
         )
+    }
+
+    private func frame(for control: TouchControl, in size: CGSize) -> CGRect {
+        let center = editorCenter(for: control, in: size)
+        let controlSize = editorSize(for: control, in: size)
+        return CGRect(x: center.x - controlSize.width / 2,
+                      y: center.y - controlSize.height / 2,
+                      width: controlSize.width,
+                      height: controlSize.height)
     }
 
     /// QUICK SAVE and the chevron share one plate in the game, with a divider
     /// between them, so the editor draws the pair the same way rather than as
     /// two buttons that are not what the player will see.
     private func saveAssembly(in size: CGSize) -> (frame: CGRect, dividerX: CGFloat) {
-        let quickSize = editorSize(for: .quickSave, in: size)
-        let quickCenter = editorCenter(for: .quickSave, in: size)
-        let traySize = editorSize(for: .tray, in: size)
-        let trayCenter = editorCenter(for: .tray, in: size)
-
-        let quick = CGRect(x: quickCenter.x - quickSize.width / 2,
-                           y: quickCenter.y - quickSize.height / 2,
-                           width: quickSize.width,
-                           height: quickSize.height)
-        let tray = CGRect(x: trayCenter.x - traySize.width / 2,
-                          y: trayCenter.y - traySize.height / 2,
-                          width: traySize.width,
-                          height: traySize.height)
-        return (quick.union(tray), tray.minX)
+        let quick = frame(for: .quickSave, in: size)
+        let tray = frame(for: .tray, in: size)
+        return (quick.union(tray), tray.midX > quick.midX ? tray.minX : tray.maxX)
     }
 
     private func saveAssemblyPreview(in size: CGSize) -> some View {
@@ -2170,7 +2192,7 @@ private struct TouchControlEditor: View {
             Rectangle()
                 .fill(Vault.controlBorder.opacity(0.7))
                 .frame(width: 1, height: dividerHeight)
-                .offset(x: assembly.dividerX - assembly.frame.minX,
+                .offset(x: assembly.dividerX - assembly.frame.minX - 0.5,
                         y: (assembly.frame.height - dividerHeight) / 2)
         }
         .frame(width: assembly.frame.width, height: assembly.frame.height, alignment: .topLeading)
@@ -2221,14 +2243,15 @@ private struct TouchControlEditor: View {
                             .scaledToFit()
                             .frame(height: max(9, min(24, shortSide * 0.32)))
                     } else {
-                        Image(systemName: control.symbol)
+                        Image(systemName: control == .tray ? traySymbol : control.symbol)
                             .font(.system(size: max(9, min(32, shortSide * 0.46)), weight: .semibold))
                     }
 
                     if control != .tray {
                         Text(control.label)
                             .font(Vault.label(max(9, min(13, shortSide * 0.19)), weight: .bold))
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
                             .minimumScaleFactor(0.6)
                     }
                 }
@@ -2268,7 +2291,7 @@ private struct TouchControlEditor: View {
     /// The size of whichever control is selected, as a readout for the panel.
     private var sizePercent: String {
         guard let selected = selected, let scale = scales[selected] else {
-            return "—"
+            return "100%"
         }
         return "\(Int((scale * 100).rounded()))%"
     }
@@ -2300,24 +2323,50 @@ private struct TouchControlEditor: View {
                 selected = control
 
                 if dragOrigins[control] == nil {
-                    dragOrigins[control] = centers[control] ?? control.defaultCenter(for: profile)
+                    let start = editorCenter(for: control, in: size)
+                    dragOrigins[control] = CGPoint(x: start.x / max(size.width, 1),
+                                                   y: start.y / max(size.height, 1))
                 }
                 guard let origin = dragOrigins[control] else {
                     return
                 }
 
-                let controlSize = editorSize(for: control, in: size)
-                let halfWidth = controlSize.width / 2
-                let halfHeight = controlSize.height / 2
-                let x = min(max((origin.x * size.width + value.translation.width) / max(size.width, 1),
-                                (halfWidth + 4) / max(size.width, 1)),
-                            (size.width - halfWidth - 4) / max(size.width, 1))
-                let y = min(max((origin.y * size.height + value.translation.height) / max(size.height, 1),
-                                (halfHeight + 4) / max(size.height, 1)),
-                            (size.height - halfHeight - 4) / max(size.height, 1))
+                let moved = CGPoint(x: origin.x * size.width + value.translation.width,
+                                    y: origin.y * size.height + value.translation.height)
 
-                centers[control] = CGPoint(x: x, y: y)
-                ControlLayout.setCenter(CGPoint(x: x, y: y), for: control, profile: profile, game: game)
+                switch control {
+                case .tray:
+                    let quick = frame(for: .quickSave, in: size)
+                    ControlLayout.setTraySide(moved.x < quick.midX ? .left : .right,
+                                              profile: profile,
+                                              game: game)
+                    revision += 1
+                case .load, .saves:
+                    let assembly = saveAssembly(in: size).frame
+                    ControlLayout.setAnchor(ControlLayout.nearestAnchor(to: moved,
+                                                                       size: editorSize(for: control, in: size),
+                                                                       assembly: assembly),
+                                            for: control,
+                                            profile: profile,
+                                            game: game)
+                    revision += 1
+                default:
+                    let controlSize = editorSize(for: control, in: size)
+                    let halfWidth = controlSize.width / 2
+                    let halfHeight = controlSize.height / 2
+                    let x = min(max(moved.x / max(size.width, 1),
+                                    (halfWidth + 4) / max(size.width, 1)),
+                                (size.width - halfWidth - 4) / max(size.width, 1))
+                    let y = min(max(moved.y / max(size.height, 1),
+                                    (halfHeight + 4) / max(size.height, 1)),
+                                (size.height - halfHeight - 4) / max(size.height, 1))
+
+                    centers[control] = CGPoint(x: x, y: y)
+                    ControlLayout.setCenter(CGPoint(x: x, y: y), for: control, profile: profile, game: game)
+                    if control == .quickSave {
+                        revision += 1
+                    }
+                }
             }
             .onEnded { _ in
                 dragOrigins[control] = nil

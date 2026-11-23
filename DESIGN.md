@@ -62,8 +62,8 @@ than marking it, so nothing coloured is allowed on their borders.
 
 - **Primary action** (`PrimaryButtonStyle`): accent plate, ink label in the
   display face, 82% while pressed.
-- **Secondary action** (`SmallButtonStyle`): inset plate, accent outline and
-  accent mono label; pressed fills with 18% accent.
+- **Secondary action** (`SmallButtonStyle`): translucent grey plate (white 4%),
+  accent outline and accent mono label; pressed fills with 18% accent.
 - **Row**: title and detail on the left, control on the right, hairline under.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
@@ -81,7 +81,9 @@ than marking it, so nothing coloured is allowed on their borders.
   off for the halves), the two sit flush, and a short 62% divider at 70% of the
   outline colour separates them. QUICK SAVE takes 73% of the width, the chevron
   the rest; each keeps its own action, press state and touch area. The chevron
-  opens a tray with LOAD and SAVE, closed by default.
+  snaps to either side of QUICK SAVE, and its glyph and the divider turn with
+  it. The chevron opens a tray with LOAD and SAVE, closed by default; both hang
+  on the assembly's four corners and four edges.
 - **Camera pad** (`CameraJoystickControl`): a thin ring and crosshair over the
   hull, with a plain knob; no glow.
 - **Help card**: hull plate with a hairline edge and mono body text.

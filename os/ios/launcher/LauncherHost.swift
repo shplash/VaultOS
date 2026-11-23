@@ -280,14 +280,14 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .joystick: english = "CAMERA"
         case .back: english = "BACK"
         case .pip: english = "PIP"
-        case .action: english = "ACTION"
+        case .action: english = "MOVE"
         case .skip: english = "END TURN"
         case .inv: english = "INV"
         case .map: english = "MAP"
         case .cha: english = "CHA"
         case .skill: english = "SKILL"
         case .swap: english = "SWAP"
-        case .end: english = "END"
+        case .end: english = "END COMBAT"
         case .reload: english = "RELOAD"
         case .fireMode: english = "ATTACK MODE"
         case .load: english = "LOAD"
@@ -303,7 +303,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .joystick: return "circle.dashed"
         case .back: return "chevron.backward"
         case .pip: return "book.closed"
-        case .action: return "hand.tap"
+        case .action: return "arrow.up.and.down.and.arrow.left.and.right"
         case .skip: return "forward.end"
         case .inv: return "bag"
         case .map: return "map"
@@ -443,6 +443,8 @@ enum LayoutProfile: String {
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
     private static let layoutVersion = 18
+    private static let anchorSuffix = ".anchor"
+    private static let sideSuffix = ".side"
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
     private static let scaleSuffix = ".scale"
@@ -612,12 +614,139 @@ enum ControlLayout {
         )
     }
 
+    enum TraySide: Int {
+        case right = 0
+        case left = 1
+    }
+
+    enum SaveAnchor: Int, CaseIterable {
+        case topLeft = 0
+        case top
+        case topRight
+        case right
+        case bottomRight
+        case bottom
+        case bottomLeft
+        case left
+
+        var horizontal: Int {
+            switch self {
+            case .topLeft, .left, .bottomLeft: return -1
+            case .topRight, .right, .bottomRight: return 1
+            default: return 0
+            }
+        }
+
+        var vertical: Int {
+            switch self {
+            case .topLeft, .top, .topRight: return -1
+            case .bottomLeft, .bottom, .bottomRight: return 1
+            default: return 0
+            }
+        }
+    }
+
+    static func traySide(profile: LayoutProfile, game: FalloutGame) -> TraySide {
+        let raw = UserDefaults.standard.object(forKey: key(.tray, sideSuffix, profile: profile, game: game)) as? Int ?? 0
+        return TraySide(rawValue: raw) ?? .right
+    }
+
+    static func setTraySide(_ side: TraySide, profile: LayoutProfile, game: FalloutGame) {
+        UserDefaults.standard.set(side.rawValue, forKey: key(.tray, sideSuffix, profile: profile, game: game))
+    }
+
+    static func anchor(for control: TouchControl, profile: LayoutProfile, game: FalloutGame) -> SaveAnchor {
+        let raw = UserDefaults.standard.object(forKey: key(control, anchorSuffix, profile: profile, game: game)) as? Int
+        if let raw = raw, let anchor = SaveAnchor(rawValue: raw) {
+            return anchor
+        }
+        return control == .saves ? .bottomRight : .right
+    }
+
+    static func setAnchor(_ anchor: SaveAnchor, for control: TouchControl, profile: LayoutProfile, game: FalloutGame) {
+        UserDefaults.standard.set(anchor.rawValue, forKey: key(control, anchorSuffix, profile: profile, game: game))
+    }
+
+    static func anchoredCenter(_ anchor: SaveAnchor, size: CGSize, assembly: CGRect) -> CGPoint {
+        let x: CGFloat
+        switch anchor.horizontal {
+        case -1: x = assembly.minX - size.width / 2
+        case 1: x = assembly.maxX + size.width / 2
+        default: x = assembly.midX
+        }
+
+        let y: CGFloat
+        switch anchor.vertical {
+        case -1: y = assembly.minY - size.height / 2
+        case 1: y = assembly.maxY + size.height / 2
+        default: y = assembly.midY
+        }
+
+        return CGPoint(x: x, y: y)
+    }
+
+    static func nearestAnchor(to point: CGPoint, size: CGSize, assembly: CGRect) -> SaveAnchor {
+        var best = SaveAnchor.right
+        var bestDistance = CGFloat.greatestFiniteMagnitude
+
+        for anchor in SaveAnchor.allCases {
+            let center = anchoredCenter(anchor, size: size, assembly: assembly)
+            let dx = center.x - point.x
+            let dy = center.y - point.y
+            let distance = dx * dx + dy * dy
+            if distance < bestDistance {
+                bestDistance = distance
+                best = anchor
+            }
+        }
+
+        return best
+    }
+
+    static func quickSaveFrame(profile: LayoutProfile, game: FalloutGame, in bounds: CGSize) -> CGRect {
+        let stored = center(for: .quickSave, profile: profile, game: game)
+        let size = displaySize(for: .quickSave, in: bounds, profile: profile, game: game)
+        return CGRect(x: stored.x * bounds.width - size.width / 2,
+                      y: stored.y * bounds.height - size.height / 2,
+                      width: size.width,
+                      height: size.height)
+    }
+
+    static func centerPoint(for control: TouchControl, profile: LayoutProfile, game: FalloutGame, in bounds: CGSize) -> CGPoint {
+        switch control {
+        case .tray, .load, .saves:
+            let quick = quickSaveFrame(profile: profile, game: game, in: bounds)
+            let traySize = displaySize(for: .tray, in: bounds, profile: profile, game: game)
+            let trayX = traySide(profile: profile, game: game) == .left
+                ? quick.minX - traySize.width / 2
+                : quick.maxX + traySize.width / 2
+            let trayCenter = CGPoint(x: trayX, y: quick.midY)
+
+            if control == .tray {
+                return trayCenter
+            }
+
+            let tray = CGRect(x: trayCenter.x - traySize.width / 2,
+                              y: trayCenter.y - traySize.height / 2,
+                              width: traySize.width,
+                              height: traySize.height)
+            return anchoredCenter(anchor(for: control, profile: profile, game: game),
+                                  size: displaySize(for: control, in: bounds, profile: profile, game: game),
+                                  assembly: quick.union(tray))
+        default:
+            let stored = center(for: control, profile: profile, game: game)
+            return CGPoint(x: stored.x * bounds.width, y: stored.y * bounds.height)
+        }
+    }
+
     static func reset(profile: LayoutProfile, game: FalloutGame) {
         let defaults = UserDefaults.standard
         for control in TouchControl.controls(for: game) {
             defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
             defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
             defaults.removeObject(forKey: key(control, scaleSuffix, profile: profile, game: game))
+            defaults.removeObject(forKey: key(control, anchorSuffix, profile: profile, game: game))
+            defaults.removeObject(forKey: key(control, sideSuffix, profile: profile, game: game))
         }
     }
 
@@ -1222,6 +1351,11 @@ final class GameControlsOverlay: UIView {
         place(trayButton, at: .tray, profile: profile, size: scaledSize(for: .tray, in: bounds.size, profile: profile))
         placeSaveAssembly()
 
+        if trayButton.glyphName != traySymbol {
+            trayButton.set(symbol: traySymbol, title: "",
+                           accessibilityLabel: trayOpen ? "Close the save tray" : "Open the save tray")
+        }
+
         if !quickSaveNotice.isHidden {
             let noticeWidth = min(220, bounds.width * 0.32)
             quickSaveNotice.frame = CGRect(x: quickSaveButton.frame.minX,
@@ -1265,7 +1399,7 @@ final class GameControlsOverlay: UIView {
             // twice.
             let width = min(152, panel.width - 30)
             backButton.solidBackground = true
-            backButton.frame = gameRect(CGRect(x: panel.midX - width / 2 + 4, y: panel.minY + 332,
+            backButton.frame = gameRect(CGRect(x: panel.midX - width / 2 + 2, y: panel.minY + 332,
                                                width: max(96, width), height: 34))
             return
         }
@@ -1331,8 +1465,9 @@ final class GameControlsOverlay: UIView {
         saveAssembly.frame = CGRect(x: left, y: top, width: right - left, height: height)
         saveAssembly.corner = max(6, min(min(18, height * 0.20), (right - left) * 0.28))
 
+        let dividerX = tray.midX > quick.midX ? tray.minX - 0.5 : tray.maxX - 0.5
         let dividerHeight = height * 0.62
-        saveDivider.frame = CGRect(x: tray.minX - 0.5,
+        saveDivider.frame = CGRect(x: dividerX,
                                    y: saveAssembly.frame.midY - dividerHeight / 2,
                                    width: 1,
                                    height: dividerHeight)
@@ -1540,13 +1675,20 @@ final class GameControlsOverlay: UIView {
     }
 
     private func place(_ view: UIView, at control: TouchControl, profile: LayoutProfile, size: CGSize) {
-        let normalized = ControlLayout.center(for: control, profile: profile, game: game)
+        let point = ControlLayout.centerPoint(for: control, profile: profile, game: game, in: bounds.size)
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
         // Use the full screen. Subtracting the window's safe-area insets here
         // pulled the right-hand column about 100pt inward on notched phones.
-        let x = min(max(normalized.x * bounds.width, halfWidth), bounds.width - halfWidth)
-        let y = min(max(normalized.y * bounds.height, halfHeight), bounds.height - halfHeight)
+        let x: CGFloat
+        let y: CGFloat
+        if control == .tray || control == .load || control == .saves {
+            x = point.x
+            y = point.y
+        } else {
+            x = min(max(point.x, halfWidth), bounds.width - halfWidth)
+            y = min(max(point.y, halfHeight), bounds.height - halfHeight)
+        }
         view.frame = CGRect(x: x - halfWidth, y: y - halfHeight, width: size.width, height: size.height)
     }
 
@@ -1602,7 +1744,7 @@ final class GameControlsOverlay: UIView {
     private func setTray(open: Bool) {
         let wasOpen = trayOpen
         trayOpen = open
-        trayButton.set(symbol: open ? "chevron.left" : "chevron.right",
+        trayButton.set(symbol: traySymbol,
                        title: "",
                        accessibilityLabel: open ? "Close the save tray" : "Open the save tray")
 
@@ -1669,6 +1811,14 @@ final class GameControlsOverlay: UIView {
     private var saveHaptics: Bool {
         let key = LauncherModel.optionKey("saveHaptics", for: game)
         return UserDefaults.standard.object(forKey: key) as? Bool ?? true
+    }
+
+    private var traySymbol: String {
+        let onLeft = ControlLayout.traySide(profile: ControlLayout.profileForCurrentResolution(), game: game) == .left
+        if trayOpen {
+            return onLeft ? "chevron.right" : "chevron.left"
+        }
+        return onLeft ? "chevron.left" : "chevron.right"
     }
 
     private func showAutoSaveNotice() {
@@ -2312,6 +2462,10 @@ private final class LabeledControlButton: UIControl {
 
     private var symbolName: String?
     private var symbolPoint: CGFloat = 0
+
+    var glyphName: String? {
+        return symbolName
+    }
 
     private func setGlyph(_ name: String) {
         symbolName = name
