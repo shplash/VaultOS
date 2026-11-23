@@ -14,6 +14,7 @@
 // The engine runs as a framework; the launcher's overlay is installed through
 // the host callbacks instead of a direct application symbol.
 #include "engine_glue.h"
+#include "engine_present.h"
 #endif
 
 namespace fallout {
@@ -275,6 +276,15 @@ void renderPresent()
     if (!canPresent()) {
         return;
     }
+
+#if defined(__APPLE__) && TARGET_OS_IOS
+    if (fallout_engine_present_frame(gSdlTextureSurface->pixels,
+            gSdlTextureSurface->pitch,
+            gSdlTextureSurface->w,
+            gSdlTextureSurface->h)) {
+        return;
+    }
+#endif
 
     SDL_UpdateTexture(gSdlTexture, NULL, gSdlTextureSurface->pixels, gSdlTextureSurface->pitch);
     SDL_RenderClear(gSdlRenderer);

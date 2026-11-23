@@ -310,6 +310,8 @@ if(IOS)
         "os/ios/engine/engine_glue.cc"
         "os/ios/engine/engine_glue.h"
         "os/ios/engine/engine_paths.cc"
+        "os/ios/engine/engine_present.h"
+        "os/ios/engine/engine_present.mm"
         "os/ios/engine/engine_fallout1.cc"
         "os/ios/engine/engine_fallout1_globals.cc"
         "os/ios/engine/fallout_engine.h"
@@ -327,6 +329,7 @@ if(IOS)
     )
 
     target_link_libraries(${EXECUTABLE_NAME} z)
+    target_link_libraries(${EXECUTABLE_NAME} "-framework Metal" "-framework QuartzCore" "-framework UIKit")
 endif()
 
 if(APPLE)
@@ -462,6 +465,7 @@ if(IOS)
         "${fallout2_ce_SOURCE_DIR}/src/mouse.cc"
         "${fallout2_ce_SOURCE_DIR}/src/touch.cc"
         "${fallout2_ce_SOURCE_DIR}/src/loadsave.cc"
+        "${fallout2_ce_SOURCE_DIR}/src/svga.cc"
     )
 
     if(NOT FALLOUT2_CE_SOURCES)
@@ -477,6 +481,7 @@ if(IOS)
         "os/ios/engine/engine_fallout2_loadsave.cc"
         "os/ios/engine/engine_fallout2_mouse.cc"
         "os/ios/engine/engine_fallout2_touch.cc"
+        "os/ios/engine/engine_fallout2_svga.cc"
         "os/ios/engine/engine_glue.cc"
         "os/ios/engine/engine_paths.cc"
         "os/ios/engine/engine_fallout2.cc"
