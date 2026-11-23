@@ -121,6 +121,10 @@ final class LauncherModel: ObservableObject {
     @Published var autoSaveMinutes = 5 { didSet { store(autoSaveMinutes, "autoSaveMinutes") } }
     @Published var saveHaptics = true { didSet { store(saveHaptics, "saveHaptics") } }
     @Published var buttonHaptics = true { didSet { store(buttonHaptics, "buttonHaptics") } }
+    /// How the game's finished frame is scaled to the display: 0 sharp, 1 smooth,
+    /// 2 enhanced. The in-game presenter reads it every frame, so it applies at
+    /// once.
+    @Published var imageScaling = 2 { didSet { store(imageScaling, "imageScaling") } }
     /// The colour of the on-screen controls. White unless the player picks one
     /// of the others; stored per game like every other option.
     @Published var buttonColour = ControlColour.white.rawValue {
@@ -338,6 +342,7 @@ final class LauncherModel: ObservableObject {
         "autoSaveMinutes",
         "saveHaptics",
         "buttonHaptics",
+        "imageScaling",
         "buttonColour",
     ]
 
@@ -450,6 +455,7 @@ final class LauncherModel: ObservableObject {
         autoSaveMinutes = min(max(storedInt("autoSaveMinutes", for: game, fallback: 5), 0), 10)
         saveHaptics = storedBool("saveHaptics", for: game, fallback: true)
         buttonHaptics = storedBool("buttonHaptics", for: game, fallback: true)
+        imageScaling = min(max(storedInt("imageScaling", for: game, fallback: 2), 0), 2)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 
@@ -474,6 +480,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(autoSaveMinutes, forKey: LauncherModel.optionKey("autoSaveMinutes", for: game))
         defaults.set(saveHaptics, forKey: LauncherModel.optionKey("saveHaptics", for: game))
         defaults.set(buttonHaptics, forKey: LauncherModel.optionKey("buttonHaptics", for: game))
+        defaults.set(imageScaling, forKey: LauncherModel.optionKey("imageScaling", for: game))
         defaults.set(buttonColour, forKey: LauncherModel.optionKey("buttonColour", for: game))
     }
 

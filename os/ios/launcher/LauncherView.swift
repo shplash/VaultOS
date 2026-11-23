@@ -978,6 +978,14 @@ struct LauncherView: View {
                 alignment: .bottom
             )
 
+            row("Image scaling", detail: "How the game picture is scaled to the screen") {
+                HStack(spacing: 8) {
+                    ForEach(0..<LauncherView.scalingTitles.count, id: \.self) { index in
+                        scalingPill(index)
+                    }
+                }
+            }
+
             row("Custom size", detail: "Written to the game's resolution file on Play") {
                 HStack(spacing: 10) {
                     DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
@@ -990,7 +998,31 @@ struct LauncherView: View {
             }
 
             footnote("FULL draws two screen pixels per game pixel, HALF about one and a half. HALF keeps the interface readable on a phone.")
+            footnote("SMOOTH softens the whole picture. ENHANCED keeps pixels crisp with soft edges. Both apply in game at once.")
         }
+    }
+
+    private static let scalingTitles = ["SHARP", "SMOOTH", "ENHANCED"]
+
+    private func scalingPill(_ index: Int) -> some View {
+        let selected = model.imageScaling == index
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+
+        return Button {
+            model.imageScaling = index
+        } label: {
+            Text(L.t(LauncherView.scalingTitles[index]))
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .kerning(0.8)
+                .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(shape.fill(selected ? accent : Color.white.opacity(0.04)))
+                .overlay(shape.stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(LauncherView.scalingTitles[index])
     }
 
     private func presetTile(_ preset: DisplayPreset) -> some View {

@@ -34,25 +34,60 @@ NSString* const kPresentShaderSource =
      "}\n"
      "fragment float4 vault_present_fragment(VaultPresentVertex in [[stage_in]],\n"
      "                                       texture2d<float> source [[texture(0)]],\n"
-     "                                       constant float2& scale [[buffer(0)]]) {\n"
-     "    constexpr sampler smp(filter::linear, address::clamp_to_edge);\n"
+     "                                       constant float2& scale [[buffer(0)]],\n"
+     "                                       constant int& mode [[buffer(1)]],\n"
+     "                                       sampler nearestSampler [[sampler(0)]],\n"
+     "                                       sampler linearSampler [[sampler(1)]]) {\n"
      "    float2 size = float2(source.get_width(), source.get_height());\n"
      "    float2 texel = in.uv * size;\n"
      "    float2 base = floor(texel);\n"
+     "    if (mode == 0) {\n"
+     "        return float4(source.sample(nearestSampler, (base + 0.5) / size).rgb, 1.0);\n"
+     "    }\n"
+     "    if (mode == 1) {\n"
+     "        return float4(source.sample(linearSampler, in.uv).rgb, 1.0);\n"
+     "    }\n"
      "    float2 phase = clamp((texel - base - 0.5) / max(scale, float2(1.0)) + 0.5,\n"
      "                         float2(0.0), float2(1.0));\n"
-     "    return float4(source.sample(smp, (base + phase) / size).rgb, 1.0);\n"
+     "    return float4(source.sample(linearSampler, (base + phase) / size).rgb, 1.0);\n"
      "}\n";
 
 id<MTLDevice> gPresentDevice = nil;
 id<MTLCommandQueue> gPresentQueue = nil;
 id<MTLRenderPipelineState> gPresentPipeline = nil;
+id<MTLSamplerState> gPresentNearestSampler = nil;
+id<MTLSamplerState> gPresentLinearSampler = nil;
 id<MTLTexture> gPresentTexture = nil;
 VaultPresentView* gPresentView = nil;
 CAMetalLayer* gPresentLayer = nil;
+NSString* gPresentModeKey = nil;
 int gPresentTextureWidth = 0;
 int gPresentTextureHeight = 0;
 bool gPresentUnavailable = false;
+
+int presentMode()
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+
+    if (gPresentModeKey == nil) {
+        NSString* game = [defaults stringForKey:@"launcher.game"];
+        if (game.length == 0) {
+            game = @"fallout1";
+        }
+        gPresentModeKey = [NSString stringWithFormat:@"launcher.%@.imageScaling", game];
+    }
+
+    if ([defaults objectForKey:gPresentModeKey] == nil) {
+        return 2;
+    }
+
+    NSInteger mode = [defaults integerForKey:gPresentModeKey];
+    if (mode < 0 || mode > 2) {
+        return 2;
+    }
+
+    return (int)mode;
+}
 
 UIWindow* presentWindow()
 {
@@ -104,6 +139,25 @@ bool presentResourcesReady()
         descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
         gPresentPipeline = [gPresentDevice newRenderPipelineStateWithDescriptor:descriptor error:&error];
         if (gPresentPipeline == nil) {
+            gPresentUnavailable = true;
+            return false;
+        }
+
+        MTLSamplerDescriptor* nearest = [[MTLSamplerDescriptor alloc] init];
+        nearest.minFilter = MTLSamplerMinMagFilterNearest;
+        nearest.magFilter = MTLSamplerMinMagFilterNearest;
+        nearest.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        nearest.tAddressMode = MTLSamplerAddressModeClampToEdge;
+        gPresentNearestSampler = [gPresentDevice newSamplerStateWithDescriptor:nearest];
+
+        MTLSamplerDescriptor* linear = [[MTLSamplerDescriptor alloc] init];
+        linear.minFilter = MTLSamplerMinMagFilterLinear;
+        linear.magFilter = MTLSamplerMinMagFilterLinear;
+        linear.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        linear.tAddressMode = MTLSamplerAddressModeClampToEdge;
+        gPresentLinearSampler = [gPresentDevice newSamplerStateWithDescriptor:linear];
+
+        if (gPresentNearestSampler == nil || gPresentLinearSampler == nil) {
             gPresentUnavailable = true;
             return false;
         }
@@ -234,8 +288,12 @@ int fallout_engine_present_frame(const void* pixels, int pitch, int width, int h
 
         [encoder setRenderPipelineState:gPresentPipeline];
         [encoder setFragmentTexture:gPresentTexture atIndex:0];
+        [encoder setFragmentSamplerState:gPresentNearestSampler atIndex:0];
+        [encoder setFragmentSamplerState:gPresentLinearSampler atIndex:1];
         float ratios[2] = { (float)(fitWidth / (CGFloat)width), (float)(fitHeight / (CGFloat)height) };
         [encoder setFragmentBytes:ratios length:sizeof(ratios) atIndex:0];
+        int mode = presentMode();
+        [encoder setFragmentBytes:&mode length:sizeof(mode) atIndex:1];
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [encoder endEncoding];
 
