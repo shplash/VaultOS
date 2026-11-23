@@ -998,11 +998,11 @@ struct LauncherView: View {
             }
 
             footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
-            footnote("ENHANCED is the default. SMOOTH is softer, SHARP is unfiltered.")
+            footnote("DEFAULT is the original. SMOOTH is softer, ENHANCED is sharper.")
         }
     }
 
-    private static let scalingTitles = ["SHARP", "SMOOTH", "ENHANCED"]
+    private static let scalingTitles = ["DEFAULT", "SMOOTH", "ENHANCED"]
 
     private func scalingPill(_ index: Int) -> some View {
         let selected = model.imageScaling == index

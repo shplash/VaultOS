@@ -1804,7 +1804,7 @@ final class GameControlsOverlay: UIView {
         selectionFeedback()
     }
 
-    private static let scalingNames = ["SHARP", "SMOOTH", "ENHANCED"]
+    private static let scalingNames = ["DEFAULT", "SMOOTH", "ENHANCED"]
 
     private var scalingMode: Int {
         let key = LauncherModel.optionKey("imageScaling", for: game)
