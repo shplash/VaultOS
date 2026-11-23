@@ -64,7 +64,8 @@ than marking it, so nothing coloured is allowed on their borders.
   display face, 82% while pressed.
 - **Secondary action** (`SmallButtonStyle`): translucent grey plate (white 4%),
   hairline outline and accent mono label; pressed fills with 18% accent.
-- **Row**: title and detail on the left, control on the right, hairline under.
+- **Row**: title and detail on the left, control on the right, hairline under,
+  except on the last row of a page.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
 - **Touch control** (`LabeledControlButton`): a dark plate at 80% with a faint

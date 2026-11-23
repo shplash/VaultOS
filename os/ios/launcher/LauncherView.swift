@@ -316,7 +316,7 @@ struct LauncherView: View {
                     .minimumScaleFactor(0.6)
                     .foregroundColor(selected ? Theme.text : Theme.faint)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -356,7 +356,7 @@ struct LauncherView: View {
             hero
 
             Rectangle()
-                .fill(Theme.line)
+                .fill(accent.opacity(0.55))
                 .frame(height: 1)
 
             VStack(alignment: .leading, spacing: 0) {
@@ -428,7 +428,7 @@ struct LauncherView: View {
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.top, 4)
+            .padding(.top, 2)
             .padding(.bottom, 16)
 
             Spacer(minLength: 0)
@@ -571,7 +571,9 @@ struct LauncherView: View {
             )
 
             ForEach(tipGroup.items.indices, id: \.self) { index in
-                tip(tipGroup.items[index].title, tipGroup.items[index].text)
+                tip(tipGroup.items[index].title,
+                    tipGroup.items[index].text,
+                    divider: index < tipGroup.items.count - 1)
             }
         }
     }
@@ -685,7 +687,7 @@ struct LauncherView: View {
             .padding(.bottom, 10)
 
             Rectangle()
-                .fill(Theme.line)
+                .fill(accent.opacity(0.55))
                 .frame(height: 1)
 
             ScrollView(.vertical, showsIndicators: true) {
@@ -698,7 +700,7 @@ struct LauncherView: View {
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 2)
-                .padding(.bottom, 14)
+                .padding(.bottom, 16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -737,13 +739,13 @@ struct LauncherView: View {
             HStack(spacing: 4) {
                 Text(isCheckingForUpdates ? L.t("CHECKING") : L.t("UPDATES"))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .kerning(0.6)
+                    .kerning(0.8)
 
                 Image(systemName: isCheckingForUpdates ? "hourglass" : "arrow.triangle.2.circlepath")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
             }
             .foregroundColor(Color.black.opacity(0.8))
-            .padding(.horizontal, 9)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -763,13 +765,13 @@ struct LauncherView: View {
             HStack(spacing: 4) {
                 Text(L.t("RESET ALL"))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .kerning(0.6)
+                    .kerning(0.8)
 
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
             }
             .foregroundColor(Theme.dim)
-            .padding(.horizontal, 9)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -938,7 +940,7 @@ struct LauncherView: View {
         }
     }
 
-    private func tip(_ title: String, _ text: String) -> some View {
+    private func tip(_ title: String, _ text: String, divider: Bool = true) -> some View {
         HStack(alignment: .top, spacing: 10) {
             RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                 .fill(accent.opacity(0.7))
@@ -963,7 +965,7 @@ struct LauncherView: View {
         .padding(.vertical, 7)
         .overlay(
             Rectangle()
-                .fill(Theme.hairline)
+                .fill(divider ? Theme.hairline : Color.clear)
                 .frame(height: 1),
             alignment: .bottom
         )
@@ -1005,7 +1007,7 @@ struct LauncherView: View {
                 }
             }
 
-            row("Frame rate", detail: "60 is smoother, 30 saves battery") {
+            row("Frame rate", detail: "60 is smoother, 30 saves battery", divider: false) {
                 HStack(spacing: 8) {
                     frameRatePill(60)
                     frameRatePill(30)
@@ -1029,7 +1031,7 @@ struct LauncherView: View {
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .kerning(0.8)
                 .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(shape.fill(selected ? accent : Color.white.opacity(0.04)))
                 .overlay(shape.stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1))
@@ -1121,10 +1123,9 @@ struct LauncherView: View {
             volumeRow("Effects", value: $model.sfxVolume)
             volumeRow("Speech", value: $model.speechVolume)
 
-            footnote("0% mutes that channel. The same volumes are in each game's own Options screen.")
-
             toggleRow("Launcher music",
                       detail: "The track this launcher plays",
+                      divider: false,
                       isOn: Binding(
                         get: { !musicMuted },
                         set: { playing in
@@ -1137,6 +1138,8 @@ struct LauncherView: View {
                             }
                         }
                       ))
+
+            footnote("0% mutes that channel. The same volumes are in each game's own Options screen.")
         }
     }
 
@@ -1159,7 +1162,7 @@ struct LauncherView: View {
 
     private var gameSheet: some View {
         sheet(title: "SYSTEM", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
-            row("Language", detail: "Game text, voice, the launcher and the controls. Add more languages with LANGUAGE FILES on HOME.") {
+            row("Language", detail: "Game text, voice, the launcher and the controls") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
@@ -1201,48 +1204,36 @@ struct LauncherView: View {
                       detail: "The tap you feel when you press an on-screen control",
                       isOn: $model.buttonHaptics)
 
-            row("Auto quick save", detail: nil) {
-                VStack(alignment: .trailing, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Button {
-                            model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
-                        } label: {
-                            Image(systemName: "minus")
-                        }
-                        .buttonStyle(SmallButtonStyle(accent: accent))
-                        .disabled(model.autoSaveMinutes == 0)
-
-                        Text(verbatim: model.autoSaveMinutes == 0
-                                ? L.t("OFF")
-                                : "\(model.autoSaveMinutes) " + L.t("MIN"))
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
-                            .frame(width: 48)
-
-                        Button {
-                            model.autoSaveMinutes = min(10, model.autoSaveMinutes + 1)
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .buttonStyle(SmallButtonStyle(accent: accent))
-                        .disabled(model.autoSaveMinutes == 10)
+            row("Auto quick save", detail: "How often the game writes its own quick save") {
+                HStack(spacing: 8) {
+                    Button {
+                        model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
+                    } label: {
+                        Image(systemName: "minus")
                     }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.autoSaveMinutes == 0)
 
-                    HStack(spacing: 6) {
-                        Text(L.t("Haptic on save"))
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                            .foregroundColor(Theme.dim)
+                    Text(verbatim: model.autoSaveMinutes == 0
+                            ? L.t("OFF")
+                            : "\(model.autoSaveMinutes) " + L.t("MIN"))
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
+                        .frame(width: 48)
 
-                        Button {
-                            model.saveHaptics.toggle()
-                        } label: {
-                            PillToggle(isOn: model.saveHaptics, accent: accent)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(L.t("Haptic on save"))
+                    Button {
+                        model.autoSaveMinutes = min(10, model.autoSaveMinutes + 1)
+                    } label: {
+                        Image(systemName: "plus")
                     }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.autoSaveMinutes == 10)
                 }
             }
+
+            toggleRow("Haptic on save",
+                      divider: false,
+                      isOn: $model.saveHaptics)
         }
     }
 
@@ -1265,10 +1256,6 @@ struct LauncherView: View {
             }
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
-
-            toggleRow("Auto target in combat",
-                      detail: "Switch to attack mode by itself when a fight starts.",
-                      isOn: $model.autoTarget)
 
             row("Button colour", detail: "The colour of a control's label and the wash while you hold it") {
                 Menu {
@@ -1307,11 +1294,11 @@ struct LauncherView: View {
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
 
-            row("Opacity", detail: "How solid the on-screen controls are", divider: false) {
+            row("Opacity", detail: "How solid the on-screen controls are") {
                 HStack(spacing: 12) {
                     Slider(value: $model.controlsOpacity, in: 0.10...1)
                         .accentColor(accent)
-                        .frame(width: 200)
+                        .frame(width: 220)
 
                     Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
@@ -1322,6 +1309,11 @@ struct LauncherView: View {
             // Greyed out, not hidden, while the on-screen controls are off.
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
+
+            toggleRow("Auto target in combat",
+                      detail: "Switch to attack mode by itself when a fight starts.",
+                      divider: false,
+                      isOn: $model.autoTarget)
         }
     }
 
@@ -1459,8 +1451,8 @@ struct LauncherView: View {
         }
     }
 
-    private func toggleRow(_ title: String, detail: String, isOn: Binding<Bool>) -> some View {
-        row(title, detail: detail) {
+    private func toggleRow(_ title: String, detail: String? = nil, divider: Bool = true, isOn: Binding<Bool>) -> some View {
+        row(title, detail: detail, divider: divider) {
             Button {
                 isOn.wrappedValue.toggle()
             } label: {
@@ -1552,7 +1544,7 @@ struct LauncherView: View {
                                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                                 .kerning(0.8)
                         }
-                        .foregroundColor(Theme.faint)
+                        .foregroundColor(Theme.dim)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
@@ -1613,7 +1605,7 @@ struct LauncherView: View {
 
             control()
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
         .overlay(
             Rectangle()
                 .fill(divider ? Theme.hairline : Color.clear)
@@ -1752,7 +1744,6 @@ private enum Theme {
     /// bar are one surface instead of a blue-grey plate over a darker one.
     static let rail = Vault.plate.opacity(0.55)
     static let railSolid = Color(red: 0.061, green: 0.067, blue: 0.078)
-    static let panel = Vault.panel
     static let line = Vault.hairline
     static let hairline = Vault.hairline
     static let text = Vault.text
