@@ -1468,8 +1468,8 @@ struct LauncherView: View {
                         .font(Vault.label(9))
                         .kerning(0.4)
                         .foregroundColor(Theme.faint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .lineLimit(2)
+                        .frame(height: 24, alignment: .topLeading)
                 }
 
                 Spacer(minLength: 8)

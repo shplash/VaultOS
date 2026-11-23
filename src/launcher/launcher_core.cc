@@ -628,19 +628,6 @@ fs::path savegame_root(const fs::path& install_dir)
     return install_dir / "SAVEGAME";
 }
 
-std::vector<fs::path> savegame_roots(const fs::path& install_dir)
-{
-    std::vector<fs::path> roots;
-    roots.push_back(savegame_root(install_dir));
-
-    const fs::path legacy = install_dir / "SAVEGAME";
-    if (roots.front() != legacy) {
-        roots.push_back(legacy);
-    }
-
-    return roots;
-}
-
 bool folder_has_saves(const fs::path& root)
 {
     std::error_code ec;
@@ -674,35 +661,11 @@ void ensure_save_directories(const fs::path& install_dir)
         fs::create_directories(root / name, ec);
         ec.clear();
     }
-
-    const fs::path legacy = install_dir / "SAVEGAME";
-    if (legacy != root && !folder_has_saves(legacy)) {
-        fs::remove_all(legacy, ec);
-        ec.clear();
-    }
 }
 
 bool has_save_files(const fs::path& install_dir)
 {
-    for (const fs::path& root : savegame_roots(install_dir)) {
-        if (folder_has_saves(root)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-fs::path savegame_folder(const fs::path& install_dir)
-{
-    const std::vector<fs::path> roots = savegame_roots(install_dir);
-    for (const fs::path& root : roots) {
-        if (folder_has_saves(root)) {
-            return root;
-        }
-    }
-
-    return roots.front();
+    return folder_has_saves(savegame_root(install_dir));
 }
 
 // Fallout 1 needs master.dat, critter.dat and the data folder.
@@ -1437,7 +1400,7 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
     }
 
     const fs::path root(install_dir);
-    const fs::path saves = savegame_folder(root);
+    const fs::path saves = savegame_root(root);
     const std::vector<std::string> names = savegame_files(saves);
     if (names.empty()) {
         fail("No saved games to back up.");
@@ -1629,10 +1592,8 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     // The import replaces rather than merges: a slot left behind by newer saves
     // would otherwise look like part of the backup. The launcher warns first.
     std::error_code ec;
-    for (const fs::path& root : savegame_roots(destination)) {
-        fs::remove_all(root, ec);
-        ec.clear();
-    }
+    fs::remove_all(saves, ec);
+    ec.clear();
 
     g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
     set_status("Restoring saves...");
