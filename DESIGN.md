@@ -68,10 +68,12 @@ than marking it, so nothing coloured is allowed on their borders.
   except on the last row of a page.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
-- **Game selector**: two stacked tiles at the top of the rail. The selected
-  game is an accent-tinted plate with an accent outline and its name in white,
-  the other a 4% plate with a hairline and its name faint. The name is centred
-  in both tiles, so switching game never moves it.
+- **Game selector**: two stacked banners at the top of the rail, each showing
+  that game's own still behind its name in the display face, centred, so
+  switching game never moves the text. The selected game's still is in colour
+  under a light scrim, its name white and its outline in that game's
+  accent; the other is desaturated under a heavier scrim, its name faint and
+  its outline a hairline.
 - **Touch control** (`LabeledControlButton`): a dark plate at 80% with a faint
   top-down shade, one 1.25pt charcoal outline, a thin lit line along its top
   edge and a small shadow, a glyph above a mono label, both in the player's
@@ -80,8 +82,7 @@ than marking it, so nothing coloured is allowed on their borders.
   selected one keeps the wash, and one that cannot be used fades to 35%. Every
   custom in-game button is one of these, so the item screens, the trading
   screens and the dialogues wear the same face as the HUD. The control editor
-  draws these faces at the size the game draws them. The hand switcher carries
-  its own glyph: two hands with a double arrow between them.
+  draws these faces at the size the game draws them.
 - **Save assembly**: QUICK SAVE and its chevron are two halves of one control.
   A single plate, outline and top highlight sit under both (`drawsOwnPlate` is
   off for the halves), the two sit flush, and a short 62% divider at 70% of the

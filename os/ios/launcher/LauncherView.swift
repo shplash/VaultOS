@@ -305,17 +305,31 @@ struct LauncherView: View {
                 }
             }
         } label: {
-            Text(game.title.uppercased())
-                .font(Vault.display(22))
-                .kerning(0.4)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .foregroundColor(selected ? Theme.text : Theme.faint)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 6)
-                .background(shape.fill(selected ? game.accent.opacity(0.16) : Color.white.opacity(0.04)))
-                .overlay(shape.stroke(selected ? game.accent.opacity(0.8) : Theme.hairline, lineWidth: 1))
-                .contentShape(Rectangle())
+            ZStack {
+                shape.fill(Color.white.opacity(0.04))
+
+                if let image = artwork(for: game) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .clipped()
+                        .saturation(selected ? 1 : 0.15)
+                }
+
+                Color.black.opacity(selected ? 0.34 : 0.66)
+
+                Text(game.title.uppercased())
+                    .font(Vault.display(20))
+                    .kerning(0.6)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .foregroundColor(selected ? Theme.text : Theme.faint)
+            }
+            .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
+            .clipShape(shape)
+            .overlay(shape.stroke(selected ? game.accent : Theme.hairline, lineWidth: selected ? 1.5 : 1))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(game.title)
@@ -531,19 +545,29 @@ struct LauncherView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
-    /// The selected game's still, bundle first. It follows `selectedGame`
-    /// directly, so the two can never disagree.
     private var heroImage: UIImage? {
-        let isFallout2 = model.selectedGame == .fallout2
-        let name = isFallout2 ? "fallout2" : "fallout1"
-        if let image = UIImage(named: name) {
-            return image
+        return artwork(for: model.selectedGame)
+    }
+
+    private static var artworkCache: [FalloutGame: UIImage] = [:]
+
+    /// Each game's own still, bundle first. The hero and the rail's game
+    /// selector draw the same image, so the two can never disagree.
+    private func artwork(for game: FalloutGame) -> UIImage? {
+        if let cached = LauncherView.artworkCache[game] {
+            return cached
         }
 
-        guard let url = Bundle.main.url(forResource: name, withExtension: isFallout2 ? "jpeg" : "webp") else {
-            return nil
+        let isFallout2 = game == .fallout2
+        let name = isFallout2 ? "fallout2" : "fallout1"
+        let image = UIImage(named: name)
+            ?? Bundle.main.url(forResource: name, withExtension: isFallout2 ? "jpeg" : "webp")
+                .flatMap { UIImage(contentsOfFile: $0.path) }
+
+        if let image = image {
+            LauncherView.artworkCache[game] = image
         }
-        return UIImage(contentsOfFile: url.path)
+        return image
     }
 
     private var tipsSheet: some View {
@@ -2291,11 +2315,6 @@ private struct TouchControlEditor: View {
                 VStack(spacing: max(1, shortSide * 0.035)) {
                     if control == .fireMode {
                         Image(uiImage: GameControlsOverlay.fireModeImage(3).withRenderingMode(.alwaysTemplate))
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: max(9, min(24, shortSide * 0.32)))
-                    } else if control == .swap, let hands = GameControlsOverlay.swapHandsImage() {
-                        Image(uiImage: hands.withRenderingMode(.alwaysTemplate))
                             .resizable()
                             .scaledToFit()
                             .frame(height: max(9, min(24, shortSide * 0.32)))

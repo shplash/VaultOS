@@ -1051,10 +1051,6 @@ final class GameControlsOverlay: UIView {
         skillButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(skillButton)
 
-        if let hands = Self.swapHandsImage() {
-            swapButton.set(image: hands, title: "SWAP")
-        }
-
         swapButton.tag = 7
         swapButton.accessibilityLabel = "Swap weapon"
         swapButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
@@ -2264,46 +2260,6 @@ final class GameControlsOverlay: UIView {
             cg.move(to: CGPoint(x: centerX + crosshairRadius - 1.2, y: centerY))
             cg.addLine(to: CGPoint(x: centerX + crosshairRadius + tick, y: centerY))
             cg.strokePath()
-        }
-    }
-
-    /// The hand switcher: two hands with a double arrow between them, drawn as
-    /// one image so both hands match and the arrow sits exactly in the gap. The
-    /// word underneath says what the button does; the glyph says which part of
-    /// the character it changes.
-    static func swapHandsImage() -> UIImage? {
-        let configuration = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        guard let left = UIImage(systemName: "hand.point.left", withConfiguration: configuration),
-              let right = UIImage(systemName: "hand.point.right", withConfiguration: configuration) else {
-            return nil
-        }
-
-        let size = CGSize(width: 40, height: 20)
-        let color = ControlTheme.control
-
-        return UIGraphicsImageRenderer(size: size).image { context in
-            let cg = context.cgContext
-
-            left.withTintColor(color).draw(in: CGRect(x: 0, y: 2, width: 16, height: 16))
-            right.withTintColor(color).draw(in: CGRect(x: 24, y: 2, width: 16, height: 16))
-
-            cg.setStrokeColor(color.cgColor)
-            cg.setLineWidth(1.4)
-            cg.setLineCap(.round)
-
-            let midX = size.width / 2
-            let midY = size.height / 2
-            cg.move(to: CGPoint(x: midX - 3, y: midY))
-            cg.addLine(to: CGPoint(x: midX + 3, y: midY))
-            cg.strokePath()
-
-            for direction: CGFloat in [-1, 1] {
-                let tipX = midX + direction * 3
-                cg.move(to: CGPoint(x: tipX - direction * 2.4, y: midY - 2.4))
-                cg.addLine(to: CGPoint(x: tipX, y: midY))
-                cg.addLine(to: CGPoint(x: tipX - direction * 2.4, y: midY + 2.4))
-                cg.strokePath()
-            }
         }
     }
 }
