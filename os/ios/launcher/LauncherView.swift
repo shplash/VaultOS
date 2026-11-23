@@ -202,32 +202,26 @@ struct LauncherView: View {
     // MARK: - Rail
 
     private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            VStack(spacing: 0) {
-                ForEach(FalloutGame.allCases) { game in
-                    gameTab(game)
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(LauncherPage.allCases) { item in
+                    railItem(item)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 8)
-
-            Rectangle()
-                .fill(Theme.line)
-                .frame(height: 1)
-                .padding(.bottom, 7)
-
-            ForEach(LauncherPage.allCases) { item in
-                railItem(item)
-            }
-
-            Spacer(minLength: 6)
+            .frame(maxHeight: CGFloat(LauncherPage.allCases.count) * 44
+                    + CGFloat(LauncherPage.allCases.count - 1) * 4)
 
             playButton
+                .padding(.top, 14)
+
+            Spacer(minLength: 0)
         }
-        .padding(.leading, 10 + leading)
-        .padding(.trailing, 10)
-        .padding(.top, 8)
-        .padding(.bottom, 14 + bottom)
+        .padding(.leading, Metrics.outer + leading)
+        .padding(.trailing, Metrics.outer)
+        .padding(.top, Metrics.outer)
+        .padding(.bottom, Metrics.outer + bottom)
         .frame(width: 152 + leading, alignment: .leading)
         .background(Theme.rail)
         .overlay(
@@ -247,28 +241,32 @@ struct LauncherView: View {
             HStack(spacing: 9) {
                 RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                     .fill(selected ? accent : Color.clear)
-                    .frame(width: 3, height: 15)
+                    .frame(width: 3, height: 18)
 
                 Image(systemName: item.symbol)
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 16, alignment: .leading)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 20, alignment: .leading)
 
                 Text(item.title)
-                    .font(Vault.label(10, weight: selected ? .bold : .regular))
-                    .kerning(1.1)
+                    .font(Vault.label(12, weight: selected ? .bold : .regular))
+                    .kerning(1.2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
                 Spacer(minLength: 0)
             }
             .foregroundColor(selected ? Theme.text : Theme.faint)
+            .padding(.leading, 4)
             .padding(.trailing, 9)
-            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(selected ? Color.white.opacity(0.05) : Color.clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxHeight: .infinity)
     }
 
     private var playButton: some View {
@@ -290,36 +288,6 @@ struct LauncherView: View {
         .buttonStyle(PrimaryButtonStyle(accent: accent))
         .disabled(model.install.installed == 0 || model.isInstalling)
         .opacity(model.install.installed == 1 ? 1 : 0.35)
-    }
-
-    private static let gameNameSize: CGFloat = 30
-    private static let gameNameGap: CGFloat = 8
-
-    /// The game switcher used at the top of the rail.
-    private func gameTab(_ game: FalloutGame) -> some View {
-        let selected = model.selectedGame == game
-
-        return Button {
-            if model.selectedGame != game {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    model.selectedGame = game
-                }
-            }
-        } label: {
-            Text(game.title.uppercased())
-                .font(Vault.display(LauncherView.gameNameSize))
-                .kerning(0.4)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .foregroundColor(selected ? game.accent : Theme.faint)
-                .frame(maxWidth: .infinity)
-                .frame(height: Vault.displayCapHeight(LauncherView.gameNameSize) + LauncherView.gameNameGap * 2)
-                .offset(y: Vault.displayCapShift(LauncherView.gameNameSize))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(game.title)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private var statusText: String {
@@ -391,7 +359,7 @@ struct LauncherView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 9)
+                .padding(.vertical, Metrics.gap)
                 .overlay(
                     Rectangle()
                         .fill(Theme.hairline)
@@ -407,12 +375,12 @@ struct LauncherView: View {
                         .padding(.vertical, 10)
 
                     Text(L.message(model.statusText))
-                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .font(Vault.label(10, weight: .regular))
                         .foregroundColor(Theme.faint)
                         .lineLimit(1)
                 } else if let summary = model.importSummary {
                     Text(summary)
-                        .font(.system(size: 10, weight: .regular, design: .monospaced))
+                        .font(Vault.label(10, weight: .regular))
                         .foregroundColor(Theme.faint)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -427,17 +395,18 @@ struct LauncherView: View {
                     footnote("LANGUAGE FILES adds a translation pack to this game. The game files themselves are left alone.")
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 2)
-            .padding(.bottom, 16)
+            .padding(.horizontal, Metrics.sheetInset)
+            .padding(.top, Metrics.gap)
+            .padding(.bottom, Metrics.outer)
 
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .vaultPlate(corner: 20, fill: Theme.rail)
-        .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 16 + screenInsets.bottom)
+        .padding(.leading, Metrics.outer)
+        .padding(.trailing, Metrics.outer)
+        .padding(.top, Metrics.outer)
+        .padding(.bottom, Metrics.outer + screenInsets.bottom)
     }
 
     /// The hero: the selected game's own wasteland still on the right, its
@@ -479,11 +448,11 @@ struct LauncherView: View {
                         .kerning(2.4)
                         .foregroundColor(accent)
                 }
-                .padding(.leading, 22)
+                .padding(.leading, Metrics.sheetInset)
                 .frame(maxWidth: geometry.size.width * 0.60, alignment: .leading)
             }
         }
-        .frame(height: 172)
+        .frame(height: 158)
     }
 
     private func heroArt(width: CGFloat, height: CGFloat) -> some View {
@@ -593,22 +562,9 @@ struct LauncherView: View {
             tipGroup = group
         } label: {
             Text(L.t(group.title))
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .kerning(0.8)
-                .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(selected ? accent : Color.white.opacity(0.04))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1)
-                )
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipStyle(accent: accent, look: selected ? .selected : .unselected))
         .accessibilityLabel(group.title)
     }
 
@@ -620,7 +576,6 @@ struct LauncherView: View {
         } label: {
             HStack(spacing: 4) {
                 Text(title)
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(0.8)
                     .lineLimit(1)
 
@@ -628,20 +583,8 @@ struct LauncherView: View {
                     .font(.system(size: 9, weight: .bold))
             }
             .fixedSize()
-            .foregroundColor(primary ? Color.black.opacity(0.8) : Theme.faint)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(primary ? accent : Color.white.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(primary ? Color.clear : Theme.hairline, lineWidth: 1)
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipStyle(accent: accent, look: primary ? .selected : .unselected))
         .accessibilityLabel("Open \(title)")
     }
 
@@ -653,36 +596,17 @@ struct LauncherView: View {
     /// and it holds static rows only.
     private var aboutSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L.t("INFO"))
-                        .font(Vault.display(27))
-                        .kerning(1.2)
-                        .foregroundColor(Theme.text)
-
-                    Text(L.t("Who made this, and what it is built on"))
-                        .font(Vault.label(9))
-                        .kerning(0.4)
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-
-                Spacer(minLength: 8)
-
+            sheetHeader("INFO", detail: "Who made this, and what it is built on") {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text(verbatim: "v\(appVersionShort)")
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .font(Vault.label(14, weight: .bold))
                         .foregroundColor(Theme.dim)
 
                     Text(verbatim: "build \(appBuild)")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(Vault.label(9))
                         .foregroundColor(Theme.faint)
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 16)
-            .padding(.bottom, 10)
 
             HStack(spacing: 8) {
                 aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=feature_request.yml", primary: true)
@@ -693,7 +617,7 @@ struct LauncherView: View {
 
                 resetAllButton
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, Metrics.sheetInset)
             .padding(.bottom, 10)
 
             Rectangle()
@@ -708,16 +632,17 @@ struct LauncherView: View {
                     tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
                     footnote("The app contains no game data; bring your own installation.")
                 }
-                .padding(.horizontal, 22)
+                .padding(.horizontal, Metrics.sheetInset)
                 .padding(.top, 2)
-                .padding(.bottom, 16)
+                .padding(.bottom, Metrics.outer)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .vaultPlate(corner: 20, fill: Theme.rail)
-        .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 16 + screenInsets.bottom)
+        .padding(.leading, Metrics.outer)
+        .padding(.trailing, Metrics.outer)
+        .padding(.top, Metrics.outer)
+        .padding(.bottom, Metrics.outer + screenInsets.bottom)
     }
 
     /// The version as built, so a bug report can name it.
@@ -748,22 +673,13 @@ struct LauncherView: View {
         } label: {
             HStack(spacing: 4) {
                 Text(isCheckingForUpdates ? L.t("CHECKING") : L.t("UPDATES"))
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(0.8)
 
                 Image(systemName: isCheckingForUpdates ? "hourglass" : "arrow.triangle.2.circlepath")
                     .font(.system(size: 9, weight: .bold))
             }
-            .foregroundColor(Color.black.opacity(0.8))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(accent)
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipStyle(accent: accent, look: .selected))
         .disabled(isCheckingForUpdates)
         .accessibilityLabel(L.t("Check for updates"))
     }
@@ -774,26 +690,13 @@ struct LauncherView: View {
         } label: {
             HStack(spacing: 4) {
                 Text(L.t("RESET ALL"))
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(0.8)
 
                 Image(systemName: "arrow.counterclockwise")
                     .font(.system(size: 9, weight: .bold))
             }
-            .foregroundColor(Theme.dim)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Theme.hairline, lineWidth: 1)
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipStyle(accent: accent, look: .quiet))
         .accessibilityLabel(L.t("Reset all settings"))
     }
 
@@ -972,7 +875,8 @@ struct LauncherView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 7)
+        .frame(minHeight: Metrics.rowMinHeight - Metrics.gap * 2, alignment: .leading)
+        .padding(.vertical, Metrics.gap)
         .overlay(
             Rectangle()
                 .fill(divider ? Theme.hairline : Color.clear)
@@ -990,11 +894,10 @@ struct LauncherView: View {
                     }
                 }
                 .padding(.top, 12)
-                .padding(.bottom, 2)
 
                 footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
-                    .padding(.bottom, 10)
             }
+            .padding(.bottom, 12)
             .overlay(
                 Rectangle()
                     .fill(Theme.hairline)
@@ -1006,7 +909,7 @@ struct LauncherView: View {
                 HStack(spacing: 10) {
                     DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
                     Text("×")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Vault.body(12, weight: .medium))
                         .foregroundColor(Theme.faint)
                     DimensionField(title: "H", value: $model.height, range: 480...4096, accent: accent)
                 }
@@ -1036,43 +939,27 @@ struct LauncherView: View {
 
     private func frameRatePill(_ rate: Int) -> some View {
         let selected = model.frameRate == rate
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
 
         return Button {
             model.frameRate = rate
         } label: {
             Text(verbatim: "\(rate)")
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .kerning(0.8)
-                .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(shape.fill(selected ? accent : Color.white.opacity(0.04)))
-                .overlay(shape.stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1))
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipStyle(accent: accent, look: selected ? .selected : .unselected))
         .accessibilityLabel("\(rate) " + L.t("frames per second"))
     }
 
     private func scalingPill(_ index: Int) -> some View {
         let selected = model.imageScaling == index
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
 
         return Button {
             model.imageScaling = index
         } label: {
             Text(L.t(LauncherView.scalingTitles[index]))
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .kerning(0.8)
-                .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(shape.fill(selected ? accent : Color.white.opacity(0.04)))
-                .overlay(shape.stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1))
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ChipStyle(accent: accent, look: selected ? .selected : .unselected))
         .accessibilityLabel(LauncherView.scalingTitles[index])
     }
 
@@ -1086,17 +973,17 @@ struct LauncherView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(L.t(preset.id.uppercased()))
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .font(Vault.label(9))
                             .kerning(1.6)
                             .foregroundColor(selected ? accent : Theme.faint)
 
                         if preset.id == "half" {
                             Text(L.t("(recommended)"))
-                                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                                .font(Vault.label(9, weight: .regular))
                                 .foregroundColor(Theme.faint)
                         } else if preset.id == "full" {
                             Text(L.t("(experimental)"))
-                                .font(.system(size: 8, weight: .regular, design: .monospaced))
+                                .font(Vault.label(9, weight: .regular))
                                 .foregroundColor(Theme.faint)
                         }
                     }
@@ -1112,7 +999,7 @@ struct LauncherView: View {
 
                 if selected {
                     Text(L.t("IN USE"))
-                        .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                        .font(Vault.label(9))
                         .foregroundColor(accent)
                 }
             }
@@ -1167,7 +1054,7 @@ struct LauncherView: View {
                     .frame(width: 220)
 
                 Text(verbatim: "\(Int(value.wrappedValue.rounded()))%")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(Vault.label(10))
                     .foregroundColor(Theme.dim)
                     .frame(width: 38, alignment: .trailing)
             }
@@ -1192,18 +1079,18 @@ struct LauncherView: View {
                             .minimumScaleFactor(0.7)
 
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                     }
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(Vault.label(10, weight: .semibold))
                     .foregroundColor(accent)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: Metrics.controlHeight)
                     .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                             .fill(Color.white.opacity(0.04))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                             .stroke(Theme.hairline, lineWidth: 1)
                     )
                 }
@@ -1225,13 +1112,13 @@ struct LauncherView: View {
                     } label: {
                         Image(systemName: "minus")
                     }
-                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .buttonStyle(SmallButtonStyle(accent: accent, square: true))
                     .disabled(model.autoSaveMinutes == 0)
 
                     Text(verbatim: model.autoSaveMinutes == 0
                             ? L.t("OFF")
                             : "\(model.autoSaveMinutes) " + L.t("MIN"))
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .font(Vault.label(10))
                         .foregroundColor(model.autoSaveMinutes == 0 ? Theme.faint : accent)
                         .frame(width: 48)
 
@@ -1240,7 +1127,7 @@ struct LauncherView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .buttonStyle(SmallButtonStyle(accent: accent, square: true))
                     .disabled(model.autoSaveMinutes == 10)
                 }
             }
@@ -1289,18 +1176,18 @@ struct LauncherView: View {
                             .minimumScaleFactor(0.7)
 
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                     }
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(Vault.label(10, weight: .semibold))
                     .foregroundColor(accent)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: Metrics.controlHeight)
                     .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                             .fill(Color.white.opacity(0.04))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                             .stroke(Theme.hairline, lineWidth: 1)
                     )
                 }
@@ -1315,7 +1202,7 @@ struct LauncherView: View {
                         .frame(width: 220)
 
                     Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .font(Vault.label(10))
                         .foregroundColor(Theme.dim)
                         .frame(width: 38, alignment: .trailing)
                 }
@@ -1379,14 +1266,7 @@ struct LauncherView: View {
                         showSaveImportWarning = false
                         saveImportCountdown = 0
                     }
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.dim)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.06))
-                    )
+                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
 
                     Button(saveImportCountdown > 0
                         ? "\(L.t("IMPORT")) \(saveImportCountdown)"
@@ -1395,14 +1275,7 @@ struct LauncherView: View {
                         pendingImport = .saves
                         model.showImporter = true
                     }
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.black.opacity(0.85))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(accent.opacity(saveImportCountdown > 0 ? 0.4 : 1))
-                    )
+                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
                     .disabled(saveImportCountdown > 0)
                 }
             }
@@ -1435,27 +1308,13 @@ struct LauncherView: View {
                     Button(L.t("CANCEL")) {
                         showResetAllWarning = false
                     }
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.dim)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.06))
-                    )
+                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
 
                     Button(L.t("RESET ALL")) {
                         showResetAllWarning = false
                         model.resetEverything()
                     }
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.black.opacity(0.85))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(accent)
-                    )
+                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
                 }
             }
             .padding(22)
@@ -1530,24 +1389,35 @@ struct LauncherView: View {
 
     // MARK: - Sheet pieces
 
+    private func sheetHeader<Trailing: View>(_ title: String,
+                                             detail: String,
+                                             @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(L.t(title))
+                    .font(Vault.display(27))
+                    .kerning(1.2)
+                    .foregroundColor(Theme.text)
+
+                Text(L.t(detail))
+                    .font(Vault.label(9))
+                    .kerning(0.4)
+                    .foregroundColor(Theme.faint)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: Metrics.gap)
+
+            trailing()
+        }
+        .padding(.horizontal, Metrics.sheetInset)
+        .padding(.top, Metrics.outer)
+        .padding(.bottom, 10)
+    }
+
     private func sheet<C: View>(title: String, detail: String, onReset: (() -> Void)? = nil, @ViewBuilder rows: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L.t(title))
-                        .font(Vault.display(27))
-                        .kerning(1.2)
-                        .foregroundColor(Theme.text)
-
-                    Text(L.t(detail))
-                        .font(Vault.label(9))
-                        .kerning(0.4)
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: 8)
-
+            sheetHeader(title, detail: detail) {
                 if let onReset = onReset {
                     Button(action: onReset) {
                         HStack(spacing: 5) {
@@ -1555,28 +1425,13 @@ struct LauncherView: View {
                                 .font(.system(size: 9, weight: .bold))
 
                             Text(L.t("RESET"))
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
                                 .kerning(0.8)
                         }
-                        .foregroundColor(Theme.dim)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.white.opacity(0.04))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(Theme.hairline, lineWidth: 1)
-                        )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ChipStyle(accent: accent, look: .quiet))
                     .accessibilityLabel("Reset \(title) to defaults")
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 16)
-            .padding(.bottom, 10)
 
             Rectangle()
                 .fill(accent.opacity(0.55))
@@ -1585,24 +1440,25 @@ struct LauncherView: View {
             VStack(alignment: .leading, spacing: 0) {
                 rows()
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, Metrics.sheetInset)
             .padding(.top, 2)
-            .padding(.bottom, 16)
+            .padding(.bottom, Metrics.outer)
 
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .vaultPlate(corner: 20, fill: Theme.rail)
-        .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 16 + screenInsets.bottom)
+        .padding(.leading, Metrics.outer)
+        .padding(.trailing, Metrics.outer)
+        .padding(.top, Metrics.outer)
+        .padding(.bottom, Metrics.outer + screenInsets.bottom)
     }
 
     private func row<C: View>(_ title: String, detail: String?, divider: Bool = true, @ViewBuilder control: () -> C) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L.t(title))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(Vault.body(13, weight: .medium))
                     .foregroundColor(Theme.text)
 
                 if let detail = detail {
@@ -1615,11 +1471,12 @@ struct LauncherView: View {
                 }
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: Metrics.gap)
 
             control()
         }
-        .padding(.vertical, 7)
+        .frame(minHeight: Metrics.rowMinHeight - Metrics.gap * 2, alignment: .leading)
+        .padding(.vertical, Metrics.gap)
         .overlay(
             Rectangle()
                 .fill(divider ? Theme.hairline : Color.clear)
@@ -1699,7 +1556,7 @@ private struct DimensionField: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(title)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(Vault.label(9))
                 .foregroundColor(Theme.faint)
 
             TextField("", text: $text)
@@ -1710,11 +1567,11 @@ private struct DimensionField: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                         .fill(Color.white.opacity(0.04))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                         .stroke(Theme.hairline, lineWidth: 1)
                 )
                 .onChange(of: text) { newValue in
@@ -1750,6 +1607,15 @@ private extension FalloutGame {
             return Vault.teal
         }
     }
+}
+
+private enum Metrics {
+    static let outer: CGFloat = 16
+    static let sheetInset: CGFloat = 22
+    static let rowMinHeight: CGFloat = 46
+    static let controlHeight: CGFloat = 32
+    static let controlRadius: CGFloat = 8
+    static let gap: CGFloat = 8
 }
 
 private enum Theme {
@@ -1839,21 +1705,72 @@ private struct PrimaryButtonStyle: ButtonStyle {
 
 private struct SmallButtonStyle: ButtonStyle {
     let accent: Color
+    var tint: Color? = nil
+    var square = false
+    var minHeight: CGFloat = Metrics.controlHeight
 
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
+        let label = configuration.label
+            .font(Vault.label(10, weight: .semibold))
+            .foregroundColor(tint ?? accent)
+
+        return Group {
+            if square {
+                label.frame(width: Metrics.controlHeight, height: Metrics.controlHeight)
+            } else {
+                label.padding(.horizontal, 14).frame(minHeight: minHeight)
+            }
+        }
+        .background(
+            shape.fill(configuration.isPressed ? accent.opacity(0.18) : Color.white.opacity(0.04))
+        )
+        .overlay(shape.stroke(configuration.isPressed ? Vault.edgeLight : Theme.hairline, lineWidth: 1))
+        .opacity(configuration.isPressed ? 0.9 : 1)
+        .modifier(DisabledDim())
+    }
+}
+
+private struct ChipStyle: ButtonStyle {
+    enum Look {
+        case selected
+        case unselected
+        case quiet
+    }
+
+    let accent: Color
+    let look: Look
+    var minHeight: CGFloat = Metrics.controlHeight
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
 
         return configuration.label
             .font(Vault.label(10, weight: .semibold))
-            .foregroundColor(accent)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                shape.fill(configuration.isPressed ? accent.opacity(0.18) : Color.white.opacity(0.04))
-            )
-            .overlay(shape.stroke(configuration.isPressed ? Vault.edgeLight : Theme.hairline, lineWidth: 1))
+            .foregroundColor(foreground)
+            .padding(.horizontal, 12)
+            .frame(minHeight: minHeight)
+            .background(shape.fill(fill))
+            .overlay(shape.stroke(stroke, lineWidth: 1))
             .opacity(configuration.isPressed ? 0.9 : 1)
+            .contentShape(Rectangle())
             .modifier(DisabledDim())
+    }
+
+    private var foreground: Color {
+        switch look {
+        case .selected: return Vault.ink
+        case .unselected: return Theme.faint
+        case .quiet: return Theme.dim
+        }
+    }
+
+    private var fill: Color {
+        return look == .selected ? accent : Color.white.opacity(0.04)
+    }
+
+    private var stroke: Color {
+        return look == .selected ? Color.clear : Theme.hairline
     }
 }
 

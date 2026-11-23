@@ -34,15 +34,6 @@ enum Vault {
     static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         return .system(size: size, weight: weight)
     }
-
-    static func displayCapHeight(_ size: CGFloat) -> CGFloat {
-        return VaultUI.display(size).capHeight
-    }
-
-    static func displayCapShift(_ size: CGFloat) -> CGFloat {
-        let font = VaultUI.display(size)
-        return (-font.descender - (font.ascender - font.capHeight)) / 2
-    }
 }
 
 extension View {

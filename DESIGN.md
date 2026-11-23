@@ -46,33 +46,45 @@ than marking it, so nothing coloured is allowed on their borders.
   own faces (Univers 59 Condensed, Gothic 821 Condensed) are proprietary and
   cannot ship. If the font is missing the same style falls back to the heaviest
   monospaced system face.
-- **Label**: SF Mono semibold or bold, 8–10pt, tracking 0.2–1.3, upper case.
-  Rail items, button faces, row details, field chips, footnotes.
+- **Label**: SF Mono semibold or bold, 9–12pt, tracking 0.2–1.3, upper case.
+  Row details, button faces, chips and footnotes sit at 9–10pt; the rail items
+  are 12pt. Nothing is drawn below 9pt.
 - **Body**: SF regular, 12–14pt. Taglines and sentences the player reads.
 - **Numbers**: SF Mono only, so a value never shifts as it changes.
 
 ## Shape
 
 - Plain rounded rectangles. Sheets and the launcher cards 20pt, dialogs 18pt,
-  tiles and PLAY 12pt, on-screen controls 10pt, small buttons 8pt.
+  tiles and PLAY 12pt, on-screen controls 10pt, chips, fields and small
+  buttons 8pt.
 - A plate is a fill, a 1pt hairline outline and a 1pt light line along its top
   edge. No cut corners, no stripes, no gradients, no shadows.
+
+## Metrics
+
+One set of numbers, `Metrics` in `LauncherView`, is used everywhere: `outer` 16
+is the margin around the rail and every card, `sheetInset` 22 the padding
+inside a card, `rowMinHeight` 46, `controlHeight` 32, `controlRadius` 8 and
+`gap` 8.
 
 ## Components
 
 - **Primary action** (`PrimaryButtonStyle`): accent plate, ink label in the
   display face, 82% while pressed.
 - **Secondary action** (`SmallButtonStyle`): translucent grey plate (white 4%),
-  hairline outline and accent mono label; pressed fills with 18% accent.
-- **Row**: title and detail on the left, control on the right, hairline under,
-  except on the last row of a page.
+  hairline outline and accent mono label, 32pt minimum height; pressed fills
+  with 18% accent. An optional tint gives a quiet action such as CANCEL the dim
+  text colour, and a square variant makes the small stepper buttons.
+- **Row**: title and detail on the left, control on the right, 46pt minimum and
+  the same 8pt above and below whether or not it carries a detail line; hairline
+  under, except on the last row of a page.
+- **Chip** (`ChipStyle`): the one pill behind a preset, a scaling mode, a frame
+  rate, a tip group, a page link and the update check. Mono 10pt with 0.8
+  tracking, 12pt side padding, 32pt high, 8pt radius. Selected and primary are
+  an accent fill with ink text, unselected is a 4% plate with a hairline and
+  faint text, and a quiet one is the same in dim text.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
-- **Game selector**: the two game names at the top of the rail, centred in the
-  display face at 30pt with no plate behind them: the selected game in its own
-  accent, the other faint. The gap above the first name, between the two and
-  below the last are the same, and each label is framed on its capitals rather
-  than on its line box, so the space above and below the letters is equal too.
 - **Touch control** (`LabeledControlButton`): a dark plate at 80% with a faint
   top-down shade, one 1.25pt charcoal outline, a thin lit line along its top
   edge and a small shadow, a glyph above a mono label, both in the player's
@@ -82,6 +94,10 @@ than marking it, so nothing coloured is allowed on their borders.
   custom in-game button is one of these, so the item screens, the trading
   screens and the dialogues wear the same face as the HUD. The control editor
   draws these faces at the size the game draws them.
+- **Rail**: a 152pt bar of page items over PLAY, the whole group centred
+  between the same 16pt margins the cards use. Each item is a 44pt row with a
+  16pt glyph in a 20pt box, a 12pt mono label, a 3 by 18 accent bar and, when
+  selected, a 10pt rounded highlight.
 - **Save assembly**: QUICK SAVE and its chevron are two halves of one control.
   A single plate, outline and top highlight sit under both (`drawsOwnPlate` is
   off for the halves), the two sit flush, and a short 62% divider at 70% of the
