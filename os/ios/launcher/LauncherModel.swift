@@ -125,6 +125,8 @@ final class LauncherModel: ObservableObject {
     /// 2 enhanced. The in-game presenter reads it every frame, so it applies at
     /// once.
     @Published var imageScaling = 2 { didSet { store(imageScaling, "imageScaling") } }
+    /// The frame rate the game is capped to in play: 60 or 30.
+    @Published var frameRate = 60 { didSet { store(frameRate, "frameRate") } }
     /// The colour of the on-screen controls. White unless the player picks one
     /// of the others; stored per game like every other option.
     @Published var buttonColour = ControlColour.white.rawValue {
@@ -343,6 +345,7 @@ final class LauncherModel: ObservableObject {
         "saveHaptics",
         "buttonHaptics",
         "imageScaling",
+        "frameRate",
         "buttonColour",
     ]
 
@@ -456,6 +459,7 @@ final class LauncherModel: ObservableObject {
         saveHaptics = storedBool("saveHaptics", for: game, fallback: true)
         buttonHaptics = storedBool("buttonHaptics", for: game, fallback: true)
         imageScaling = min(max(storedInt("imageScaling", for: game, fallback: 2), 0), 2)
+        frameRate = storedInt("frameRate", for: game, fallback: 60) == 30 ? 30 : 60
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 
@@ -481,6 +485,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(saveHaptics, forKey: LauncherModel.optionKey("saveHaptics", for: game))
         defaults.set(buttonHaptics, forKey: LauncherModel.optionKey("buttonHaptics", for: game))
         defaults.set(imageScaling, forKey: LauncherModel.optionKey("imageScaling", for: game))
+        defaults.set(frameRate, forKey: LauncherModel.optionKey("frameRate", for: game))
         defaults.set(buttonColour, forKey: LauncherModel.optionKey("buttonColour", for: game))
     }
 

@@ -997,12 +997,40 @@ struct LauncherView: View {
                 }
             }
 
+            row("Frame rate", detail: "30 saves battery, 60 is smoother") {
+                HStack(spacing: 8) {
+                    frameRatePill(60)
+                    frameRatePill(30)
+                }
+            }
+
             footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
-            footnote("DEFAULT is the original. SMOOTH is softer, ENHANCED is sharper.")
+            footnote("NONE is the original. SMOOTH is softer, ENHANCED is sharper.")
         }
     }
 
-    private static let scalingTitles = ["DEFAULT", "SMOOTH", "ENHANCED"]
+    private static let scalingTitles = ["NONE", "SMOOTH", "ENHANCED"]
+
+    private func frameRatePill(_ rate: Int) -> some View {
+        let selected = model.frameRate == rate
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+
+        return Button {
+            model.frameRate = rate
+        } label: {
+            Text(verbatim: "\(rate)")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .kerning(0.8)
+                .foregroundColor(selected ? Color.black.opacity(0.8) : Theme.faint)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(shape.fill(selected ? accent : Color.white.opacity(0.04)))
+                .overlay(shape.stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(rate) " + L.t("frames per second"))
+    }
 
     private func scalingPill(_ index: Int) -> some View {
         let selected = model.imageScaling == index
@@ -1456,6 +1484,7 @@ struct LauncherView: View {
             model.apply(preset: half)
         }
         model.imageScaling = 2
+        model.frameRate = 60
     }
 
     private func resetAudio() {

@@ -3,6 +3,7 @@
 #import <UIKit/UIKit.h>
 
 #include "engine_present.h"
+#include "launcher/launcher.h"
 
 @interface VaultPresentView : UIView
 @end
@@ -118,21 +119,32 @@ id<MTLTexture> gPresentTexture = nil;
 VaultPresentView* gPresentView = nil;
 CAMetalLayer* gPresentLayer = nil;
 NSString* gPresentModeKey = nil;
+NSString* gPresentFrameRateKey = nil;
+CFAbsoluteTime gPresentLast = 0;
 int gPresentTextureWidth = 0;
 int gPresentTextureHeight = 0;
 bool gPresentUnavailable = false;
 
+void presentPrepareKeys()
+{
+    if (gPresentModeKey != nil) {
+        return;
+    }
+
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSString* game = [defaults stringForKey:@"launcher.game"];
+    if (game.length == 0) {
+        game = @"fallout1";
+    }
+
+    gPresentModeKey = [NSString stringWithFormat:@"launcher.%@.imageScaling", game];
+    gPresentFrameRateKey = [NSString stringWithFormat:@"launcher.%@.frameRate", game];
+}
+
 int presentMode()
 {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-
-    if (gPresentModeKey == nil) {
-        NSString* game = [defaults stringForKey:@"launcher.game"];
-        if (game.length == 0) {
-            game = @"fallout1";
-        }
-        gPresentModeKey = [NSString stringWithFormat:@"launcher.%@.imageScaling", game];
-    }
+    presentPrepareKeys();
 
     if ([defaults objectForKey:gPresentModeKey] == nil) {
         return 2;
@@ -144,6 +156,36 @@ int presentMode()
     }
 
     return (int)mode;
+}
+
+int presentFrameRate()
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    presentPrepareKeys();
+
+    if ([defaults objectForKey:gPresentFrameRateKey] == nil) {
+        return 60;
+    }
+
+    return [defaults integerForKey:gPresentFrameRateKey] == 30 ? 30 : 60;
+}
+
+void presentPace()
+{
+    if (fallout_ios_screen() != 0 || fallout_ios_movie_state() != 0 || presentFrameRate() > 30) {
+        gPresentLast = 0;
+        return;
+    }
+
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (gPresentLast > 0) {
+        CFAbsoluteTime target = gPresentLast + (1.0 / 30.0);
+        if (target > now) {
+            [NSThread sleepForTimeInterval:(NSTimeInterval)(target - now)];
+            now = CFAbsoluteTimeGetCurrent();
+        }
+    }
+    gPresentLast = now;
 }
 
 UIWindow* presentWindow()
@@ -266,6 +308,8 @@ int fallout_engine_present_frame(const void* pixels, int pitch, int width, int h
     }
 
     @autoreleasepool {
+        presentPace();
+
         if (!presentResourcesReady()) {
             return 0;
         }
