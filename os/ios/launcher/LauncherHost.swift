@@ -287,7 +287,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .cha: english = "CHA"
         case .skill: english = "SKILL"
         case .swap: english = "SWAP"
-        case .end: english = "END COMBAT"
+        case .end: english = "END\nCOMBAT"
         case .reload: english = "RELOAD"
         case .fireMode: english = "ATTACK MODE"
         case .load: english = "LOAD"
@@ -443,7 +443,6 @@ enum LayoutProfile: String {
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
     private static let layoutVersion = 18
-    private static let anchorSuffix = ".anchor"
     private static let sideSuffix = ".side"
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
@@ -619,33 +618,6 @@ enum ControlLayout {
         case left = 1
     }
 
-    enum SaveAnchor: Int, CaseIterable {
-        case topLeft = 0
-        case top
-        case topRight
-        case right
-        case bottomRight
-        case bottom
-        case bottomLeft
-        case left
-
-        var horizontal: Int {
-            switch self {
-            case .topLeft, .left, .bottomLeft: return -1
-            case .topRight, .right, .bottomRight: return 1
-            default: return 0
-            }
-        }
-
-        var vertical: Int {
-            switch self {
-            case .topLeft, .top, .topRight: return -1
-            case .bottomLeft, .bottom, .bottomRight: return 1
-            default: return 0
-            }
-        }
-    }
-
     static func traySide(profile: LayoutProfile, game: FalloutGame) -> TraySide {
         let raw = UserDefaults.standard.object(forKey: key(.tray, sideSuffix, profile: profile, game: game)) as? Int ?? 0
         return TraySide(rawValue: raw) ?? .right
@@ -653,54 +625,6 @@ enum ControlLayout {
 
     static func setTraySide(_ side: TraySide, profile: LayoutProfile, game: FalloutGame) {
         UserDefaults.standard.set(side.rawValue, forKey: key(.tray, sideSuffix, profile: profile, game: game))
-    }
-
-    static func anchor(for control: TouchControl, profile: LayoutProfile, game: FalloutGame) -> SaveAnchor {
-        let raw = UserDefaults.standard.object(forKey: key(control, anchorSuffix, profile: profile, game: game)) as? Int
-        if let raw = raw, let anchor = SaveAnchor(rawValue: raw) {
-            return anchor
-        }
-        return control == .saves ? .bottomRight : .right
-    }
-
-    static func setAnchor(_ anchor: SaveAnchor, for control: TouchControl, profile: LayoutProfile, game: FalloutGame) {
-        UserDefaults.standard.set(anchor.rawValue, forKey: key(control, anchorSuffix, profile: profile, game: game))
-    }
-
-    static func anchoredCenter(_ anchor: SaveAnchor, size: CGSize, assembly: CGRect) -> CGPoint {
-        let x: CGFloat
-        switch anchor.horizontal {
-        case -1: x = assembly.minX - size.width / 2
-        case 1: x = assembly.maxX + size.width / 2
-        default: x = assembly.midX
-        }
-
-        let y: CGFloat
-        switch anchor.vertical {
-        case -1: y = assembly.minY - size.height / 2
-        case 1: y = assembly.maxY + size.height / 2
-        default: y = assembly.midY
-        }
-
-        return CGPoint(x: x, y: y)
-    }
-
-    static func nearestAnchor(to point: CGPoint, size: CGSize, assembly: CGRect) -> SaveAnchor {
-        var best = SaveAnchor.right
-        var bestDistance = CGFloat.greatestFiniteMagnitude
-
-        for anchor in SaveAnchor.allCases {
-            let center = anchoredCenter(anchor, size: size, assembly: assembly)
-            let dx = center.x - point.x
-            let dy = center.y - point.y
-            let distance = dx * dx + dy * dy
-            if distance < bestDistance {
-                bestDistance = distance
-                best = anchor
-            }
-        }
-
-        return best
     }
 
     static func quickSaveFrame(profile: LayoutProfile, game: FalloutGame, in bounds: CGSize) -> CGRect {
@@ -713,30 +637,17 @@ enum ControlLayout {
     }
 
     static func centerPoint(for control: TouchControl, profile: LayoutProfile, game: FalloutGame, in bounds: CGSize) -> CGPoint {
-        switch control {
-        case .tray, .load, .saves:
+        if control == .tray {
             let quick = quickSaveFrame(profile: profile, game: game, in: bounds)
             let traySize = displaySize(for: .tray, in: bounds, profile: profile, game: game)
             let trayX = traySide(profile: profile, game: game) == .left
                 ? quick.minX - traySize.width / 2
                 : quick.maxX + traySize.width / 2
-            let trayCenter = CGPoint(x: trayX, y: quick.midY)
-
-            if control == .tray {
-                return trayCenter
-            }
-
-            let tray = CGRect(x: trayCenter.x - traySize.width / 2,
-                              y: trayCenter.y - traySize.height / 2,
-                              width: traySize.width,
-                              height: traySize.height)
-            return anchoredCenter(anchor(for: control, profile: profile, game: game),
-                                  size: displaySize(for: control, in: bounds, profile: profile, game: game),
-                                  assembly: quick.union(tray))
-        default:
-            let stored = center(for: control, profile: profile, game: game)
-            return CGPoint(x: stored.x * bounds.width, y: stored.y * bounds.height)
+            return CGPoint(x: trayX, y: quick.midY)
         }
+
+        let stored = center(for: control, profile: profile, game: game)
+        return CGPoint(x: stored.x * bounds.width, y: stored.y * bounds.height)
     }
 
     static func reset(profile: LayoutProfile, game: FalloutGame) {
@@ -745,7 +656,6 @@ enum ControlLayout {
             defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
             defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
             defaults.removeObject(forKey: key(control, scaleSuffix, profile: profile, game: game))
-            defaults.removeObject(forKey: key(control, anchorSuffix, profile: profile, game: game))
             defaults.removeObject(forKey: key(control, sideSuffix, profile: profile, game: game))
         }
     }
@@ -1250,7 +1160,7 @@ final class GameControlsOverlay: UIView {
         offerButton.onHold = { [weak self] in
             fallout_ios_press_action(23)
             self?.refreshControls()
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            self?.successFeedback()
         }
         addSubview(offerButton)
 
@@ -1682,7 +1592,7 @@ final class GameControlsOverlay: UIView {
         // pulled the right-hand column about 100pt inward on notched phones.
         let x: CGFloat
         let y: CGFloat
-        if control == .tray || control == .load || control == .saves {
+        if control == .tray {
             x = point.x
             y = point.y
         } else {
@@ -1712,13 +1622,13 @@ final class GameControlsOverlay: UIView {
             fallout_ios_right_click()
         }
         refreshControls()
-        UISelectionFeedbackGenerator().selectionChanged()
+        selectionFeedback()
     }
 
     @objc private func goBack() {
         fallout_ios_back()
         refreshControls()
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        impactFeedback()
     }
 
     @objc private func sideActionPressed(_ sender: LabeledControlButton) {
@@ -1730,7 +1640,7 @@ final class GameControlsOverlay: UIView {
             setTray(open: false)
         }
         refreshControls()
-        UISelectionFeedbackGenerator().selectionChanged()
+        selectionFeedback()
     }
 
     /// The chevron beside QUICK SAVE. Tapping it slides LOAD and SAVE out of the
@@ -1738,7 +1648,7 @@ final class GameControlsOverlay: UIView {
     /// as its neighbour and never moves.
     @objc private func trayPressed() {
         setTray(open: !trayOpen)
-        UISelectionFeedbackGenerator().selectionChanged()
+        selectionFeedback()
     }
 
     private func setTray(open: Bool) {
@@ -1782,7 +1692,7 @@ final class GameControlsOverlay: UIView {
             // The engine cannot report a result: ask it the old way and claim
             // nothing.
             fallout_ios_press_action(19)
-            UISelectionFeedbackGenerator().selectionChanged()
+            selectionFeedback()
             return
         }
 
@@ -1811,6 +1721,29 @@ final class GameControlsOverlay: UIView {
     private var saveHaptics: Bool {
         let key = LauncherModel.optionKey("saveHaptics", for: game)
         return UserDefaults.standard.object(forKey: key) as? Bool ?? true
+    }
+
+    private var buttonHaptics: Bool {
+        let key = LauncherModel.optionKey("buttonHaptics", for: game)
+        return UserDefaults.standard.object(forKey: key) as? Bool ?? true
+    }
+
+    private func selectionFeedback() {
+        if buttonHaptics {
+            UISelectionFeedbackGenerator().selectionChanged()
+        }
+    }
+
+    private func impactFeedback() {
+        if buttonHaptics {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+    }
+
+    private func successFeedback() {
+        if buttonHaptics {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
     }
 
     private var traySymbol: String {
@@ -1844,12 +1777,12 @@ final class GameControlsOverlay: UIView {
         inspectOn.toggle()
         fallout_ios_press_action(inspectOn ? 17 : 18)
         lookButton.showsSelection = inspectOn
-        UISelectionFeedbackGenerator().selectionChanged()
+        selectionFeedback()
     }
 
     @objc private func helpPressed() {
         setHelp(visible: helpCard.isHidden)
-        UISelectionFeedbackGenerator().selectionChanged()
+        selectionFeedback()
     }
 
     @objc private func keyboardWillShow(_ notification: Notification) {

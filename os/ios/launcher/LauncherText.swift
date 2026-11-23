@@ -416,6 +416,8 @@ enum L {
             "SHOW BARS": "MONTRER LES BARRES",
             "Game text, voice, the launcher and the controls": "Textes et voix du jeu, le lanceur et les commandes",
             "Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.": "Langue, sous-titres et course sont écrits dans la configuration du jeu au lancement. Les textes absents de votre installation restent en anglais.",
+            "Button haptics": "Retour haptique des boutons",
+            "The tap you feel when you press an on-screen control": "La vibration ressentie quand vous appuyez sur une commande à l'écran",
         ],
 
         .german: [
@@ -487,6 +489,8 @@ enum L {
             "Auto save found no free slot.": "Auto-Speichern fand keinen freien Slot.",
             "Clear one in SAVES.": "Mach einen in SPEICHERN frei.",
             "Haptic on save": "Vibration beim Speichern",
+            "Button haptics": "Tastenhaptik",
+            "The tap you feel when you press an on-screen control": "Der Impuls, den du beim Drücken einer Bildschirmtaste spürst",
             "UPDATES": "UPDATES",
             "CHECKING": "PRÜFUNG",
             "GET": "HOLEN",
@@ -976,6 +980,8 @@ enum L {
             "SHOW BARS": "MOSTRA BARRE",
             "Game text, voice, the launcher and the controls": "Testi e voci del gioco, il launcher e i comandi",
             "Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.": "Lingua, sottotitoli e corsa vengono scritti nella configurazione del gioco all'avvio. I testi assenti dalla tua installazione restano in inglese.",
+            "Button haptics": "Feedback dei pulsanti",
+            "The tap you feel when you press an on-screen control": "Il tocco che senti quando premi un comando a schermo",
         ],
 
         .spanish: [
@@ -1256,6 +1262,8 @@ enum L {
             "SHOW BARS": "MOSTRAR BARRAS",
             "Game text, voice, the launcher and the controls": "Textos y voces del juego, el lanzador y los controles",
             "Language, subtitles and running are written into the game's configuration on Play. Text your installation does not contain stays English.": "Idioma, subtítulos y correr se escriben en la configuración del juego al iniciar. Los textos que tu instalación no incluye permanecen en inglés.",
+            "Button haptics": "Vibración de los botones",
+            "The tap you feel when you press an on-screen control": "El toque que notas al pulsar un control en pantalla",
         ],
     ]
 }

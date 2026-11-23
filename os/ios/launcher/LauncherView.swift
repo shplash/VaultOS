@@ -208,7 +208,8 @@ struct LauncherView: View {
                     gameTab(game)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 3)
             .padding(.bottom, 11)
 
             Rectangle()
@@ -303,38 +304,22 @@ struct LauncherView: View {
                 }
             }
         } label: {
-            VStack(spacing: 3) {
-                if game == .fallout1 {
-                    gameTabRule(game, selected: selected)
-                }
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(game.accent)
+                    .frame(width: 6, height: 6)
 
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(game.accent)
-                        .frame(width: 6, height: 6)
-
-                    Text(game.title.uppercased())
-                        .font(Vault.display(32))
-                        .kerning(0.4)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                        .foregroundColor(selected ? Theme.text : Theme.faint)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-
-                if game == .fallout2 {
-                    gameTabRule(game, selected: selected)
-                }
+                Text(game.title.uppercased())
+                    .font(Vault.display(32))
+                    .kerning(0.4)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .foregroundColor(selected ? Theme.text : Theme.faint)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private func gameTabRule(_ game: FalloutGame, selected: Bool) -> some View {
-        return Rectangle()
-            .fill(selected ? game.accent : Color.clear)
-            .frame(height: 2)
     }
 
     private var statusText: String {
@@ -1145,6 +1130,10 @@ struct LauncherView: View {
                       detail: "Moves at a run everywhere",
                       isOn: $model.alwaysRun)
 
+            toggleRow("Button haptics",
+                      detail: "The tap you feel when you press an on-screen control",
+                      isOn: $model.buttonHaptics)
+
             row("Auto quick save", detail: nil) {
                 VStack(alignment: .trailing, spacing: 8) {
                     HStack(spacing: 8) {
@@ -1452,6 +1441,7 @@ struct LauncherView: View {
         model.alwaysRun = true
         model.autoSaveMinutes = 5
         model.saveHaptics = true
+        model.buttonHaptics = true
     }
 
     private func resetControls() {
@@ -1787,7 +1777,7 @@ private struct SmallButtonStyle: ButtonStyle {
             .background(
                 shape.fill(configuration.isPressed ? accent.opacity(0.18) : Color.white.opacity(0.04))
             )
-            .overlay(shape.stroke(accent.opacity(configuration.isPressed ? 0.85 : 0.45), lineWidth: 1))
+            .overlay(shape.stroke(configuration.isPressed ? Vault.edgeLight : Theme.hairline, lineWidth: 1))
             .opacity(configuration.isPressed ? 0.9 : 1)
             .modifier(DisabledDim())
     }
@@ -2138,16 +2128,12 @@ private struct TouchControlEditor: View {
     }
 
     private func editorCenter(for control: TouchControl, in size: CGSize) -> CGPoint {
-        let point: CGPoint
-        switch control {
-        case .tray, .load, .saves:
-            point = ControlLayout.centerPoint(for: control, profile: profile, game: game, in: size)
-            return point
-        default:
-            let stored = centers[control] ?? control.defaultCenter(for: profile)
-            point = CGPoint(x: stored.x * size.width, y: stored.y * size.height)
+        if control == .tray {
+            return ControlLayout.centerPoint(for: control, profile: profile, game: game, in: size)
         }
 
+        let stored = centers[control] ?? control.defaultCenter(for: profile)
+        let point = CGPoint(x: stored.x * size.width, y: stored.y * size.height)
         let controlSize = editorSize(for: control, in: size)
         let halfWidth = controlSize.width / 2
         let halfHeight = controlSize.height / 2
@@ -2340,15 +2326,6 @@ private struct TouchControlEditor: View {
                     ControlLayout.setTraySide(moved.x < quick.midX ? .left : .right,
                                               profile: profile,
                                               game: game)
-                    revision += 1
-                case .load, .saves:
-                    let assembly = saveAssembly(in: size).frame
-                    ControlLayout.setAnchor(ControlLayout.nearestAnchor(to: moved,
-                                                                       size: editorSize(for: control, in: size),
-                                                                       assembly: assembly),
-                                            for: control,
-                                            profile: profile,
-                                            game: game)
                     revision += 1
                 default:
                     let controlSize = editorSize(for: control, in: size)
