@@ -819,12 +819,6 @@ final class GameControlsOverlay: UIView {
         symbol: "info",
         iconPointSize: 22
     )
-    private let scalingButton = LabeledControlButton(
-        title: "ENHANCED",
-        symbol: "wand.and.stars",
-        iconPointSize: 12,
-        layout: .horizontal
-    )
     private let barterButton = LabeledControlButton(
         title: "",
         symbol: "dollarsign.circle",
@@ -874,7 +868,6 @@ final class GameControlsOverlay: UIView {
     private var keepTargeting = false
     private var quickSaveSerial: Int32 = -1
     private var trayOpen = false
-    private var scalingShown = -1
 
     /// Refreshes the overlay that is on screen, if there is one. The engine
     /// calls this from its own input loop, on the main thread between frames,
@@ -1196,11 +1189,6 @@ final class GameControlsOverlay: UIView {
         helpButton.addTarget(self, action: #selector(helpPressed), for: .touchUpInside)
         addSubview(helpButton)
 
-        scalingButton.accessibilityLabel = "Image scaling"
-        scalingButton.backgroundOpacity = 0.9
-        scalingButton.addTarget(self, action: #selector(cycleScaling), for: .touchUpInside)
-        addSubview(scalingButton)
-
         helpBackdrop.isHidden = true
         helpBackdrop.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dismissHelp)))
         addSubview(helpBackdrop)
@@ -1277,13 +1265,6 @@ final class GameControlsOverlay: UIView {
             trayButton.set(symbol: traySymbol, title: "",
                            accessibilityLabel: trayOpen ? "Close the save tray" : "Open the save tray")
         }
-
-        let scalingWidth = min(max(104, bounds.width * 0.15), 156)
-        let scalingHeight = max(28, min(40, bounds.height * 0.075))
-        scalingButton.frame = CGRect(x: (bounds.width - scalingWidth) / 2,
-                                     y: max(6, safeAreaInsets.top + 4),
-                                     width: scalingWidth,
-                                     height: scalingHeight)
 
         if !quickSaveNotice.isHidden {
             let noticeWidth = min(220, bounds.width * 0.32)
@@ -1804,22 +1785,6 @@ final class GameControlsOverlay: UIView {
         selectionFeedback()
     }
 
-    private static let scalingNames = ["DEFAULT", "SMOOTH", "ENHANCED"]
-
-    private var scalingMode: Int {
-        let key = LauncherModel.optionKey("imageScaling", for: game)
-        let value = UserDefaults.standard.object(forKey: key) as? Int ?? 2
-        return min(max(value, 0), 2)
-    }
-
-    @objc private func cycleScaling() {
-        let next = (scalingMode + 1) % GameControlsOverlay.scalingNames.count
-        UserDefaults.standard.set(next, forKey: LauncherModel.optionKey("imageScaling", for: game))
-        scalingShown = next
-        scalingButton.set(symbol: "wand.and.stars", title: GameControlsOverlay.scalingNames[next])
-        selectionFeedback()
-    }
-
     @objc private func keyboardWillShow(_ notification: Notification) {
         keyboardIsUp = true
 
@@ -1934,7 +1899,6 @@ final class GameControlsOverlay: UIView {
         for button in sideButtons {
             button.controlOpacity = value
         }
-        scalingButton.controlOpacity = value
     }
 
     private func refreshControls() {
@@ -1943,13 +1907,8 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider, scalingButton]
+        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider]
         controls.append(contentsOf: sideButtons as [UIView])
-
-        if scalingShown != scalingMode {
-            scalingShown = scalingMode
-            scalingButton.set(symbol: "wand.and.stars", title: GameControlsOverlay.scalingNames[scalingMode])
-        }
 
         let movie = fallout_ios_movie_state()
         skipMovieButton.isHidden = movie == 0

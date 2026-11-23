@@ -1455,6 +1455,7 @@ struct LauncherView: View {
         if let half = model.presets.last {
             model.apply(preset: half)
         }
+        model.imageScaling = 2
     }
 
     private func resetAudio() {
