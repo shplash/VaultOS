@@ -209,7 +209,7 @@ struct LauncherView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 9)
+            .padding(.top, 14)
             .padding(.bottom, 11)
 
             Rectangle()
@@ -279,11 +279,11 @@ struct LauncherView: View {
         } label: {
             VStack(spacing: 4) {
                 Text(L.t("PLAY"))
-                    .font(Vault.display(21))
+                    .font(Vault.display(24))
                     .kerning(1.6)
 
                 Text(statusText)
-                    .font(Vault.label(8, weight: .bold))
+                    .font(Vault.label(10, weight: .bold))
                     .kerning(1.3)
                     .foregroundColor(Vault.ink.opacity(0.62))
             }
@@ -429,6 +429,7 @@ struct LauncherView: View {
             }
             .padding(.horizontal, 22)
             .padding(.top, 4)
+            .padding(.bottom, 16)
 
             Spacer(minLength: 0)
         }
@@ -553,6 +554,11 @@ struct LauncherView: View {
                 }
                 Spacer(minLength: 0)
 
+                Text(verbatim: "WIKI:")
+                    .font(Vault.label(9))
+                    .kerning(0.8)
+                    .foregroundColor(Theme.faint)
+
                 wikiLink("FALLOUT", address: "https://fallout.fandom.com/wiki/Fallout", primary: model.selectedGame == .fallout1)
                 wikiLink("FALLOUT 2", address: "https://fallout.fandom.com/wiki/Fallout_2", primary: model.selectedGame == .fallout2)
             }
@@ -643,7 +649,8 @@ struct LauncherView: View {
                         .foregroundColor(Theme.text)
 
                     Text(L.t("Who made this, and what it is built on"))
-                        .font(.system(size: 11, weight: .regular))
+                        .font(Vault.label(9))
+                        .kerning(0.4)
                         .foregroundColor(Theme.faint)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -926,7 +933,6 @@ struct LauncherView: View {
                     ("HALF or FULL", "HALF keeps the interface readable on a phone; FULL is sharpest on a tablet."),
                     ("Per game", "Resolution, audio, language and controls are stored separately for each game."),
                     ("Own folders", "Fallout keeps its files in Documents, Fallout 2 in Documents/Fallout2, so the two never mix."),
-                    ("Layout", "Every control can be moved, resized, faded and coloured from Controls."),
                 ]
             }
         }
@@ -978,6 +984,8 @@ struct LauncherView: View {
                 alignment: .bottom
             )
 
+            footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
+
             row("Custom size", detail: "Written to the game's resolution file on Play") {
                 HStack(spacing: 10) {
                     DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
@@ -997,14 +1005,13 @@ struct LauncherView: View {
                 }
             }
 
-            row("Frame rate", detail: "30 saves battery, 60 is smoother") {
+            row("Frame rate", detail: "60 is smoother, 30 saves battery") {
                 HStack(spacing: 8) {
                     frameRatePill(60)
                     frameRatePill(30)
                 }
             }
 
-            footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
             footnote("NONE is the original. SMOOTH is softer, ENHANCED is sharper.")
         }
     }
@@ -1300,7 +1307,7 @@ struct LauncherView: View {
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
 
-            row("Opacity", detail: "How solid the on-screen controls are") {
+            row("Opacity", detail: "How solid the on-screen controls are", divider: false) {
                 HStack(spacing: 12) {
                     Slider(value: $model.controlsOpacity, in: 0.10...1)
                         .accentColor(accent)
@@ -1395,7 +1402,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.sheet)
+            .vaultPlate(corner: 18, fill: Theme.railSolid)
             .padding(24)
         }
     }
@@ -1447,7 +1454,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.sheet)
+            .vaultPlate(corner: 18, fill: Theme.railSolid)
             .padding(24)
         }
     }
@@ -1531,7 +1538,6 @@ struct LauncherView: View {
                         .kerning(0.4)
                         .foregroundColor(Theme.faint)
                         .lineLimit(2)
-                        .frame(height: 24, alignment: .topLeading)
                 }
 
                 Spacer(minLength: 8)
@@ -1575,6 +1581,7 @@ struct LauncherView: View {
             }
             .padding(.horizontal, 22)
             .padding(.top, 2)
+            .padding(.bottom, 16)
 
             Spacer(minLength: 0)
         }
@@ -1585,7 +1592,7 @@ struct LauncherView: View {
         .padding(.bottom, 16 + screenInsets.bottom)
     }
 
-    private func row<C: View>(_ title: String, detail: String?, @ViewBuilder control: () -> C) -> some View {
+    private func row<C: View>(_ title: String, detail: String?, divider: Bool = true, @ViewBuilder control: () -> C) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L.t(title))
@@ -1609,7 +1616,7 @@ struct LauncherView: View {
         .padding(.vertical, 8)
         .overlay(
             Rectangle()
-                .fill(Theme.hairline)
+                .fill(divider ? Theme.hairline : Color.clear)
                 .frame(height: 1),
             alignment: .bottom
         )
@@ -1741,10 +1748,10 @@ private extension FalloutGame {
 
 private enum Theme {
     static let background = Vault.hull
-    static let sheet = Vault.plate
     /// The rail's own fill. The home sheet uses it too, so the panel and the
     /// bar are one surface instead of a blue-grey plate over a darker one.
     static let rail = Vault.plate.opacity(0.55)
+    static let railSolid = Color(red: 0.061, green: 0.067, blue: 0.078)
     static let panel = Vault.panel
     static let line = Vault.hairline
     static let hairline = Vault.hairline
