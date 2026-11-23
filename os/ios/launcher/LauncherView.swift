@@ -19,7 +19,6 @@ struct LauncherView: View {
     /// What the ZIP picker is being opened for.
     @State private var pendingImport: LauncherImport = .game
     @State private var showSaveImportWarning = false
-    @State private var saveImportCountdown = 0
     @State private var showResetAllWarning = false
     /// The update check runs only while the player waits for it, and its answer
     /// is shown once in a note over the About page.
@@ -60,7 +59,9 @@ struct LauncherView: View {
 
                 HStack(spacing: 0) {
                     rail(leading: screenInsets.leading, bottom: screenInsets.bottom)
+                        .alert(isPresented: $showResetAllWarning) { resetAllAlert }
                     content
+                        .alert(isPresented: $showSaveImportWarning) { replaceSavesAlert }
                 }
                 .frame(width: geometry.size.width / scale, height: geometry.size.height / scale)
                 .scaleEffect(scale)
@@ -71,16 +72,6 @@ struct LauncherView: View {
         // safe area to SwiftUI instead shrank the launcher into a box with black
         // bands around it on every device with a cut-out.
         .ignoresSafeArea()
-        .overlay(
-            Group {
-                if showSaveImportWarning {
-                    saveImportWarning
-                }
-                if showResetAllWarning {
-                    resetAllWarning
-                }
-            }
-        )
         .preferredColorScheme(.dark)
         .fullScreenCover(isPresented: $showControlEditor) {
             TouchControlEditor(model: model)
@@ -120,14 +111,6 @@ struct LauncherView: View {
             // can be dropped in while the launcher is in the background. Look
             // at the installation again when it comes back to the front.
             model.refreshInstall()
-        }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            // Only the save-import countdown needs a tick. Without it this ran a
-            // full redraw of the launcher every second for as long as it was open.
-            guard showSaveImportWarning && saveImportCountdown > 0 else {
-                return
-            }
-            saveImportCountdown -= 1
         }
         .onChange(of: model.showImporter) { shown in
             guard shown else {
@@ -203,14 +186,13 @@ struct LauncherView: View {
 
     private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            VStack(spacing: 2) {
+            VStack(spacing: 0) {
                 ForEach(FalloutGame.allCases) { game in
                     gameTab(game)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 14)
-            .padding(.bottom, 11)
+            .padding(.bottom, 8)
 
             Rectangle()
                 .fill(Theme.line)
@@ -227,7 +209,7 @@ struct LauncherView: View {
         }
         .padding(.leading, 10 + leading)
         .padding(.trailing, 10)
-        .padding(.top, 14)
+        .padding(.top, 8)
         .padding(.bottom, 14 + bottom)
         .frame(width: 152 + leading, alignment: .leading)
         .background(Theme.rail)
@@ -293,10 +275,12 @@ struct LauncherView: View {
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
 
+    private static let gameNameSize: CGFloat = 30
+    private static let gameNameGap: CGFloat = 8
+
     /// The game switcher used at the top of the rail.
     private func gameTab(_ game: FalloutGame) -> some View {
         let selected = model.selectedGame == game
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
 
         return Button {
             if model.selectedGame != game {
@@ -305,31 +289,16 @@ struct LauncherView: View {
                 }
             }
         } label: {
-            ZStack {
-                shape.fill(Color.white.opacity(0.04))
-
-                if let image = artwork(for: game) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                        .clipped()
-                        .saturation(selected ? 1 : 0.15)
-                }
-
-                Color.black.opacity(selected ? 0.34 : 0.66)
-
-                Text(game.title.uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.6)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .foregroundColor(selected ? Theme.text : Theme.faint)
-            }
-            .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38)
-            .clipShape(shape)
-            .overlay(shape.stroke(selected ? game.accent : Theme.hairline, lineWidth: selected ? 1.5 : 1))
-            .contentShape(Rectangle())
+            Text(game.title.uppercased())
+                .font(Vault.display(LauncherView.gameNameSize))
+                .kerning(0.4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .foregroundColor(selected ? game.accent : Theme.faint)
+                .frame(maxWidth: .infinity)
+                .frame(height: Vault.displayCapHeight(LauncherView.gameNameSize) + LauncherView.gameNameGap * 2)
+                .offset(y: Vault.displayCapShift(LauncherView.gameNameSize))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(game.title)
@@ -551,8 +520,8 @@ struct LauncherView: View {
 
     private static var artworkCache: [FalloutGame: UIImage] = [:]
 
-    /// Each game's own still, bundle first. The hero and the rail's game
-    /// selector draw the same image, so the two can never disagree.
+    /// Each game's own still, bundle first and kept, so a redraw never reads it
+    /// again.
     private func artwork(for game: FalloutGame) -> UIImage? {
         if let cached = LauncherView.artworkCache[game] {
             return cached
@@ -1348,7 +1317,7 @@ struct LauncherView: View {
     }
 
     /// Backing the saves up is harmless; putting a backup back replaces them, so
-    /// that one waits out a countdown with the warning on screen.
+    /// that one asks first.
     private var savegamesRow: some View {
         row("Saved games", detail: model.savesNotice.map { L.message($0) }) {
             HStack(spacing: 8) {
@@ -1361,7 +1330,6 @@ struct LauncherView: View {
                 .disabled(model.isInstalling || model.install.installed == 0 || model.install.has_saves == 0)
 
                 Button {
-                    saveImportCountdown = 5
                     showSaveImportWarning = true
                 } label: {
                     Text(L.t("IMPORT"))
@@ -1372,113 +1340,29 @@ struct LauncherView: View {
         }
     }
 
-    private var saveImportWarning: some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L.t("Replace your saved games?").uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.8)
-                    .foregroundColor(Theme.text)
-
-                Text(L.t("Every save in this installation is deleted and the ones in the backup you choose take their place. This cannot be undone."))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-
-                    Button(L.t("CANCEL")) {
-                        showSaveImportWarning = false
-                        saveImportCountdown = 0
-                    }
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.dim)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.06))
-                    )
-
-                    Button(saveImportCountdown > 0
-                        ? "\(L.t("IMPORT")) \(saveImportCountdown)"
-                        : L.t("IMPORT")) {
-                        showSaveImportWarning = false
-                        pendingImport = .saves
-                        model.showImporter = true
-                    }
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.black.opacity(0.85))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(accent.opacity(saveImportCountdown > 0 ? 0.4 : 1))
-                    )
-                    .disabled(saveImportCountdown > 0)
+    private var replaceSavesAlert: Alert {
+        Alert(
+            title: Text(L.t("Replace your saved games?")),
+            message: Text(L.t("Every save in this installation is deleted and the ones in the backup you choose take their place. This cannot be undone.")),
+            primaryButton: .destructive(Text(L.t("IMPORT"))) {
+                pendingImport = .saves
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    model.showImporter = true
                 }
-            }
-            .padding(22)
-            .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.railSolid)
-            .padding(24)
-        }
+            },
+            secondaryButton: .cancel(Text(L.t("CANCEL")))
+        )
     }
 
-    private var resetAllWarning: some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L.t("Reset every setting?").uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.8)
-                    .foregroundColor(Theme.text)
-
-                Text(L.t("Every setting in the launcher goes back to its default - resolution, audio, language, subtitles and the touch controls - for both games. Your game files and your saved games are kept."))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-
-                    Button(L.t("CANCEL")) {
-                        showResetAllWarning = false
-                    }
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Theme.dim)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.06))
-                    )
-
-                    Button(L.t("RESET ALL")) {
-                        showResetAllWarning = false
-                        model.resetEverything()
-                    }
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.black.opacity(0.85))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(accent)
-                    )
-                }
-            }
-            .padding(22)
-            .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.railSolid)
-            .padding(24)
-        }
+    private var resetAllAlert: Alert {
+        Alert(
+            title: Text(L.t("Reset every setting?")),
+            message: Text(L.t("Every setting in the launcher goes back to its default - resolution, audio, language, subtitles and the touch controls - for both games. Your game files and your saved games are kept.")),
+            primaryButton: .destructive(Text(L.t("RESET ALL"))) {
+                model.resetEverything()
+            },
+            secondaryButton: .cancel(Text(L.t("CANCEL")))
+        )
     }
 
     private func toggleRow(_ title: String, detail: String? = nil, divider: Bool = true, isOn: Binding<Bool>) -> some View {
@@ -1773,7 +1657,6 @@ private enum Theme {
     /// The rail's own fill. The home sheet uses it too, so the panel and the
     /// bar are one surface instead of a blue-grey plate over a darker one.
     static let rail = Vault.plate.opacity(0.55)
-    static let railSolid = Color(red: 0.061, green: 0.067, blue: 0.078)
     static let line = Vault.hairline
     static let hairline = Vault.hairline
     static let text = Vault.text

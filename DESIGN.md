@@ -68,12 +68,11 @@ than marking it, so nothing coloured is allowed on their borders.
   except on the last row of a page.
 - **Toggle** (`PillToggle`): accent when on with an ink knob, near-black when
   off.
-- **Game selector**: two stacked banners at the top of the rail, each showing
-  that game's own still behind its name in the display face, centred, so
-  switching game never moves the text. The selected game's still is in colour
-  under a light scrim, its name white and its outline in that game's
-  accent; the other is desaturated under a heavier scrim, its name faint and
-  its outline a hairline.
+- **Game selector**: the two game names at the top of the rail, centred in the
+  display face at 30pt with no plate behind them: the selected game in its own
+  accent, the other faint. The gap above the first name, between the two and
+  below the last are the same, and each label is framed on its capitals rather
+  than on its line box, so the space above and below the letters is equal too.
 - **Touch control** (`LabeledControlButton`): a dark plate at 80% with a faint
   top-down shade, one 1.25pt charcoal outline, a thin lit line along its top
   edge and a small shadow, a glyph above a mono label, both in the player's
