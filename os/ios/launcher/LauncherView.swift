@@ -978,14 +978,6 @@ struct LauncherView: View {
                 alignment: .bottom
             )
 
-            row("Image scaling", detail: "How the game picture is scaled to the screen") {
-                HStack(spacing: 8) {
-                    ForEach(0..<LauncherView.scalingTitles.count, id: \.self) { index in
-                        scalingPill(index)
-                    }
-                }
-            }
-
             row("Custom size", detail: "Written to the game's resolution file on Play") {
                 HStack(spacing: 10) {
                     DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
@@ -997,8 +989,16 @@ struct LauncherView: View {
                 .frame(width: 240)
             }
 
-            footnote("FULL draws two screen pixels per game pixel, HALF about one and a half. HALF keeps the interface readable on a phone.")
-            footnote("SMOOTH softens the whole picture. ENHANCED keeps pixels crisp with soft edges. Both apply in game at once.")
+            row("Image scaling", detail: "How the game picture is scaled to the screen") {
+                HStack(spacing: 8) {
+                    ForEach(0..<LauncherView.scalingTitles.count, id: \.self) { index in
+                        scalingPill(index)
+                    }
+                }
+            }
+
+            footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
+            footnote("ENHANCED is the default. SMOOTH is softer, SHARP is unfiltered.")
         }
     }
 
