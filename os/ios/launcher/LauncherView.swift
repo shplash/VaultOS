@@ -209,7 +209,7 @@ struct LauncherView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 6)
+            .padding(.top, 9)
             .padding(.bottom, 11)
 
             Rectangle()
@@ -1335,7 +1335,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.rail)
+            .vaultPlate(corner: 18, fill: Theme.sheet)
             .padding(24)
         }
     }
@@ -1387,7 +1387,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.rail)
+            .vaultPlate(corner: 18, fill: Theme.sheet)
             .padding(24)
         }
     }
