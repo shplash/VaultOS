@@ -49,15 +49,11 @@ NSString* const kPresentShaderSource =
      "    }\n"
      "    return 0.0;\n"
      "}\n"
-     "float vault_grain(float2 p, float t) {\n"
-     "    return fract(sin(dot(p + float2(t * 61.7, t * 47.3), float2(12.9898, 78.233))) * 43758.5453);\n"
-     "}\n"
      "fragment float4 vault_present_fragment(VaultPresentVertex in [[stage_in]],\n"
      "                                       texture2d<float> source [[texture(0)]],\n"
      "                                       constant float2& scale [[buffer(0)]],\n"
      "                                       constant int& mode [[buffer(1)]],\n"
      "                                       constant int& effects [[buffer(2)]],\n"
-     "                                       constant float& time [[buffer(3)]],\n"
      "                                       sampler nearestSampler [[sampler(0)]],\n"
      "                                       sampler linearSampler [[sampler(1)]]) {\n"
      "    float2 size = float2(source.get_width(), source.get_height());\n"
@@ -115,14 +111,20 @@ NSString* const kPresentShaderSource =
      "        rgb = vault_encode(sharp * 0.25);\n"
      "    }\n"
      "    if ((effects & 1) != 0) {\n"
-     "        rgb += (vault_grain(base, time) - 0.5) * 0.06;\n"
+     "        float2 o = 1.0 / (size * max(scale, float2(1.0)));\n"
+     "        float3 near1 = source.sample(linearSampler, in.uv + float2(o.x, 0.0)).rgb;\n"
+     "        float3 near2 = source.sample(linearSampler, in.uv - float2(o.x, 0.0)).rgb;\n"
+     "        float3 near3 = source.sample(linearSampler, in.uv + float2(0.0, o.y)).rgb;\n"
+     "        float3 near4 = source.sample(linearSampler, in.uv - float2(0.0, o.y)).rgb;\n"
+     "        float3 average = (near1 + near2 + near3 + near4) * 0.25;\n"
+     "        rgb += (rgb - average) * 0.35;\n"
      "    }\n"
      "    if ((effects & 2) != 0) {\n"
-     "        float2 d = in.uv - 0.5;\n"
-     "        rgb *= 1.0 - 0.45 * smoothstep(0.30, 1.05, length(d));\n"
+     "        rgb = mix(rgb, sqrt(max(rgb, float3(0.0))), 0.30);\n"
      "    }\n"
      "    if ((effects & 4) != 0) {\n"
-     "        rgb *= 0.86 + 0.14 * (0.5 + 0.5 * cos(in.position.y * 3.14159265));\n"
+     "        float luma = dot(rgb, float3(0.299, 0.587, 0.114));\n"
+     "        rgb = mix(float3(luma), rgb, 1.18);\n"
      "    }\n"
      "    return float4(clamp(rgb, float3(0.0), float3(1.0)), 1.0);\n"
      "}\n";
@@ -137,13 +139,12 @@ VaultPresentView* gPresentView = nil;
 CAMetalLayer* gPresentLayer = nil;
 NSString* gPresentModeKey = nil;
 NSString* gPresentFrameRateKey = nil;
-NSString* gPresentGrainKey = nil;
-NSString* gPresentVignetteKey = nil;
-NSString* gPresentScanlineKey = nil;
+NSString* gPresentSharpenKey = nil;
+NSString* gPresentLiftKey = nil;
+NSString* gPresentSaturationKey = nil;
 UILabel* gPresentTestLabel = nil;
 NSString* gPresentTestShown = nil;
 CFAbsoluteTime gPresentLast = 0;
-CFAbsoluteTime gPresentStart = 0;
 int gPresentTextureWidth = 0;
 int gPresentTextureHeight = 0;
 bool gPresentUnavailable = false;
@@ -162,9 +163,9 @@ void presentPrepareKeys()
 
     gPresentModeKey = [NSString stringWithFormat:@"launcher.%@.imageScaling", game];
     gPresentFrameRateKey = [NSString stringWithFormat:@"launcher.%@.frameRate", game];
-    gPresentGrainKey = [NSString stringWithFormat:@"launcher.%@.shaderGrain", game];
-    gPresentVignetteKey = [NSString stringWithFormat:@"launcher.%@.shaderVignette", game];
-    gPresentScanlineKey = [NSString stringWithFormat:@"launcher.%@.shaderScanlines", game];
+    gPresentSharpenKey = [NSString stringWithFormat:@"launcher.%@.shaderSharpen", game];
+    gPresentLiftKey = [NSString stringWithFormat:@"launcher.%@.shaderLift", game];
+    gPresentSaturationKey = [NSString stringWithFormat:@"launcher.%@.shaderColour", game];
 }
 
 int presentMode()
@@ -190,13 +191,13 @@ int presentEffects()
     presentPrepareKeys();
 
     int mask = 0;
-    if ([defaults boolForKey:gPresentGrainKey]) {
+    if ([defaults boolForKey:gPresentSharpenKey]) {
         mask |= 1;
     }
-    if ([defaults boolForKey:gPresentVignetteKey]) {
+    if ([defaults boolForKey:gPresentLiftKey]) {
         mask |= 2;
     }
-    if ([defaults boolForKey:gPresentScanlineKey]) {
+    if ([defaults boolForKey:gPresentSaturationKey]) {
         mask |= 4;
     }
 
@@ -240,7 +241,7 @@ void presentTestOverlay(int mode, int effects)
     }
 
     NSString* scaling = mode == 0 ? @"NONE" : (mode == 1 ? @"SMOOTH" : @"ENHANCED");
-    NSString* text = [NSString stringWithFormat:@"[%@] GRAIN   [%@] VIGNETTE   [%@] SCANLINES\n%@ · %d FPS · shader test",
+    NSString* text = [NSString stringWithFormat:@"[%@] SHARPEN   [%@] SHADOWS   [%@] SATURATION\n%@ · %d FPS · shader test",
                       (effects & 1) != 0 ? @"x" : @" ",
                       (effects & 2) != 0 ? @"x" : @" ",
                       (effects & 4) != 0 ? @"x" : @" ",
@@ -338,8 +339,6 @@ bool presentResourcesReady()
             gPresentUnavailable = true;
             return false;
         }
-
-        gPresentStart = CFAbsoluteTimeGetCurrent();
     }
 
     UIWindow* window = presentWindow();
@@ -490,8 +489,6 @@ int fallout_engine_present_frame(const void* pixels, int pitch, int width, int h
         [encoder setFragmentBytes:&mode length:sizeof(mode) atIndex:1];
         int effects = presentEffects();
         [encoder setFragmentBytes:&effects length:sizeof(effects) atIndex:2];
-        float elapsed = (float)fmod(CFAbsoluteTimeGetCurrent() - gPresentStart, 60.0);
-        [encoder setFragmentBytes:&elapsed length:sizeof(elapsed) atIndex:3];
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [encoder endEncoding];
 

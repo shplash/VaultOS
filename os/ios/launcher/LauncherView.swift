@@ -504,7 +504,14 @@ struct LauncherView: View {
     private func homeSheet(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
         let gameAccent = game.accent
         let chips = model.installRows(for: game, info: info)
-        let lines = chipLines(chips, width: width - Metrics.sheetInset * 2)
+        let buttonFont = VaultUI.label(10, weight: .semibold)
+        let buttonNames = [L.t("LANGUAGE FILES"),
+                           L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP")]
+        let buttons = buttonNames.reduce(CGFloat(8)) { total, name in
+            total + ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width) + 28
+        }
+        let columns = width - Metrics.sheetInset * 2
+        let lines = chipLines(chips, width: max(columns - buttons - 16, 140))
         return VStack(alignment: .leading, spacing: 0) {
             hero(game: game)
 
@@ -513,53 +520,53 @@ struct LauncherView: View {
                 .frame(height: 1)
 
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 16) {
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(L.t("Game data"))
                             .font(Vault.body(13, weight: .medium))
                             .foregroundColor(Theme.text)
 
-                        Spacer(minLength: Metrics.gap)
-
-                        HStack(spacing: 8) {
-                            Button {
-                                pendingImport = .language
-                                model.showImporter = true
-                            } label: {
-                                Text(L.t("LANGUAGE FILES"))
-                            }
-                            .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                            .disabled(model.isInstalling || info.installed == 0)
-
-                            Button {
-                                pendingImport = .game
-                                model.showImporter = true
-                            } label: {
-                                Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
-                            }
-                            .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                            .disabled(model.isInstalling)
+                        if info.installed != 1 {
+                            Text(L.t("No game files yet. Import your game ZIP to begin."))
+                                .font(Vault.label(9))
+                                .kerning(0.2)
+                                .foregroundColor(Theme.faint)
                         }
-                    }
 
-                    if info.installed != 1 {
-                        Text(L.t("No game files yet. Import your game ZIP to begin."))
-                            .font(Vault.label(9))
-                            .kerning(0.2)
-                            .foregroundColor(Theme.faint)
-                    }
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        ForEach(lines.indices, id: \.self) { line in
-                            HStack(spacing: 10) {
-                                ForEach(lines[line].indices, id: \.self) { index in
-                                    fileChip(lines[line][index].0,
-                                             present: lines[line][index].1,
-                                             accent: gameAccent)
+                        VStack(alignment: .leading, spacing: 3) {
+                            ForEach(lines.indices, id: \.self) { line in
+                                HStack(spacing: 8) {
+                                    ForEach(lines[line].indices, id: \.self) { index in
+                                        fileChip(lines[line][index].0,
+                                                 present: lines[line][index].1,
+                                                 accent: gameAccent)
+                                    }
+                                    Spacer(minLength: 0)
                                 }
-                                Spacer(minLength: 0)
                             }
                         }
+                    }
+
+                    Spacer(minLength: Metrics.gap)
+
+                    HStack(spacing: 8) {
+                        Button {
+                            pendingImport = .language
+                            model.showImporter = true
+                        } label: {
+                            Text(L.t("LANGUAGE FILES"))
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
+                        .disabled(model.isInstalling || info.installed == 0)
+
+                        Button {
+                            pendingImport = .game
+                            model.showImporter = true
+                        } label: {
+                            Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
+                        .disabled(model.isInstalling)
                     }
                 }
                 .padding(.top, 9)
@@ -615,9 +622,9 @@ struct LauncherView: View {
         return 14 + 36 + 2 + title + 2 + tagline + 2 + edition + 12
     }
 
-    private func heroTitleWidth(_ game: FalloutGame) -> CGFloat {
+    private static var heroTitleWidth: CGFloat {
         let font = VaultUI.display(54)
-        let title = game.title.uppercased() as NSString
+        let title = FalloutGame.fallout1.title.uppercased() as NSString
         let width = title.size(withAttributes: [.font: font]).width
         return ceil(width + CGFloat(title.length) * 1.4)
     }
@@ -626,7 +633,7 @@ struct LauncherView: View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.46, 300), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
-            let titleWidth = min(heroTitleWidth(game), geometry.size.width * 0.60)
+            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.60)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -641,7 +648,7 @@ struct LauncherView: View {
                         Spacer(minLength: 12)
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
                     }
-                    .frame(width: titleWidth, alignment: .leading)
+                    .frame(width: linksWidth, alignment: .leading)
                     .frame(height: 36)
 
                     Text(game.title.uppercased())
@@ -1167,11 +1174,11 @@ struct LauncherView: View {
                 }
             }
 
-            row("Shaders", detail: "Film grain, vignette and scanlines over the finished picture") {
+            row("Shaders", detail: "Sharpen, shadows and colour, applied to the finished picture") {
                 Menu {
-                    shaderItem("Film grain", isOn: $model.shaderGrain)
-                    shaderItem("Vignette", isOn: $model.shaderVignette)
-                    shaderItem("Scanlines", isOn: $model.shaderScanlines)
+                    shaderItem("Sharpen", isOn: $model.shaderSharpen)
+                    shaderItem("Shadows", isOn: $model.shaderLift)
+                    shaderItem("Colour", isOn: $model.shaderColour)
                 } label: {
                     HStack(spacing: 6) {
                         Text(L.t("EFFECTS"))
@@ -1610,9 +1617,9 @@ struct LauncherView: View {
 
     private func fileChip(_ name: String, present: Bool, accent: Color? = nil) -> some View {
         let chipAccent = accent ?? self.accent
-        return HStack(spacing: 6) {
+        return HStack(spacing: 5) {
             Image(systemName: present ? "checkmark" : "minus")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 8, weight: .bold))
                 .foregroundColor(present ? chipAccent : Theme.faint)
 
             Text(name)
@@ -1624,7 +1631,7 @@ struct LauncherView: View {
 
     private func chipLines(_ items: [(String, Bool)], width: CGFloat) -> [[(String, Bool)]] {
         let font = VaultUI.label(9)
-        let gap: CGFloat = 10
+        let gap: CGFloat = 8
 
         var lines: [[(String, Bool)]] = []
         var line: [(String, Bool)] = []
@@ -1632,7 +1639,7 @@ struct LauncherView: View {
 
         for item in items {
             let measured = (item.0 as NSString).size(withAttributes: [.font: font])
-            let chip = 16 + ceil(measured.width)
+            let chip = 14 + ceil(measured.width)
 
             if line.isEmpty {
                 line = [item]
@@ -1664,9 +1671,9 @@ struct LauncherView: View {
         }
         model.imageScaling = 2
         model.frameRate = 60
-        model.shaderGrain = false
-        model.shaderVignette = false
-        model.shaderScanlines = false
+        model.shaderSharpen = false
+        model.shaderLift = false
+        model.shaderColour = false
     }
 
     private func resetAudio() {
