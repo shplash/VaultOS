@@ -366,8 +366,7 @@ struct LauncherView: View {
                 .contentShape(Rectangle())
                 .highPriorityGesture(homePagingGesture(width: pageWidth))
 
-                gameSwitcher(progress: progress)
-                    .frame(height: 30)
+                homeFooter(progress: progress)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
@@ -469,8 +468,50 @@ struct LauncherView: View {
             }
             .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
         }
-        .frame(maxWidth: 340)
         .frame(height: 30)
+    }
+
+    private func homeFooter(progress: CGFloat) -> some View {
+        HStack(spacing: 12) {
+            gameSwitcher(progress: progress)
+
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(width: 1, height: 18)
+
+            footerLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
+            footerLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
+        }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+        .frame(height: 30)
+    }
+
+    private func footerLink(_ title: String, address: String) -> some View {
+        Button {
+            if let url = URL(string: address) {
+                UIApplication.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(title)
+                    .font(Vault.label(12, weight: .semibold))
+                    .kerning(1.2)
+                    .foregroundColor(Theme.dim)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Theme.dim)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(Capsule().fill(Color.white.opacity(0.05)))
+            .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel("Open \(title)")
     }
 
     private func switchHome(to game: FalloutGame) {
@@ -605,21 +646,14 @@ struct LauncherView: View {
         let title = VaultUI.display(heroTitleSize).lineHeight
         let tagline = VaultUI.label(14).lineHeight
         let edition = VaultUI.label(11, weight: .bold).lineHeight
-        return 14 + 34 + 2 + title + 2 + tagline + 2 + edition + 14
-    }
-
-    private static var heroTitleWidth: CGFloat {
-        let font = VaultUI.display(heroTitleSize)
-        let title = FalloutGame.fallout1.title.uppercased() as NSString
-        let width = title.size(withAttributes: [.font: font]).width
-        return ceil(width + CGFloat(title.length) * 1.4)
+        return 14 + 2 + title + 2 + tagline + 2 + edition + 14
     }
 
     private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
-            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.62)
+            let textWidth = geometry.size.width * 0.62
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -628,15 +662,7 @@ struct LauncherView: View {
                     .transition(.opacity)
                     .allowsHitTesting(false)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 0) {
-                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
-                        Spacer(minLength: 12)
-                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
-                    }
-                    .frame(width: linksWidth, alignment: .leading)
-                    .frame(height: 34)
-
+                VStack(spacing: 2) {
                     Text(game.title.uppercased())
                         .font(Vault.display(LauncherView.heroTitleSize))
                         .kerning(1.4)
@@ -654,10 +680,12 @@ struct LauncherView: View {
                         .kerning(2.4)
                         .foregroundColor(game.accent)
                 }
+                .multilineTextAlignment(.center)
+                .frame(width: textWidth, alignment: .top)
                 .padding(.top, 14)
                 .padding(.bottom, 14)
                 .padding(.leading, Metrics.sheetInset)
-                .frame(maxWidth: geometry.size.width * 0.62, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
         .frame(minHeight: LauncherView.heroHeight, maxHeight: .infinity)
@@ -692,28 +720,6 @@ struct LauncherView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-
-    private func plainLink(_ title: String, address: String) -> some View {
-        Button {
-            if let url = URL(string: address) {
-                UIApplication.shared.open(url)
-            }
-        } label: {
-            HStack(spacing: 5) {
-                Text(title)
-                    .font(Vault.label(12, weight: .semibold))
-                    .kerning(1.0)
-
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .bold))
-            }
-            .foregroundColor(Theme.dim)
-            .frame(height: 34)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open \(title)")
     }
 
     private static var artworkCache: [FalloutGame: UIImage] = [:]
