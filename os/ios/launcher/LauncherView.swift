@@ -2211,17 +2211,12 @@ private struct TouchControlEditor: View {
     /// left, in the same place, so the whole screen is free to lay out.
     private func chrome(in size: CGSize) -> some View {
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(L.t("Touch controls").uppercased())
-                    .font(Vault.display(19))
-                    .kerning(1)
-                    .foregroundColor(Theme.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-
+            HStack(spacing: 0) {
                 iconButton("square.and.arrow.up", label: "Copy layout") {
                     shareFile = layoutText(in: size)
                 }
+
+                Spacer(minLength: 0)
 
                 iconButton("square.and.arrow.down", label: "Import layout") {
                     LauncherDocumentPicker.shared.present(contentTypes: [UTType.plainText]) { url in
@@ -2232,7 +2227,7 @@ private struct TouchControlEditor: View {
                     }
                 }
 
-                Spacer(minLength: 14)
+                Spacer(minLength: 0)
 
                 chromeButton(L.t("PRESET 1"), selected: profile == .half) {
                     profile = .half
@@ -2241,6 +2236,9 @@ private struct TouchControlEditor: View {
                     dragOrigins.removeAll()
                     selected = nil
                 }
+
+                Spacer(minLength: 0)
+
                 chromeButton(L.t("PRESET 2"), selected: profile == .full) {
                     profile = .full
                     centers = ControlLayout.allCenters(profile: .full, game: game)
@@ -2248,6 +2246,9 @@ private struct TouchControlEditor: View {
                     dragOrigins.removeAll()
                     selected = nil
                 }
+
+                Spacer(minLength: 0)
+
                 chromeButton(L.t("RESET"), selected: false) {
                     ControlLayout.reset(profile: profile, game: game)
                     model.controlsOpacity = 1
@@ -2256,10 +2257,14 @@ private struct TouchControlEditor: View {
                     dragOrigins.removeAll()
                     selected = nil
                 }
+
+                Spacer(minLength: 0)
+
                 chromeButton(L.t("DONE"), selected: true) {
                     presentationMode.wrappedValue.dismiss()
                 }
             }
+            .frame(maxWidth: .infinity)
 
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
