@@ -203,26 +203,21 @@ struct LauncherView: View {
 
     private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
-
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(LauncherPage.allCases) { item in
                     railItem(item)
                 }
             }
-            .frame(maxHeight: CGFloat(LauncherPage.allCases.count) * 44
-                    + CGFloat(LauncherPage.allCases.count - 1) * 4)
+            .frame(maxHeight: .infinity, alignment: .top)
 
             playButton
                 .padding(.top, 14)
-
-            Spacer(minLength: 0)
         }
         .padding(.leading, Metrics.outer + leading)
         .padding(.trailing, Metrics.outer)
         .padding(.top, Metrics.outer)
         .padding(.bottom, Metrics.outer + bottom)
-        .frame(width: 152 + leading, alignment: .leading)
+        .frame(width: 172 + leading, alignment: .leading)
         .background(Theme.rail)
         .overlay(
             Rectangle()
@@ -244,29 +239,30 @@ struct LauncherView: View {
                     .frame(width: 3, height: 18)
 
                 Image(systemName: item.symbol)
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 20, alignment: .leading)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 20)
 
                 Text(item.title)
-                    .font(Vault.label(12, weight: selected ? .bold : .regular))
-                    .kerning(1.2)
+                    .font(Vault.label(13, weight: selected ? .bold : .regular))
+                    .kerning(1.0)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: true, vertical: false)
 
                 Spacer(minLength: 0)
             }
             .foregroundColor(selected ? Theme.text : Theme.faint)
             .padding(.leading, 4)
             .padding(.trailing, 9)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(selected ? Color.white.opacity(0.05) : Color.clear)
+                    .padding(.vertical, 2)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(maxHeight: .infinity)
+        .frame(maxHeight: 52)
     }
 
     private var playButton: some View {
@@ -328,11 +324,31 @@ struct LauncherView: View {
                 .frame(height: 1)
 
             VStack(alignment: .leading, spacing: 0) {
-                row("Game data",
-                    detail: model.install.installed == 1 ? "Ready to play" : "Not installed yet") {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L.t("Game data"))
+                            .font(Vault.body(13, weight: .medium))
+                            .foregroundColor(Theme.text)
+
+                        if model.install.installed != 1 {
+                            Text(L.t("Not installed yet"))
+                                .font(Vault.label(9))
+                                .kerning(0.2)
+                                .foregroundColor(Theme.faint)
+                        }
+
+                        HStack(spacing: 16) {
+                            ForEach(model.installRows.indices, id: \.self) { index in
+                                fileChip(model.installRows[index].0, present: model.installRows[index].1)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.top, 2)
+                    }
+
+                    Spacer(minLength: Metrics.gap)
+
                     HStack(spacing: 8) {
-                        // A translation pack is the game's own text tree, which
-                        // the player supplies: the app ships no game data.
                         Button {
                             pendingImport = .language
                             model.showImporter = true
@@ -352,14 +368,10 @@ struct LauncherView: View {
                         .disabled(model.isInstalling)
                     }
                 }
-
-                HStack(spacing: 16) {
-                    ForEach(model.installRows.indices, id: \.self) { index in
-                        fileChip(model.installRows[index].0, present: model.installRows[index].1)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, Metrics.gap)
+                .frame(minHeight: Metrics.rowMinHeight - 12,
+                       maxHeight: Metrics.rowMaxHeight - 12,
+                       alignment: .leading)
+                .padding(.vertical, 6)
                 .overlay(
                     Rectangle()
                         .fill(Theme.hairline)
@@ -388,11 +400,16 @@ struct LauncherView: View {
                 }
 
                 if model.importSummary == nil {
-                    footnote(model.install.has_saves == 1
+                    Text(L.t(model.install.has_saves == 1
                         ? "Your existing saves are kept. Re-importing replaces the game files only."
                         : "Each game keeps its own data, configuration and savegames.")
-
-                    footnote("LANGUAGE FILES adds a translation pack to this game. The game files themselves are left alone.")
+                        + " "
+                        + L.t("LANGUAGE FILES adds a translation pack to this game. The game files themselves are left alone."))
+                        .font(Vault.label(9))
+                        .kerning(0.2)
+                        .foregroundColor(Theme.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
                 }
             }
             .padding(.horizontal, Metrics.sheetInset)
@@ -407,6 +424,13 @@ struct LauncherView: View {
         .padding(.trailing, Metrics.outer)
         .padding(.top, Metrics.outer)
         .padding(.bottom, Metrics.outer + screenInsets.bottom)
+    }
+
+    private static var heroHeight: CGFloat {
+        let title = VaultUI.display(54).lineHeight
+        let tagline = VaultUI.label(12).lineHeight
+        let edition = VaultUI.label(9, weight: .bold).lineHeight
+        return 14 + 32 + 2 + title + 2 + tagline + 2 + edition + 12
     }
 
     /// The hero: the selected game's own wasteland still on the right, its
@@ -426,10 +450,11 @@ struct LauncherView: View {
                     .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        aboutLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", primary: true)
-                        aboutLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", primary: true)
+                    HStack(spacing: 14) {
+                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
+                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
                     }
+                    .frame(height: 32)
 
                     Text(model.selectedGame.title.uppercased())
                         .font(Vault.display(54))
@@ -448,11 +473,35 @@ struct LauncherView: View {
                         .kerning(2.4)
                         .foregroundColor(accent)
                 }
+                .padding(.top, 14)
+                .padding(.bottom, 12)
                 .padding(.leading, Metrics.sheetInset)
-                .frame(maxWidth: geometry.size.width * 0.60, alignment: .leading)
+                .frame(maxWidth: geometry.size.width * 0.60, maxHeight: .infinity, alignment: .topLeading)
             }
         }
-        .frame(height: 158)
+        .frame(height: LauncherView.heroHeight)
+    }
+
+    private func plainLink(_ title: String, address: String) -> some View {
+        Button {
+            if let url = URL(string: address) {
+                UIApplication.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(Vault.label(10, weight: .semibold))
+                    .kerning(0.8)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundColor(Theme.dim)
+            .frame(height: 32)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(title)")
     }
 
     private func heroArt(width: CGFloat, height: CGFloat) -> some View {
@@ -875,8 +924,8 @@ struct LauncherView: View {
 
             Spacer(minLength: 0)
         }
-        .frame(minHeight: Metrics.rowMinHeight - Metrics.gap * 2, alignment: .leading)
-        .padding(.vertical, Metrics.gap)
+        .frame(minHeight: Metrics.rowMinHeight - 12, maxHeight: Metrics.rowMaxHeight - 12, alignment: .leading)
+        .padding(.vertical, 6)
         .overlay(
             Rectangle()
                 .fill(divider ? Theme.hairline : Color.clear)
@@ -1221,7 +1270,7 @@ struct LauncherView: View {
     /// Backing the saves up is harmless; putting a backup back replaces them, so
     /// that one waits out a countdown with the warning on screen.
     private var savegamesRow: some View {
-        row("Saved games", detail: model.savesNotice.map { L.message($0) }) {
+        row("Saved games", detail: model.savesNotice.map { L.message($0) }, divider: false) {
             HStack(spacing: 8) {
                 Button {
                     model.backupSaves()
@@ -1411,8 +1460,8 @@ struct LauncherView: View {
             trailing()
         }
         .padding(.horizontal, Metrics.sheetInset)
-        .padding(.top, Metrics.outer)
-        .padding(.bottom, 10)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
     }
 
     private func sheet<C: View>(title: String, detail: String, onReset: (() -> Void)? = nil, @ViewBuilder rows: () -> C) -> some View {
@@ -1475,8 +1524,8 @@ struct LauncherView: View {
 
             control()
         }
-        .frame(minHeight: Metrics.rowMinHeight - Metrics.gap * 2, alignment: .leading)
-        .padding(.vertical, Metrics.gap)
+        .frame(minHeight: Metrics.rowMinHeight - 12, maxHeight: Metrics.rowMaxHeight - 12, alignment: .leading)
+        .padding(.vertical, 6)
         .overlay(
             Rectangle()
                 .fill(divider ? Theme.hairline : Color.clear)
@@ -1612,7 +1661,8 @@ private extension FalloutGame {
 private enum Metrics {
     static let outer: CGFloat = 16
     static let sheetInset: CGFloat = 22
-    static let rowMinHeight: CGFloat = 46
+    static let rowMinHeight: CGFloat = 36
+    static let rowMaxHeight: CGFloat = 46
     static let controlHeight: CGFloat = 32
     static let controlRadius: CGFloat = 8
     static let gap: CGFloat = 8
@@ -1695,7 +1745,7 @@ private struct PrimaryButtonStyle: ButtonStyle {
 
         return configuration.label
             .foregroundColor(Vault.ink)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
             .background(shape.fill(accent))
             .overlay(shape.stroke(Vault.edgeLight, lineWidth: 1))

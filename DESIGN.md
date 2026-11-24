@@ -64,8 +64,8 @@ than marking it, so nothing coloured is allowed on their borders.
 
 One set of numbers, `Metrics` in `LauncherView`, is used everywhere: `outer` 16
 is the margin around the rail and every card, `sheetInset` 22 the padding
-inside a card, `rowMinHeight` 46, `controlHeight` 32, `controlRadius` 8 and
-`gap` 8.
+inside a card, `rowMinHeight` 36, `rowMaxHeight` 46, `controlHeight` 32,
+`controlRadius` 8 and `gap` 8.
 
 ## Components
 
@@ -75,9 +75,9 @@ inside a card, `rowMinHeight` 46, `controlHeight` 32, `controlRadius` 8 and
   hairline outline and accent mono label, 32pt minimum height; pressed fills
   with 18% accent. An optional tint gives a quiet action such as CANCEL the dim
   text colour, and a square variant makes the small stepper buttons.
-- **Row**: title and detail on the left, control on the right, 46pt minimum and
-  the same 8pt above and below whether or not it carries a detail line; hairline
-  under, except on the last row of a page.
+- **Row**: title and detail on the left, control on the right, between 36 and
+  46pt tall so the rows of a page share the height it has left, 6pt above and
+  below at the minimum; hairline under, except on the last row of a page.
 - **Chip** (`ChipStyle`): the one pill behind a preset, a scaling mode, a frame
   rate, a tip group, a page link and the update check. Mono 10pt with 0.8
   tracking, 12pt side padding, 32pt high, 8pt radius. Selected and primary are
@@ -94,10 +94,11 @@ inside a card, `rowMinHeight` 46, `controlHeight` 32, `controlRadius` 8 and
   custom in-game button is one of these, so the item screens, the trading
   screens and the dialogues wear the same face as the HUD. The control editor
   draws these faces at the size the game draws them.
-- **Rail**: a 152pt bar of page items over PLAY, the whole group centred
-  between the same 16pt margins the cards use. Each item is a 44pt row with a
-  16pt glyph in a 20pt box, a 12pt mono label, a 3 by 18 accent bar and, when
-  selected, a 10pt rounded highlight.
+- **Rail**: a 172pt bar of page items over PLAY. Each item is a flexible row of
+  up to 52pt with a 15pt glyph in a 20pt box, a 13pt mono label, a 3 by 18 accent
+  bar and, when selected, a 10pt rounded highlight inset 2pt from the row's top
+  and bottom. The whole column runs from the card's top margin to its bottom
+  edge.
 - **Save assembly**: QUICK SAVE and its chevron are two halves of one control.
   A single plate, outline and top highlight sit under both (`drawsOwnPlate` is
   off for the halves), the two sit flush, and a short 62% divider at 70% of the
