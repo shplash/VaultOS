@@ -596,10 +596,29 @@ struct LauncherView: View {
                 alignment: .bottom
             )
 
-            ForEach(tipGroup.items.indices, id: \.self) { index in
-                tip(tipGroup.items[index].title,
-                    tipGroup.items[index].text,
-                    divider: index < tipGroup.items.count - 1)
+            ForEach(0..<((tipGroup.items.count + 1) / 2), id: \.self) { pair in
+                HStack(alignment: .top, spacing: Metrics.sheetInset) {
+                    tip(tipGroup.items[pair * 2].title,
+                        tipGroup.items[pair * 2].text,
+                        divider: false)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if pair * 2 + 1 < tipGroup.items.count {
+                        tip(tipGroup.items[pair * 2 + 1].title,
+                            tipGroup.items[pair * 2 + 1].text,
+                            divider: false)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Spacer(minLength: 0)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .overlay(
+                    Rectangle()
+                        .fill((pair + 1) * 2 < tipGroup.items.count ? Theme.hairline : Color.clear)
+                        .frame(height: 1),
+                    alignment: .bottom
+                )
             }
         }
     }
