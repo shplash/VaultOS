@@ -167,6 +167,7 @@ final class LauncherModel: ObservableObject {
     }
 
     @Published var install = LauncherInstallInfo()
+    @Published private(set) var installInfos: [FalloutGame: LauncherInstallInfo] = [:]
     @Published private(set) var installedGames: Set<FalloutGame> = []
     @Published var isInstalling = false
     @Published var progress: Double = 0
@@ -509,32 +510,39 @@ final class LauncherModel: ObservableObject {
         install = info
 
         var ready: Set<FalloutGame> = []
+        var snapshots: [FalloutGame: LauncherInstallInfo] = [:]
         for game in FalloutGame.allCases {
             var gameInfo = LauncherInstallInfo()
             launcher_scan(installDirectory(for: game).path,
                           Int32(game == .fallout2 ? LAUNCHER_GAME_FALLOUT2 : LAUNCHER_GAME_FALLOUT1),
                           &gameInfo)
+            snapshots[game] = gameInfo
             if gameInfo.installed == 1 {
                 ready.insert(game)
             }
         }
+        installInfos = snapshots
         installedGames = ready
     }
 
     var installRows: [(String, Bool)] {
-        switch selectedGame {
+        return installRows(for: selectedGame, info: install)
+    }
+
+    func installRows(for game: FalloutGame, info: LauncherInstallInfo) -> [(String, Bool)] {
+        switch game {
         case .fallout1:
             return [
-                ("master.dat", install.has_master_dat == 1),
-                ("critter.dat", install.has_critter_dat == 1),
-                ("data folder", install.has_data_folder == 1),
+                ("master.dat", info.has_master_dat == 1),
+                ("critter.dat", info.has_critter_dat == 1),
+                ("data folder", info.has_data_folder == 1),
             ]
         case .fallout2:
             return [
-                ("master.dat", install.has_master_dat == 1),
-                ("critter.dat", install.has_critter_dat == 1),
-                ("patch000.dat", install.has_patch_dat == 1),
-                ("data folder", install.has_data_folder == 1),
+                ("master.dat", info.has_master_dat == 1),
+                ("critter.dat", info.has_critter_dat == 1),
+                ("patch000.dat", info.has_patch_dat == 1),
+                ("data folder", info.has_data_folder == 1),
             ]
         }
     }

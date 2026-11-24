@@ -25,6 +25,12 @@ struct LauncherView: View {
     /// is shown once in a note over the About page.
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
+    @State private var homeDrag: CGFloat = 0
+    @State private var homeDragIsHorizontal = false
+    @State private var hasSwipedHome = false
+    @State private var homeNudge: CGFloat = 0
+    @State private var swipeHintTask: DispatchWorkItem?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var accent: Color {
         return model.selectedGame.accent
@@ -99,16 +105,25 @@ struct LauncherView: View {
         }
         .onAppear {
             model.refreshInstall()
+            scheduleSwipeHint()
             if !musicMuted {
                 LauncherMusic.shared.playIfAvailable()
             }
         }
         .onDisappear {
+            swipeHintTask?.cancel()
+            swipeHintTask = nil
             model.saveSettingsNow()
         }
         .onChange(of: page) { _ in
             model.savesNotice = nil
             model.importSummary = nil
+            if page == .home {
+                scheduleSwipeHint()
+            } else {
+                swipeHintTask?.cancel()
+                swipeHintTask = nil
+            }
         }
         .onChange(of: model.install.installed) { installed in
             if installed == 1 {
@@ -299,7 +314,7 @@ struct LauncherView: View {
     private var content: some View {
         switch page {
         case .home:
-            homeSheet
+            homePager
         case .display:
             displaySheet
         case .audio:
@@ -315,12 +330,151 @@ struct LauncherView: View {
         }
     }
 
-    private var homeSheet: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            hero
+    private var homePager: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let drag = homeDragIsHorizontal ? homeDrag : 0
+            let currentIndex = model.selectedGame == .fallout1 ? 0 : 1
+            let progress = min(max(CGFloat(currentIndex) - drag / max(width, 1), 0), 1)
+            let pageWidth = width
+
+            VStack(spacing: 6) {
+                ZStack(alignment: .top) {
+                    ForEach(FalloutGame.allCases) { game in
+                        let index = game == .fallout1 ? 0 : 1
+                        let relative = CGFloat(index - currentIndex)
+                        let offset = relative * (pageWidth + 6) + drag + homeNudge
+                        let dragProgress = min(max(abs(drag) / max(width, 1), 0), 1)
+                        let isSelected = game == model.selectedGame
+                        let scale = isSelected ? 1 - dragProgress * 0.04 : 0.96 + dragProgress * 0.04
+
+                        homeSheet(game: game,
+                                  info: model.installInfos[game] ?? LauncherInstallInfo())
+                            .frame(width: pageWidth, height: geometry.size.height - 30)
+                            .scaleEffect(reduceMotion ? 1 : scale)
+                            .opacity(isSelected ? 1 : 0.45)
+                            .offset(x: offset)
+                            .allowsHitTesting(isSelected)
+                    }
+                }
+                .frame(height: geometry.size.height - 30)
+                .contentShape(Rectangle())
+                .simultaneousGesture(homePagingGesture(width: pageWidth))
+
+                gameSwitcher(progress: progress)
+                    .frame(height: 24)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .padding(.horizontal, Metrics.outer)
+        .padding(.top, Metrics.outer)
+        .padding(.bottom, Metrics.outer + screenInsets.bottom)
+    }
+
+    private func homePagingGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                if !homeDragIsHorizontal && abs(dx) > abs(dy) * 1.2 {
+                    homeDragIsHorizontal = true
+                    hasSwipedHome = true
+                    swipeHintTask?.cancel()
+                    swipeHintTask = nil
+                }
+                guard homeDragIsHorizontal else { return }
+                let index = model.selectedGame == .fallout1 ? 0 : 1
+                let atEdge = (index == 0 && dx > 0) || (index == 1 && dx < 0)
+                homeDrag = atEdge ? dx * 0.28 : dx
+            }
+            .onEnded { value in
+                guard homeDragIsHorizontal else {
+                    homeDrag = 0
+                    return
+                }
+                let index = model.selectedGame == .fallout1 ? 0 : 1
+                let predicted = value.predictedEndTranslation.width
+                let direction = abs(predicted) > abs(homeDrag) ? predicted : homeDrag
+                let shouldChange = abs(homeDrag) > width * 0.22 || abs(predicted) > width * 0.35
+                let nextIndex = shouldChange ? min(max(index + (direction < 0 ? 1 : -1), 0), 1) : index
+                let target = nextIndex == 0 ? FalloutGame.fallout1 : .fallout2
+                withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 0.82)) {
+                    model.selectedGame = target
+                    homeDrag = 0
+                    homeDragIsHorizontal = false
+                }
+            }
+    }
+
+    private func gameSwitcher(progress: CGFloat) -> some View {
+        GeometryReader { geometry in
+            let segment = geometry.size.width / 2
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(accent.opacity(0.18))
+                    .frame(width: segment, height: 24)
+                    .offset(x: min(max(progress, 0), 1) * segment)
+
+                HStack(spacing: 0) {
+                    ForEach(FalloutGame.allCases) { game in
+                        Button {
+                            switchHome(to: game)
+                        } label: {
+                            Text(game.title)
+                                .font(Vault.label(10, weight: .semibold))
+                                .foregroundColor(model.selectedGame == game ? accent : Theme.faint)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 24)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(game.title)
+                        .accessibilityAddTraits(model.selectedGame == game ? .isSelected : [])
+                    }
+                }
+            }
+            .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
+        }
+        .frame(height: 24)
+    }
+
+    private func switchHome(to game: FalloutGame) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 0.82)) {
+            model.selectedGame = game
+            homeDrag = 0
+            homeDragIsHorizontal = false
+        }
+    }
+
+    private func scheduleSwipeHint() {
+        guard page == .home,
+              !reduceMotion,
+              !UserDefaults.standard.bool(forKey: "launcher.swipeHintShown") else { return }
+        let task = DispatchWorkItem {
+            guard !hasSwipedHome, page == .home else { return }
+            UserDefaults.standard.set(true, forKey: "launcher.swipeHintShown")
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.55)) {
+                homeNudge = -24
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
+                    homeNudge = 0
+                }
+            }
+        }
+        swipeHintTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
+    }
+
+    private func homeSheet(game: FalloutGame, info: LauncherInstallInfo) -> some View {
+        let gameAccent = game.accent
+        let rows = model.installRows(for: game, info: info)
+        return VStack(alignment: .leading, spacing: 0) {
+            hero(game: game)
 
             Rectangle()
-                .fill(accent.opacity(0.55))
+                .fill(gameAccent.opacity(0.55))
                 .frame(height: 1)
 
             VStack(alignment: .leading, spacing: 0) {
@@ -330,7 +484,7 @@ struct LauncherView: View {
                             .font(Vault.body(13, weight: .medium))
                             .foregroundColor(Theme.text)
 
-                        if model.install.installed != 1 {
+                        if info.installed != 1 {
                             Text(L.t("Not installed yet"))
                                 .font(Vault.label(9))
                                 .kerning(0.2)
@@ -338,8 +492,8 @@ struct LauncherView: View {
                         }
 
                         HStack(spacing: 10) {
-                            ForEach(model.installRows.indices, id: \.self) { index in
-                                fileChip(model.installRows[index].0, present: model.installRows[index].1)
+                            ForEach(rows.indices, id: \.self) { index in
+                                fileChip(rows[index].0, present: rows[index].1, accent: gameAccent)
                             }
                             Spacer(minLength: 0)
                         }
@@ -355,35 +509,29 @@ struct LauncherView: View {
                         } label: {
                             Text(L.t("LANGUAGE FILES"))
                         }
-                        .buttonStyle(SmallButtonStyle(accent: accent))
-                        .disabled(model.isInstalling || model.install.installed == 0)
+                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
+                        .disabled(model.isInstalling || info.installed == 0)
 
                         Button {
                             pendingImport = .game
                             model.showImporter = true
                         } label: {
-                            Text(L.t(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
+                            Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
                         }
-                        .buttonStyle(SmallButtonStyle(accent: accent))
+                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
                         .disabled(model.isInstalling)
                     }
                 }
                 .frame(minHeight: Metrics.rowMinHeight - 10, alignment: .leading)
                 .padding(.vertical, 5)
-                .overlay(
-                    Rectangle()
-                        .fill(Theme.hairline)
-                        .frame(height: 1),
-                    alignment: .bottom
-                )
+                .overlay(Rectangle().fill(Theme.hairline).frame(height: 1), alignment: .bottom)
 
-                savegamesRow
+                savegamesRow(info: info, accent: gameAccent)
 
                 if model.isInstalling {
                     ProgressView(value: min(max(model.progress, 0), 1))
-                        .accentColor(accent)
+                        .accentColor(gameAccent)
                         .padding(.vertical, 10)
-
                     Text(L.message(model.statusText))
                         .font(Vault.label(10, weight: .regular))
                         .foregroundColor(Theme.faint)
@@ -398,7 +546,7 @@ struct LauncherView: View {
                 }
 
                 if model.importSummary == nil {
-                    Text(L.t(model.install.has_saves == 1
+                    Text(L.t(info.has_saves == 1
                         ? "Your existing saves are kept. Re-importing replaces the game files only."
                         : "Each game keeps its own data, configuration and savegames.")
                         + " "
@@ -413,15 +561,10 @@ struct LauncherView: View {
             .padding(.horizontal, Metrics.sheetInset)
             .padding(.top, Metrics.gap)
             .padding(.bottom, Metrics.outer)
-
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .vaultPlate(corner: 20, fill: Theme.rail)
-        .padding(.leading, Metrics.outer)
-        .padding(.trailing, Metrics.outer)
-        .padding(.top, Metrics.outer)
-        .padding(.bottom, Metrics.outer + screenInsets.bottom)
     }
 
     private static var heroHeight: CGFloat {
@@ -431,19 +574,15 @@ struct LauncherView: View {
         return 14 + 32 + 2 + title + 2 + tagline + 2 + edition + 12
     }
 
-    /// The hero: the selected game's own wasteland still on the right, its
-    /// title on the left. The still is masked into the sheet on its left and
-    /// bottom edges and tinted warm, so it reads as part of the panel rather
-    /// than a photograph pinned to it.
-    private var hero: some View {
+    private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.46, 300), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
 
             ZStack(alignment: .leading) {
-                heroArt(width: artWidth, height: artHeight)
+                heroArt(game: game, width: artWidth, height: artHeight)
                     .frame(width: geometry.size.width, height: geometry.size.height, alignment: .trailing)
-                    .id(model.selectedGame)
+                    .id(game)
                     .transition(.opacity)
                     .allowsHitTesting(false)
 
@@ -454,14 +593,14 @@ struct LauncherView: View {
                     }
                     .frame(height: 32)
 
-                    Text(model.selectedGame.title.uppercased())
+                    Text(game.title.uppercased())
                         .font(Vault.display(54))
                         .kerning(1.4)
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
-                    Text(L.t(model.selectedGame.tagline))
+                    Text(L.t(game.tagline))
                         .font(Vault.body(12))
                         .foregroundColor(Theme.dim)
                         .lineLimit(1)
@@ -469,7 +608,7 @@ struct LauncherView: View {
                     Text(L.t("COMMUNITY EDITION"))
                         .font(Vault.label(9, weight: .bold))
                         .kerning(2.4)
-                        .foregroundColor(accent)
+                        .foregroundColor(game.accent)
                 }
                 .padding(.top, 14)
                 .padding(.bottom, 12)
@@ -478,6 +617,37 @@ struct LauncherView: View {
             }
         }
         .frame(height: LauncherView.heroHeight)
+    }
+
+    private func heroArt(game: FalloutGame, width: CGFloat, height: CGFloat) -> some View {
+        Group {
+            if let image = artwork(for: game) {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .saturation(0.82)
+                    .brightness(-0.03)
+                    .overlay(Color(red: 0.40, green: 0.25, blue: 0.11).opacity(0.16))
+                    .overlay(
+                        LinearGradient(colors: [Color.clear, Theme.rail.opacity(0.92)],
+                                       startPoint: .center, endPoint: .bottom)
+                    )
+                    .overlay(
+                        RadialGradient(colors: [Color.clear, Color.black.opacity(0.45)],
+                                       center: .center, startRadius: width * 0.22, endRadius: width * 0.64)
+                    )
+                    .mask(
+                        LinearGradient(gradient: Gradient(stops: [
+                            .init(color: Color.black.opacity(0), location: 0),
+                            .init(color: Color.black.opacity(0.55), location: 0.30),
+                            .init(color: Color.black, location: 0.58)
+                        ]), startPoint: .leading, endPoint: .trailing)
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private func plainLink(_ title: String, address: String) -> some View {
@@ -500,55 +670,6 @@ struct LauncherView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open \(title)")
-    }
-
-    private func heroArt(width: CGFloat, height: CGFloat) -> some View {
-        Group {
-            if let image = heroImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: width, height: height)
-                    .clipped()
-                    .saturation(0.82)
-                    .brightness(-0.03)
-                    .overlay(
-                        Color(red: 0.40, green: 0.25, blue: 0.11)
-                            .opacity(0.16)
-                    )
-                    .overlay(
-                        LinearGradient(
-                            colors: [Color.clear, Theme.rail.opacity(0.92)],
-                            startPoint: .center,
-                            endPoint: .bottom
-                        )
-                    )
-                    .overlay(
-                        RadialGradient(
-                            colors: [Color.clear, Color.black.opacity(0.45)],
-                            center: .center,
-                            startRadius: width * 0.22,
-                            endRadius: width * 0.64
-                        )
-                    )
-                    .mask(
-                        LinearGradient(
-                            gradient: Gradient(stops: [
-                                .init(color: Color.black.opacity(0), location: 0),
-                                .init(color: Color.black.opacity(0.55), location: 0.30),
-                                .init(color: Color.black, location: 0.58)
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-
-    private var heroImage: UIImage? {
-        return artwork(for: model.selectedGame)
     }
 
     private static var artworkCache: [FalloutGame: UIImage] = [:]
@@ -1291,7 +1412,7 @@ struct LauncherView: View {
 
     /// Backing the saves up is harmless; putting a backup back replaces them, so
     /// that one waits out a countdown with the warning on screen.
-    private var savegamesRow: some View {
+    private func savegamesRow(info: LauncherInstallInfo, accent: Color) -> some View {
         row("Saved games", detail: model.savesNotice.map { L.message($0) }, divider: false) {
             HStack(spacing: 8) {
                 Button {
@@ -1300,7 +1421,7 @@ struct LauncherView: View {
                     Text(L.t("BACK UP"))
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling || model.install.installed == 0 || model.install.has_saves == 0)
+                .disabled(model.isInstalling || info.installed == 0 || info.has_saves == 0)
 
                 Button {
                     saveImportCountdown = 5
@@ -1309,7 +1430,7 @@ struct LauncherView: View {
                     Text(L.t("IMPORT"))
                 }
                 .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling || model.install.installed == 0)
+                .disabled(model.isInstalling || info.installed == 0)
             }
         }
     }
@@ -1408,11 +1529,12 @@ struct LauncherView: View {
         }
     }
 
-    private func fileChip(_ name: String, present: Bool) -> some View {
-        HStack(spacing: 6) {
+    private func fileChip(_ name: String, present: Bool, accent: Color? = nil) -> some View {
+        let chipAccent = accent ?? self.accent
+        return HStack(spacing: 6) {
             Image(systemName: present ? "checkmark" : "minus")
                 .font(.system(size: 9, weight: .bold))
-                .foregroundColor(present ? accent : Theme.faint)
+                .foregroundColor(present ? chipAccent : Theme.faint)
 
             Text(name)
                 .font(Vault.label(9))
