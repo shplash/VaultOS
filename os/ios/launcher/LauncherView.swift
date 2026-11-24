@@ -25,9 +25,10 @@ struct LauncherView: View {
     /// is shown once in a note over the About page.
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
-    @GestureState private var homeDrag: CGFloat = 0
+    @State private var homeDrag: CGFloat = 0
     @GestureState private var homeDragIsHorizontal = false
     @State private var hasSwipedHome = false
+    @State private var dragWatchdog: DispatchWorkItem?
     @State private var homeNudge: CGFloat = 0
     @State private var isPaging = false
     @State private var swipeHintTask: DispatchWorkItem?
@@ -114,6 +115,8 @@ struct LauncherView: View {
         .onDisappear {
             swipeHintTask?.cancel()
             swipeHintTask = nil
+            dragWatchdog?.cancel()
+            dragWatchdog = nil
             model.saveSettingsNow()
         }
         .onChange(of: page) { _ in
@@ -376,9 +379,6 @@ struct LauncherView: View {
 
     private func homePagingGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 12)
-            .updating($homeDrag) { value, state, _ in
-                state = value.translation.width
-            }
             .updating($homeDragIsHorizontal) { value, state, _ in
                 state = abs(value.translation.width) > abs(value.translation.height) * 1.2
             }
@@ -386,7 +386,9 @@ struct LauncherView: View {
                 guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
                     return
                 }
+                homeDrag = value.translation.width
                 isPaging = true
+                scheduleDragWatchdog()
                 if !hasSwipedHome {
                     hasSwipedHome = true
                     swipeHintTask?.cancel()
@@ -394,25 +396,48 @@ struct LauncherView: View {
                 }
             }
             .onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
-                    return
+                dragWatchdog?.cancel()
+                dragWatchdog = nil
+
+                var target = model.selectedGame
+                if abs(value.translation.width) > abs(value.translation.height) * 1.2 {
+                    let index = model.selectedGame == .fallout1 ? 0 : 1
+                    let raw = value.translation.width
+                    let atEdge = (index == 0 && raw > 0) || (index == 1 && raw < 0)
+                    let drag = atEdge ? raw * 0.28 : raw
+                    let predicted = value.predictedEndTranslation.width
+                    let direction = abs(predicted) > abs(drag) ? predicted : drag
+                    let shouldChange = abs(drag) > width * 0.22 || abs(predicted) > width * 0.35
+                    let nextIndex = shouldChange ? min(max(index + (direction < 0 ? 1 : -1), 0), 1) : index
+                    target = nextIndex == 0 ? FalloutGame.fallout1 : .fallout2
                 }
-                let index = model.selectedGame == .fallout1 ? 0 : 1
-                let raw = value.translation.width
-                let atEdge = (index == 0 && raw > 0) || (index == 1 && raw < 0)
-                let drag = atEdge ? raw * 0.28 : raw
-                let predicted = value.predictedEndTranslation.width
-                let direction = abs(predicted) > abs(drag) ? predicted : drag
-                let shouldChange = abs(drag) > width * 0.22 || abs(predicted) > width * 0.35
-                let nextIndex = shouldChange ? min(max(index + (direction < 0 ? 1 : -1), 0), 1) : index
-                let target = nextIndex == 0 ? FalloutGame.fallout1 : .fallout2
-                withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 0.82)) {
-                    model.selectedGame = target
+
+                withAnimation(reduceMotion ? .easeOut(duration: 0.18) : .spring(response: 0.34, dampingFraction: 0.86)) {
+                    homeDrag = 0
+                    if target != model.selectedGame {
+                        model.selectedGame = target
+                    }
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
                     isPaging = false
                 }
             }
+    }
+
+    private func scheduleDragWatchdog() {
+        dragWatchdog?.cancel()
+        let task = DispatchWorkItem {
+            isPaging = false
+            guard abs(homeDrag) > 0.5 else {
+                return
+            }
+            withAnimation(reduceMotion ? .easeOut(duration: 0.18) : .spring(response: 0.32, dampingFraction: 0.86)) {
+                homeDrag = 0
+            }
+        }
+        dragWatchdog = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
 
     private func gameSwitcher(progress: CGFloat) -> some View {
@@ -424,7 +449,6 @@ struct LauncherView: View {
                     .fill(accent.opacity(0.18))
                     .frame(width: segment, height: 30)
                     .offset(x: min(max(progress, 0), 1) * segment)
-                    .animation(reduceMotion ? nil : .spring(response: 0.30, dampingFraction: 0.86), value: model.selectedGame)
 
                 HStack(spacing: 0) {
                     ForEach(FalloutGame.allCases) { game in
@@ -538,9 +562,12 @@ struct LauncherView: View {
                         }
                     }
                 }
-                .frame(minHeight: Metrics.rowMinHeight - 10, alignment: .leading)
-                .padding(.vertical, 5)
-                .overlay(Rectangle().fill(Theme.hairline).frame(height: 1), alignment: .bottom)
+                .padding(.top, 9)
+                .padding(.bottom, 9)
+
+                Rectangle()
+                    .fill(Theme.hairline)
+                    .frame(height: 1)
 
                 savegamesRow(info: info, accent: gameAccent)
 
@@ -585,13 +612,21 @@ struct LauncherView: View {
         let title = VaultUI.display(54).lineHeight
         let tagline = VaultUI.label(12).lineHeight
         let edition = VaultUI.label(9, weight: .bold).lineHeight
-        return 14 + 32 + 2 + title + 2 + tagline + 2 + edition + 12
+        return 14 + 36 + 2 + title + 2 + tagline + 2 + edition + 12
+    }
+
+    private func heroTitleWidth(_ game: FalloutGame) -> CGFloat {
+        let font = VaultUI.display(54)
+        let title = game.title.uppercased() as NSString
+        let width = title.size(withAttributes: [.font: font]).width
+        return ceil(width + CGFloat(title.length) * 1.4)
     }
 
     private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.46, 300), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
+            let titleWidth = min(heroTitleWidth(game), geometry.size.width * 0.60)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -601,11 +636,13 @@ struct LauncherView: View {
                     .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 14) {
+                    HStack(spacing: 0) {
                         plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
+                        Spacer(minLength: 12)
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
                     }
-                    .frame(height: 32)
+                    .frame(width: titleWidth, alignment: .leading)
+                    .frame(height: 36)
 
                     Text(game.title.uppercased())
                         .font(Vault.display(54))
@@ -670,16 +707,16 @@ struct LauncherView: View {
                 UIApplication.shared.open(url)
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Text(title)
-                    .font(Vault.label(10, weight: .semibold))
-                    .kerning(0.8)
+                    .font(Vault.label(11, weight: .semibold))
+                    .kerning(1.0)
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
             }
             .foregroundColor(Theme.dim)
-            .frame(height: 32)
+            .frame(height: 36)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1122,12 +1159,29 @@ struct LauncherView: View {
                 .frame(width: 240)
             }
 
-            row("Pixel quality", detail: nil) {
+            row("Pixel quality", detail: "NONE = original. SMOOTH = softer. ENHANCED = sharper.") {
                 HStack(spacing: 8) {
                     ForEach(0..<LauncherView.scalingTitles.count, id: \.self) { index in
                         scalingPill(index)
                     }
                 }
+            }
+
+            row("Shaders", detail: "Film grain, vignette and scanlines over the finished picture") {
+                Menu {
+                    shaderItem("Film grain", isOn: $model.shaderGrain)
+                    shaderItem("Vignette", isOn: $model.shaderVignette)
+                    shaderItem("Scanlines", isOn: $model.shaderScanlines)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(L.t("EFFECTS"))
+                            .kerning(0.8)
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                }
+                .buttonStyle(ChipStyle(accent: accent, look: .quiet))
             }
 
             row("Frame rate", detail: "60 is smoother, 30 saves battery", divider: false) {
@@ -1136,8 +1190,6 @@ struct LauncherView: View {
                     frameRatePill(30)
                 }
             }
-
-            footnote("NONE = original. SMOOTH = softer. ENHANCED = sharper.")
         }
     }
 
@@ -1154,6 +1206,18 @@ struct LauncherView: View {
         }
         .buttonStyle(ChipStyle(accent: accent, look: selected ? .selected : .unselected))
         .accessibilityLabel("\(rate) " + L.t("frames per second"))
+    }
+
+    private func shaderItem(_ title: String, isOn: Binding<Bool>) -> some View {
+        Button {
+            isOn.wrappedValue.toggle()
+        } label: {
+            if isOn.wrappedValue {
+                Label(L.t(title), systemImage: "checkmark")
+            } else {
+                Text(L.t(title))
+            }
+        }
     }
 
     private func scalingPill(_ index: Int) -> some View {
@@ -1600,6 +1664,9 @@ struct LauncherView: View {
         }
         model.imageScaling = 2
         model.frameRate = 60
+        model.shaderGrain = false
+        model.shaderVignette = false
+        model.shaderScanlines = false
     }
 
     private func resetAudio() {
@@ -1869,7 +1936,7 @@ private enum Theme {
     /// The rail's own fill. The home sheet uses it too, so the panel and the
     /// bar are one surface instead of a blue-grey plate over a darker one.
     static let rail = Vault.plate.opacity(0.55)
-    static let alert = Color(white: 0.098)
+    static let alert = Color(white: 0.072)
     static let line = Vault.hairline
     static let hairline = Vault.hairline
     static let text = Vault.text

@@ -49,19 +49,24 @@ NSString* const kPresentShaderSource =
      "    }\n"
      "    return 0.0;\n"
      "}\n"
+     "float vault_grain(float2 p, float t) {\n"
+     "    return fract(sin(dot(p + float2(t * 61.7, t * 47.3), float2(12.9898, 78.233))) * 43758.5453);\n"
+     "}\n"
      "fragment float4 vault_present_fragment(VaultPresentVertex in [[stage_in]],\n"
      "                                       texture2d<float> source [[texture(0)]],\n"
      "                                       constant float2& scale [[buffer(0)]],\n"
      "                                       constant int& mode [[buffer(1)]],\n"
+     "                                       constant int& effects [[buffer(2)]],\n"
+     "                                       constant float& time [[buffer(3)]],\n"
      "                                       sampler nearestSampler [[sampler(0)]],\n"
      "                                       sampler linearSampler [[sampler(1)]]) {\n"
      "    float2 size = float2(source.get_width(), source.get_height());\n"
      "    float2 texel = in.uv * size;\n"
      "    float2 base = floor(texel);\n"
+     "    float3 rgb = float3(0.0);\n"
      "    if (mode == 0) {\n"
-     "        return float4(source.sample(nearestSampler, (base + 0.5) / size).rgb, 1.0);\n"
-     "    }\n"
-     "    if (mode == 1) {\n"
+     "        rgb = source.sample(nearestSampler, (base + 0.5) / size).rgb;\n"
+     "    } else if (mode == 1) {\n"
      "        float2 c = texel - 0.5;\n"
      "        float2 fl = floor(c);\n"
      "        float fx = c.x - fl.x;\n"
@@ -84,30 +89,42 @@ NSString* const kPresentShaderSource =
      "        float py0 = (fl.y - 0.5) / size.y;\n"
      "        float py1 = (fl.y + 0.5 + oy) / size.y;\n"
      "        float py2 = (fl.y + 2.5) / size.y;\n"
-     "        float3 rgb = float3(0.0);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px0, py0)).rgb) * (wx0 * wy0);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px1, py0)).rgb) * (sx * wy0);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px2, py0)).rgb) * (wx3 * wy0);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px0, py1)).rgb) * (wx0 * sy);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px1, py1)).rgb) * (sx * sy);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px2, py1)).rgb) * (wx3 * sy);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px0, py2)).rgb) * (wx0 * wy3);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px1, py2)).rgb) * (sx * wy3);\n"
-     "        rgb += vault_decode(source.sample(linearSampler, float2(px2, py2)).rgb) * (wx3 * wy3);\n"
-     "        return float4(vault_encode(rgb), 1.0);\n"
+     "        float3 blurred = float3(0.0);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px0, py0)).rgb) * (wx0 * wy0);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px1, py0)).rgb) * (sx * wy0);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px2, py0)).rgb) * (wx3 * wy0);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px0, py1)).rgb) * (wx0 * sy);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px1, py1)).rgb) * (sx * sy);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px2, py1)).rgb) * (wx3 * sy);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px0, py2)).rgb) * (wx0 * wy3);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px1, py2)).rgb) * (sx * wy3);\n"
+     "        blurred += vault_decode(source.sample(linearSampler, float2(px2, py2)).rgb) * (wx3 * wy3);\n"
+     "        rgb = vault_encode(blurred);\n"
+     "    } else {\n"
+     "        float2 sharpScale = max(scale, float2(1.0));\n"
+     "        float2 pixelStep = 1.0 / (size * sharpScale);\n"
+     "        float2 offsets[4] = { float2(-0.375, -0.125), float2(0.125, -0.375),\n"
+     "                              float2(0.375, 0.125), float2(-0.125, 0.375) };\n"
+     "        float3 sharp = float3(0.0);\n"
+     "        for (int i = 0; i < 4; i++) {\n"
+     "            float2 t = (in.uv + offsets[i] * pixelStep) * size;\n"
+     "            float2 b = floor(t);\n"
+     "            float2 phase = clamp((t - b - 0.5) / sharpScale + 0.5, float2(0.0), float2(1.0));\n"
+     "            sharp += vault_decode(source.sample(linearSampler, (b + phase) / size).rgb);\n"
+     "        }\n"
+     "        rgb = vault_encode(sharp * 0.25);\n"
      "    }\n"
-     "    float2 sharpScale = max(scale, float2(1.0));\n"
-     "    float2 pixelStep = 1.0 / (size * sharpScale);\n"
-     "    float2 offsets[4] = { float2(-0.375, -0.125), float2(0.125, -0.375),\n"
-     "                          float2(0.375, 0.125), float2(-0.125, 0.375) };\n"
-     "    float3 rgb = float3(0.0);\n"
-     "    for (int i = 0; i < 4; i++) {\n"
-     "        float2 t = (in.uv + offsets[i] * pixelStep) * size;\n"
-     "        float2 b = floor(t);\n"
-     "        float2 phase = clamp((t - b - 0.5) / sharpScale + 0.5, float2(0.0), float2(1.0));\n"
-     "        rgb += vault_decode(source.sample(linearSampler, (b + phase) / size).rgb);\n"
+     "    if ((effects & 1) != 0) {\n"
+     "        rgb += (vault_grain(base, time) - 0.5) * 0.06;\n"
      "    }\n"
-     "    return float4(vault_encode(rgb * 0.25), 1.0);\n"
+     "    if ((effects & 2) != 0) {\n"
+     "        float2 d = in.uv - 0.5;\n"
+     "        rgb *= 1.0 - 0.45 * smoothstep(0.30, 1.05, length(d));\n"
+     "    }\n"
+     "    if ((effects & 4) != 0) {\n"
+     "        rgb *= 0.86 + 0.14 * (0.5 + 0.5 * cos(in.position.y * 3.14159265));\n"
+     "    }\n"
+     "    return float4(clamp(rgb, float3(0.0), float3(1.0)), 1.0);\n"
      "}\n";
 
 id<MTLDevice> gPresentDevice = nil;
@@ -120,7 +137,13 @@ VaultPresentView* gPresentView = nil;
 CAMetalLayer* gPresentLayer = nil;
 NSString* gPresentModeKey = nil;
 NSString* gPresentFrameRateKey = nil;
+NSString* gPresentGrainKey = nil;
+NSString* gPresentVignetteKey = nil;
+NSString* gPresentScanlineKey = nil;
+UILabel* gPresentTestLabel = nil;
+NSString* gPresentTestShown = nil;
 CFAbsoluteTime gPresentLast = 0;
+CFAbsoluteTime gPresentStart = 0;
 int gPresentTextureWidth = 0;
 int gPresentTextureHeight = 0;
 bool gPresentUnavailable = false;
@@ -139,6 +162,9 @@ void presentPrepareKeys()
 
     gPresentModeKey = [NSString stringWithFormat:@"launcher.%@.imageScaling", game];
     gPresentFrameRateKey = [NSString stringWithFormat:@"launcher.%@.frameRate", game];
+    gPresentGrainKey = [NSString stringWithFormat:@"launcher.%@.shaderGrain", game];
+    gPresentVignetteKey = [NSString stringWithFormat:@"launcher.%@.shaderVignette", game];
+    gPresentScanlineKey = [NSString stringWithFormat:@"launcher.%@.shaderScanlines", game];
 }
 
 int presentMode()
@@ -156,6 +182,25 @@ int presentMode()
     }
 
     return (int)mode;
+}
+
+int presentEffects()
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    presentPrepareKeys();
+
+    int mask = 0;
+    if ([defaults boolForKey:gPresentGrainKey]) {
+        mask |= 1;
+    }
+    if ([defaults boolForKey:gPresentVignetteKey]) {
+        mask |= 2;
+    }
+    if ([defaults boolForKey:gPresentScanlineKey]) {
+        mask |= 4;
+    }
+
+    return mask;
 }
 
 int presentFrameRate()
@@ -186,6 +231,39 @@ void presentPace()
         }
     }
     gPresentLast = now;
+}
+
+void presentTestOverlay(int mode, int effects)
+{
+    if (gPresentTestLabel == nil) {
+        return;
+    }
+
+    NSString* scaling = mode == 0 ? @"NONE" : (mode == 1 ? @"SMOOTH" : @"ENHANCED");
+    NSString* text = [NSString stringWithFormat:@"[%@] GRAIN   [%@] VIGNETTE   [%@] SCANLINES\n%@ · %d FPS · shader test",
+                      (effects & 1) != 0 ? @"x" : @" ",
+                      (effects & 2) != 0 ? @"x" : @" ",
+                      (effects & 4) != 0 ? @"x" : @" ",
+                      scaling,
+                      presentFrameRate()];
+
+    BOOL hidden = fallout_ios_movie_state() != 0;
+    if (gPresentTestShown != nil
+        && [gPresentTestShown isEqualToString:text]
+        && gPresentTestLabel.hidden == hidden) {
+        return;
+    }
+
+    gPresentTestLabel.hidden = hidden;
+    gPresentTestShown = text;
+    gPresentTestLabel.text = text;
+
+    CGSize fitted = [gPresentTestLabel sizeThatFits:CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX)];
+    UIEdgeInsets insets = gPresentView.safeAreaInsets;
+    gPresentTestLabel.frame = CGRectMake(14.0 + insets.left,
+                                         14.0 + insets.top,
+                                         ceil(fitted.width) + 18.0,
+                                         ceil(fitted.height) + 12.0);
 }
 
 UIWindow* presentWindow()
@@ -260,6 +338,8 @@ bool presentResourcesReady()
             gPresentUnavailable = true;
             return false;
         }
+
+        gPresentStart = CFAbsoluteTimeGetCurrent();
     }
 
     UIWindow* window = presentWindow();
@@ -277,6 +357,19 @@ bool presentResourcesReady()
         gPresentLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         gPresentLayer.framebufferOnly = YES;
         gPresentLayer.opaque = YES;
+    }
+
+    if (gPresentTestLabel == nil) {
+        gPresentTestLabel = [[UILabel alloc] initWithFrame:CGRectZero];
+        gPresentTestLabel.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.45];
+        gPresentTestLabel.textColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+        gPresentTestLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightSemibold];
+        gPresentTestLabel.textAlignment = NSTextAlignmentCenter;
+        gPresentTestLabel.numberOfLines = 2;
+        gPresentTestLabel.userInteractionEnabled = NO;
+        gPresentTestLabel.layer.cornerRadius = 6;
+        gPresentTestLabel.layer.masksToBounds = YES;
+        [gPresentView addSubview:gPresentTestLabel];
     }
 
     if (gPresentView.superview != window) {
@@ -395,11 +488,17 @@ int fallout_engine_present_frame(const void* pixels, int pitch, int width, int h
         [encoder setFragmentBytes:ratios length:sizeof(ratios) atIndex:0];
         int mode = presentMode();
         [encoder setFragmentBytes:&mode length:sizeof(mode) atIndex:1];
+        int effects = presentEffects();
+        [encoder setFragmentBytes:&effects length:sizeof(effects) atIndex:2];
+        float elapsed = (float)(CFAbsoluteTimeGetCurrent() - gPresentStart);
+        [encoder setFragmentBytes:&elapsed length:sizeof(elapsed) atIndex:3];
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [encoder endEncoding];
 
         [commandBuffer presentDrawable:drawable];
         [commandBuffer commit];
+
+        presentTestOverlay(mode, effects);
 
         return 1;
     }

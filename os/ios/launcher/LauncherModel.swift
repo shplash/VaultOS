@@ -127,6 +127,9 @@ final class LauncherModel: ObservableObject {
     @Published var imageScaling = 2 { didSet { store(imageScaling, "imageScaling") } }
     /// The frame rate the game is capped to in play: 60 or 30.
     @Published var frameRate = 60 { didSet { store(frameRate, "frameRate") } }
+    @Published var shaderGrain = false { didSet { store(shaderGrain, "shaderGrain") } }
+    @Published var shaderVignette = false { didSet { store(shaderVignette, "shaderVignette") } }
+    @Published var shaderScanlines = false { didSet { store(shaderScanlines, "shaderScanlines") } }
     /// The colour of the on-screen controls. White unless the player picks one
     /// of the others; stored per game like every other option.
     @Published var buttonColour = ControlColour.white.rawValue {
@@ -347,6 +350,9 @@ final class LauncherModel: ObservableObject {
         "buttonHaptics",
         "imageScaling",
         "frameRate",
+        "shaderGrain",
+        "shaderVignette",
+        "shaderScanlines",
         "buttonColour",
     ]
 
@@ -461,6 +467,9 @@ final class LauncherModel: ObservableObject {
         buttonHaptics = storedBool("buttonHaptics", for: game, fallback: true)
         imageScaling = min(max(storedInt("imageScaling", for: game, fallback: 2), 0), 2)
         frameRate = storedInt("frameRate", for: game, fallback: 60) == 30 ? 30 : 60
+        shaderGrain = storedBool("shaderGrain", for: game, fallback: false)
+        shaderVignette = storedBool("shaderVignette", for: game, fallback: false)
+        shaderScanlines = storedBool("shaderScanlines", for: game, fallback: false)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
     }
 
@@ -487,6 +496,9 @@ final class LauncherModel: ObservableObject {
         defaults.set(buttonHaptics, forKey: LauncherModel.optionKey("buttonHaptics", for: game))
         defaults.set(imageScaling, forKey: LauncherModel.optionKey("imageScaling", for: game))
         defaults.set(frameRate, forKey: LauncherModel.optionKey("frameRate", for: game))
+        defaults.set(shaderGrain, forKey: LauncherModel.optionKey("shaderGrain", for: game))
+        defaults.set(shaderVignette, forKey: LauncherModel.optionKey("shaderVignette", for: game))
+        defaults.set(shaderScanlines, forKey: LauncherModel.optionKey("shaderScanlines", for: game))
         defaults.set(buttonColour, forKey: LauncherModel.optionKey("buttonColour", for: game))
     }
 
