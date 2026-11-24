@@ -498,7 +498,7 @@ static bool gmouse_glow_wants(Object* object)
 
 #define GMOUSE_GLOW_ITEM_RADIUS 4
 #define GMOUSE_GLOW_ITEM_MAX 6
-#define GMOUSE_GLOW_ITEM_PERIOD 200
+#define GMOUSE_GLOW_ITEM_PERIOD 120
 
 static const int gmouse_glow_types[] = { OBJ_TYPE_ITEM, OBJ_TYPE_CRITTER, OBJ_TYPE_SCENERY };
 

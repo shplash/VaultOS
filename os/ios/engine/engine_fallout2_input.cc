@@ -209,7 +209,7 @@ static bool glowWants(Object* object)
 
 #define GLOW_ITEM_RADIUS 4
 #define GLOW_ITEM_MAX 6
-#define GLOW_ITEM_PERIOD 200
+#define GLOW_ITEM_PERIOD 120
 
 static const int gGlowTypes[] = { OBJ_TYPE_ITEM, OBJ_TYPE_CRITTER, OBJ_TYPE_SCENERY };
 
