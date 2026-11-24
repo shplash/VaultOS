@@ -599,17 +599,27 @@ struct LauncherView: View {
         .vaultPlate(corner: 20, fill: Theme.rail)
     }
 
+    private static let heroTitleSize: CGFloat = 68
+
     private static var heroHeight: CGFloat {
-        let title = VaultUI.display(62).lineHeight
-        let tagline = VaultUI.label(13).lineHeight
-        let edition = VaultUI.label(10, weight: .bold).lineHeight
-        return 14 + title + 2 + tagline + 2 + edition + 8 + 26 + 14
+        let title = VaultUI.display(heroTitleSize).lineHeight
+        let tagline = VaultUI.label(14).lineHeight
+        let edition = VaultUI.label(11, weight: .bold).lineHeight
+        return 14 + 34 + 2 + title + 2 + tagline + 2 + edition + 14
+    }
+
+    private static var heroTitleWidth: CGFloat {
+        let font = VaultUI.display(heroTitleSize)
+        let title = FalloutGame.fallout1.title.uppercased() as NSString
+        let width = title.size(withAttributes: [.font: font]).width
+        return ceil(width + CGFloat(title.length) * 1.4)
     }
 
     private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
+            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.62)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -619,29 +629,30 @@ struct LauncherView: View {
                     .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 0) {
+                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
+                        Spacer(minLength: 12)
+                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
+                    }
+                    .frame(width: linksWidth, alignment: .leading)
+                    .frame(height: 34)
+
                     Text(game.title.uppercased())
-                        .font(Vault.display(62))
+                        .font(Vault.display(LauncherView.heroTitleSize))
                         .kerning(1.4)
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
                     Text(L.t(game.tagline))
-                        .font(Vault.body(13))
+                        .font(Vault.body(14))
                         .foregroundColor(Theme.dim)
                         .lineLimit(1)
 
                     Text(L.t("COMMUNITY EDITION"))
-                        .font(Vault.label(10, weight: .bold))
+                        .font(Vault.label(11, weight: .bold))
                         .kerning(2.4)
                         .foregroundColor(game.accent)
-
-                    Spacer(minLength: 8)
-
-                    HStack(spacing: 16) {
-                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
-                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
-                    }
                 }
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -691,14 +702,14 @@ struct LauncherView: View {
         } label: {
             HStack(spacing: 5) {
                 Text(title)
-                    .font(Vault.label(11, weight: .semibold))
+                    .font(Vault.label(12, weight: .semibold))
                     .kerning(1.0)
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
             }
             .foregroundColor(Theme.dim)
-            .frame(height: 26)
+            .frame(height: 34)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
