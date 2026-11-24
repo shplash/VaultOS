@@ -1080,7 +1080,7 @@ struct LauncherView: View {
                 }
                 .padding(.top, 10)
 
-                Text(L.t("HALF is the readable choice on a phone; FULL is sharper on a tablet."))
+                Text(L.t("HALF keeps text and buttons larger on a phone. FULL is sharper, best on a tablet."))
                     .font(Vault.label(9))
                     .kerning(0.2)
                     .foregroundColor(Theme.faint)
@@ -1095,7 +1095,7 @@ struct LauncherView: View {
                 alignment: .bottom
             )
 
-            row("Custom size", detail: "Written to the game's resolution file on Play") {
+            row("Custom size", detail: "Applied when you press Play") {
                 HStack(spacing: 10) {
                     DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
                     Text("×")
@@ -1217,7 +1217,7 @@ struct LauncherView: View {
             volumeRow("Speech", value: $model.speechVolume)
 
             toggleRow("Launcher music",
-                      detail: "The track this launcher plays",
+                      detail: "Play music while you are in this launcher",
                       divider: false,
                       isOn: Binding(
                         get: { !musicMuted },
