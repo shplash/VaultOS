@@ -337,7 +337,7 @@ struct LauncherView: View {
                                 .foregroundColor(Theme.faint)
                         }
 
-                        HStack(spacing: 16) {
+                        HStack(spacing: 10) {
                             ForEach(model.installRows.indices, id: \.self) { index in
                                 fileChip(model.installRows[index].0, present: model.installRows[index].1)
                             }
@@ -368,9 +368,7 @@ struct LauncherView: View {
                         .disabled(model.isInstalling)
                     }
                 }
-                .frame(minHeight: Metrics.rowMinHeight - 10,
-                       maxHeight: Metrics.rowMaxHeight - 10,
-                       alignment: .leading)
+                .frame(minHeight: Metrics.rowMinHeight - 10, alignment: .leading)
                 .padding(.vertical, 5)
                 .overlay(
                     Rectangle()
@@ -924,7 +922,7 @@ struct LauncherView: View {
 
             Spacer(minLength: 0)
         }
-        .frame(minHeight: Metrics.rowMinHeight - 10, maxHeight: Metrics.rowMaxHeight - 10, alignment: .leading)
+        .frame(minHeight: Metrics.rowMinHeight - 10, alignment: .leading)
         .padding(.vertical, 5)
         .overlay(
             Rectangle()
@@ -1401,6 +1399,7 @@ struct LauncherView: View {
                 .font(Vault.label(9))
                 .foregroundColor(present ? Theme.dim : Theme.faint)
         }
+        .fixedSize()
     }
 
     // MARK: - Resetting a page
@@ -1523,7 +1522,6 @@ struct LauncherView: View {
                         .font(Vault.label(9))
                         .kerning(0.2)
                         .foregroundColor(Theme.faint)
-                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -1532,7 +1530,7 @@ struct LauncherView: View {
 
             control()
         }
-        .frame(minHeight: Metrics.rowMinHeight - 10, maxHeight: Metrics.rowMaxHeight - 10, alignment: .leading)
+        .frame(minHeight: Metrics.rowMinHeight - 10, alignment: .leading)
         .padding(.vertical, 5)
         .overlay(
             Rectangle()

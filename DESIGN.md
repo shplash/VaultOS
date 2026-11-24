@@ -75,9 +75,9 @@ inside a card, `rowMinHeight` 34, `rowMaxHeight` 46, `controlHeight` 32,
   hairline outline and accent mono label, 32pt minimum height; pressed fills
   with 18% accent. An optional tint gives a quiet action such as CANCEL the dim
   text colour, and a square variant makes the small stepper buttons.
-- **Row**: title and detail on the left, control on the right, between 34 and
-  46pt tall so the rows of a page share the height it has left, 5pt above and
-  below at the minimum; hairline under, except on the last row of a page.
+- **Row**: title and detail on the left, control on the right, at least 34pt and
+  as tall as its content needs with 5pt above and below, so a wrapped detail
+  never meets the hairline; hairline under, except on the last row of a page.
 - **Page header**: the display title and its one-line mono detail share a
   baseline, 10pt apart, with the reset chip or version block at the trailing
   edge.
