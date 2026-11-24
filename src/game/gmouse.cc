@@ -480,10 +480,6 @@ static bool gmouse_glow_wants(Object* object)
         return false;
     }
 
-    if ((object->flags & OBJECT_NO_HIGHLIGHT) != 0) {
-        return false;
-    }
-
     switch (FID_TYPE(object->fid)) {
     case OBJ_TYPE_ITEM:
         return true;
