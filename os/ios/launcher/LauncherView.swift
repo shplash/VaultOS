@@ -347,15 +347,13 @@ struct LauncherView: View {
                         let index = game == .fallout1 ? 0 : 1
                         let relative = CGFloat(index - currentIndex)
                         let offset = relative * (pageWidth + 6) + drag + homeNudge
-                        let dragProgress = min(max(abs(drag) / max(width, 1), 0), 1)
                         let isSelected = game == model.selectedGame
-                        let scale = isSelected ? 1 - dragProgress * 0.04 : 0.96 + dragProgress * 0.04
 
                         homeSheet(game: game,
-                                  info: model.installInfos[game] ?? LauncherInstallInfo())
+                                  info: model.installInfos[game] ?? LauncherInstallInfo(),
+                                  width: pageWidth)
                             .frame(width: pageWidth, height: geometry.size.height - 36)
                             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .scaleEffect(reduceMotion ? 1 : scale)
                             .opacity(isSelected ? 1 : 0.45)
                             .offset(x: offset)
                             .allowsHitTesting(isSelected && !isPaging)
@@ -426,7 +424,7 @@ struct LauncherView: View {
                     .fill(accent.opacity(0.18))
                     .frame(width: segment, height: 30)
                     .offset(x: min(max(progress, 0), 1) * segment)
-                    .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.28, dampingFraction: 0.86), value: progress)
+                    .animation(reduceMotion ? nil : .spring(response: 0.30, dampingFraction: 0.86), value: model.selectedGame)
 
                 HStack(spacing: 0) {
                     ForEach(FalloutGame.allCases) { game in
@@ -479,9 +477,10 @@ struct LauncherView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
     }
 
-    private func homeSheet(game: FalloutGame, info: LauncherInstallInfo) -> some View {
+    private func homeSheet(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
         let gameAccent = game.accent
-        let rows = model.installRows(for: game, info: info)
+        let chips = model.installRows(for: game, info: info)
+        let lines = chipLines(chips, width: width - Metrics.sheetInset * 2)
         return VStack(alignment: .leading, spacing: 0) {
             hero(game: game)
 
@@ -526,11 +525,17 @@ struct LauncherView: View {
                             .foregroundColor(Theme.faint)
                     }
 
-                    HStack(spacing: 10) {
-                        ForEach(rows.indices, id: \.self) { index in
-                            fileChip(rows[index].0, present: rows[index].1, accent: gameAccent)
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(lines.indices, id: \.self) { line in
+                            HStack(spacing: 10) {
+                                ForEach(lines[line].indices, id: \.self) { index in
+                                    fileChip(lines[line][index].0,
+                                             present: lines[line][index].1,
+                                             accent: gameAccent)
+                                }
+                                Spacer(minLength: 0)
+                            }
                         }
-                        Spacer(minLength: 0)
                     }
                 }
                 .frame(minHeight: Metrics.rowMinHeight - 10, alignment: .leading)
@@ -1082,7 +1087,7 @@ struct LauncherView: View {
     }
 
     private var displaySheet: some View {
-        sheet(title: "VIDEO", detail: "Resolution, image scaling and frame rate", onReset: resetDisplay) {
+        sheet(title: "VIDEO", detail: "Resolution, pixel quality and frame rate", onReset: resetDisplay) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
                     ForEach(model.presets) { preset in
@@ -1117,7 +1122,7 @@ struct LauncherView: View {
                 .frame(width: 240)
             }
 
-            row("Image scaling", detail: "How the game picture is scaled to the screen") {
+            row("Pixel quality", detail: nil) {
                 HStack(spacing: 8) {
                     ForEach(0..<LauncherView.scalingTitles.count, id: \.self) { index in
                         scalingPill(index)
@@ -1132,7 +1137,7 @@ struct LauncherView: View {
                 }
             }
 
-            footnote("NONE is the original. SMOOTH is softer, ENHANCED is sharper.")
+            footnote("NONE = original. SMOOTH = softer. ENHANCED = sharper.")
         }
     }
 
@@ -1483,7 +1488,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.railSolid)
+            .warningPlate()
             .padding(24)
         }
     }
@@ -1521,7 +1526,7 @@ struct LauncherView: View {
             }
             .padding(22)
             .frame(maxWidth: 440)
-            .vaultPlate(corner: 18, fill: Theme.railSolid)
+            .warningPlate()
             .padding(24)
         }
     }
@@ -1551,6 +1556,40 @@ struct LauncherView: View {
                 .foregroundColor(present ? Theme.dim : Theme.faint)
         }
         .fixedSize()
+    }
+
+    private func chipLines(_ items: [(String, Bool)], width: CGFloat) -> [[(String, Bool)]] {
+        let font = VaultUI.label(9)
+        let gap: CGFloat = 10
+
+        var lines: [[(String, Bool)]] = []
+        var line: [(String, Bool)] = []
+        var used: CGFloat = 0
+
+        for item in items {
+            let measured = (item.0 as NSString).size(withAttributes: [.font: font])
+            let chip = 16 + ceil(measured.width)
+
+            if line.isEmpty {
+                line = [item]
+                used = chip
+                continue
+            }
+
+            if used + gap + chip > width {
+                lines.append(line)
+                line = [item]
+                used = chip
+            } else {
+                used += gap + chip
+                line.append(item)
+            }
+        }
+
+        if !line.isEmpty {
+            lines.append(line)
+        }
+        return lines
     }
 
     // MARK: - Resetting a page
@@ -1830,12 +1869,22 @@ private enum Theme {
     /// The rail's own fill. The home sheet uses it too, so the panel and the
     /// bar are one surface instead of a blue-grey plate over a darker one.
     static let rail = Vault.plate.opacity(0.55)
-    static let railSolid = Color(red: 0.061, green: 0.067, blue: 0.078)
+    static let alert = Color(white: 0.098)
     static let line = Vault.hairline
     static let hairline = Vault.hairline
     static let text = Vault.text
     static let dim = Vault.dim
     static let faint = Vault.faint
+}
+
+private extension View {
+    func warningPlate() -> some View {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        return self
+            .background(shape.fill(Color.white.opacity(0.04)))
+            .background(shape.fill(Theme.alert))
+            .overlay(shape.stroke(Color.white.opacity(0.14), lineWidth: 1))
+    }
 }
 
 private struct LauncherBackdrop: View {
