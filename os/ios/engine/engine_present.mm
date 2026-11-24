@@ -15,6 +15,22 @@
     return [CAMetalLayer class];
 }
 
+- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent*)event
+{
+    UIView* hit = [super hitTest:point withEvent:event];
+    return hit == self ? nil : hit;
+}
+
+@end
+
+@interface VaultPresentButton : UIButton
+
+@property (nonatomic, assign) int testAction;
+
++ (instancetype)presentButtonWithAction:(int)action title:(NSString*)title;
+- (void)setTestTitle:(NSString*)title on:(BOOL)on;
+- (void)pressed;
+
 @end
 
 namespace {
@@ -142,8 +158,14 @@ NSString* gPresentFrameRateKey = nil;
 NSString* gPresentSharpenKey = nil;
 NSString* gPresentLiftKey = nil;
 NSString* gPresentSaturationKey = nil;
-UILabel* gPresentTestLabel = nil;
-NSString* gPresentTestShown = nil;
+UIStackView* gPresentTestBar = nil;
+VaultPresentButton* gPresentModeButton = nil;
+VaultPresentButton* gPresentSharpenButton = nil;
+VaultPresentButton* gPresentLiftButton = nil;
+VaultPresentButton* gPresentSaturationButton = nil;
+int gPresentTestMode = -1;
+int gPresentTestEffects = -1;
+BOOL gPresentTestHidden = NO;
 CFAbsoluteTime gPresentLast = 0;
 int gPresentTextureWidth = 0;
 int gPresentTextureHeight = 0;
@@ -204,6 +226,45 @@ int presentEffects()
     return mask;
 }
 
+void presentSetMode(int mode)
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    presentPrepareKeys();
+
+    int next = mode;
+    if (next < 0) {
+        next = 0;
+    } else if (next > 2) {
+        next = 2;
+    }
+
+    [defaults setInteger:next forKey:gPresentModeKey];
+}
+
+void presentSetSharpen(BOOL value)
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    presentPrepareKeys();
+
+    [defaults setBool:value forKey:gPresentSharpenKey];
+}
+
+void presentSetLift(BOOL value)
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    presentPrepareKeys();
+
+    [defaults setBool:value forKey:gPresentLiftKey];
+}
+
+void presentSetSaturation(BOOL value)
+{
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    presentPrepareKeys();
+
+    [defaults setBool:value forKey:gPresentSaturationKey];
+}
+
 int presentFrameRate()
 {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
@@ -236,35 +297,31 @@ void presentPace()
 
 void presentTestOverlay(int mode, int effects)
 {
-    if (gPresentTestLabel == nil) {
+    if (gPresentTestBar == nil) {
         return;
     }
-
-    NSString* scaling = mode == 0 ? @"NONE" : (mode == 1 ? @"SMOOTH" : @"ENHANCED");
-    NSString* text = [NSString stringWithFormat:@"[%@] SHARPEN   [%@] SHADOWS   [%@] SATURATION\n%@ · %d FPS · shader test",
-                      (effects & 1) != 0 ? @"x" : @" ",
-                      (effects & 2) != 0 ? @"x" : @" ",
-                      (effects & 4) != 0 ? @"x" : @" ",
-                      scaling,
-                      presentFrameRate()];
 
     BOOL hidden = fallout_ios_movie_state() != 0;
-    if (gPresentTestShown != nil
-        && [gPresentTestShown isEqualToString:text]
-        && gPresentTestLabel.hidden == hidden) {
+    if (mode == gPresentTestMode && effects == gPresentTestEffects && hidden == gPresentTestHidden) {
         return;
     }
 
-    gPresentTestLabel.hidden = hidden;
-    gPresentTestShown = text;
-    gPresentTestLabel.text = text;
+    gPresentTestMode = mode;
+    gPresentTestEffects = effects;
+    gPresentTestHidden = hidden;
+    gPresentTestBar.hidden = hidden;
 
-    CGSize fitted = [gPresentTestLabel sizeThatFits:CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX)];
+    [gPresentModeButton setTestTitle:(mode == 0 ? @"NONE" : (mode == 1 ? @"SMOOTH" : @"ENHANCED")) on:YES];
+    [gPresentSharpenButton setTestTitle:@"SHARPEN" on:(effects & 1) != 0];
+    [gPresentLiftButton setTestTitle:@"SHADOWS" on:(effects & 2) != 0];
+    [gPresentSaturationButton setTestTitle:@"SATURATION" on:(effects & 4) != 0];
+
+    [gPresentTestBar sizeToFit];
     UIEdgeInsets insets = gPresentView.safeAreaInsets;
-    gPresentTestLabel.frame = CGRectMake(14.0 + insets.left,
-                                         14.0 + insets.top,
-                                         ceil(fitted.width) + 18.0,
-                                         ceil(fitted.height) + 12.0);
+    gPresentTestBar.frame = CGRectMake(14.0 + insets.left,
+                                       14.0 + insets.top,
+                                       gPresentTestBar.bounds.size.width,
+                                       gPresentTestBar.bounds.size.height);
 }
 
 UIWindow* presentWindow()
@@ -348,7 +405,7 @@ bool presentResourcesReady()
 
     if (gPresentView == nil) {
         gPresentView = [[VaultPresentView alloc] initWithFrame:window.bounds];
-        gPresentView.userInteractionEnabled = NO;
+        gPresentView.userInteractionEnabled = YES;
         gPresentView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         gPresentView.backgroundColor = [UIColor blackColor];
         gPresentLayer = (CAMetalLayer*)gPresentView.layer;
@@ -358,17 +415,24 @@ bool presentResourcesReady()
         gPresentLayer.opaque = YES;
     }
 
-    if (gPresentTestLabel == nil) {
-        gPresentTestLabel = [[UILabel alloc] initWithFrame:CGRectZero];
-        gPresentTestLabel.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.45];
-        gPresentTestLabel.textColor = [UIColor colorWithWhite:0.90 alpha:1.0];
-        gPresentTestLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightSemibold];
-        gPresentTestLabel.textAlignment = NSTextAlignmentCenter;
-        gPresentTestLabel.numberOfLines = 2;
-        gPresentTestLabel.userInteractionEnabled = NO;
-        gPresentTestLabel.layer.cornerRadius = 6;
-        gPresentTestLabel.layer.masksToBounds = YES;
-        [gPresentView addSubview:gPresentTestLabel];
+    if (gPresentTestBar == nil) {
+        gPresentTestBar = [[UIStackView alloc] initWithFrame:CGRectZero];
+        gPresentTestBar.axis = UILayoutConstraintAxisHorizontal;
+        gPresentTestBar.spacing = 8.0;
+        gPresentTestBar.alignment = UIStackViewAlignmentFill;
+        gPresentTestBar.distribution = UIStackViewDistributionFill;
+
+        gPresentModeButton = [VaultPresentButton presentButtonWithAction:0 title:@"NONE"];
+        gPresentSharpenButton = [VaultPresentButton presentButtonWithAction:1 title:@"SHARPEN"];
+        gPresentLiftButton = [VaultPresentButton presentButtonWithAction:2 title:@"SHADOWS"];
+        gPresentSaturationButton = [VaultPresentButton presentButtonWithAction:3 title:@"SATURATION"];
+
+        [gPresentTestBar addArrangedSubview:gPresentModeButton];
+        [gPresentTestBar addArrangedSubview:gPresentSharpenButton];
+        [gPresentTestBar addArrangedSubview:gPresentLiftButton];
+        [gPresentTestBar addArrangedSubview:gPresentSaturationButton];
+
+        [gPresentView addSubview:gPresentTestBar];
     }
 
     if (gPresentView.superview != window) {
@@ -392,6 +456,53 @@ bool presentResourcesReady()
 }
 
 }
+
+@implementation VaultPresentButton
+
++ (instancetype)presentButtonWithAction:(int)action title:(NSString*)title
+{
+    VaultPresentButton* button = [[VaultPresentButton alloc] initWithFrame:CGRectZero];
+    button.testAction = action;
+    button.titleLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
+    button.contentEdgeInsets = UIEdgeInsetsMake(8.0, 12.0, 8.0, 12.0);
+    button.layer.cornerRadius = 7.0;
+    button.layer.masksToBounds = YES;
+    button.layer.borderWidth = 1.0;
+    [button addTarget:button action:@selector(pressed) forControlEvents:UIControlEventTouchUpInside];
+    [button setTestTitle:title on:NO];
+    return button;
+}
+
+- (void)setTestTitle:(NSString*)title on:(BOOL)on
+{
+    [self setTitle:title forState:UIControlStateNormal];
+    [self setTitleColor:(on ? [UIColor colorWithWhite:0.05 alpha:1.0] : [UIColor colorWithWhite:0.92 alpha:1.0])
+               forState:UIControlStateNormal];
+    self.backgroundColor = on ? [UIColor colorWithWhite:0.92 alpha:0.95] : [UIColor colorWithWhite:0.0 alpha:0.55];
+    self.layer.borderColor = on ? [UIColor colorWithWhite:1.0 alpha:0.75].CGColor
+                                : [UIColor colorWithWhite:1.0 alpha:0.28].CGColor;
+    [self invalidateIntrinsicContentSize];
+}
+
+- (void)pressed
+{
+    switch (self.testAction) {
+    case 0:
+        presentSetMode((presentMode() + 1) % 3);
+        break;
+    case 1:
+        presentSetSharpen((presentEffects() & 1) == 0);
+        break;
+    case 2:
+        presentSetLift((presentEffects() & 2) == 0);
+        break;
+    case 3:
+        presentSetSaturation((presentEffects() & 4) == 0);
+        break;
+    }
+}
+
+@end
 
 int fallout_engine_present_frame(const void* pixels, int pitch, int width, int height)
 {
