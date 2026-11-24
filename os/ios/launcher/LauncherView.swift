@@ -26,7 +26,7 @@ struct LauncherView: View {
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
     @State private var homeDrag: CGFloat = 0
-    @GestureState private var homeDragIsHorizontal = false
+    @State private var homeAtEdge = false
     @State private var hasSwipedHome = false
     @State private var dragWatchdog: DispatchWorkItem?
     @State private var homeNudge: CGFloat = 0
@@ -338,9 +338,8 @@ struct LauncherView: View {
         GeometryReader { geometry in
             let width = geometry.size.width
             let currentIndex = model.selectedGame == .fallout1 ? 0 : 1
-            let raw = homeDragIsHorizontal ? homeDrag : 0
-            let atEdge = (currentIndex == 0 && raw > 0) || (currentIndex == 1 && raw < 0)
-            let drag = atEdge ? raw * 0.28 : raw
+            let raw = homeDrag
+            let drag = homeAtEdge ? raw * 0.28 : raw
             let progress = min(max(CGFloat(currentIndex) - drag / max(width, 1), 0), 1)
             let pageWidth = width
 
@@ -379,14 +378,13 @@ struct LauncherView: View {
 
     private func homePagingGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 12)
-            .updating($homeDragIsHorizontal) { value, state, _ in
-                state = abs(value.translation.width) > abs(value.translation.height) * 1.2
-            }
             .onChanged { value in
                 guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
                     return
                 }
                 homeDrag = value.translation.width
+                homeAtEdge = (model.selectedGame == .fallout1 && value.translation.width > 0)
+                    || (model.selectedGame == .fallout2 && value.translation.width < 0)
                 isPaging = true
                 scheduleDragWatchdog()
                 if !hasSwipedHome {
@@ -520,9 +518,7 @@ struct LauncherView: View {
 
             HStack(alignment: .top, spacing: 18) {
                 VStack(alignment: .leading, spacing: 7) {
-                    headerLine(L.t("Game data"),
-                               status: L.t(info.installed == 1 ? "READY" : "FILES REQUIRED"),
-                               accent: gameAccent)
+                    headerLine(L.t("Game data"))
 
                     chipRow(chips, width: filesWidth, accent: gameAccent)
 
@@ -564,7 +560,7 @@ struct LauncherView: View {
                 .frame(width: filesWidth, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 7) {
-                    headerLine(L.t("Saved games"), status: nil, accent: gameAccent)
+                    headerLine(L.t("Saved games"))
 
                     HStack(spacing: 8) {
                         Button {
@@ -587,6 +583,8 @@ struct LauncherView: View {
 
                     if let notice = model.savesNotice {
                         subheader(L.message(notice))
+                    } else {
+                        subheader(L.t("Keep your saves intact"))
                     }
                 }
                 .frame(width: savesWidth, alignment: .leading)
@@ -608,9 +606,9 @@ struct LauncherView: View {
         return 14 + 38 + 2 + title + 2 + tagline + 2 + edition + 14
     }
 
-    private static var heroTitleWidth: CGFloat {
+    private static func heroTitleWidth(for game: FalloutGame) -> CGFloat {
         let font = VaultUI.display(62)
-        let title = FalloutGame.fallout1.title.uppercased() as NSString
+        let title = game.title.uppercased() as NSString
         let width = title.size(withAttributes: [.font: font]).width
         return ceil(width + CGFloat(title.length) * 1.4)
     }
@@ -619,7 +617,7 @@ struct LauncherView: View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
-            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.62)
+            let linksWidth = min(LauncherView.heroTitleWidth(for: game), geometry.size.width * 0.62)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -1466,22 +1464,15 @@ struct LauncherView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func headerLine(_ title: String, status: String?, accent: Color) -> some View {
+    private func headerLine(_ title: String) -> some View {
         return HStack(spacing: 8) {
             Text(title)
                 .font(Vault.body(12, weight: .medium))
                 .foregroundColor(Theme.text)
-
-            if let status = status {
-                Text(status)
-                    .font(Vault.label(8, weight: .bold))
-                    .kerning(0.7)
-                    .foregroundColor(accent)
-            }
+                .lineLimit(1)
 
             Spacer(minLength: 0)
         }
-        .lineLimit(1)
     }
 
     private func chipRow(_ items: [(String, Bool)], width: CGFloat, accent: Color) -> some View {

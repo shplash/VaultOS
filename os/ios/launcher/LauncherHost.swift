@@ -346,7 +346,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
         switch self {
         case .quickSave:
-            return CGPoint(x: 0.9375, y: 0.0715)
+            return CGPoint(x: 0.9550, y: 0.1054)
         case .tray:
             let save = TouchControl.quickSave.defaultCenter(for: profile, in: bounds)
             let size = TouchControl.quickSave.defaultSize(in: bounds, profile: profile)
@@ -355,31 +355,31 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let direction: CGFloat = ControlLayout.traySide(profile: profile, game: ControlLayout.activeGame()) == .left ? -1 : 1
             return CGPoint(x: save.x + direction * step / max(bounds.width, 1), y: save.y)
         case .load:
-            return CGPoint(x: 0.8305, y: 0.0681)
+            return CGPoint(x: 0.8493, y: 0.1029)
         case .saves:
-            return CGPoint(x: 0.7608, y: 0.0681)
+            return CGPoint(x: 0.7800, y: 0.1020)
         case .pip:
-            return CGPoint(x: 0.0989, y: 0.2407)
+            return CGPoint(x: 0.1565, y: 0.6063)
         case .back:
-            return CGPoint(x: 0.1626, y: 0.5653)
+            return CGPoint(x: 0.2209, y: 0.7154)
         case .joystick:
-            return CGPoint(x: 0.1161, y: 0.8300)
+            return CGPoint(x: 0.1165, y: 0.8308)
         case .end:
-            return CGPoint(x: 0.9518, y: 0.2589)
+            return CGPoint(x: 0.8646, y: 0.2547)
         case .fireMode:
-            return CGPoint(x: 0.9518, y: 0.4134)
+            return CGPoint(x: 0.9517, y: 0.2565)
         case .skill:
-            return CGPoint(x: 0.8405, y: 0.9249)
+            return CGPoint(x: 0.8389, y: 0.7934)
         case .swap:
-            return CGPoint(x: 0.8402, y: 0.7902)
+            return CGPoint(x: 0.9655, y: 0.4026)
         case .skip:
             return CGPoint(x: 0.9454, y: 0.6270)
         case .action:
             return CGPoint(x: 0.9327, y: 0.8385)
         case .reload:
-            return CGPoint(x: 0.8745, y: 0.4134)
+            return CGPoint(x: 0.8389, y: 0.9260)
         case .map:
-            return CGPoint(x: 0.0338, y: 0.2407)
+            return CGPoint(x: 0.0937, y: 0.2195)
         case .cha:
             return CGPoint(x: 0.0931, y: 0.3892)
         case .inv:
@@ -490,7 +490,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 22
+    private static let layoutVersion = 23
     private static let sideSuffix = ".side"
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
@@ -653,6 +653,17 @@ enum ControlLayout {
         }
 
         if previous < 22 {
+            for game in FalloutGame.allCases {
+                for control in TouchControl.allCases {
+                    defaults.removeObject(forKey: key(control, xSuffix, profile: .full, game: game))
+                    defaults.removeObject(forKey: key(control, ySuffix, profile: .full, game: game))
+                    defaults.removeObject(forKey: key(control, scaleSuffix, profile: .full, game: game))
+                }
+                defaults.removeObject(forKey: key(.tray, sideSuffix, profile: .full, game: game))
+            }
+        }
+
+        if previous < 23 {
             for game in FalloutGame.allCases {
                 for control in TouchControl.allCases {
                     defaults.removeObject(forKey: key(control, xSuffix, profile: .full, game: game))
