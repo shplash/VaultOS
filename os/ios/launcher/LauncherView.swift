@@ -2228,14 +2228,36 @@ private struct TouchControlEditor: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
-                copyButton(in: size)
+                iconButton("square.and.arrow.up", label: "Copy layout") {
+                    shareFile = layoutText(in: size)
+                }
+
+                iconButton("square.and.arrow.down", label: "Import layout") {
+                    LauncherDocumentPicker.shared.present(contentTypes: [UTType.plainText]) { url in
+                        guard let url = url else {
+                            return
+                        }
+                        applyLayout(from: url)
+                    }
+                }
 
                 Spacer(minLength: 14)
 
-                presetButton("PRESET 1", profile: .half)
-                presetButton("PRESET 2", profile: .full)
-
-                Button(L.t("RESET")) {
+                chromeButton(L.t("PRESET 1"), selected: profile == .half) {
+                    profile = .half
+                    centers = ControlLayout.allCenters(profile: .half, game: game)
+                    scales = ControlLayout.allScales(profile: .half, game: game)
+                    dragOrigins.removeAll()
+                    selected = nil
+                }
+                chromeButton(L.t("PRESET 2"), selected: profile == .full) {
+                    profile = .full
+                    centers = ControlLayout.allCenters(profile: .full, game: game)
+                    scales = ControlLayout.allScales(profile: .full, game: game)
+                    dragOrigins.removeAll()
+                    selected = nil
+                }
+                chromeButton(L.t("RESET"), selected: false) {
                     ControlLayout.reset(profile: profile, game: game)
                     model.controlsOpacity = 1
                     centers = ControlLayout.allCenters(profile: profile, game: game)
@@ -2243,19 +2265,9 @@ private struct TouchControlEditor: View {
                     dragOrigins.removeAll()
                     selected = nil
                 }
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundColor(Theme.dim)
-
-                Button(L.t("DONE")) {
+                chromeButton(L.t("DONE"), selected: true) {
                     presentationMode.wrappedValue.dismiss()
                 }
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(Vault.ink)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(accent)
-                )
             }
 
             HStack(spacing: 8) {
@@ -2312,11 +2324,9 @@ private struct TouchControlEditor: View {
         )
     }
 
-    private func copyButton(in size: CGSize) -> some View {
-        Button {
-            shareFile = layoutText(in: size)
-        } label: {
-            Image(systemName: "square.and.arrow.up")
+    private func iconButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(accent)
                 .frame(width: 26, height: 26)
@@ -2331,7 +2341,71 @@ private struct TouchControlEditor: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(L.t("Copy layout"))
+        .accessibilityLabel(L.t(label))
+    }
+
+    private func chromeButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .kerning(0.6)
+                .foregroundColor(selected ? Color.black.opacity(0.85) : accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, 10)
+                .frame(height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(selected ? accent : Color.white.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(selected ? Color.white.opacity(0.28) : Theme.line, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func applyLayout(from url: URL) {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            LauncherLog.write("layout import: \(url.lastPathComponent) could not be read")
+            return
+        }
+
+        var applied = 0
+        for line in text.split(separator: "\n") {
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count >= 8, let control = TouchControl(rawValue: String(fields[0])) else {
+                let entry = String(line).trimmingCharacters(in: .whitespaces)
+                if entry.hasPrefix("tray:") {
+                    let side = String(entry.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                    ControlLayout.setTraySide(side == "left" ? .left : .right, profile: profile, game: game)
+                } else if entry.hasPrefix("preset:") {
+                    profile = entry.contains("1") ? .half : .full
+                }
+                continue
+            }
+            guard control != .tray,
+                  let x = Double(String(fields[1])),
+                  let y = Double(String(fields[2])),
+                  let scale = Double(String(fields[5])) else {
+                continue
+            }
+
+            ControlLayout.setCenter(CGPoint(x: x, y: y), for: control, profile: profile, game: game)
+            ControlLayout.setScale(CGFloat(scale), for: control, profile: profile, game: game)
+            applied += 1
+        }
+
+        centers = ControlLayout.allCenters(profile: profile, game: game)
+        scales = ControlLayout.allScales(profile: profile, game: game)
+        dragOrigins.removeAll()
+        selected = nil
+        revision += 1
+        LauncherLog.write("layout import: \(url.lastPathComponent) applied \(applied) controls")
     }
 
     private func layoutText(in size: CGSize) -> URL? {
@@ -2375,24 +2449,6 @@ private struct TouchControlEditor: View {
             LauncherLog.write("controls report: \(error.localizedDescription)")
             return nil
         }
-    }
-
-    private func presetButton(_ title: String, profile target: LayoutProfile) -> some View {
-        Button(L.t(title)) {
-            profile = target
-            centers = ControlLayout.allCenters(profile: target, game: game)
-            scales = ControlLayout.allScales(profile: target, game: game)
-            dragOrigins.removeAll()
-            selected = nil
-        }
-        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-        .foregroundColor(profile == target ? Color.black.opacity(0.85) : Theme.dim)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(profile == target ? accent : Color.white.opacity(0.05))
-        )
     }
 
     /// The game's own screen, drawn where the renderer puts it, with the
@@ -2758,7 +2814,7 @@ final class LauncherDocumentPicker: NSObject, UIDocumentPickerDelegate {
 
     private var completion: ((URL?) -> Void)?
 
-    func present(completion: @escaping (URL?) -> Void) {
+    func present(contentTypes: [UTType] = [UTType.zip], completion: @escaping (URL?) -> Void) {
         guard let controller = LauncherDocumentPicker.topViewController() else {
             LauncherLog.write("picker: no view controller to present from")
             completion(nil)
@@ -2767,7 +2823,7 @@ final class LauncherDocumentPicker: NSObject, UIDocumentPickerDelegate {
 
         self.completion = completion
 
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.zip], asCopy: true)
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: contentTypes, asCopy: true)
         picker.allowsMultipleSelection = false
         picker.delegate = self
         controller.present(picker, animated: true)
