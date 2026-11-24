@@ -13,8 +13,6 @@ struct LauncherView: View {
     let onPlay: () -> Void
 
     @State private var page: LauncherPage = .home
-    @State private var showGameData = false
-    @State private var showSavedGames = false
     @State private var showControlEditor = false
     @State private var tipGroup: TipGroup = .touch
     @State private var musicMuted = LauncherMusic.isMuted
@@ -507,13 +505,12 @@ struct LauncherView: View {
         let gameAccent = game.accent
         let chips = model.installRows(for: game, info: info)
         let buttonFont = VaultUI.label(10, weight: .semibold)
-        let buttonNames = [L.t("LANGUAGE FILES"),
-                           L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP")]
-        let buttons = buttonNames.reduce(CGFloat(8)) { total, name in
+        let columns = width - Metrics.sheetInset * 2
+        let savesButtons = [L.t("BACK UP"), L.t("IMPORT")].reduce(CGFloat(8)) { total, name in
             total + ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width) + 28
         }
-        let columns = width - Metrics.sheetInset * 2
-        let lines = chipLines(chips, width: max(columns - buttons - 16, 140))
+        let savesWidth = max(152, savesButtons)
+        let filesWidth = max(columns - savesWidth - 18, 150)
         return VStack(alignment: .leading, spacing: 0) {
             hero(game: game)
 
@@ -521,23 +518,13 @@ struct LauncherView: View {
                 .fill(gameAccent.opacity(0.55))
                 .frame(height: 1)
 
-            VStack(alignment: .leading, spacing: 0) {
-                section(L.t("Game data"),
-                        status: L.t(info.installed == 1 ? "READY" : "FILES REQUIRED"),
-                        accent: gameAccent,
-                        open: $showGameData) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        ForEach(lines.indices, id: \.self) { line in
-                            HStack(spacing: 8) {
-                                ForEach(lines[line].indices, id: \.self) { index in
-                                    fileChip(lines[line][index].0,
-                                             present: lines[line][index].1,
-                                             accent: gameAccent)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                        }
-                    }
+            HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: 7) {
+                    headerLine(L.t("Game data"),
+                               status: L.t(info.installed == 1 ? "READY" : "FILES REQUIRED"),
+                               accent: gameAccent)
+
+                    chipRow(chips, width: filesWidth, accent: gameAccent)
 
                     HStack(spacing: 8) {
                         Button {
@@ -572,16 +559,13 @@ struct LauncherView: View {
                             .foregroundColor(Theme.faint)
                             .lineLimit(3)
                             .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        subheader(L.t(info.installed == 1
-                            ? "REPLACE FILES installs a new copy of the game and keeps your saves. LANGUAGE FILES adds a translation pack. Each game keeps its own files, settings and saves."
-                            : "Import a ZIP of your own game files; the app contains no game data. Each game keeps its own files, settings and saves."))
                     }
                 }
+                .frame(width: filesWidth, alignment: .leading)
 
-                section(L.t("Saved games"),
-                        accent: gameAccent,
-                        open: $showSavedGames) {
+                VStack(alignment: .leading, spacing: 7) {
+                    headerLine(L.t("Saved games"), status: nil, accent: gameAccent)
+
                     HStack(spacing: 8) {
                         Button {
                             model.backupSaves()
@@ -605,25 +589,27 @@ struct LauncherView: View {
                         subheader(L.message(notice))
                     }
                 }
+                .frame(width: savesWidth, alignment: .leading)
+
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, Metrics.sheetInset)
             .padding(.top, Metrics.gap)
             .padding(.bottom, Metrics.outer)
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .vaultPlate(corner: 20, fill: Theme.rail)
     }
 
     private static var heroHeight: CGFloat {
-        let title = VaultUI.display(54).lineHeight
-        let tagline = VaultUI.label(12).lineHeight
-        let edition = VaultUI.label(9, weight: .bold).lineHeight
-        return 14 + 36 + 2 + title + 2 + tagline + 2 + edition + 12
+        let title = VaultUI.display(62).lineHeight
+        let tagline = VaultUI.label(13).lineHeight
+        let edition = VaultUI.label(10, weight: .bold).lineHeight
+        return 14 + 38 + 2 + title + 2 + tagline + 2 + edition + 14
     }
 
     private static var heroTitleWidth: CGFloat {
-        let font = VaultUI.display(54)
+        let font = VaultUI.display(62)
         let title = FalloutGame.fallout1.title.uppercased() as NSString
         let width = title.size(withAttributes: [.font: font]).width
         return ceil(width + CGFloat(title.length) * 1.4)
@@ -631,9 +617,9 @@ struct LauncherView: View {
 
     private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
-            let artWidth = min(min(geometry.size.width * 0.46, 300), geometry.size.height * 4 / 3)
+            let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
-            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.60)
+            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.62)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -649,32 +635,32 @@ struct LauncherView: View {
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
                     }
                     .frame(width: linksWidth, alignment: .leading)
-                    .frame(height: 36)
+                    .frame(height: 38)
 
                     Text(game.title.uppercased())
-                        .font(Vault.display(54))
+                        .font(Vault.display(62))
                         .kerning(1.4)
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
                     Text(L.t(game.tagline))
-                        .font(Vault.body(12))
+                        .font(Vault.body(13))
                         .foregroundColor(Theme.dim)
                         .lineLimit(1)
 
                     Text(L.t("COMMUNITY EDITION"))
-                        .font(Vault.label(9, weight: .bold))
+                        .font(Vault.label(10, weight: .bold))
                         .kerning(2.4)
                         .foregroundColor(game.accent)
                 }
                 .padding(.top, 14)
-                .padding(.bottom, 12)
+                .padding(.bottom, 14)
                 .padding(.leading, Metrics.sheetInset)
-                .frame(maxWidth: geometry.size.width * 0.60, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: geometry.size.width * 0.62, maxHeight: .infinity, alignment: .topLeading)
             }
         }
-        .frame(height: LauncherView.heroHeight)
+        .frame(minHeight: LauncherView.heroHeight, maxHeight: .infinity)
     }
 
     private func heroArt(game: FalloutGame, width: CGFloat, height: CGFloat) -> some View {
@@ -1480,52 +1466,44 @@ struct LauncherView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func section<Content: View>(_ title: String,
-                                       status: String? = nil,
-                                       accent: Color,
-                                       open: Binding<Bool>,
-                                       @ViewBuilder content: () -> Content) -> some View {
-        return VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    open.wrappedValue.toggle()
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Text(title)
-                        .font(Vault.body(13, weight: .medium))
-                        .foregroundColor(Theme.text)
+    private func headerLine(_ title: String, status: String?, accent: Color) -> some View {
+        return HStack(spacing: 8) {
+            Text(title)
+                .font(Vault.body(12, weight: .medium))
+                .foregroundColor(Theme.text)
 
-                    if let status = status {
-                        Text(status)
-                            .font(Vault.label(9, weight: .bold))
-                            .kerning(0.8)
-                            .foregroundColor(accent)
-                    }
-
-                    Spacer(minLength: Metrics.gap)
-
-                    Image(systemName: open.wrappedValue ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(Theme.faint)
-                }
-                .frame(minHeight: Metrics.rowMinHeight - 10)
-                .padding(.vertical, 5)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if open.wrappedValue {
-                VStack(alignment: .leading, spacing: 8) {
-                    content()
-                }
-                .padding(.top, 2)
-                .padding(.bottom, 10)
+            if let status = status {
+                Text(status)
+                    .font(Vault.label(8, weight: .bold))
+                    .kerning(0.7)
+                    .foregroundColor(accent)
             }
 
-            Rectangle()
-                .fill(Theme.hairline)
-                .frame(height: 1)
+            Spacer(minLength: 0)
+        }
+        .lineLimit(1)
+    }
+
+    private func chipRow(_ items: [(String, Bool)], width: CGFloat, accent: Color) -> some View {
+        let gap: CGFloat = 8
+        var size: CGFloat = 7
+
+        for candidate in [CGFloat(9), 8, 7] {
+            let font = VaultUI.label(candidate)
+            let chips = items.reduce(CGFloat(0)) { total, item in
+                total + 14 + ceil((item.0 as NSString).size(withAttributes: [.font: font]).width)
+            }
+            let total = chips + gap * CGFloat(max(items.count - 1, 0))
+            size = candidate
+            if total <= width {
+                break
+            }
+        }
+
+        return HStack(spacing: gap) {
+            ForEach(items.indices, id: \.self) { index in
+                fileChip(items[index].0, present: items[index].1, accent: accent, size: size)
+            }
         }
     }
 
@@ -1625,52 +1603,19 @@ struct LauncherView: View {
         }
     }
 
-    private func fileChip(_ name: String, present: Bool, accent: Color? = nil) -> some View {
+    private func fileChip(_ name: String, present: Bool, accent: Color? = nil, size: CGFloat = 9) -> some View {
         let chipAccent = accent ?? self.accent
         return HStack(spacing: 5) {
             Image(systemName: present ? "checkmark" : "minus")
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: max(6, size - 2), weight: .bold))
                 .foregroundColor(present ? chipAccent : Theme.faint)
 
             Text(name)
-                .font(Vault.label(9))
+                .font(Vault.label(size))
                 .foregroundColor(present ? Theme.dim : Theme.faint)
+                .lineLimit(1)
         }
         .fixedSize()
-    }
-
-    private func chipLines(_ items: [(String, Bool)], width: CGFloat) -> [[(String, Bool)]] {
-        let font = VaultUI.label(9)
-        let gap: CGFloat = 8
-
-        var lines: [[(String, Bool)]] = []
-        var line: [(String, Bool)] = []
-        var used: CGFloat = 0
-
-        for item in items {
-            let measured = (item.0 as NSString).size(withAttributes: [.font: font])
-            let chip = 14 + ceil(measured.width)
-
-            if line.isEmpty {
-                line = [item]
-                used = chip
-                continue
-            }
-
-            if used + gap + chip > width {
-                lines.append(line)
-                line = [item]
-                used = chip
-            } else {
-                used += gap + chip
-                line.append(item)
-            }
-        }
-
-        if !line.isEmpty {
-            lines.append(line)
-        }
-        return lines
     }
 
     // MARK: - Resetting a page
@@ -2367,9 +2312,6 @@ private struct TouchControlEditor: View {
         )
     }
 
-    /// The layout as plain text, handed to the share sheet: the device it was
-    /// laid out on, the size the editor drew in, and where every control sits
-    /// in it, so a layout can be read off a screenshot instead of guessed at.
     private func copyButton(in size: CGSize) -> some View {
         Button {
             shareFile = layoutText(in: size)
