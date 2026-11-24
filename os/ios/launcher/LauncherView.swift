@@ -617,6 +617,18 @@ struct LauncherView: View {
         return ceil(width + CGFloat(title.length) * 1.4)
     }
 
+    private static func heroLinkSize(for width: CGFloat) -> CGFloat {
+        let reference: CGFloat = 11
+        let font = VaultUI.label(reference, weight: .semibold)
+        let github = ("GITHUB" as NSString).size(withAttributes: [.font: font]).width
+        let support = (L.t("SUPPORT ME") as NSString).size(withAttributes: [.font: font]).width
+        let perPoint = (github + support) / reference + 1.8
+        guard perPoint > 0 else {
+            return reference
+        }
+        return min(max((width - 38) / perPoint, reference), 26)
+    }
+
     private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
@@ -624,6 +636,7 @@ struct LauncherView: View {
             let measured = heroTitleWidths[game] ?? 0
             let titleWidth = measured > 1 ? measured : LauncherView.heroTitleWidth
             let linksWidth = min(titleWidth, geometry.size.width * 0.62)
+            let linkSize = LauncherView.heroLinkSize(for: linksWidth)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -634,9 +647,9 @@ struct LauncherView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 0) {
-                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
-                        Spacer(minLength: 12)
-                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
+                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", size: linkSize)
+                        Spacer(minLength: 8)
+                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", size: linkSize)
                     }
                     .frame(width: linksWidth, alignment: .leading)
                     .frame(height: 38)
@@ -704,7 +717,7 @@ struct LauncherView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
-    private func plainLink(_ title: String, address: String) -> some View {
+    private func plainLink(_ title: String, address: String, size: CGFloat) -> some View {
         Button {
             if let url = URL(string: address) {
                 UIApplication.shared.open(url)
@@ -712,14 +725,14 @@ struct LauncherView: View {
         } label: {
             HStack(spacing: 5) {
                 Text(title)
-                    .font(Vault.label(11, weight: .semibold))
+                    .font(Vault.label(size, weight: .semibold))
                     .kerning(1.0)
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: size * 0.9, weight: .bold))
             }
             .foregroundColor(Theme.dim)
-            .frame(height: 36)
+            .frame(height: 38)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
