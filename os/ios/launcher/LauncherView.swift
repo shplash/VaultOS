@@ -479,17 +479,17 @@ struct LauncherView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L.t("Game data"))
-                            .font(Vault.body(13, weight: .medium))
-                            .foregroundColor(Theme.text)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L.t("Game data"))
+                    .font(Vault.body(13, weight: .medium))
+                    .foregroundColor(Theme.text)
 
-                        if info.installed != 1 {
-                            Text(L.t("Not installed yet"))
-                                .font(Vault.label(9))
-                                .kerning(0.2)
-                                .foregroundColor(Theme.faint)
-                        }
+                if info.installed != 1 {
+                    Text(L.t("No game files yet. Import your game ZIP to begin."))
+                        .font(Vault.label(9))
+                        .kerning(0.2)
+                        .foregroundColor(Theme.faint)
+                }
 
                         HStack(spacing: 10) {
                             ForEach(rows.indices, id: \.self) { index in
@@ -546,11 +546,9 @@ struct LauncherView: View {
                 }
 
                 if model.importSummary == nil {
-                    Text(L.t(info.has_saves == 1
-                        ? "Your existing saves are kept. Re-importing replaces the game files only."
-                        : "Each game keeps its own data, configuration and savegames.")
-                        + " "
-                        + L.t("LANGUAGE FILES adds a translation pack to this game. The game files themselves are left alone."))
+                    Text(L.t(info.installed == 1
+                        ? "REPLACE FILES installs a new copy of the game and keeps your saves. LANGUAGE FILES adds a translation pack. Each game keeps its own files, settings and saves."
+                        : "Import a ZIP of your own game files; the app contains no game data. Each game keeps its own files, settings and saves."))
                         .font(Vault.label(9))
                         .kerning(0.2)
                         .foregroundColor(Theme.faint)
