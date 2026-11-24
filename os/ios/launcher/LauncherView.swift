@@ -25,8 +25,8 @@ struct LauncherView: View {
     /// is shown once in a note over the About page.
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
-    @State private var homeDrag: CGFloat = 0
-    @State private var homeDragIsHorizontal = false
+    @GestureState private var homeDrag: CGFloat = 0
+    @GestureState private var homeDragIsHorizontal = false
     @State private var hasSwipedHome = false
     @State private var homeNudge: CGFloat = 0
     @State private var isPaging = false
@@ -334,8 +334,10 @@ struct LauncherView: View {
     private var homePager: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
-            let drag = homeDragIsHorizontal ? homeDrag : 0
             let currentIndex = model.selectedGame == .fallout1 ? 0 : 1
+            let raw = homeDragIsHorizontal ? homeDrag : 0
+            let atEdge = (currentIndex == 0 && raw > 0) || (currentIndex == 1 && raw < 0)
+            let drag = atEdge ? raw * 0.28 : raw
             let progress = min(max(CGFloat(currentIndex) - drag / max(width, 1), 0), 1)
             let pageWidth = width
 
@@ -351,20 +353,20 @@ struct LauncherView: View {
 
                         homeSheet(game: game,
                                   info: model.installInfos[game] ?? LauncherInstallInfo())
-                            .frame(width: pageWidth, height: geometry.size.height - 30)
+                            .frame(width: pageWidth, height: geometry.size.height - 36)
                             .scaleEffect(reduceMotion ? 1 : scale)
                             .opacity(isSelected ? 1 : 0.45)
                             .offset(x: offset)
                             .allowsHitTesting(isSelected && !isPaging)
                     }
                 }
-                .frame(width: width, height: geometry.size.height - 30)
+                .frame(width: width, height: geometry.size.height - 36)
                 .clipped()
                 .contentShape(Rectangle())
                 .highPriorityGesture(homePagingGesture(width: pageWidth))
 
                 gameSwitcher(progress: progress)
-                    .frame(height: 24)
+                    .frame(height: 30)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
@@ -375,36 +377,38 @@ struct LauncherView: View {
 
     private func homePagingGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 12)
+            .updating($homeDrag) { value, state, _ in
+                state = value.translation.width
+            }
+            .updating($homeDragIsHorizontal) { value, state, _ in
+                state = abs(value.translation.width) > abs(value.translation.height) * 1.2
+            }
             .onChanged { value in
-                let dx = value.translation.width
-                let dy = value.translation.height
-                if !homeDragIsHorizontal && abs(dx) > abs(dy) * 1.2 {
-                    homeDragIsHorizontal = true
-                    isPaging = true
+                guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
+                    return
+                }
+                isPaging = true
+                if !hasSwipedHome {
                     hasSwipedHome = true
                     swipeHintTask?.cancel()
                     swipeHintTask = nil
                 }
-                guard homeDragIsHorizontal else { return }
-                let index = model.selectedGame == .fallout1 ? 0 : 1
-                let atEdge = (index == 0 && dx > 0) || (index == 1 && dx < 0)
-                homeDrag = atEdge ? dx * 0.28 : dx
             }
             .onEnded { value in
-                guard homeDragIsHorizontal else {
-                    homeDrag = 0
+                guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
                     return
                 }
                 let index = model.selectedGame == .fallout1 ? 0 : 1
+                let raw = value.translation.width
+                let atEdge = (index == 0 && raw > 0) || (index == 1 && raw < 0)
+                let drag = atEdge ? raw * 0.28 : raw
                 let predicted = value.predictedEndTranslation.width
-                let direction = abs(predicted) > abs(homeDrag) ? predicted : homeDrag
-                let shouldChange = abs(homeDrag) > width * 0.22 || abs(predicted) > width * 0.35
+                let direction = abs(predicted) > abs(drag) ? predicted : drag
+                let shouldChange = abs(drag) > width * 0.22 || abs(predicted) > width * 0.35
                 let nextIndex = shouldChange ? min(max(index + (direction < 0 ? 1 : -1), 0), 1) : index
                 let target = nextIndex == 0 ? FalloutGame.fallout1 : .fallout2
                 withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 0.82)) {
                     model.selectedGame = target
-                    homeDrag = 0
-                    homeDragIsHorizontal = false
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     isPaging = false
@@ -419,7 +423,7 @@ struct LauncherView: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(accent.opacity(0.18))
-                    .frame(width: segment, height: 24)
+                    .frame(width: segment, height: 30)
                     .offset(x: min(max(progress, 0), 1) * segment)
 
                 HStack(spacing: 0) {
@@ -428,10 +432,11 @@ struct LauncherView: View {
                             switchHome(to: game)
                         } label: {
                             Text(game.title)
-                                .font(Vault.label(10, weight: .semibold))
+                                .font(Vault.label(12, weight: .semibold))
+                                .kerning(1.2)
                                 .foregroundColor(model.selectedGame == game ? accent : Theme.faint)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 24)
+                                .frame(height: 30)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -442,14 +447,13 @@ struct LauncherView: View {
             }
             .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
         }
-        .frame(height: 24)
+        .frame(maxWidth: 340)
+        .frame(height: 30)
     }
 
     private func switchHome(to game: FalloutGame) {
         withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 0.82)) {
             model.selectedGame = game
-            homeDrag = 0
-            homeDragIsHorizontal = false
         }
     }
 
