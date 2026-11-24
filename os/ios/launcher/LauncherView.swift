@@ -1252,8 +1252,8 @@ struct LauncherView: View {
     }
 
     private var gameSheet: some View {
-        sheet(title: "SYSTEM", detail: "Language, subtitles and how the character moves", onReset: resetGame) {
-            row("Language", detail: "Game text, voice, the launcher and the controls") {
+        sheet(title: "SYSTEM", detail: "Language, movement, haptics and saving", onReset: resetGame) {
+            row("Language", detail: "Game text, voice, this launcher and the buttons") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
                         Button(model.languageNames[index]) {
@@ -1288,14 +1288,14 @@ struct LauncherView: View {
 
             toggleRow("Subtitles", detail: "Spoken lines appear as text", isOn: $model.subtitles)
             toggleRow("Always sprint",
-                      detail: "Moves at a run everywhere",
+                      detail: "Your character runs instead of walking",
                       isOn: $model.alwaysRun)
 
             toggleRow("Button haptics",
-                      detail: "The tap you feel when you press an on-screen control",
+                      detail: "Vibrate when you press an on-screen button",
                       isOn: $model.buttonHaptics)
 
-            row("Auto quick save", detail: "How often the game writes its own quick save") {
+            row("Auto quick save", detail: "The game quick-saves by itself at this interval. OFF stops it.") {
                 HStack(spacing: 8) {
                     Button {
                         model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
@@ -1323,6 +1323,7 @@ struct LauncherView: View {
             }
 
             toggleRow("Haptic on save",
+                      detail: "Vibrate when a save finishes",
                       divider: false,
                       isOn: $model.saveHaptics)
         }
