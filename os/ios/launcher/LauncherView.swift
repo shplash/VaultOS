@@ -368,10 +368,10 @@ struct LauncherView: View {
                         .disabled(model.isInstalling)
                     }
                 }
-                .frame(minHeight: Metrics.rowMinHeight - 12,
-                       maxHeight: Metrics.rowMaxHeight - 12,
+                .frame(minHeight: Metrics.rowMinHeight - 10,
+                       maxHeight: Metrics.rowMaxHeight - 10,
                        alignment: .leading)
-                .padding(.vertical, 6)
+                .padding(.vertical, 5)
                 .overlay(
                     Rectangle()
                         .fill(Theme.hairline)
@@ -924,8 +924,8 @@ struct LauncherView: View {
 
             Spacer(minLength: 0)
         }
-        .frame(minHeight: Metrics.rowMinHeight - 12, maxHeight: Metrics.rowMaxHeight - 12, alignment: .leading)
-        .padding(.vertical, 6)
+        .frame(minHeight: Metrics.rowMinHeight - 10, maxHeight: Metrics.rowMaxHeight - 10, alignment: .leading)
+        .padding(.vertical, 5)
         .overlay(
             Rectangle()
                 .fill(divider ? Theme.hairline : Color.clear)
@@ -942,11 +942,16 @@ struct LauncherView: View {
                         presetTile(preset)
                     }
                 }
-                .padding(.top, 12)
+                .padding(.top, 10)
 
-                footnote("HALF is the readable choice on a phone; FULL is sharper on a tablet.")
+                Text(L.t("HALF is the readable choice on a phone; FULL is sharper on a tablet."))
+                    .font(Vault.label(9))
+                    .kerning(0.2)
+                    .foregroundColor(Theme.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 8)
             .overlay(
                 Rectangle()
                     .fill(Theme.hairline)
@@ -1053,7 +1058,7 @@ struct LauncherView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1441,18 +1446,21 @@ struct LauncherView: View {
     private func sheetHeader<Trailing: View>(_ title: String,
                                              detail: String,
                                              @ViewBuilder trailing: () -> Trailing) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(L.t(title))
                     .font(Vault.display(27))
                     .kerning(1.2)
                     .foregroundColor(Theme.text)
+                    .lineLimit(1)
+                    .layoutPriority(1)
 
                 Text(L.t(detail))
                     .font(Vault.label(9))
                     .kerning(0.4)
                     .foregroundColor(Theme.faint)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
             Spacer(minLength: Metrics.gap)
@@ -1524,8 +1532,8 @@ struct LauncherView: View {
 
             control()
         }
-        .frame(minHeight: Metrics.rowMinHeight - 12, maxHeight: Metrics.rowMaxHeight - 12, alignment: .leading)
-        .padding(.vertical, 6)
+        .frame(minHeight: Metrics.rowMinHeight - 10, maxHeight: Metrics.rowMaxHeight - 10, alignment: .leading)
+        .padding(.vertical, 5)
         .overlay(
             Rectangle()
                 .fill(divider ? Theme.hairline : Color.clear)
@@ -1614,7 +1622,7 @@ private struct DimensionField: View {
                 .foregroundColor(Theme.text)
                 .accentColor(accent)
                 .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+                .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                         .fill(Color.white.opacity(0.04))
@@ -1661,7 +1669,7 @@ private extension FalloutGame {
 private enum Metrics {
     static let outer: CGFloat = 16
     static let sheetInset: CGFloat = 22
-    static let rowMinHeight: CGFloat = 36
+    static let rowMinHeight: CGFloat = 34
     static let rowMaxHeight: CGFloat = 46
     static let controlHeight: CGFloat = 32
     static let controlRadius: CGFloat = 8

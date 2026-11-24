@@ -64,7 +64,7 @@ than marking it, so nothing coloured is allowed on their borders.
 
 One set of numbers, `Metrics` in `LauncherView`, is used everywhere: `outer` 16
 is the margin around the rail and every card, `sheetInset` 22 the padding
-inside a card, `rowMinHeight` 36, `rowMaxHeight` 46, `controlHeight` 32,
+inside a card, `rowMinHeight` 34, `rowMaxHeight` 46, `controlHeight` 32,
 `controlRadius` 8 and `gap` 8.
 
 ## Components
@@ -75,9 +75,12 @@ inside a card, `rowMinHeight` 36, `rowMaxHeight` 46, `controlHeight` 32,
   hairline outline and accent mono label, 32pt minimum height; pressed fills
   with 18% accent. An optional tint gives a quiet action such as CANCEL the dim
   text colour, and a square variant makes the small stepper buttons.
-- **Row**: title and detail on the left, control on the right, between 36 and
-  46pt tall so the rows of a page share the height it has left, 6pt above and
+- **Row**: title and detail on the left, control on the right, between 34 and
+  46pt tall so the rows of a page share the height it has left, 5pt above and
   below at the minimum; hairline under, except on the last row of a page.
+- **Page header**: the display title and its one-line mono detail share a
+  baseline, 10pt apart, with the reset chip or version block at the trailing
+  edge.
 - **Chip** (`ChipStyle`): the one pill behind a preset, a scaling mode, a frame
   rate, a tip group, a page link and the update check. Mono 10pt with 0.8
   tracking, 12pt side padding, 32pt high, 8pt radius. Selected and primary are
