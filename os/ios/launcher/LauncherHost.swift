@@ -355,18 +355,9 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let direction: CGFloat = ControlLayout.traySide(profile: profile, game: ControlLayout.activeGame()) == .left ? -1 : 1
             return CGPoint(x: save.x + direction * step / max(bounds.width, 1), y: save.y)
         case .load:
-            let tray = TouchControl.tray.defaultCenter(for: profile, in: bounds)
-            let side = TouchControl.tray.defaultSize(in: bounds, profile: profile).width
-            let width = TouchControl.load.defaultSize(in: bounds, profile: profile).width
-            let step = side / 2 + TouchControl.gap(in: bounds) + width / 2
-            let direction: CGFloat = ControlLayout.traySide(profile: profile, game: ControlLayout.activeGame()) == .left ? -1 : 1
-            return CGPoint(x: tray.x + direction * step / max(bounds.width, 1), y: tray.y)
+            return CGPoint(x: 0.8305, y: 0.0681)
         case .saves:
-            let load = TouchControl.load.defaultCenter(for: profile, in: bounds)
-            let width = TouchControl.load.defaultSize(in: bounds, profile: profile).width
-            let step = width + TouchControl.gap(in: bounds)
-            let direction: CGFloat = ControlLayout.traySide(profile: profile, game: ControlLayout.activeGame()) == .left ? -1 : 1
-            return CGPoint(x: load.x + direction * step / max(bounds.width, 1), y: load.y)
+            return CGPoint(x: 0.7608, y: 0.0681)
         case .pip:
             return CGPoint(x: 0.0989, y: 0.2407)
         case .back:
@@ -374,19 +365,19 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .joystick:
             return CGPoint(x: 0.1161, y: 0.8300)
         case .end:
-            return CGPoint(x: 0.9503, y: 0.2682)
+            return CGPoint(x: 0.9518, y: 0.2589)
         case .fireMode:
-            return CGPoint(x: 0.9471, y: 0.4058)
+            return CGPoint(x: 0.9518, y: 0.4134)
         case .skill:
-            return CGPoint(x: 0.8284, y: 0.9436)
+            return CGPoint(x: 0.8405, y: 0.9249)
         case .swap:
-            return CGPoint(x: 0.8253, y: 0.7868)
+            return CGPoint(x: 0.8402, y: 0.7902)
         case .skip:
-            return CGPoint(x: 0.9312, y: 0.6100)
+            return CGPoint(x: 0.9454, y: 0.6270)
         case .action:
-            return CGPoint(x: 0.9260, y: 0.8005)
+            return CGPoint(x: 0.9327, y: 0.8385)
         case .reload:
-            return CGPoint(x: 0.8737, y: 0.4058)
+            return CGPoint(x: 0.8745, y: 0.4134)
         case .map:
             return CGPoint(x: 0.0338, y: 0.2407)
         case .cha:
@@ -499,7 +490,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 21
+    private static let layoutVersion = 22
     private static let sideSuffix = ".side"
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
@@ -661,6 +652,17 @@ enum ControlLayout {
             }
         }
 
+        if previous < 22 {
+            for game in FalloutGame.allCases {
+                for control in TouchControl.allCases {
+                    defaults.removeObject(forKey: key(control, xSuffix, profile: .full, game: game))
+                    defaults.removeObject(forKey: key(control, ySuffix, profile: .full, game: game))
+                    defaults.removeObject(forKey: key(control, scaleSuffix, profile: .full, game: game))
+                }
+                defaults.removeObject(forKey: key(.tray, sideSuffix, profile: .full, game: game))
+            }
+        }
+
         defaults.set(layoutVersion, forKey: layoutVersionKey)
     }
 
@@ -685,12 +687,16 @@ enum ControlLayout {
         }
 
         switch control {
-        case .action, .skip:
-            return 1.20
-        case .end, .fireMode, .skill:
-            return 0.92
-        case .swap:
-            return 0.84
+        case .action:
+            return 1.35
+        case .skip:
+            return 1.19
+        case .end, .fireMode:
+            return 1.21
+        case .skill, .swap:
+            return 1.06
+        case .reload:
+            return 1.07
         case .quickSave, .load, .saves:
             return 0.95
         default:
