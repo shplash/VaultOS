@@ -490,7 +490,7 @@ int fallout_engine_present_frame(const void* pixels, int pitch, int width, int h
         [encoder setFragmentBytes:&mode length:sizeof(mode) atIndex:1];
         int effects = presentEffects();
         [encoder setFragmentBytes:&effects length:sizeof(effects) atIndex:2];
-        float elapsed = (float)(CFAbsoluteTimeGetCurrent() - gPresentStart);
+        float elapsed = (float)fmod(CFAbsoluteTimeGetCurrent() - gPresentStart, 60.0);
         [encoder setFragmentBytes:&elapsed length:sizeof(elapsed) atIndex:3];
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [encoder endEncoding];
