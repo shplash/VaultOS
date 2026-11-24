@@ -27,7 +27,6 @@ struct LauncherView: View {
     @State private var updateOutcome: UpdateOutcome?
     @State private var homeDrag: CGFloat = 0
     @State private var homeAtEdge = false
-    @State private var heroTitleWidths: [FalloutGame: CGFloat] = [:]
     @State private var hasSwipedHome = false
     @State private var dragWatchdog: DispatchWorkItem?
     @State private var homeNudge: CGFloat = 0
@@ -375,9 +374,6 @@ struct LauncherView: View {
         .padding(.horizontal, Metrics.outer)
         .padding(.top, Metrics.outer)
         .padding(.bottom, Metrics.outer + screenInsets.bottom)
-        .onPreferenceChange(HeroTitleWidth.self) { widths in
-            heroTitleWidths = widths
-        }
     }
 
     private func homePagingGesture(width: CGFloat) -> some Gesture {
@@ -607,36 +603,13 @@ struct LauncherView: View {
         let title = VaultUI.display(62).lineHeight
         let tagline = VaultUI.label(13).lineHeight
         let edition = VaultUI.label(10, weight: .bold).lineHeight
-        return 14 + 38 + 2 + title + 2 + tagline + 2 + edition + 14
-    }
-
-    private static var heroTitleWidth: CGFloat {
-        let font = VaultUI.display(62)
-        let title = FalloutGame.fallout1.title.uppercased() as NSString
-        let width = title.size(withAttributes: [.font: font]).width
-        return ceil(width + CGFloat(title.length) * 1.4)
-    }
-
-    private static func heroLinkSize(for width: CGFloat) -> CGFloat {
-        let reference: CGFloat = 11
-        let font = VaultUI.label(reference, weight: .semibold)
-        let github = ("GITHUB" as NSString).size(withAttributes: [.font: font]).width
-        let support = (L.t("SUPPORT ME") as NSString).size(withAttributes: [.font: font]).width
-        let perPoint = (github + support) / reference + 1.8
-        guard perPoint > 0 else {
-            return reference
-        }
-        return min(max((width - 38) / perPoint, reference), 26)
+        return 14 + title + 2 + tagline + 2 + edition + 8 + 26 + 14
     }
 
     private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
-            let measured = heroTitleWidths[game] ?? 0
-            let titleWidth = measured > 1 ? measured : LauncherView.heroTitleWidth
-            let linksWidth = min(titleWidth, geometry.size.width * 0.62)
-            let linkSize = LauncherView.heroLinkSize(for: linksWidth)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -646,26 +619,12 @@ struct LauncherView: View {
                     .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 0) {
-                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved", size: linkSize)
-                        Spacer(minLength: 8)
-                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash", size: linkSize)
-                    }
-                    .frame(width: linksWidth, alignment: .leading)
-                    .frame(height: 38)
-
                     Text(game.title.uppercased())
                         .font(Vault.display(62))
                         .kerning(1.4)
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(key: HeroTitleWidth.self,
-                                                       value: [game: proxy.size.width])
-                            }
-                        )
 
                     Text(L.t(game.tagline))
                         .font(Vault.body(13))
@@ -676,6 +635,13 @@ struct LauncherView: View {
                         .font(Vault.label(10, weight: .bold))
                         .kerning(2.4)
                         .foregroundColor(game.accent)
+
+                    Spacer(minLength: 8)
+
+                    HStack(spacing: 16) {
+                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
+                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
+                    }
                 }
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -717,7 +683,7 @@ struct LauncherView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
-    private func plainLink(_ title: String, address: String, size: CGFloat) -> some View {
+    private func plainLink(_ title: String, address: String) -> some View {
         Button {
             if let url = URL(string: address) {
                 UIApplication.shared.open(url)
@@ -725,14 +691,14 @@ struct LauncherView: View {
         } label: {
             HStack(spacing: 5) {
                 Text(title)
-                    .font(Vault.label(size, weight: .semibold))
+                    .font(Vault.label(11, weight: .semibold))
                     .kerning(1.0)
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: size * 0.9, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
             }
             .foregroundColor(Theme.dim)
-            .frame(height: 38)
+            .frame(height: 26)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1288,6 +1254,10 @@ struct LauncherView: View {
             volumeRow("Effects", value: $model.sfxVolume)
             volumeRow("Speech", value: $model.speechVolume)
 
+            toggleRow("Subtitles",
+                      detail: "Spoken lines appear as text",
+                      isOn: $model.subtitles)
+
             toggleRow("Launcher music",
                       detail: "Play music while you are in this launcher",
                       divider: false,
@@ -1358,7 +1328,6 @@ struct LauncherView: View {
                 }
             }
 
-            toggleRow("Subtitles", detail: "Spoken lines appear as text", isOn: $model.subtitles)
             toggleRow("Always sprint",
                       detail: "Your character runs instead of walking",
                       isOn: $model.alwaysRun)
@@ -1649,6 +1618,7 @@ struct LauncherView: View {
         model.sound = true
         model.music = true
         model.speech = true
+        model.subtitles = true
         model.masterVolume = 70
         model.musicVolume = 70
         model.sfxVolume = 70
@@ -1657,7 +1627,6 @@ struct LauncherView: View {
 
     private func resetGame() {
         model.language = 0
-        model.subtitles = true
         model.alwaysRun = true
         model.targetHighlight = 1
         model.autoSaveMinutes = 5
@@ -2079,14 +2048,6 @@ private struct DisabledDim: ViewModifier {
 
     func body(content: Content) -> some View {
         content.opacity(isEnabled ? 1 : 0.4)
-    }
-}
-
-private struct HeroTitleWidth: PreferenceKey {
-    static var defaultValue: [FalloutGame: CGFloat] = [:]
-
-    static func reduce(value: inout [FalloutGame: CGFloat], nextValue: () -> [FalloutGame: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { $1 })
     }
 }
 
