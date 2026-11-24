@@ -29,6 +29,7 @@ struct LauncherView: View {
     @State private var homeDragIsHorizontal = false
     @State private var hasSwipedHome = false
     @State private var homeNudge: CGFloat = 0
+    @State private var isPaging = false
     @State private var swipeHintTask: DispatchWorkItem?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -354,12 +355,13 @@ struct LauncherView: View {
                             .scaleEffect(reduceMotion ? 1 : scale)
                             .opacity(isSelected ? 1 : 0.45)
                             .offset(x: offset)
-                            .allowsHitTesting(isSelected)
+                            .allowsHitTesting(isSelected && !isPaging)
                     }
                 }
-                .frame(height: geometry.size.height - 30)
+                .frame(width: width, height: geometry.size.height - 30)
+                .clipped()
                 .contentShape(Rectangle())
-                .simultaneousGesture(homePagingGesture(width: pageWidth))
+                .highPriorityGesture(homePagingGesture(width: pageWidth))
 
                 gameSwitcher(progress: progress)
                     .frame(height: 24)
@@ -378,6 +380,7 @@ struct LauncherView: View {
                 let dy = value.translation.height
                 if !homeDragIsHorizontal && abs(dx) > abs(dy) * 1.2 {
                     homeDragIsHorizontal = true
+                    isPaging = true
                     hasSwipedHome = true
                     swipeHintTask?.cancel()
                     swipeHintTask = nil
@@ -402,6 +405,9 @@ struct LauncherView: View {
                     model.selectedGame = target
                     homeDrag = 0
                     homeDragIsHorizontal = false
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    isPaging = false
                 }
             }
     }
