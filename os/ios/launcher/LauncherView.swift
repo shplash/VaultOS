@@ -27,6 +27,7 @@ struct LauncherView: View {
     @State private var updateOutcome: UpdateOutcome?
     @State private var homeDrag: CGFloat = 0
     @State private var homeAtEdge = false
+    @State private var heroTitleWidths: [FalloutGame: CGFloat] = [:]
     @State private var hasSwipedHome = false
     @State private var dragWatchdog: DispatchWorkItem?
     @State private var homeNudge: CGFloat = 0
@@ -374,6 +375,9 @@ struct LauncherView: View {
         .padding(.horizontal, Metrics.outer)
         .padding(.top, Metrics.outer)
         .padding(.bottom, Metrics.outer + screenInsets.bottom)
+        .onPreferenceChange(HeroTitleWidth.self) { widths in
+            heroTitleWidths = widths
+        }
     }
 
     private func homePagingGesture(width: CGFloat) -> some Gesture {
@@ -562,6 +566,8 @@ struct LauncherView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     headerLine(L.t("Saved games"))
 
+                    subheader(L.t("Keep your saves intact"))
+
                     HStack(spacing: 8) {
                         Button {
                             model.backupSaves()
@@ -583,8 +589,6 @@ struct LauncherView: View {
 
                     if let notice = model.savesNotice {
                         subheader(L.message(notice))
-                    } else {
-                        subheader(L.t("Keep your saves intact"))
                     }
                 }
                 .frame(width: savesWidth, alignment: .leading)
@@ -617,7 +621,9 @@ struct LauncherView: View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
-            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.62)
+            let measured = heroTitleWidths[game] ?? 0
+            let titleWidth = measured > 1 ? measured : LauncherView.heroTitleWidth
+            let linksWidth = min(titleWidth, geometry.size.width * 0.62)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
@@ -641,6 +647,12 @@ struct LauncherView: View {
                         .foregroundColor(Theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear.preference(key: HeroTitleWidth.self,
+                                                       value: [game: proxy.size.width])
+                            }
+                        )
 
                     Text(L.t(game.tagline))
                         .font(Vault.body(13))
@@ -1150,7 +1162,7 @@ struct LauncherView: View {
                 .frame(width: 240)
             }
 
-            row("Pixel quality", detail: "NONE = original. SMOOTH = softer. ENHANCED = sharper.") {
+            row("Pixel quality", detail: "NONE = original. SMOOTH = softer. ENHANCED = soft + sharp blend.") {
                 HStack(spacing: 8) {
                     ForEach(0..<LauncherView.scalingTitles.count, id: \.self) { index in
                         scalingPill(index)
@@ -1158,10 +1170,10 @@ struct LauncherView: View {
                 }
             }
 
-            row("Frame rate", detail: "60 is smoother, 30 saves battery") {
+            row("Frame rate", detail: "30 saves battery, 60 is smoother") {
                 HStack(spacing: 8) {
-                    frameRatePill(60)
                     frameRatePill(30)
+                    frameRatePill(60)
                 }
             }
 
@@ -2057,6 +2069,14 @@ private struct DisabledDim: ViewModifier {
     }
 }
 
+private struct HeroTitleWidth: PreferenceKey {
+    static var defaultValue: [FalloutGame: CGFloat] = [:]
+
+    static func reduce(value: inout [FalloutGame: CGFloat], nextValue: () -> [FalloutGame: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 private struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
@@ -2122,6 +2142,7 @@ private struct TouchControlEditor: View {
                 previewSurface(geometry.size)
 
                 saveAssemblyPreview(in: geometry.size)
+                    .opacity(model.controlsOpacity)
 
                 ForEach(TouchControl.controls(for: game)) { control in
                     let controlSize = editorSize(for: control, in: geometry.size)
