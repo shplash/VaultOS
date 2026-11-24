@@ -191,6 +191,10 @@ static bool glowWants(Object* object)
         return false;
     }
 
+    if (object->data.inventory.length > 0) {
+        return true;
+    }
+
     switch (FID_TYPE(object->fid)) {
     case OBJ_TYPE_ITEM:
         return true;
