@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/shplash/fallout1-ce-iosimproved/stargazers">
-    <img src="https://img.shields.io/github/stars/shplash/fallout1-ce-iosimproved?style=for-the-badge&label=stars&color=729864">
+  <a href="https://github.com/shplash/vaultos/stargazers">
+    <img src="https://img.shields.io/github/stars/shplash/vaultos?style=for-the-badge&label=stars&color=729864">
   </a>
 
   <a href="https://raw.githubusercontent.com/shplash/shplash-repo/main/apps.json">
@@ -19,18 +19,18 @@
 
   <br>
 
-  <a href="https://github.com/shplash/fallout1-ce-iosimproved/releases">
-    <img src="https://img.shields.io/github/v/release/shplash/fallout1-ce-iosimproved?style=for-the-badge&label=release&color=0A84FF">
+  <a href="https://github.com/shplash/vaultos/releases">
+    <img src="https://img.shields.io/github/v/release/shplash/vaultos?style=for-the-badge&label=release&color=0A84FF">
   </a>
 
-  <a href="https://github.com/shplash/fallout1-ce-iosimproved/releases">
+  <a href="https://github.com/shplash/vaultos/releases">
     <img src="https://img.shields.io/badge/Download-IPA-0A84FF?style=for-the-badge">
   </a>
 
   <br>
 
-  <a href="https://github.com/shplash/fallout1-ce-iosimproved/issues">
-    <img src="https://img.shields.io/github/issues/shplash/fallout1-ce-iosimproved?style=for-the-badge&label=open%20issues&color=6E7681">
+  <a href="https://github.com/shplash/vaultos/issues">
+    <img src="https://img.shields.io/github/issues/shplash/vaultos?style=for-the-badge&label=open%20issues&color=6E7681">
   </a>
 </p>
 
@@ -49,7 +49,7 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 
 ## Install
 
-1. Grab `vaultos-ios-unsigned.ipa` from [releases](https://github.com/shplash/fallout1-ce-iosimproved/releases). CI adds every build to the draft "Private Builds" release, so that is where the newest one is.
+1. Grab `vaultos-ios-unsigned.ipa` from [releases](https://github.com/shplash/vaultos/releases). CI adds every build to the draft "Private Builds" release, so that is where the newest one is.
 2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
 If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings or **"Files"** will not let you select the zip

@@ -639,7 +639,7 @@ struct LauncherView: View {
                         .foregroundColor(game.accent)
 
                     HStack(spacing: 8) {
-                        plainLink("GITHUB", address: "https://github.com/shplash/fallout1-ce-iosimproved")
+                        plainLink("GITHUB", address: "https://github.com/shplash/vaultos")
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
                     }
                     .padding(.top, 4)
@@ -830,8 +830,8 @@ struct LauncherView: View {
             }
 
             HStack(spacing: 8) {
-                aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=feature_request.yml", primary: true)
-                aboutLink(L.t("BUG"), address: "https://github.com/shplash/fallout1-ce-iosimproved/issues/new?template=bug_report.yml", primary: true)
+                aboutLink(L.t("REQUEST"), address: "https://github.com/shplash/vaultos/issues/new?template=feature_request.yml", primary: true)
+                aboutLink(L.t("BUG"), address: "https://github.com/shplash/vaultos/issues/new?template=bug_report.yml", primary: true)
                 checkForUpdatesButton
 
                 Spacer(minLength: 0)
@@ -945,7 +945,7 @@ struct LauncherView: View {
         // The list, not releases/latest: that endpoint skips prereleases and
         // drafts, and this project publishes its builds as a draft, so it could
         // only ever answer 404.
-        guard let url = URL(string: "https://api.github.com/repos/shplash/fallout1-ce-iosimproved/releases?per_page=1") else {
+        guard let url = URL(string: "https://api.github.com/repos/shplash/vaultos/releases?per_page=1") else {
             return
         }
 
