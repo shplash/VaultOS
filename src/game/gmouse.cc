@@ -486,13 +486,13 @@ static bool gmouse_glow_wants(Object* object)
     case OBJ_TYPE_CRITTER:
         return (object->data.critter.combat.results & DAM_DEAD) != 0;
     case OBJ_TYPE_SCENERY:
-        return obj_action_can_use(object);
+        return proto_action_can_use(object->pid);
     default:
         return false;
     }
 }
 
-#define GMOUSE_GLOW_ITEM_RADIUS 3
+#define GMOUSE_GLOW_ITEM_RADIUS 4
 #define GMOUSE_GLOW_ITEM_MAX 6
 #define GMOUSE_GLOW_ITEM_PERIOD 200
 
@@ -511,6 +511,8 @@ static void gmouse_glow_items()
         return;
     }
     lastTime = now;
+
+    colorTable[30632] = colorTable[32767];
 
     Object* wanted[GMOUSE_GLOW_ITEM_MAX];
     int wantedDistance[GMOUSE_GLOW_ITEM_MAX];

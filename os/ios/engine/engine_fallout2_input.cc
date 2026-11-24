@@ -203,7 +203,7 @@ static bool glowWants(Object* object)
     }
 }
 
-#define GLOW_ITEM_RADIUS 3
+#define GLOW_ITEM_RADIUS 4
 #define GLOW_ITEM_MAX 6
 #define GLOW_ITEM_PERIOD 200
 
@@ -222,6 +222,8 @@ static void glowNearbyItems()
         return;
     }
     lastTime = now;
+
+    _colorTable[30632] = _colorTable[32767];
 
     Object* hovered = gmouse_get_outlined_object();
 
