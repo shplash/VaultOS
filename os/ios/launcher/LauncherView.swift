@@ -13,6 +13,8 @@ struct LauncherView: View {
     let onPlay: () -> Void
 
     @State private var page: LauncherPage = .home
+    @State private var showGameData = false
+    @State private var showSavedGames = false
     @State private var showControlEditor = false
     @State private var tipGroup: TipGroup = .touch
     @State private var musicMuted = LauncherMusic.isMuted
@@ -520,34 +522,22 @@ struct LauncherView: View {
                 .frame(height: 1)
 
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .center, spacing: 16) {
+                section(L.t("Game data"),
+                        status: L.t(info.installed == 1 ? "READY" : "FILES REQUIRED"),
+                        accent: gameAccent,
+                        open: $showGameData) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(L.t("Game data"))
-                            .font(Vault.body(13, weight: .medium))
-                            .foregroundColor(Theme.text)
-
-                        if info.installed != 1 {
-                            Text(L.t("No game files yet. Import your game ZIP to begin."))
-                                .font(Vault.label(9))
-                                .kerning(0.2)
-                                .foregroundColor(Theme.faint)
-                        }
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            ForEach(lines.indices, id: \.self) { line in
-                                HStack(spacing: 8) {
-                                    ForEach(lines[line].indices, id: \.self) { index in
-                                        fileChip(lines[line][index].0,
-                                                 present: lines[line][index].1,
-                                                 accent: gameAccent)
-                                    }
-                                    Spacer(minLength: 0)
+                        ForEach(lines.indices, id: \.self) { line in
+                            HStack(spacing: 8) {
+                                ForEach(lines[line].indices, id: \.self) { index in
+                                    fileChip(lines[line][index].0,
+                                             present: lines[line][index].1,
+                                             accent: gameAccent)
                                 }
+                                Spacer(minLength: 0)
                             }
                         }
                     }
-
-                    Spacer(minLength: Metrics.gap)
 
                     HStack(spacing: 8) {
                         Button {
@@ -568,42 +558,52 @@ struct LauncherView: View {
                         .buttonStyle(SmallButtonStyle(accent: gameAccent))
                         .disabled(model.isInstalling)
                     }
-                }
-                .padding(.top, 9)
-                .padding(.bottom, 9)
 
-                Rectangle()
-                    .fill(Theme.hairline)
-                    .frame(height: 1)
-
-                savegamesRow(info: info, accent: gameAccent)
-
-                if model.isInstalling {
-                    ProgressView(value: min(max(model.progress, 0), 1))
-                        .accentColor(gameAccent)
-                        .padding(.vertical, 10)
-                    Text(L.message(model.statusText))
-                        .font(Vault.label(10, weight: .regular))
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(1)
-                } else if let summary = model.importSummary {
-                    Text(summary)
-                        .font(Vault.label(10, weight: .regular))
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, 8)
+                    if model.isInstalling {
+                        ProgressView(value: min(max(model.progress, 0), 1))
+                            .accentColor(gameAccent)
+                        Text(L.message(model.statusText))
+                            .font(Vault.label(10, weight: .regular))
+                            .foregroundColor(Theme.faint)
+                            .lineLimit(1)
+                    } else if let summary = model.importSummary {
+                        Text(summary)
+                            .font(Vault.label(10, weight: .regular))
+                            .foregroundColor(Theme.faint)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        subheader(L.t(info.installed == 1
+                            ? "REPLACE FILES installs a new copy of the game and keeps your saves. LANGUAGE FILES adds a translation pack. Each game keeps its own files, settings and saves."
+                            : "Import a ZIP of your own game files; the app contains no game data. Each game keeps its own files, settings and saves."))
+                    }
                 }
 
-                if model.importSummary == nil {
-                    Text(L.t(info.installed == 1
-                        ? "REPLACE FILES installs a new copy of the game and keeps your saves. LANGUAGE FILES adds a translation pack. Each game keeps its own files, settings and saves."
-                        : "Import a ZIP of your own game files; the app contains no game data. Each game keeps its own files, settings and saves."))
-                        .font(Vault.label(9))
-                        .kerning(0.2)
-                        .foregroundColor(Theme.faint)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
+                section(L.t("Saved games"),
+                        accent: gameAccent,
+                        open: $showSavedGames) {
+                    HStack(spacing: 8) {
+                        Button {
+                            model.backupSaves()
+                        } label: {
+                            Text(L.t("BACK UP"))
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
+                        .disabled(model.isInstalling || info.installed == 0 || info.has_saves == 0)
+
+                        Button {
+                            saveImportCountdown = 5
+                            showSaveImportWarning = true
+                        } label: {
+                            Text(L.t("IMPORT"))
+                        }
+                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
+                        .disabled(model.isInstalling || info.installed == 0)
+                    }
+
+                    if let notice = model.savesNotice {
+                        subheader(L.message(notice))
+                    }
                 }
             }
             .padding(.horizontal, Metrics.sheetInset)
@@ -1472,31 +1472,65 @@ struct LauncherView: View {
         }
     }
 
-    /// Backing the saves up is harmless; putting a backup back replaces them, so
-    /// that one waits out a countdown with the warning on screen.
-    private func savegamesRow(info: LauncherInstallInfo, accent: Color) -> some View {
-        row("Saved games", detail: model.savesNotice.map { L.message($0) }, divider: false) {
-            HStack(spacing: 8) {
-                Button {
-                    model.backupSaves()
-                } label: {
-                    Text(L.t("BACK UP"))
-                }
-                .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling || info.installed == 0 || info.has_saves == 0)
+    private func subheader(_ text: String) -> some View {
+        return Text(text)
+            .font(Vault.label(9))
+            .kerning(0.2)
+            .foregroundColor(Theme.faint)
+            .fixedSize(horizontal: false, vertical: true)
+    }
 
-                Button {
-                    saveImportCountdown = 5
-                    showSaveImportWarning = true
-                } label: {
-                    Text(L.t("IMPORT"))
+    private func section<Content: View>(_ title: String,
+                                       status: String? = nil,
+                                       accent: Color,
+                                       open: Binding<Bool>,
+                                       @ViewBuilder content: () -> Content) -> some View {
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    open.wrappedValue.toggle()
                 }
-                .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling || info.installed == 0)
+            } label: {
+                HStack(spacing: 10) {
+                    Text(title)
+                        .font(Vault.body(13, weight: .medium))
+                        .foregroundColor(Theme.text)
+
+                    if let status = status {
+                        Text(status)
+                            .font(Vault.label(9, weight: .bold))
+                            .kerning(0.8)
+                            .foregroundColor(accent)
+                    }
+
+                    Spacer(minLength: Metrics.gap)
+
+                    Image(systemName: open.wrappedValue ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(Theme.faint)
+                }
+                .frame(minHeight: Metrics.rowMinHeight - 10)
+                .padding(.vertical, 5)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+
+            if open.wrappedValue {
+                VStack(alignment: .leading, spacing: 8) {
+                    content()
+                }
+                .padding(.top, 2)
+                .padding(.bottom, 10)
+            }
+
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(height: 1)
         }
     }
 
+    /// Backing the saves up is harmless; putting a backup back replaces them, so
+    /// that one waits out a countdown with the warning on screen.
     private var saveImportWarning: some View {
         ZStack {
             Color.black.opacity(0.62)
@@ -2120,6 +2154,7 @@ private struct TouchControlEditor: View {
     @State private var selected: TouchControl?
     @State private var barsHidden = false
     @State private var revision = 0
+    @State private var shareFile: URL?
 
     init(model: LauncherModel) {
         self.model = model
@@ -2180,6 +2215,18 @@ private struct TouchControlEditor: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+        .sheet(isPresented: Binding(
+            get: { shareFile != nil },
+            set: { shown in
+                if !shown {
+                    shareFile = nil
+                }
+            }
+        )) {
+            if let url = shareFile {
+                ShareSheet(items: [url])
+            }
+        }
     }
 
     /// The capsule's width is fixed so its label never moves the bar: HIDE BARS
@@ -2235,6 +2282,8 @@ private struct TouchControlEditor: View {
                     .foregroundColor(Theme.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
+
+                copyButton(in: size)
 
                 Spacer(minLength: 14)
 
@@ -2316,6 +2365,74 @@ private struct TouchControlEditor: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Theme.line, lineWidth: 1)
         )
+    }
+
+    /// The layout as plain text, handed to the share sheet: the device it was
+    /// laid out on, the size the editor drew in, and where every control sits
+    /// in it, so a layout can be read off a screenshot instead of guessed at.
+    private func copyButton(in size: CGSize) -> some View {
+        Button {
+            shareFile = layoutText(in: size)
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(accent)
+                .frame(width: 26, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.white.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Theme.line, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L.t("Copy layout"))
+    }
+
+    private func layoutText(in size: CGSize) -> URL? {
+        let device = UIDevice.current
+        let screen = UIScreen.main
+        var lines = [
+            "VaultOS touch controls",
+            "device: \(device.model) \(device.systemName) \(device.systemVersion)",
+            "screen: \(Int(screen.bounds.width.rounded()))x\(Int(screen.bounds.height.rounded())) @\(Int(screen.scale.rounded()))x",
+            "editor: \(Int(size.width.rounded()))x\(Int(size.height.rounded()))",
+            "game: \(game.title)",
+            "preset: \(profile == .full ? "PRESET 2" : "PRESET 1")",
+            "resolution: \(model.width)x\(model.height)",
+            "tray: \(ControlLayout.traySide(profile: profile, game: game) == .left ? "left" : "right")",
+            "opacity: \(Int((model.controlsOpacity * 100).rounded()))%",
+            "",
+            "control\tx\ty\tcx\tcy\tscale\twidth\theight"
+        ]
+
+        for control in TouchControl.controls(for: game) {
+            let point = editorCenter(for: control, in: size)
+            let controlSize = editorSize(for: control, in: size)
+            let stored = centers[control] ?? CGPoint(x: point.x / max(size.width, 1),
+                                                     y: point.y / max(size.height, 1))
+            lines.append(String(format: "%@\t%.4f\t%.4f\t%.1f\t%.1f\t%.2f\t%.1f\t%.1f",
+                                control.rawValue,
+                                Double(stored.x),
+                                Double(stored.y),
+                                Double(point.x),
+                                Double(point.y),
+                                Double(scales[control] ?? 1),
+                                Double(controlSize.width),
+                                Double(controlSize.height)))
+        }
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("vaultos-controls.txt")
+        do {
+            try (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+            return url
+        } catch {
+            LauncherLog.write("controls report: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func presetButton(_ title: String, profile target: LayoutProfile) -> some View {
