@@ -785,6 +785,7 @@ std::string build_game_config(const InstallLayout& layout, const LauncherOptions
     config += std::string("subtitles=") + (options.subtitles ? "1" : "0") + "\n";
     config += std::string("running=") + (options.always_run ? "1" : "0") + "\n";
     config += "target_highlight=" + std::to_string(clamp_int(options.target_highlight, 0, 2)) + "\n";
+    config += "brightness=1.09\n";
     config += "\n[sound]\n";
     config += std::string("initialize=") + (options.sound ? "1" : "0") + "\n";
     config += std::string("sounds=") + (options.sound ? "1" : "0") + "\n";

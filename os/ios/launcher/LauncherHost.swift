@@ -346,7 +346,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
         switch self {
         case .quickSave:
-            return CGPoint(x: 0.1180, y: 0.0750)
+            return CGPoint(x: 0.0800, y: 0.0750)
         case .tray:
             let save = TouchControl.quickSave.defaultCenter(for: profile, in: bounds)
             let size = TouchControl.quickSave.defaultSize(in: bounds, profile: profile)
@@ -365,31 +365,31 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let step = width + TouchControl.gap(in: bounds)
             return CGPoint(x: load.x + step / max(bounds.width, 1), y: load.y)
         case .pip:
-            return CGPoint(x: 0.1080, y: 0.2700)
+            return CGPoint(x: 0.0700, y: 0.2700)
         case .back:
-            return CGPoint(x: 0.1080, y: 0.4230)
+            return CGPoint(x: 0.0700, y: 0.4230)
         case .joystick:
-            return CGPoint(x: 0.1550, y: 0.7000)
+            return CGPoint(x: 0.1050, y: 0.7000)
         case .end:
-            return CGPoint(x: 0.7620, y: 0.7790)
+            return CGPoint(x: 0.8250, y: 0.7790)
         case .fireMode:
-            return CGPoint(x: 0.8700, y: 0.4430)
+            return CGPoint(x: 0.9250, y: 0.4430)
         case .skill:
-            return CGPoint(x: 0.8700, y: 0.3000)
+            return CGPoint(x: 0.9250, y: 0.3000)
         case .swap:
-            return CGPoint(x: 0.7620, y: 0.3000)
+            return CGPoint(x: 0.8250, y: 0.3000)
         case .skip:
-            return CGPoint(x: 0.8700, y: 0.6110)
+            return CGPoint(x: 0.9250, y: 0.6110)
         case .action:
-            return CGPoint(x: 0.8700, y: 0.7790)
+            return CGPoint(x: 0.9250, y: 0.7790)
         case .reload:
-            return CGPoint(x: 0.7620, y: 0.6400)
+            return CGPoint(x: 0.8250, y: 0.6400)
         case .map:
-            return CGPoint(x: 0.7600, y: 0.0950)
+            return CGPoint(x: 0.7000, y: 0.0950)
         case .cha:
-            return CGPoint(x: 0.8255, y: 0.0950)
+            return CGPoint(x: 0.7755, y: 0.0950)
         case .inv:
-            return CGPoint(x: 0.8910, y: 0.0950)
+            return CGPoint(x: 0.8510, y: 0.0950)
         }
     }
 
@@ -1382,6 +1382,12 @@ final class GameControlsOverlay: UIView {
         let clampRight = bounds.width - max(10, safeAreaInsets.right + 6) - side
         let clampTop = max(10, safeAreaInsets.top + 6)
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
+
+        if currentScreen == .options {
+            let top = min(max(clampTop, (bounds.height - side) / 2), clampBottom - side)
+            backButton.frame = CGRect(x: clampLeft, y: top, width: side, height: side)
+            return
+        }
 
         if currentScreen == .dialogue {
             placeDialogueButtons(in: box)
