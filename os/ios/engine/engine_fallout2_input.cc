@@ -185,9 +185,29 @@ void get_input_position(int* x, int* y)
     *y = _input_my;
 }
 
+static bool glowWants(Object* object)
+{
+    if (object == gDude || object->tile < 0) {
+        return false;
+    }
+
+    switch (FID_TYPE(object->fid)) {
+    case OBJ_TYPE_ITEM:
+        return true;
+    case OBJ_TYPE_CRITTER:
+        return (object->data.critter.combat.results & DAM_DEAD) != 0;
+    case OBJ_TYPE_SCENERY:
+        return _obj_action_can_use(object);
+    default:
+        return false;
+    }
+}
+
 #define GLOW_ITEM_RADIUS 3
 #define GLOW_ITEM_MAX 6
 #define GLOW_ITEM_PERIOD 200
+
+static const int gGlowTypes[] = { OBJ_TYPE_ITEM, OBJ_TYPE_CRITTER, OBJ_TYPE_SCENERY };
 
 static void glowNearbyItems()
 {
@@ -205,42 +225,88 @@ static void glowNearbyItems()
 
     Object* hovered = gmouse_get_outlined_object();
 
-    Object** items;
-    int itemsCount = objectListCreate(-1, gDude->elevation, OBJ_TYPE_ITEM, &items);
-    int glowing = 0;
+    Object* wanted[GLOW_ITEM_MAX];
+    int wantedDistance[GLOW_ITEM_MAX];
+    int wantedCount = 0;
 
-    for (int index = 0; index < itemsCount; index++) {
-        Object* item = items[index];
+    for (int typeIndex = 0; typeIndex < 3; typeIndex++) {
+        Object** objects;
+        int objectsCount = objectListCreate(-1, gDude->elevation, gGlowTypes[typeIndex], &objects);
 
-        if (item == hovered) {
-            continue;
-        }
-
-        bool near = item != gDude
-            && item->tile >= 0
-            && objectGetDistanceBetween(item, gDude) <= GLOW_ITEM_RADIUS;
-        bool outlined = (item->outline & OUTLINE_TYPE_ITEM) != 0;
-        Rect rect;
-
-        if (near && glowing < GLOW_ITEM_MAX) {
-            if (outlined) {
-                glowing++;
+        for (int index = 0; index < objectsCount; index++) {
+            Object* object = objects[index];
+            if (object == hovered || !glowWants(object)) {
                 continue;
             }
 
-            if (objectSetOutline(item, OUTLINE_TYPE_ITEM, &rect) == 0) {
-                tileWindowRefreshRect(&rect, item->elevation);
-                glowing++;
+            int distance = objectGetDistanceBetween(object, gDude);
+            if (distance > GLOW_ITEM_RADIUS) {
+                continue;
             }
-        } else if (outlined) {
-            if (objectClearOutline(item, &rect) == 0) {
-                tileWindowRefreshRect(&rect, item->elevation);
+            if (wantedCount == GLOW_ITEM_MAX && distance >= wantedDistance[GLOW_ITEM_MAX - 1]) {
+                continue;
             }
+
+            int slot = wantedCount < GLOW_ITEM_MAX ? wantedCount : GLOW_ITEM_MAX - 1;
+            while (slot > 0 && wantedDistance[slot - 1] > distance) {
+                wanted[slot] = wanted[slot - 1];
+                wantedDistance[slot] = wantedDistance[slot - 1];
+                slot--;
+            }
+            wanted[slot] = object;
+            wantedDistance[slot] = distance;
+            if (wantedCount < GLOW_ITEM_MAX) {
+                wantedCount++;
+            }
+        }
+
+        if (objectsCount != 0) {
+            objectListFree(objects);
         }
     }
 
-    if (itemsCount != 0) {
-        objectListFree(items);
+    for (int typeIndex = 0; typeIndex < 3; typeIndex++) {
+        Object** objects;
+        int objectsCount = objectListCreate(-1, gDude->elevation, gGlowTypes[typeIndex], &objects);
+
+        for (int index = 0; index < objectsCount; index++) {
+            Object* object = objects[index];
+            if (object == hovered || (object->outline & OUTLINE_TYPE_ITEM) == 0) {
+                continue;
+            }
+
+            bool keep = false;
+            for (int other = 0; other < wantedCount; other++) {
+                if (wanted[other] == object) {
+                    keep = true;
+                    break;
+                }
+            }
+            if (keep) {
+                continue;
+            }
+
+            Rect rect;
+            if (objectClearOutline(object, &rect) == 0) {
+                tileWindowRefreshRect(&rect, object->elevation);
+            }
+        }
+
+        if (objectsCount != 0) {
+            objectListFree(objects);
+        }
+    }
+
+    for (int index = 0; index < wantedCount; index++) {
+        Object* object = wanted[index];
+        if ((object->outline & OUTLINE_TYPE_ITEM) != 0) {
+            continue;
+        }
+
+        Rect rect;
+        if (objectSetOutline(object, OUTLINE_TYPE_ITEM, &rect) == 0) {
+            tileWindowRefreshRect(&rect, object->elevation);
+        }
     }
 }
 

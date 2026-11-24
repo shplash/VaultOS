@@ -1174,29 +1174,17 @@ struct LauncherView: View {
                 }
             }
 
-            row("Shaders", detail: "Sharpen, shadows and colour, applied to the finished picture") {
-                Menu {
-                    shaderItem("Sharpen", isOn: $model.shaderSharpen)
-                    shaderItem("Shadows", isOn: $model.shaderLift)
-                    shaderItem("Colour", isOn: $model.shaderColour)
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(L.t("EFFECTS"))
-                            .kerning(0.8)
-
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                }
-                .buttonStyle(ChipStyle(accent: accent, look: .quiet))
-            }
-
-            row("Frame rate", detail: "60 is smoother, 30 saves battery", divider: false) {
+            row("Frame rate", detail: "60 is smoother, 30 saves battery") {
                 HStack(spacing: 8) {
                     frameRatePill(60)
                     frameRatePill(30)
                 }
             }
+
+            toggleRow("Vibrant",
+                      detail: "Lifts muted colours without washing out the strong ones",
+                      divider: false,
+                      isOn: $model.shaderVibrant)
         }
     }
 
@@ -1213,18 +1201,6 @@ struct LauncherView: View {
         }
         .buttonStyle(ChipStyle(accent: accent, look: selected ? .selected : .unselected))
         .accessibilityLabel("\(rate) " + L.t("frames per second"))
-    }
-
-    private func shaderItem(_ title: String, isOn: Binding<Bool>) -> some View {
-        Button {
-            isOn.wrappedValue.toggle()
-        } label: {
-            if isOn.wrappedValue {
-                Label(L.t(title), systemImage: "checkmark")
-            } else {
-                Text(L.t(title))
-            }
-        }
     }
 
     private func scalingPill(_ index: Int) -> some View {
@@ -1671,9 +1647,7 @@ struct LauncherView: View {
         }
         model.imageScaling = 2
         model.frameRate = 60
-        model.shaderSharpen = false
-        model.shaderLift = false
-        model.shaderColour = false
+        model.shaderVibrant = false
     }
 
     private func resetAudio() {

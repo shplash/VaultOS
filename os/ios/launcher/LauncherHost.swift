@@ -340,12 +340,13 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// Normalized center of the control on the game view. The editor stores the
     /// same coordinates, so layouts survive resolution and orientation changes.
     func defaultCenter(for profile: LayoutProfile = .full, in bounds: CGSize = UIScreen.main.bounds.size) -> CGPoint {
+        if profile == .half {
+            return presetCenter(in: bounds)
+        }
+
         switch self {
         case .quickSave:
-            let width = TouchControl.quickSave.defaultSize(in: bounds, profile: profile).width
-            let side = min(bounds.width * 0.05625, bounds.height * 0.130)
-            let left = (1 - 0.9594) * bounds.width - side / 2
-            return CGPoint(x: (left + width / 2) / max(bounds.width, 1), y: 0.0750)
+            return CGPoint(x: 0.1180, y: 0.0750)
         case .tray:
             let save = TouchControl.quickSave.defaultCenter(for: profile, in: bounds)
             let size = TouchControl.quickSave.defaultSize(in: bounds, profile: profile)
@@ -364,18 +365,71 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
             let step = width + TouchControl.gap(in: bounds)
             return CGPoint(x: load.x + step / max(bounds.width, 1), y: load.y)
         case .pip:
+            return CGPoint(x: 0.1080, y: 0.2700)
+        case .back:
+            return CGPoint(x: 0.1080, y: 0.4230)
+        case .joystick:
+            return CGPoint(x: 0.1550, y: 0.7000)
+        case .end:
+            return CGPoint(x: 0.7620, y: 0.7790)
+        case .fireMode:
+            return CGPoint(x: 0.8700, y: 0.4430)
+        case .skill:
+            return CGPoint(x: 0.8700, y: 0.3000)
+        case .swap:
+            return CGPoint(x: 0.7620, y: 0.3000)
+        case .skip:
+            return CGPoint(x: 0.8700, y: 0.6110)
+        case .action:
+            return CGPoint(x: 0.8700, y: 0.7790)
+        case .reload:
+            return CGPoint(x: 0.7620, y: 0.6400)
+        case .map:
+            return CGPoint(x: 0.7600, y: 0.0950)
+        case .cha:
+            return CGPoint(x: 0.8255, y: 0.0950)
+        case .inv:
+            return CGPoint(x: 0.8910, y: 0.0950)
+        }
+    }
+
+    func presetCenter(in bounds: CGSize) -> CGPoint {
+        switch self {
+        case .quickSave:
+            let width = TouchControl.quickSave.defaultSize(in: bounds).width
+            let side = min(bounds.width * 0.05625, bounds.height * 0.130)
+            let left = (1 - 0.9594) * bounds.width - side / 2
+            return CGPoint(x: (left + width / 2) / max(bounds.width, 1), y: 0.0750)
+        case .tray:
+            let save = TouchControl.quickSave.presetCenter(in: bounds)
+            let size = TouchControl.quickSave.defaultSize(in: bounds)
+            let side = TouchControl.tray.defaultSize(in: bounds).width
+            let step = size.width / 2 + side / 2
+            return CGPoint(x: save.x + step / max(bounds.width, 1), y: save.y)
+        case .load:
+            let tray = TouchControl.tray.presetCenter(in: bounds)
+            let side = TouchControl.tray.defaultSize(in: bounds).width
+            let width = TouchControl.load.defaultSize(in: bounds).width
+            let step = side / 2 + TouchControl.gap(in: bounds) + width / 2
+            return CGPoint(x: tray.x + step / max(bounds.width, 1), y: tray.y)
+        case .saves:
+            let load = TouchControl.load.presetCenter(in: bounds)
+            let width = TouchControl.load.defaultSize(in: bounds).width
+            let step = width + TouchControl.gap(in: bounds)
+            return CGPoint(x: load.x + step / max(bounds.width, 1), y: load.y)
+        case .pip:
             return CGPoint(x: 0.1080, y: 0.4250)
         case .back:
             return CGPoint(x: 0.1160, y: 0.5725)
         case .joystick:
             return CGPoint(x: 0.1170, y: 0.8110)
         case .end:
-            let width = TouchControl.end.defaultSize(in: bounds, profile: profile).width
+            let width = TouchControl.end.defaultSize(in: bounds).width
             let square = min(bounds.width * 0.05625, bounds.height * 0.130)
             return CGPoint(x: 0.9594 - (width - square) / 2 / max(bounds.width, 1), y: 0.0750)
         case .fireMode:
-            let end = TouchControl.end.defaultCenter(for: profile, in: bounds)
-            let side = TouchControl.end.defaultSize(in: bounds, profile: profile).width
+            let end = TouchControl.end.presetCenter(in: bounds)
+            let side = TouchControl.end.defaultSize(in: bounds).width
             let step = side + TouchControl.gap(in: bounds)
             return CGPoint(x: end.x - step / max(bounds.width, 1), y: end.y)
         case .skill:
@@ -442,7 +496,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 18
+    private static let layoutVersion = 19
     private static let sideSuffix = ".side"
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
@@ -570,6 +624,15 @@ enum ControlLayout {
                         defaults.removeObject(forKey: key(control, xSuffix, profile: profile, game: game))
                         defaults.removeObject(forKey: key(control, ySuffix, profile: profile, game: game))
                     }
+                }
+            }
+        }
+
+        if previous < 19 {
+            for game in FalloutGame.allCases {
+                for control in TouchControl.allCases {
+                    defaults.removeObject(forKey: key(control, xSuffix, profile: .full, game: game))
+                    defaults.removeObject(forKey: key(control, ySuffix, profile: .full, game: game))
                 }
             }
         }

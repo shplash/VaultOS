@@ -474,9 +474,29 @@ int gmouse_is_scrolling()
     return is_scrolling;
 }
 
+static bool gmouse_glow_wants(Object* object)
+{
+    if (object == obj_dude || object->tile < 0) {
+        return false;
+    }
+
+    switch (FID_TYPE(object->fid)) {
+    case OBJ_TYPE_ITEM:
+        return true;
+    case OBJ_TYPE_CRITTER:
+        return (object->data.critter.combat.results & DAM_DEAD) != 0;
+    case OBJ_TYPE_SCENERY:
+        return obj_action_can_use(object);
+    default:
+        return false;
+    }
+}
+
 #define GMOUSE_GLOW_ITEM_RADIUS 3
 #define GMOUSE_GLOW_ITEM_MAX 6
 #define GMOUSE_GLOW_ITEM_PERIOD 200
+
+static const int gmouse_glow_types[] = { OBJ_TYPE_ITEM, OBJ_TYPE_CRITTER, OBJ_TYPE_SCENERY };
 
 static void gmouse_glow_items()
 {
@@ -492,42 +512,92 @@ static void gmouse_glow_items()
     }
     lastTime = now;
 
-    Object** items;
-    int itemsCount = obj_create_list(-1, obj_dude->elevation, OBJ_TYPE_ITEM, &items);
-    int glowing = 0;
+    Object* wanted[GMOUSE_GLOW_ITEM_MAX];
+    int wantedDistance[GMOUSE_GLOW_ITEM_MAX];
+    int wantedCount = 0;
 
-    for (int index = 0; index < itemsCount; index++) {
-        Object* item = items[index];
+    for (int typeIndex = 0; typeIndex < 3; typeIndex++) {
+        Object** objects;
+        int objectsCount = obj_create_list(-1, obj_dude->elevation, gmouse_glow_types[typeIndex], &objects);
 
-        if (item == outlined_object) {
-            continue;
-        }
+        for (int index = 0; index < objectsCount; index++) {
+            Object* object = objects[index];
 
-        bool near = item != obj_dude
-            && item->tile >= 0
-            && obj_dist(item, obj_dude) <= GMOUSE_GLOW_ITEM_RADIUS;
-        bool outlined = (item->outline & OUTLINE_TYPE_ITEM) != 0;
-        Rect rect;
-
-        if (near && glowing < GMOUSE_GLOW_ITEM_MAX) {
-            if (outlined) {
-                glowing++;
+            if (object == obj_dude || object == outlined_object || object->tile < 0) {
+                continue;
+            }
+            if (!gmouse_glow_wants(object)) {
                 continue;
             }
 
-            if (obj_outline_object(item, OUTLINE_TYPE_ITEM, &rect) == 0) {
-                tile_refresh_rect(&rect, item->elevation);
-                glowing++;
+            int distance = obj_dist(object, obj_dude);
+            if (distance > GMOUSE_GLOW_ITEM_RADIUS) {
+                continue;
             }
-        } else if (outlined) {
-            if (obj_remove_outline(item, &rect) == 0) {
-                tile_refresh_rect(&rect, item->elevation);
+            if (wantedCount == GMOUSE_GLOW_ITEM_MAX && distance >= wantedDistance[GMOUSE_GLOW_ITEM_MAX - 1]) {
+                continue;
             }
+
+            int slot = wantedCount < GMOUSE_GLOW_ITEM_MAX ? wantedCount : GMOUSE_GLOW_ITEM_MAX - 1;
+            while (slot > 0 && wantedDistance[slot - 1] > distance) {
+                wanted[slot] = wanted[slot - 1];
+                wantedDistance[slot] = wantedDistance[slot - 1];
+                slot--;
+            }
+            wanted[slot] = object;
+            wantedDistance[slot] = distance;
+            if (wantedCount < GMOUSE_GLOW_ITEM_MAX) {
+                wantedCount++;
+            }
+        }
+
+        if (objectsCount != 0) {
+            obj_delete_list(objects);
         }
     }
 
-    if (itemsCount != 0) {
-        obj_delete_list(items);
+    for (int index = 0; index < wantedCount; index++) {
+        Object* object = wanted[index];
+        if ((object->outline & OUTLINE_TYPE_ITEM) != 0) {
+            continue;
+        }
+
+        Rect rect;
+        if (obj_outline_object(object, OUTLINE_TYPE_ITEM, &rect) == 0) {
+            tile_refresh_rect(&rect, object->elevation);
+        }
+    }
+
+    for (int typeIndex = 0; typeIndex < 3; typeIndex++) {
+        Object** glowObjects;
+        int glowCount = obj_create_list(-1, obj_dude->elevation, gmouse_glow_types[typeIndex], &glowObjects);
+
+        for (int index = 0; index < glowCount; index++) {
+            Object* object = glowObjects[index];
+            if (object == outlined_object || (object->outline & OUTLINE_TYPE_ITEM) == 0) {
+                continue;
+            }
+
+            bool wantedStill = false;
+            for (int other = 0; other < wantedCount; other++) {
+                if (wanted[other] == object) {
+                    wantedStill = true;
+                    break;
+                }
+            }
+            if (wantedStill) {
+                continue;
+            }
+
+            Rect rect;
+            if (obj_remove_outline(object, &rect) == 0) {
+                tile_refresh_rect(&rect, object->elevation);
+            }
+        }
+
+        if (glowCount != 0) {
+            obj_delete_list(glowObjects);
+        }
     }
 }
 

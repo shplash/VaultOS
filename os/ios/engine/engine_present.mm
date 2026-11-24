@@ -127,20 +127,11 @@ NSString* const kPresentShaderSource =
      "        rgb = vault_encode(sharp * 0.25);\n"
      "    }\n"
      "    if ((effects & 1) != 0) {\n"
-     "        float2 o = 1.0 / (size * max(scale, float2(1.0)));\n"
-     "        float3 near1 = source.sample(linearSampler, in.uv + float2(o.x, 0.0)).rgb;\n"
-     "        float3 near2 = source.sample(linearSampler, in.uv - float2(o.x, 0.0)).rgb;\n"
-     "        float3 near3 = source.sample(linearSampler, in.uv + float2(0.0, o.y)).rgb;\n"
-     "        float3 near4 = source.sample(linearSampler, in.uv - float2(0.0, o.y)).rgb;\n"
-     "        float3 average = (near1 + near2 + near3 + near4) * 0.25;\n"
-     "        rgb += (rgb - average) * 0.35;\n"
-     "    }\n"
-     "    if ((effects & 2) != 0) {\n"
-     "        rgb = mix(rgb, sqrt(max(rgb, float3(0.0))), 0.30);\n"
-     "    }\n"
-     "    if ((effects & 4) != 0) {\n"
      "        float luma = dot(rgb, float3(0.299, 0.587, 0.114));\n"
-     "        rgb = mix(float3(luma), rgb, 1.18);\n"
+     "        float3 chroma = rgb - luma;\n"
+     "        float peak = max(max(fabs(chroma.r), fabs(chroma.g)), fabs(chroma.b));\n"
+     "        float weight = 1.0 - smoothstep(0.04, 0.40, peak);\n"
+     "        rgb = luma + chroma * (1.0 + 0.55 * weight);\n"
      "    }\n"
      "    return float4(clamp(rgb, float3(0.0), float3(1.0)), 1.0);\n"
      "}\n";
@@ -155,14 +146,10 @@ VaultPresentView* gPresentView = nil;
 CAMetalLayer* gPresentLayer = nil;
 NSString* gPresentModeKey = nil;
 NSString* gPresentFrameRateKey = nil;
-NSString* gPresentSharpenKey = nil;
-NSString* gPresentLiftKey = nil;
-NSString* gPresentSaturationKey = nil;
+NSString* gPresentVibranceKey = nil;
 UIStackView* gPresentTestBar = nil;
 VaultPresentButton* gPresentModeButton = nil;
-VaultPresentButton* gPresentSharpenButton = nil;
-VaultPresentButton* gPresentLiftButton = nil;
-VaultPresentButton* gPresentSaturationButton = nil;
+VaultPresentButton* gPresentVibrantButton = nil;
 int gPresentTestMode = -1;
 int gPresentTestEffects = -1;
 BOOL gPresentTestHidden = NO;
@@ -185,9 +172,7 @@ void presentPrepareKeys()
 
     gPresentModeKey = [NSString stringWithFormat:@"launcher.%@.imageScaling", game];
     gPresentFrameRateKey = [NSString stringWithFormat:@"launcher.%@.frameRate", game];
-    gPresentSharpenKey = [NSString stringWithFormat:@"launcher.%@.shaderSharpen", game];
-    gPresentLiftKey = [NSString stringWithFormat:@"launcher.%@.shaderLift", game];
-    gPresentSaturationKey = [NSString stringWithFormat:@"launcher.%@.shaderColour", game];
+    gPresentVibranceKey = [NSString stringWithFormat:@"launcher.%@.shaderVibrant", game];
 }
 
 int presentMode()
@@ -213,14 +198,8 @@ int presentEffects()
     presentPrepareKeys();
 
     int mask = 0;
-    if ([defaults boolForKey:gPresentSharpenKey]) {
+    if ([defaults boolForKey:gPresentVibranceKey]) {
         mask |= 1;
-    }
-    if ([defaults boolForKey:gPresentLiftKey]) {
-        mask |= 2;
-    }
-    if ([defaults boolForKey:gPresentSaturationKey]) {
-        mask |= 4;
     }
 
     return mask;
@@ -241,28 +220,12 @@ void presentSetMode(int mode)
     [defaults setInteger:next forKey:gPresentModeKey];
 }
 
-void presentSetSharpen(BOOL value)
+void presentSetVibrance(BOOL value)
 {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     presentPrepareKeys();
 
-    [defaults setBool:value forKey:gPresentSharpenKey];
-}
-
-void presentSetLift(BOOL value)
-{
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    presentPrepareKeys();
-
-    [defaults setBool:value forKey:gPresentLiftKey];
-}
-
-void presentSetSaturation(BOOL value)
-{
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    presentPrepareKeys();
-
-    [defaults setBool:value forKey:gPresentSaturationKey];
+    [defaults setBool:value forKey:gPresentVibranceKey];
 }
 
 int presentFrameRate()
@@ -312,9 +275,7 @@ void presentTestOverlay(int mode, int effects)
     gPresentTestBar.hidden = hidden;
 
     [gPresentModeButton setTestTitle:(mode == 0 ? @"NONE" : (mode == 1 ? @"SMOOTH" : @"ENHANCED")) on:YES];
-    [gPresentSharpenButton setTestTitle:@"SHARPEN" on:(effects & 1) != 0];
-    [gPresentLiftButton setTestTitle:@"SHADOWS" on:(effects & 2) != 0];
-    [gPresentSaturationButton setTestTitle:@"SATURATION" on:(effects & 4) != 0];
+    [gPresentVibrantButton setTestTitle:@"VIBRANT" on:(effects & 1) != 0];
 
     [gPresentTestBar sizeToFit];
     UIEdgeInsets insets = gPresentView.safeAreaInsets;
@@ -423,14 +384,10 @@ bool presentResourcesReady()
         gPresentTestBar.distribution = UIStackViewDistributionFill;
 
         gPresentModeButton = [VaultPresentButton presentButtonWithAction:0 title:@"NONE"];
-        gPresentSharpenButton = [VaultPresentButton presentButtonWithAction:1 title:@"SHARPEN"];
-        gPresentLiftButton = [VaultPresentButton presentButtonWithAction:2 title:@"SHADOWS"];
-        gPresentSaturationButton = [VaultPresentButton presentButtonWithAction:3 title:@"SATURATION"];
+        gPresentVibrantButton = [VaultPresentButton presentButtonWithAction:1 title:@"VIBRANT"];
 
         [gPresentTestBar addArrangedSubview:gPresentModeButton];
-        [gPresentTestBar addArrangedSubview:gPresentSharpenButton];
-        [gPresentTestBar addArrangedSubview:gPresentLiftButton];
-        [gPresentTestBar addArrangedSubview:gPresentSaturationButton];
+        [gPresentTestBar addArrangedSubview:gPresentVibrantButton];
 
         [gPresentView addSubview:gPresentTestBar];
     }
@@ -491,13 +448,7 @@ bool presentResourcesReady()
         presentSetMode((presentMode() + 1) % 3);
         break;
     case 1:
-        presentSetSharpen((presentEffects() & 1) == 0);
-        break;
-    case 2:
-        presentSetLift((presentEffects() & 2) == 0);
-        break;
-    case 3:
-        presentSetSaturation((presentEffects() & 4) == 0);
+        presentSetVibrance((presentEffects() & 1) == 0);
         break;
     }
 }
