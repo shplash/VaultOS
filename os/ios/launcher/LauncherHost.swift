@@ -346,7 +346,7 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
 
         switch self {
         case .quickSave:
-            return CGPoint(x: 0.9407, y: 0.0701)
+            return CGPoint(x: 0.9375, y: 0.0715)
         case .tray:
             let save = TouchControl.quickSave.defaultCenter(for: profile, in: bounds)
             let size = TouchControl.quickSave.defaultSize(in: bounds, profile: profile)
@@ -374,19 +374,19 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         case .joystick:
             return CGPoint(x: 0.1161, y: 0.8300)
         case .end:
-            return CGPoint(x: 0.9420, y: 0.2407)
+            return CGPoint(x: 0.9503, y: 0.2682)
         case .fireMode:
-            return CGPoint(x: 0.9484, y: 0.3906)
+            return CGPoint(x: 0.9471, y: 0.4058)
         case .skill:
-            return CGPoint(x: 0.8284, y: 0.9463)
+            return CGPoint(x: 0.8284, y: 0.9436)
         case .swap:
-            return CGPoint(x: 0.8284, y: 0.8005)
+            return CGPoint(x: 0.8253, y: 0.7868)
         case .skip:
-            return CGPoint(x: 0.9355, y: 0.5516)
+            return CGPoint(x: 0.9312, y: 0.6100)
         case .action:
-            return CGPoint(x: 0.9229, y: 0.7634)
+            return CGPoint(x: 0.9260, y: 0.8005)
         case .reload:
-            return CGPoint(x: 0.8878, y: 0.3892)
+            return CGPoint(x: 0.8737, y: 0.4058)
         case .map:
             return CGPoint(x: 0.0338, y: 0.2407)
         case .cha:
@@ -499,7 +499,7 @@ enum LayoutProfile: String {
 
 enum ControlLayout {
     private static let layoutVersionKey = "launcher.controlLayoutVersion"
-    private static let layoutVersion = 20
+    private static let layoutVersion = 21
     private static let sideSuffix = ".side"
     private static let xSuffix = ".x"
     private static let ySuffix = ".y"
@@ -650,6 +650,17 @@ enum ControlLayout {
             }
         }
 
+        if previous < 21 {
+            for game in FalloutGame.allCases {
+                for control in TouchControl.allCases {
+                    defaults.removeObject(forKey: key(control, xSuffix, profile: .full, game: game))
+                    defaults.removeObject(forKey: key(control, ySuffix, profile: .full, game: game))
+                    defaults.removeObject(forKey: key(control, scaleSuffix, profile: .full, game: game))
+                }
+                defaults.removeObject(forKey: key(.tray, sideSuffix, profile: .full, game: game))
+            }
+        }
+
         defaults.set(layoutVersion, forKey: layoutVersionKey)
     }
 
@@ -668,9 +679,30 @@ enum ControlLayout {
         defaults.set(Double(min(max(point.y, 0), 1)), forKey: key(control, ySuffix, profile: profile, game: game))
     }
 
+    static func defaultScale(for control: TouchControl, profile: LayoutProfile) -> CGFloat {
+        guard profile == .full else {
+            return 1.0
+        }
+
+        switch control {
+        case .action, .skip:
+            return 1.20
+        case .end, .fireMode, .skill:
+            return 0.92
+        case .swap:
+            return 0.84
+        case .quickSave, .load, .saves:
+            return 0.95
+        default:
+            return 1.0
+        }
+    }
+
     static func scale(for control: TouchControl, profile: LayoutProfile, game: FalloutGame) -> CGFloat {
-        let value = UserDefaults.standard.object(forKey: key(control, scaleSuffix, profile: profile, game: game)) as? Double ?? 1.0
-        return CGFloat(min(max(value, 0.55), 2.0))
+        if let value = UserDefaults.standard.object(forKey: key(control, scaleSuffix, profile: profile, game: game)) as? Double {
+            return CGFloat(min(max(value, 0.55), 2.0))
+        }
+        return defaultScale(for: control, profile: profile)
     }
 
     static func setScale(_ scale: CGFloat, for control: TouchControl, profile: LayoutProfile, game: FalloutGame) {
