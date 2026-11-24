@@ -8,6 +8,7 @@
 #include "dinput.h"
 #include "draw.h"
 #include "engine_glue.h"
+#include "game_mouse.h"
 #include "kb.h"
 #include "memory.h"
 #include "mouse.h"
