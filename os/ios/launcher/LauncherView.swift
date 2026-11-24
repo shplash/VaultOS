@@ -1329,15 +1329,15 @@ struct LauncherView: View {
     }
 
     private var controlsSheet: some View {
-        sheet(title: "CONTROLS", detail: "Size, colour and opacity of the on-screen controls", onReset: resetControls) {
+        sheet(title: "CONTROLS", detail: "Layout, colour and opacity of the on-screen buttons", onReset: resetControls) {
             toggleRow("On-screen controls",
-                      detail: "Draw the touch controls over the game. Off, the screen is the game alone.",
+                      detail: "Show the touch buttons over the game. Off, you get the bare game screen.",
                       isOn: $model.touchControls)
 
             // The layout, colour and opacity rows are greyed, not hidden, while
             // the controls are off: there is nothing on the screen to edit,
             // colour or dim then.
-            row("Control scheme", detail: "Where the buttons sit and how big they are. Best judged over the game screen itself.") {
+            row("Button layout", detail: "Move and resize the buttons. Best judged over the game itself.") {
                 Button {
                     showControlEditor = true
                 } label: {
@@ -1348,7 +1348,7 @@ struct LauncherView: View {
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
 
-            row("Button colour", detail: "The colour of a control's label and the wash while you hold it") {
+            row("Button colour", detail: "Colour of the button labels and of the glow while you hold one") {
                 Menu {
                     ForEach(ControlColour.allCases) { colour in
                         Button(L.t(colour.title)) {
@@ -1385,7 +1385,7 @@ struct LauncherView: View {
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
 
-            row("Opacity", detail: "How solid the on-screen controls are") {
+            row("Opacity", detail: "How solid the buttons are. Lower is more see-through.") {
                 HStack(spacing: 12) {
                     Slider(value: $model.controlsOpacity, in: 0.10...1)
                         .accentColor(accent)
