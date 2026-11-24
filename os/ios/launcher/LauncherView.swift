@@ -354,6 +354,7 @@ struct LauncherView: View {
                         homeSheet(game: game,
                                   info: model.installInfos[game] ?? LauncherInstallInfo())
                             .frame(width: pageWidth, height: geometry.size.height - 36)
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                             .scaleEffect(reduceMotion ? 1 : scale)
                             .opacity(isSelected ? 1 : 0.45)
                             .offset(x: offset)
@@ -425,6 +426,7 @@ struct LauncherView: View {
                     .fill(accent.opacity(0.18))
                     .frame(width: segment, height: 30)
                     .offset(x: min(max(progress, 0), 1) * segment)
+                    .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.28, dampingFraction: 0.86), value: progress)
 
                 HStack(spacing: 0) {
                     ForEach(FalloutGame.allCases) { game in
@@ -488,48 +490,47 @@ struct LauncherView: View {
                 .frame(height: 1)
 
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(L.t("Game data"))
-                    .font(Vault.body(13, weight: .medium))
-                    .foregroundColor(Theme.text)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 16) {
+                        Text(L.t("Game data"))
+                            .font(Vault.body(13, weight: .medium))
+                            .foregroundColor(Theme.text)
 
-                if info.installed != 1 {
-                    Text(L.t("No game files yet. Import your game ZIP to begin."))
-                        .font(Vault.label(9))
-                        .kerning(0.2)
-                        .foregroundColor(Theme.faint)
-                }
+                        Spacer(minLength: Metrics.gap)
 
-                        HStack(spacing: 10) {
-                            ForEach(rows.indices, id: \.self) { index in
-                                fileChip(rows[index].0, present: rows[index].1, accent: gameAccent)
+                        HStack(spacing: 8) {
+                            Button {
+                                pendingImport = .language
+                                model.showImporter = true
+                            } label: {
+                                Text(L.t("LANGUAGE FILES"))
                             }
-                            Spacer(minLength: 0)
+                            .buttonStyle(SmallButtonStyle(accent: gameAccent))
+                            .disabled(model.isInstalling || info.installed == 0)
+
+                            Button {
+                                pendingImport = .game
+                                model.showImporter = true
+                            } label: {
+                                Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
+                            }
+                            .buttonStyle(SmallButtonStyle(accent: gameAccent))
+                            .disabled(model.isInstalling)
                         }
-                        .padding(.top, 2)
                     }
 
-                    Spacer(minLength: Metrics.gap)
+                    if info.installed != 1 {
+                        Text(L.t("No game files yet. Import your game ZIP to begin."))
+                            .font(Vault.label(9))
+                            .kerning(0.2)
+                            .foregroundColor(Theme.faint)
+                    }
 
-                    HStack(spacing: 8) {
-                        Button {
-                            pendingImport = .language
-                            model.showImporter = true
-                        } label: {
-                            Text(L.t("LANGUAGE FILES"))
+                    HStack(spacing: 10) {
+                        ForEach(rows.indices, id: \.self) { index in
+                            fileChip(rows[index].0, present: rows[index].1, accent: gameAccent)
                         }
-                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                        .disabled(model.isInstalling || info.installed == 0)
-
-                        Button {
-                            pendingImport = .game
-                            model.showImporter = true
-                        } label: {
-                            Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
-                        }
-                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                        .disabled(model.isInstalling)
+                        Spacer(minLength: 0)
                     }
                 }
                 .frame(minHeight: Metrics.rowMinHeight - 10, alignment: .leading)
