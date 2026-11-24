@@ -1690,6 +1690,7 @@ struct LauncherView: View {
         model.language = 0
         model.subtitles = true
         model.alwaysRun = true
+        model.targetHighlight = 1
         model.autoSaveMinutes = 5
         model.saveHaptics = true
         model.buttonHaptics = true

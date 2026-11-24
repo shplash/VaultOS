@@ -110,6 +110,7 @@ final class LauncherModel: ObservableObject {
     /// A run is the only way to get anywhere at a decent pace on a phone, and
     /// the touch controls have no Shift to walk with, so running is the default.
     @Published var alwaysRun = true { didSet { store(alwaysRun, "alwaysRun") } }
+    @Published var targetHighlight = 1 { didSet { store(targetHighlight, "targetHighlight") } }
     @Published var joystickScale: Double = 1 { didSet { store(joystickScale, "joystickScale") } }
     @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
     /// Opacity of the in-game touch controls, 0.10 (barely there) to 1.
@@ -340,6 +341,7 @@ final class LauncherModel: ObservableObject {
         "language",
         "subtitles",
         "alwaysRun",
+        "targetHighlight",
         "joystickScale",
         "buttonScale",
         "controlsOpacity",
@@ -457,6 +459,7 @@ final class LauncherModel: ObservableObject {
         language = storedInt("language", for: game, fallback: LauncherModel.deviceLanguage)
         subtitles = storedBool("subtitles", for: game, fallback: true)
         alwaysRun = storedBool("alwaysRun", for: game, fallback: true)
+        targetHighlight = min(max(storedInt("targetHighlight", for: game, fallback: 1), 0), 2)
         joystickScale = storedDouble("joystickScale", for: game, fallback: 1)
         buttonScale = storedDouble("buttonScale", for: game, fallback: 1)
         controlsOpacity = min(max(storedDouble("controlsOpacity", for: game, fallback: 1), 0.10), 1)
@@ -486,6 +489,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(language, forKey: LauncherModel.optionKey("language", for: game))
         defaults.set(subtitles, forKey: LauncherModel.optionKey("subtitles", for: game))
         defaults.set(alwaysRun, forKey: LauncherModel.optionKey("alwaysRun", for: game))
+        defaults.set(targetHighlight, forKey: LauncherModel.optionKey("targetHighlight", for: game))
         defaults.set(joystickScale, forKey: LauncherModel.optionKey("joystickScale", for: game))
         defaults.set(buttonScale, forKey: LauncherModel.optionKey("buttonScale", for: game))
         defaults.set(controlsOpacity, forKey: LauncherModel.optionKey("controlsOpacity", for: game))
@@ -862,6 +866,7 @@ final class LauncherModel: ObservableObject {
         raw.speech_volume = Int32(speechVolume.rounded())
         raw.subtitles = subtitles ? 1 : 0
         raw.always_run = alwaysRun ? 1 : 0
+        raw.target_highlight = Int32(targetHighlight)
         raw.language = Int32(language)
         raw.game = Int32(selectedGame == .fallout2 ? LAUNCHER_GAME_FALLOUT2 : LAUNCHER_GAME_FALLOUT1)
         return raw

@@ -784,6 +784,7 @@ std::string build_game_config(const InstallLayout& layout, const LauncherOptions
     config += "\n[preferences]\n";
     config += std::string("subtitles=") + (options.subtitles ? "1" : "0") + "\n";
     config += std::string("running=") + (options.always_run ? "1" : "0") + "\n";
+    config += "target_highlight=" + std::to_string(clamp_int(options.target_highlight, 0, 2)) + "\n";
     config += "\n[sound]\n";
     config += std::string("initialize=") + (options.sound ? "1" : "0") + "\n";
     config += std::string("sounds=") + (options.sound ? "1" : "0") + "\n";
@@ -909,6 +910,7 @@ void launcher_default_options(LauncherOptions* options)
     options->speech_volume = 70;
     options->language = LAUNCHER_LANGUAGE_ENGLISH;
     options->game = LAUNCHER_GAME_FALLOUT1;
+    options->target_highlight = 1;
 }
 
 void launcher_scan(const char* install_dir, int32_t game, LauncherInstallInfo* info)

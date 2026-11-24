@@ -63,6 +63,10 @@ typedef struct LauncherOptions {
     int32_t subtitles;
     int32_t always_run;
 
+    // 0 never outlines a creature, 1 always while the cursor is a crosshair,
+    // 2 only while targeting.
+    int32_t target_highlight;
+
     // One of LAUNCHER_LANGUAGE_*.
     int32_t language;
 
