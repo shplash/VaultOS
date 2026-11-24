@@ -474,6 +474,63 @@ int gmouse_is_scrolling()
     return is_scrolling;
 }
 
+#define GMOUSE_GLOW_ITEM_RADIUS 3
+#define GMOUSE_GLOW_ITEM_MAX 6
+#define GMOUSE_GLOW_ITEM_PERIOD 200
+
+static void gmouse_glow_items()
+{
+    static unsigned int lastTime;
+
+    if (gmouse_mapper_mode != 0 || obj_dude == NULL || !gmouse_3d_is_on()) {
+        return;
+    }
+
+    unsigned int now = get_bk_time();
+    if (elapsed_tocks(now, lastTime) < GMOUSE_GLOW_ITEM_PERIOD) {
+        return;
+    }
+    lastTime = now;
+
+    Object** items;
+    int itemsCount = obj_create_list(-1, obj_dude->elevation, OBJ_TYPE_ITEM, &items);
+    int glowing = 0;
+
+    for (int index = 0; index < itemsCount; index++) {
+        Object* item = items[index];
+
+        if (item == outlined_object) {
+            continue;
+        }
+
+        bool near = item != obj_dude
+            && item->tile >= 0
+            && obj_dist(item, obj_dude) <= GMOUSE_GLOW_ITEM_RADIUS;
+        bool outlined = (item->outline & OUTLINE_TYPE_ITEM) != 0;
+        Rect rect;
+
+        if (near && glowing < GMOUSE_GLOW_ITEM_MAX) {
+            if (outlined) {
+                glowing++;
+                continue;
+            }
+
+            if (obj_outline_object(item, OUTLINE_TYPE_ITEM, &rect) == 0) {
+                tile_refresh_rect(&rect, item->elevation);
+                glowing++;
+            }
+        } else if (outlined) {
+            if (obj_remove_outline(item, &rect) == 0) {
+                tile_refresh_rect(&rect, item->elevation);
+            }
+        }
+    }
+
+    if (itemsCount != 0) {
+        obj_delete_list(items);
+    }
+}
+
 // 0x443274
 void gmouse_bk_process()
 {
@@ -486,6 +543,8 @@ void gmouse_bk_process()
     if (!gmouse_initialized) {
         return;
     }
+
+    gmouse_glow_items();
 
     int mouseX;
     int mouseY;

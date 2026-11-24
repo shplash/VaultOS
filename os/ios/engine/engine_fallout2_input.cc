@@ -11,8 +11,10 @@
 #include "kb.h"
 #include "memory.h"
 #include "mouse.h"
+#include "object.h"
 #include "svga.h"
 #include "text_font.h"
+#include "tile.h"
 #include "touch.h"
 #include "win32.h"
 
@@ -43,6 +45,7 @@ static int dequeueInputEvent();
 static void screenshotBlitter(unsigned char* src, int src_pitch, int a3, int x, int y, int width, int height, int dest_x, int dest_y);
 static void buildNormalizedQwertyKeys();
 static void _GNW95_process_key(KeyboardData* data);
+static void glowNearbyItems();
 
 // 0x51E23C
 static int gKeyboardKeyRepeatRate = 80;
@@ -181,6 +184,65 @@ void get_input_position(int* x, int* y)
     *y = _input_my;
 }
 
+#define GLOW_ITEM_RADIUS 3
+#define GLOW_ITEM_MAX 6
+#define GLOW_ITEM_PERIOD 200
+
+static void glowNearbyItems()
+{
+    static unsigned int lastTime;
+
+    if (gDude == nullptr || !gameMouseObjectsIsVisible()) {
+        return;
+    }
+
+    unsigned int now = SDL_GetTicks();
+    if (now - lastTime < GLOW_ITEM_PERIOD) {
+        return;
+    }
+    lastTime = now;
+
+    Object* hovered = gmouse_get_outlined_object();
+
+    Object** items;
+    int itemsCount = objectListCreate(-1, gDude->elevation, OBJ_TYPE_ITEM, &items);
+    int glowing = 0;
+
+    for (int index = 0; index < itemsCount; index++) {
+        Object* item = items[index];
+
+        if (item == hovered) {
+            continue;
+        }
+
+        bool near = item != gDude
+            && item->tile >= 0
+            && objectGetDistanceBetween(item, gDude) <= GLOW_ITEM_RADIUS;
+        bool outlined = (item->outline & OUTLINE_TYPE_ITEM) != 0;
+        Rect rect;
+
+        if (near && glowing < GLOW_ITEM_MAX) {
+            if (outlined) {
+                glowing++;
+                continue;
+            }
+
+            if (objectSetOutline(item, OUTLINE_TYPE_ITEM, &rect) == 0) {
+                tileWindowRefreshRect(&rect, item->elevation);
+                glowing++;
+            }
+        } else if (outlined) {
+            if (objectClearOutline(item, &rect) == 0) {
+                tileWindowRefreshRect(&rect, item->elevation);
+            }
+        }
+    }
+
+    if (itemsCount != 0) {
+        objectListFree(items);
+    }
+}
+
 // 0x4C8BDC
 void _process_bk()
 {
@@ -189,6 +251,8 @@ void _process_bk()
     tickersExecute();
 
     _mouse_info();
+
+    glowNearbyItems();
 
     v1 = _win_check_all_buttons();
     if (v1 != -1) {
