@@ -606,9 +606,9 @@ struct LauncherView: View {
         return 14 + 38 + 2 + title + 2 + tagline + 2 + edition + 14
     }
 
-    private static func heroTitleWidth(for game: FalloutGame) -> CGFloat {
+    private static var heroTitleWidth: CGFloat {
         let font = VaultUI.display(62)
-        let title = game.title.uppercased() as NSString
+        let title = FalloutGame.fallout1.title.uppercased() as NSString
         let width = title.size(withAttributes: [.font: font]).width
         return ceil(width + CGFloat(title.length) * 1.4)
     }
@@ -617,7 +617,7 @@ struct LauncherView: View {
         GeometryReader { geometry in
             let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
-            let linksWidth = min(LauncherView.heroTitleWidth(for: game), geometry.size.width * 0.62)
+            let linksWidth = min(LauncherView.heroTitleWidth, geometry.size.width * 0.62)
 
             ZStack(alignment: .leading) {
                 heroArt(game: game, width: artWidth, height: artHeight)
