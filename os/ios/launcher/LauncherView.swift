@@ -1887,11 +1887,11 @@ private struct NumberField: UIViewRepresentable {
         func bar() -> UIToolbar {
             let width = UIScreen.main.bounds.size.width
             let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: width, height: 44))
+            bar.autoresizingMask = .flexibleWidth
             bar.items = [
                 UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
                 UIBarButtonItem(title: L.t("DONE"), style: .done, target: self, action: #selector(done)),
             ]
-            bar.sizeToFit()
             return bar
         }
 
