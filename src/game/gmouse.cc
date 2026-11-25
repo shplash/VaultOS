@@ -583,11 +583,10 @@ static void gmouse_glow_items()
 
         object->outline = OUTLINE_TYPE_ITEM;
 
-        if (obj_bound(object, &rect) == 0) {
-            tile_refresh_rect(&rect, object->elevation);
-            if (hadOutline) {
-                tile_refresh_rect(&oldRect, object->elevation);
-            }
+        obj_bound(object, &rect);
+        tile_refresh_rect(&rect, object->elevation);
+        if (hadOutline) {
+            tile_refresh_rect(&oldRect, object->elevation);
         }
     }
 
