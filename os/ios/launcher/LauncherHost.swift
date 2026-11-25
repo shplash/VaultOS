@@ -200,7 +200,7 @@ final class LauncherHost {
         // hierarchy go away, then hand control back to the engine.
         DispatchQueue.main.async {
             closingWindow?.rootViewController = nil
-            if launchGame, let slot = launcherModel?.launchSlot {
+            if launchGame, let slot = self.launcherModel?.launchSlot {
                 fallout_ios_request_load_slot(Int32(slot))
             }
             fallout_launcher_finish(Int32(launchGame ? 1 : 0))
