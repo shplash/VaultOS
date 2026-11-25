@@ -861,13 +861,40 @@ static void doSubtitle()
         return;
     }
 
+    // The row hangs under the movie and has to stay inside the window: on a
+    // tall screen the old bottom edge landed one row past the window's last
+    // pixel, and the fill wrote over whatever follows the window's surface.
+    const int winWidth = win_width(GNWWin);
+    const int winHeight = win_height(GNWWin);
+    if (winWidth < 1 || winHeight < 1) {
+        return;
+    }
+
+    // The window can be resized while the movie plays, so the row is measured
+    // against it on every frame rather than once when the file opens.
+    subtitleW = winWidth;
+
     int v1 = text_height();
     int v2 = movieFitted
         ? lastMovieH + lastMovieY
         : (480 - lastMovieH - lastMovieY - v1) / 2 + lastMovieH + lastMovieY;
 
-    if (subtitleH + v2 > windowGetYres()) {
-        subtitleH = windowGetYres() - v2;
+    if (v2 < 0) {
+        v2 = 0;
+    } else if (v2 > winHeight - 1) {
+        v2 = winHeight - 1;
+    }
+
+    if (subtitleH < 1) {
+        subtitleH = v1 + 4;
+    }
+
+    if (subtitleH > winHeight - v2) {
+        subtitleH = winHeight - v2;
+    }
+
+    if (subtitleH < 1) {
+        return;
     }
 
     int frame;
@@ -892,11 +919,13 @@ static void doSubtitle()
         int colorIndex = (subtitleR << 10) | (subtitleG << 5) | subtitleB;
         windowWrapLine(GNWWin, subtitleList->text, subtitleW, subtitleH, 0, v2, colorTable[colorIndex] | 0x2000000, TEXT_ALIGNMENT_CENTER);
 
+        // Rect edges are inclusive, so the row ends on its last pixel rather
+        // than one past it.
         Rect rect;
-        rect.lrx = subtitleW;
-        rect.uly = v2;
-        rect.lry = v2 + subtitleH;
         rect.ulx = 0;
+        rect.uly = v2;
+        rect.lrx = subtitleW - 1;
+        rect.lry = v2 + subtitleH - 1;
         win_draw_rect(GNWWin, &rect);
 
         myfree(subtitleList->text, __FILE__, __LINE__); // "..\\int\\MOVIE.C", 1108
