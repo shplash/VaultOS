@@ -2480,13 +2480,8 @@ private struct TouchControlEditor: View {
 
         let stored = centers[control] ?? control.defaultCenter(for: profile)
         let point = CGPoint(x: stored.x * size.width, y: stored.y * size.height)
-        let controlSize = editorSize(for: control, in: size)
-        let halfWidth = controlSize.width / 2
-        let halfHeight = controlSize.height / 2
-        return CGPoint(
-            x: min(max(point.x, halfWidth), size.width - halfWidth),
-            y: min(max(point.y, halfHeight), size.height - halfHeight)
-        )
+        return ControlLayout.clampedCenter(point, size: editorSize(for: control, in: size), in: size,
+                                           insets: LauncherHost.safeInsets)
     }
 
     private func frame(for control: TouchControl, in size: CGSize) -> CGRect {
