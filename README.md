@@ -49,7 +49,7 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 
 ## Install
 
-1. Grab `vaultos.ipa` from [releases](https://github.com/shplash/vaultos/releases).
+1. Grab the latest [release](https://github.com/shplash/vaultos/releases).
 2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
 If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings or **"Files"** will not let you select the zip
