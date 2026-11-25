@@ -131,7 +131,7 @@ NSString* const kPresentShaderSource =
      "        float3 chroma = rgb - luma;\n"
      "        float peak = max(max(fabs(chroma.r), fabs(chroma.g)), fabs(chroma.b));\n"
      "        float weight = 1.0 - smoothstep(0.04, 0.40, peak);\n"
-     "        rgb = luma + chroma * (1.0 + 0.275 * weight);\n"
+     "        rgb = luma + chroma * (1.0 + 0.1375 * weight);\n"
      "    }\n"
      "    return float4(clamp(rgb, float3(0.0), float3(1.0)), 1.0);\n"
      "}\n";
