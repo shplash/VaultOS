@@ -107,6 +107,7 @@ struct LauncherView: View {
         }
         .onAppear {
             model.refreshInstall()
+            model.refreshSaves()
             scheduleSwipeHint()
             if !musicMuted {
                 LauncherMusic.shared.playIfAvailable()
@@ -228,6 +229,11 @@ struct LauncherView: View {
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
+
+            if let save = model.saves.first {
+                continueButton(save)
+                    .padding(.top, 14)
+            }
 
             playButton
                 .padding(.top, 14)
@@ -359,6 +365,26 @@ struct LauncherView: View {
         .onAppear {
             model.refreshSaves()
         }
+    }
+
+    private func continueButton(_ save: LauncherModel.LauncherSave) -> some View {
+        Button {
+            LauncherMusic.shared.stop()
+            model.play(onPlay: onPlay, loadSlot: save.slot)
+        } label: {
+            VStack(spacing: 2) {
+                Text(L.t("CONTINUE"))
+                    .font(Vault.display(16))
+                    .kerning(1.2)
+
+                Text(save.name)
+                    .font(Vault.label(9, weight: .bold))
+                    .kerning(0.8)
+                    .foregroundColor(Vault.ink.opacity(0.62))
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle(accent: accent))
     }
 
     private var playButton: some View {
