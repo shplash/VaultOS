@@ -337,17 +337,34 @@ int cameraX = 0;
 int cameraY = 0;
 const int cameraSafeMargin = 5;
 
+// The player may wander a few tiles from the middle before the view keeps up:
+// three tiles each way, which is one scrolling step per tile. Inside that clear
+// area the finger owns the view, so a pan stays where it was left until the
+// player actually walks out of it.
+#define CAMERA_FOLLOW_MARGIN_X (32 * 3)
+#define CAMERA_FOLLOW_MARGIN_Y (24 * 3)
+
 static bool cameraFollow = false;
+static bool cameraFollowChase = false;
+static int cameraFollowTile = -1;
 
 void camera_follow(int on)
 {
     cameraFollow = on != 0;
+    cameraFollowChase = false;
+    cameraFollowTile = -1;
 }
 
-// The player may wander a few tiles from the middle before the view keeps up:
-// inside that box the finger owns the view. Past it the view takes one tile step
-// per pass toward the player, so the picture glides after them instead of
-// jumping, and stops as soon as they are back inside.
+// A pan is the finger taking the view over, so the follow gives way until the
+// player takes a step of their own.
+void camera_follow_cancel()
+{
+    cameraFollowChase = false;
+}
+
+// Once the player steps out of the clear area the view takes one tile step per
+// pass after them, the same scrolling the joystick uses, and stops as soon as
+// they are back inside rather than chasing them to the middle.
 void camera_follow_tick()
 {
     if (!cameraFollow || cameraIsPanning || fallout::obj_dude == nullptr) {
@@ -358,7 +375,17 @@ void camera_follow_tick()
         return;
     }
 
-    if (fallout::obj_dude->tile < 0) {
+    const int tile = fallout::obj_dude->tile;
+    if (tile < 0) {
+        return;
+    }
+
+    if (tile != cameraFollowTile) {
+        cameraFollowTile = tile;
+        cameraFollowChase = true;
+    }
+
+    if (!cameraFollowChase) {
         return;
     }
 
@@ -374,24 +401,27 @@ void camera_follow_tick()
     const int dx = rect.ulx + (rect.lrx - rect.ulx) / 2 - width / 2;
     const int dy = rect.uly + (rect.lry - rect.uly) / 2 - height / 2;
 
-    const int marginX = width / 6;
-    const int marginY = height / 6;
+    if (abs(dx) <= CAMERA_FOLLOW_MARGIN_X && abs(dy) <= CAMERA_FOLLOW_MARGIN_Y) {
+        cameraFollowChase = false;
+        return;
+    }
 
     int stepX = 0;
-    if (dx > marginX) {
+    if (dx > CAMERA_FOLLOW_MARGIN_X) {
         stepX = 1;
-    } else if (dx < -marginX) {
+    } else if (dx < -CAMERA_FOLLOW_MARGIN_X) {
         stepX = -1;
     }
 
     int stepY = 0;
-    if (dy > marginY) {
+    if (dy > CAMERA_FOLLOW_MARGIN_Y) {
         stepY = 1;
-    } else if (dy < -marginY) {
+    } else if (dy < -CAMERA_FOLLOW_MARGIN_Y) {
         stepY = -1;
     }
 
     if (stepX == 0 && stepY == 0) {
+        cameraFollowChase = false;
         return;
     }
 
@@ -420,6 +450,7 @@ void camera_pan(double x, double y)
         cameraIsPanning = true;
         cameraX = targetX;
         cameraY = targetY;
+        camera_follow_cancel();
     }
 
     if (dx < 0) {
@@ -443,6 +474,7 @@ void camera_stop()
     }
 
     cameraIsPanning = false;
+    camera_follow_cancel();
 
     const int width = fallout::screenGetWidth();
     const int height = fallout::screenGetHeight();
