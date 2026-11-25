@@ -1466,16 +1466,10 @@ final class GameControlsOverlay: UIView {
         }
         backButton.solidBackground = false
 
-        let clampLeft = currentScreen == .options ? 8 : max(10, safeAreaInsets.left + 6)
+        let clampLeft = max(10, safeAreaInsets.left + 6)
         let clampRight = bounds.width - max(10, safeAreaInsets.right + 6) - side
         let clampTop = max(10, safeAreaInsets.top + 6)
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
-
-        if currentScreen == .options {
-            let top = min(max(clampTop, (bounds.height - side) / 2), clampBottom - side)
-            backButton.frame = CGRect(x: clampLeft, y: top, width: side, height: side)
-            return
-        }
 
         if currentScreen == .dialogue {
             placeDialogueButtons(in: box)
@@ -1994,7 +1988,7 @@ final class GameControlsOverlay: UIView {
         let surface = gameSurface()
         let keyboardTop = bounds.height - keyboardHeight
         let needed = keyboardHeight > 0 ? max(0, surface.maxY - keyboardTop + 12) : 0
-        let shift = min(needed, bounds.height * 0.55)
+        let shift = needed
         guard abs(shift - pushedUp) > 0.5 else {
             return
         }
