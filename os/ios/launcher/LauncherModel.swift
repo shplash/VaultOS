@@ -301,15 +301,19 @@ final class LauncherModel: ObservableObject {
         ]
     }
 
-    /// What the custom size accepts: the engine's own floor of 640x480 up to the
-    /// FULL preset. FULL is the sharpest size whose interface is still drawn at
-    /// a pixel size a phone can read; anything larger shrinks the game's HUD.
-    var customWidthRange: ClosedRange<Int> {
-        return 640...max(640, presets.first { $0.id == "full" }?.width ?? 640)
-    }
+    /// The size stored for a game. The launcher only plays at FULL or HALF, so a
+    /// size from an earlier build that offered a custom one falls back to HALF.
+    private func storedResolution(for game: FalloutGame) -> (Int, Int) {
+        let fallback = LauncherModel.displayResolution(divisor: 3)
+        let storedWidth = storedInt("width", for: game, fallback: fallback.0)
+        let storedHeight = storedInt("height", for: game, fallback: fallback.1)
 
-    var customHeightRange: ClosedRange<Int> {
-        return 480...max(480, presets.first { $0.id == "full" }?.height ?? 480)
+        let presets = self.presets
+        let preset = presets.first {
+            abs($0.width - storedWidth) <= 2 && abs($0.height - storedHeight) <= 2
+        } ?? presets[presets.count - 1]
+
+        return (preset.width, preset.height)
     }
 
     func selected(preset: DisplayPreset) -> Bool {
@@ -453,14 +457,7 @@ final class LauncherModel: ObservableObject {
     }
 
     private func loadSettings(for game: FalloutGame) {
-        let resolution = LauncherModel.displayResolution(divisor: 3)
-        width = storedInt("width", for: game, fallback: resolution.0)
-        height = storedInt("height", for: game, fallback: resolution.1)
-        // A size stored by an earlier build could be anything, including the
-        // screen's own pixel size, which made the game's HUD tiny: keep what is
-        // read inside what this screen now offers.
-        width = min(max(width, customWidthRange.lowerBound), customWidthRange.upperBound)
-        height = min(max(height, customHeightRange.lowerBound), customHeightRange.upperBound)
+        (width, height) = storedResolution(for: game)
         sound = storedBool("sound", for: game, fallback: true)
         music = storedBool("music", for: game, fallback: true)
         speech = storedBool("speech", for: game, fallback: true)

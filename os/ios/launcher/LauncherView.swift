@@ -1108,19 +1108,6 @@ struct LauncherView: View {
 
     private var displaySheet: some View {
         sheet(title: "VIDEO", detail: "Resolution, pixel quality and frame rate", onReset: resetDisplay) {
-            // The size fields sit above the presets: the keypad covers the lower
-            // half of the page, and this row is the only one being typed in.
-            row("Custom size", detail: "Applied when you press Play") {
-                HStack(spacing: 10) {
-                    DimensionField(title: "W", value: $model.width, range: model.customWidthRange, accent: accent)
-                    Text("×")
-                        .font(Vault.body(12, weight: .medium))
-                        .foregroundColor(Theme.faint)
-                    DimensionField(title: "H", value: $model.height, range: model.customHeightRange, accent: accent)
-                }
-                .frame(width: 240)
-            }
-
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
                     ForEach(model.presets) { preset in
@@ -1803,143 +1790,10 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Resolution field
-
-private struct DimensionField: View {
-    let title: String
-    @Binding var value: Int
-    let range: ClosedRange<Int>
-    let accent: Color
-
-    init(title: String, value: Binding<Int>, range: ClosedRange<Int>, accent: Color) {
-        self.title = title
-        self._value = value
-        self.range = range
-        self.accent = accent
-    }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(title)
-                .font(Vault.label(9))
-                .foregroundColor(Theme.faint)
-
-            NumberField(value: $value, range: range, accent: accent)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.04))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
-                        .stroke(Theme.hairline, lineWidth: 1)
-                )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
+// MARK: - Dismissing
 
 private func dismissKeyboard() {
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-}
-
-private struct NumberField: UIViewRepresentable {
-    @Binding var value: Int
-    let range: ClosedRange<Int>
-    let accent: Color
-
-    func makeUIView(context: Context) -> UITextField {
-        let field = UITextField()
-        field.keyboardType = .numberPad
-        field.font = VaultUI.label(18, weight: .semibold)
-        field.textColor = VaultUI.text
-        field.tintColor = UIColor(accent)
-        field.backgroundColor = .clear
-        field.text = String(value)
-        field.delegate = context.coordinator
-        field.inputAccessoryView = context.coordinator.bar()
-        context.coordinator.field = field
-        return field
-    }
-
-    func updateUIView(_ field: UITextField, context: Context) {
-        context.coordinator.parent = self
-        guard !field.isFirstResponder else {
-            return
-        }
-        let text = String(value)
-        if field.text != text {
-            field.text = text
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        return Coordinator(self)
-    }
-
-    final class Coordinator: NSObject, UITextFieldDelegate {
-        var parent: NumberField
-        weak var field: UITextField?
-
-        init(_ parent: NumberField) {
-            self.parent = parent
-        }
-
-        func bar() -> UIToolbar {
-            let width = UIScreen.main.bounds.size.width
-            let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: width, height: 44))
-            bar.autoresizingMask = .flexibleWidth
-            bar.items = [
-                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-                UIBarButtonItem(title: L.t("DONE"), style: .done, target: self, action: #selector(done)),
-            ]
-            return bar
-        }
-
-        @objc func done() {
-            field?.resignFirstResponder()
-            dismissKeyboard()
-        }
-
-        func textField(_ field: UITextField,
-                       shouldChangeCharactersIn range: NSRange,
-                       replacementString string: String) -> Bool {
-            guard string.allSatisfy({ $0.isNumber }) else {
-                return false
-            }
-            let current = field.text ?? ""
-            guard let edited = Range(range, in: current) else {
-                return false
-            }
-            let updated = current.replacingCharacters(in: edited, with: string)
-            guard !updated.isEmpty else {
-                return true
-            }
-            guard updated.count <= 4, let parsed = Int(updated) else {
-                return false
-            }
-            return parsed <= parent.range.upperBound
-        }
-
-        func textFieldDidChangeSelection(_ field: UITextField) {
-            guard let parsed = Int(field.text ?? "") else {
-                return
-            }
-            if parent.range.contains(parsed) && parent.value != parsed {
-                parent.value = parsed
-            }
-        }
-
-        func textFieldDidEndEditing(_ field: UITextField) {
-            let parsed = Int(field.text ?? "") ?? parent.value
-            let clamped = min(max(parsed, parent.range.lowerBound), parent.range.upperBound)
-            field.text = String(clamped)
-            if parent.value != clamped {
-                parent.value = clamped
-            }
-        }
-    }
 }
 
 // MARK: - Styling
