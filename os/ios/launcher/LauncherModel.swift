@@ -122,6 +122,9 @@ final class LauncherModel: ObservableObject {
     @Published var autoSaveMinutes = 5 { didSet { store(autoSaveMinutes, "autoSaveMinutes") } }
     @Published var saveHaptics = true { didSet { store(saveHaptics, "saveHaptics") } }
     @Published var buttonHaptics = false { didSet { store(buttonHaptics, "buttonHaptics") } }
+    /// Whether the view follows the player: it stays where the finger scrolled it
+    /// while the player stands still, and comes back once they walk off.
+    @Published var followPlayer = true { didSet { store(followPlayer, "followPlayer") } }
     /// How the game's finished frame is scaled to the display: 0 sharp, 1 smooth,
     /// 2 enhanced. The in-game presenter reads it every frame, so it applies at
     /// once.
@@ -393,6 +396,7 @@ final class LauncherModel: ObservableObject {
         "autoSaveMinutes",
         "saveHaptics",
         "buttonHaptics",
+        "followPlayer",
         "imageScaling",
         "frameRate",
         "shaderVibrant",
@@ -509,6 +513,7 @@ final class LauncherModel: ObservableObject {
         autoSaveMinutes = min(max(storedInt("autoSaveMinutes", for: game, fallback: 5), 0), 10)
         saveHaptics = storedBool("saveHaptics", for: game, fallback: true)
         buttonHaptics = storedBool("buttonHaptics", for: game, fallback: false)
+        followPlayer = storedBool("followPlayer", for: game, fallback: true)
         imageScaling = min(max(storedInt("imageScaling", for: game, fallback: 2), 0), 2)
         frameRate = storedInt("frameRate", for: game, fallback: 60) == 30 ? 30 : 60
         shaderVibrant = storedBool("shaderVibrant", for: game, fallback: false)
@@ -537,6 +542,7 @@ final class LauncherModel: ObservableObject {
         defaults.set(autoSaveMinutes, forKey: LauncherModel.optionKey("autoSaveMinutes", for: game))
         defaults.set(saveHaptics, forKey: LauncherModel.optionKey("saveHaptics", for: game))
         defaults.set(buttonHaptics, forKey: LauncherModel.optionKey("buttonHaptics", for: game))
+        defaults.set(followPlayer, forKey: LauncherModel.optionKey("followPlayer", for: game))
         defaults.set(imageScaling, forKey: LauncherModel.optionKey("imageScaling", for: game))
         defaults.set(frameRate, forKey: LauncherModel.optionKey("frameRate", for: game))
         defaults.set(shaderVibrant, forKey: LauncherModel.optionKey("shaderVibrant", for: game))

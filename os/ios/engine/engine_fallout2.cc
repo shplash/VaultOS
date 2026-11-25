@@ -842,6 +842,8 @@ const FalloutEngineAPI g_api = {
     quick_save_serial,
     action_button_rect,
     cursor_mode_requests,
+    NULL,
+    NULL,
 };
 
 } // namespace

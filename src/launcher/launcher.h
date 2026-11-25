@@ -169,6 +169,12 @@ void fallout_ios_hide_keyboard(void);
 // Moves the game's presented frame up the given number of points, away from
 // the keyboard, and back down at zero.
 void fallout_ios_present_shift(double points);
+// Keeps the player in the middle of the view once they move; the view stays
+// where the finger scrolled it while they stand still. 1 turns it on.
+void fallout_ios_camera_follow(int on);
+// Called once a frame while the game runs, so follow can scroll the view when
+// the player has stepped away from the middle.
+void fallout_ios_camera_follow_tick(void);
 void fallout_ios_pause_game_audio(void);
 void fallout_ios_resume_game_audio(void);
 

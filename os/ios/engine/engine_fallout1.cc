@@ -28,6 +28,7 @@
 #include "game/map.h"
 #include "game/object.h"
 #include "game/object_types.h"
+#include "game/tile.h"
 #include "int/movie.h"
 #include "launcher/launcher.h"
 #include "plib/gnw/debug.h"
@@ -336,6 +337,63 @@ bool cameraIsPanning = false;
 int cameraX = 0;
 int cameraY = 0;
 const int cameraSafeMargin = 5;
+
+static bool cameraFollow = false;
+static int cameraFollowTile = -1;
+
+void camera_follow_tick();
+
+void camera_follow(int on)
+{
+    cameraFollow = on != 0;
+    cameraFollowTile = -1;
+
+    if (cameraFollow) {
+        camera_follow_tick();
+    }
+}
+
+// The view belongs to the player as soon as they move: a step is the moment the
+// follow takes over, so the finger can pan around while they stand still and the
+// view only comes back once they walk off. Scrolling by a sixth of the screen
+// rather than the exact middle keeps the picture from shifting under the finger
+// on every step.
+void camera_follow_tick()
+{
+    if (!cameraFollow || cameraIsPanning || fallout::obj_dude == nullptr) {
+        return;
+    }
+
+    if (fallout::ios_screen != fallout::IOS_SCREEN_GAME || fallout::isInCombat()) {
+        return;
+    }
+
+    const int tile = fallout::obj_dude->tile;
+    if (tile < 0 || tile == cameraFollowTile) {
+        return;
+    }
+
+    const int width = fallout::screenGetWidth();
+    const int height = fallout::screenGetHeight();
+    if (width <= 1 || height <= 1) {
+        return;
+    }
+
+    fallout::Rect rect;
+    fallout::obj_bound(fallout::obj_dude, &rect);
+
+    const int centerX = rect.ulx + (rect.lrx - rect.ulx) / 2;
+    const int centerY = rect.uly + (rect.lry - rect.uly) / 2;
+
+    cameraFollowTile = tile;
+
+    if (abs(centerX - width / 2) <= width / 6
+        && abs(centerY - height / 2) <= height / 6) {
+        return;
+    }
+
+    fallout::tile_scroll_to(tile, 2);
+}
 
 void camera_pan(double x, double y)
 {
@@ -664,6 +722,8 @@ const FalloutEngineAPI g_api = {
     quick_save_serial,
     action_button_rect,
     cursor_mode_requests,
+    camera_follow,
+    camera_follow_tick,
 };
 
 } // namespace

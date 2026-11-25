@@ -968,6 +968,11 @@ final class GameControlsOverlay: UIView {
         symbol: "info",
         iconPointSize: 22
     )
+    private let followButton = LabeledControlButton(
+        title: "",
+        symbol: "location.fill",
+        iconPointSize: 20
+    )
     private let barterButton = LabeledControlButton(
         title: "",
         symbol: "dollarsign.circle",
@@ -996,6 +1001,7 @@ final class GameControlsOverlay: UIView {
     private var quickSaveNoticeTimer: Timer?
     private var keyboardIsUp = false
     private var pushedUp: CGFloat = 0
+    private var followApplied = false
     private var keyboardTap: UITapGestureRecognizer?
     private var keyboardSwipe: UISwipeGestureRecognizer?
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
@@ -1337,6 +1343,11 @@ final class GameControlsOverlay: UIView {
         helpButton.addTarget(self, action: #selector(helpPressed), for: .touchUpInside)
         addSubview(helpButton)
 
+        followButton.isHidden = true
+        followButton.accessibilityLabel = "Follow the player"
+        followButton.addTarget(self, action: #selector(followPressed), for: .touchUpInside)
+        addSubview(followButton)
+
         helpBackdrop.isHidden = true
         helpBackdrop.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dismissHelp)))
         addSubview(helpBackdrop)
@@ -1408,6 +1419,13 @@ final class GameControlsOverlay: UIView {
         place(quickSaveButton, at: .quickSave, profile: profile, size: scaledSize(for: .quickSave, in: bounds.size, profile: profile))
         place(trayButton, at: .tray, profile: profile, size: scaledSize(for: .tray, in: bounds.size, profile: profile))
         placeSaveAssembly()
+
+        let followSide = max(26, min(38, bounds.height * 0.09))
+        followButton.frame = clampFrame(CGRect(x: bounds.width - followSide - max(10, safeAreaInsets.right + 10),
+                                               y: safeAreaInsets.top + 16,
+                                               width: followSide,
+                                               height: followSide))
+        followButton.layer.cornerRadius = max(6, followSide * 0.20)
 
         if trayButton.glyphName != traySymbol {
             trayButton.set(symbol: traySymbol, title: "",
@@ -1936,6 +1954,19 @@ final class GameControlsOverlay: UIView {
         selectionFeedback()
     }
 
+    @objc private func followPressed() {
+        setFollow(!followButton.showsSelection)
+    }
+
+    private func setFollow(_ on: Bool, feedback: Bool = true) {
+        followButton.showsSelection = on
+        UserDefaults.standard.set(on, forKey: LauncherModel.optionKey("followPlayer", for: game))
+        fallout_ios_camera_follow(on ? 1 : 0)
+        if feedback {
+            selectionFeedback()
+        }
+    }
+
     @objc private func keyboardWillShow(_ notification: Notification) {
         keyboardIsUp = true
 
@@ -2036,6 +2067,7 @@ final class GameControlsOverlay: UIView {
         tellAboutButton.controlOpacity = value
         offerButton.controlOpacity = value
         talkButton.controlOpacity = value
+        followButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }
@@ -2047,7 +2079,7 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider]
+        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider, followButton]
         controls.append(contentsOf: sideButtons as [UIView])
 
         if keyboardIsUp {
@@ -2105,6 +2137,19 @@ final class GameControlsOverlay: UIView {
         // LOAD and SAVE only exist while the tray beside QUICK SAVE is open.
         loadButton.isHidden = !trayOpen
         savesButton.isHidden = !trayOpen
+
+        followButton.isHidden = currentScreen != .game
+
+        if !followApplied {
+            followApplied = true
+            let key = LauncherModel.optionKey("followPlayer", for: game)
+            let stored = UserDefaults.standard.object(forKey: key) as? Bool ?? true
+            setFollow(stored, feedback: false)
+        }
+
+        if currentScreen == .game {
+            fallout_ios_camera_follow_tick()
+        }
 
         let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
         if screen != currentScreen {
