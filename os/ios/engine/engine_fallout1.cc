@@ -28,7 +28,6 @@
 #include "game/map.h"
 #include "game/object.h"
 #include "game/object_types.h"
-#include "game/tile.h"
 #include "int/movie.h"
 #include "launcher/launcher.h"
 #include "plib/gnw/debug.h"
@@ -339,25 +338,16 @@ int cameraY = 0;
 const int cameraSafeMargin = 5;
 
 static bool cameraFollow = false;
-static int cameraFollowTile = -1;
-
-void camera_follow_tick();
 
 void camera_follow(int on)
 {
     cameraFollow = on != 0;
-    cameraFollowTile = -1;
-
-    if (cameraFollow) {
-        camera_follow_tick();
-    }
 }
 
-// The view belongs to the player as soon as they move: a step is the moment the
-// follow takes over, so the finger can pan around while they stand still and the
-// view only comes back once they walk off. Scrolling by a sixth of the screen
-// rather than the exact middle keeps the picture from shifting under the finger
-// on every step.
+// The player may wander a few tiles from the middle before the view keeps up:
+// inside that box the finger owns the view. Past it the view takes one tile step
+// per pass toward the player, so the picture glides after them instead of
+// jumping, and stops as soon as they are back inside.
 void camera_follow_tick()
 {
     if (!cameraFollow || cameraIsPanning || fallout::obj_dude == nullptr) {
@@ -368,8 +358,7 @@ void camera_follow_tick()
         return;
     }
 
-    const int tile = fallout::obj_dude->tile;
-    if (tile < 0 || tile == cameraFollowTile) {
+    if (fallout::obj_dude->tile < 0) {
         return;
     }
 
@@ -382,17 +371,31 @@ void camera_follow_tick()
     fallout::Rect rect;
     fallout::obj_bound(fallout::obj_dude, &rect);
 
-    const int centerX = rect.ulx + (rect.lrx - rect.ulx) / 2;
-    const int centerY = rect.uly + (rect.lry - rect.uly) / 2;
+    const int dx = rect.ulx + (rect.lrx - rect.ulx) / 2 - width / 2;
+    const int dy = rect.uly + (rect.lry - rect.uly) / 2 - height / 2;
 
-    cameraFollowTile = tile;
+    const int marginX = width / 6;
+    const int marginY = height / 6;
 
-    if (abs(centerX - width / 2) <= width / 6
-        && abs(centerY - height / 2) <= height / 6) {
+    int stepX = 0;
+    if (dx > marginX) {
+        stepX = 1;
+    } else if (dx < -marginX) {
+        stepX = -1;
+    }
+
+    int stepY = 0;
+    if (dy > marginY) {
+        stepY = 1;
+    } else if (dy < -marginY) {
+        stepY = -1;
+    }
+
+    if (stepX == 0 && stepY == 0) {
         return;
     }
 
-    fallout::tile_scroll_to(tile, 2);
+    fallout::map_scroll(stepX, stepY);
 }
 
 void camera_pan(double x, double y)
