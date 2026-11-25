@@ -6,7 +6,7 @@ set(EXECUTABLE_NAME vaultos)
 
 # VaultOS is an iOS application: the launcher and both engines ship in one app.
 # Configure it with the iOS toolchain; there is no desktop or Android target.
-if(NOT IOS)
+if(NOT IOS AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "ios\\.toolchain\\.cmake")
     message(FATAL_ERROR "VaultOS is built for iOS only: pass -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/ios.toolchain.cmake -D PLATFORM=OS64.")
 endif()
 
