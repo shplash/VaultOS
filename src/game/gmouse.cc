@@ -570,24 +570,24 @@ static void gmouse_glow_items()
             continue;
         }
 
-        // A body that fell in combat still wears the combat outline's type,
-        // which keeps the glow off it until combat ends and the type is
-        // cleared. The glow takes the body over right away instead.
-        if (FID_TYPE(object->fid) != OBJ_TYPE_CRITTER
-            || (object->data.critter.combat.results & DAM_DEAD) == 0
-            || (object->outline & OUTLINE_TYPE_MASK) == 0) {
-            continue;
-        }
+        // A corpse is often flagged as never highlighted, and one that fell in
+        // combat still wears the combat outline's type, so the outline call is
+        // refused and the body only glows once something else clears it. What
+        // the glow wants takes the outline whatever its flags or type say.
 
         Rect oldRect;
-        if (obj_remove_outline(object, &oldRect) != 0) {
+        bool hadOutline = (object->outline & OUTLINE_TYPE_MASK) != 0;
+        if (hadOutline && obj_remove_outline(object, &oldRect) != 0) {
             continue;
         }
 
-        tile_refresh_rect(&oldRect, object->elevation);
+        object->outline = OUTLINE_TYPE_ITEM;
 
-        if (obj_outline_object(object, OUTLINE_TYPE_ITEM, &rect) == 0) {
+        if (obj_bound(object, &rect) == 0) {
             tile_refresh_rect(&rect, object->elevation);
+            if (hadOutline) {
+                tile_refresh_rect(&oldRect, object->elevation);
+            }
         }
     }
 
