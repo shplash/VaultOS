@@ -1108,6 +1108,19 @@ struct LauncherView: View {
 
     private var displaySheet: some View {
         sheet(title: "VIDEO", detail: "Resolution, pixel quality and frame rate", onReset: resetDisplay) {
+            // The size fields sit above the presets: the keypad covers the lower
+            // half of the page, and this row is the only one being typed in.
+            row("Custom size", detail: "Applied when you press Play") {
+                HStack(spacing: 10) {
+                    DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
+                    Text("×")
+                        .font(Vault.body(12, weight: .medium))
+                        .foregroundColor(Theme.faint)
+                    DimensionField(title: "H", value: $model.height, range: 480...4096, accent: accent)
+                }
+                .frame(width: 240)
+            }
+
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
                     ForEach(model.presets) { preset in
@@ -1130,17 +1143,6 @@ struct LauncherView: View {
                     .frame(height: 1),
                 alignment: .bottom
             )
-
-            row("Custom size", detail: "Applied when you press Play") {
-                HStack(spacing: 10) {
-                    DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
-                    Text("×")
-                        .font(Vault.body(12, weight: .medium))
-                        .foregroundColor(Theme.faint)
-                    DimensionField(title: "H", value: $model.height, range: 480...4096, accent: accent)
-                }
-                .frame(width: 240)
-            }
 
             row("Pixel quality", detail: "NONE = original. SMOOTH = softer. ENHANCED = soft + sharp blend.") {
                 HStack(spacing: 8) {
