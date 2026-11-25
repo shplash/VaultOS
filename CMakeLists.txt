@@ -382,6 +382,18 @@ if(APPLE)
     set(MACOSX_BUNDLE_BUNDLE_VERSION "109")
 endif()
 
+# A release names its version in its tag (1.0, v1.0.1): the bundle takes that
+# version, so an installed build reports the release it came from instead of the
+# number the source tree happens to carry.
+if(VAULTOS_VERSION)
+    string(REGEX REPLACE "^[vV]" "" VAULTOS_RELEASE_VERSION "${VAULTOS_VERSION}")
+    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VAULTOS_RELEASE_VERSION}")
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${VAULTOS_RELEASE_VERSION}"
+        XCODE_ATTRIBUTE_MARKETING_VERSION "${VAULTOS_RELEASE_VERSION}"
+    )
+endif()
+
 # The CI run number becomes the build number, so two IPAs from two runs are
 # told apart by Settings and by the About page instead of both saying 109.
 if(VAULTOS_BUILD)

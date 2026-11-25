@@ -9,6 +9,12 @@ defaults:
   run:
     shell: bash
 
+# Uploading the IPA to the release needs a write token. The build workflow asks
+# for the same permission explicitly; without it here the upload is refused
+# wherever the repository's default token is read-only.
+permissions:
+  contents: write
+
 jobs:
   ios:
     name: iOS
@@ -49,6 +55,7 @@ jobs:
             -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -D VAULTOS_BUILD_SHA=${{ github.sha }} \
             -D VAULTOS_BUILD=${{ github.run_number }} \
+            -D VAULTOS_VERSION=${{ github.event.release.tag_name }} \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
