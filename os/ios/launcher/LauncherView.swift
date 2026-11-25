@@ -439,11 +439,27 @@ struct LauncherView: View {
         }
         .contextMenu {
             if let save = save {
-                Button(role: .destructive) {
-                    model.delete(save: save)
-                } label: {
-                    Text(L.t("Delete"))
-                }
+                deleteItem(save)
+            }
+        }
+    }
+
+    /// Deleting is a long press away on a save card. A button's role is what
+    /// marks the item as destructive, and roles start at iOS 15 while the app
+    /// still runs on iOS 14: there the item is a plain one and says the same.
+    @ViewBuilder
+    private func deleteItem(_ save: LauncherModel.LauncherSave) -> some View {
+        if #available(iOS 15.0, *) {
+            Button(role: .destructive) {
+                model.delete(save: save)
+            } label: {
+                Text(L.t("Delete"))
+            }
+        } else {
+            Button {
+                model.delete(save: save)
+            } label: {
+                Text(L.t("Delete"))
             }
         }
     }
@@ -676,7 +692,6 @@ struct LauncherView: View {
 
     private func homeSheet(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
         let gameAccent = game.accent
-        let chips = model.installRows(for: game, info: info)
         let buttonFont = VaultUI.label(10, weight: .semibold)
         let columns = width - Metrics.sheetInset * 2
         let savesButtons = [L.t("BACK UP"), L.t("IMPORT")].reduce(CGFloat(8)) { total, name in
