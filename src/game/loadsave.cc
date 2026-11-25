@@ -28,6 +28,7 @@
 #include "game/object.h"
 #include "game/options.h"
 #include "game/palette.h"
+#include "game/stat.h"
 #include "game/perk.h"
 #include "game/pipboy.h"
 #include "game/proto.h"
@@ -506,7 +507,10 @@ static void save_play_time(const char* directory)
         return;
     }
 
-    fprintf(fp, "{\n  \"playSeconds\": %u\n}\n", total);
+    fprintf(fp, "{\n  \"playSeconds\": %u,\n  \"level\": %d,\n  \"xp\": %d\n}\n",
+        total,
+        stat_pc_get(PC_STAT_LEVEL),
+        stat_pc_get(PC_STAT_EXPERIENCE));
     fclose(fp);
 }
 

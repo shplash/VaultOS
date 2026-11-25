@@ -230,11 +230,6 @@ struct LauncherView: View {
             }
             .frame(maxHeight: .infinity, alignment: .top)
 
-            if let save = model.saves.first {
-                continueButton(save)
-                    .padding(.top, 14)
-            }
-
             playButton
                 .padding(.top, 14)
         }
@@ -331,7 +326,9 @@ struct LauncherView: View {
                                     .font(Vault.label(11))
                                     .foregroundColor(Theme.dim)
 
-                                Text("\(save.saved)  ·  \(save.played)")
+                                Text(save.level > 0
+                                        ? "\(save.saved)  ·  \(save.played)  ·  \(L.t("LEVEL")) \(save.level)"
+                                        : "\(save.saved)  ·  \(save.played)")
                                     .font(Vault.label(10))
                                     .foregroundColor(Theme.faint)
                             }
@@ -367,39 +364,25 @@ struct LauncherView: View {
         }
     }
 
-    private func continueButton(_ save: LauncherModel.LauncherSave) -> some View {
-        Button {
-            LauncherMusic.shared.stop()
-            model.play(onPlay: onPlay, loadSlot: save.slot)
-        } label: {
-            VStack(spacing: 2) {
-                Text(L.t("CONTINUE"))
-                    .font(Vault.display(16))
-                    .kerning(1.2)
-
-                Text(save.name)
-                    .font(Vault.label(9, weight: .bold))
-                    .kerning(0.8)
-                    .foregroundColor(Vault.ink.opacity(0.62))
-                    .lineLimit(1)
-            }
-        }
-        .buttonStyle(PrimaryButtonStyle(accent: accent))
-    }
-
     private var playButton: some View {
         Button {
             LauncherMusic.shared.stop()
-            model.play(onPlay: onPlay)
+            if let save = model.saves.first {
+                model.play(onPlay: onPlay, loadSlot: save.slot)
+            } else {
+                model.play(onPlay: onPlay)
+            }
         } label: {
             VStack(spacing: 4) {
-                Text(L.t("PLAY"))
+                Text(L.t(model.saves.isEmpty ? "PLAY" : "CONTINUE"))
                     .font(Vault.display(24))
                     .kerning(1.6)
 
                 Text(statusText)
                     .font(Vault.label(10, weight: .bold))
                     .kerning(1.3)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .foregroundColor(Vault.ink.opacity(0.62))
             }
         }
@@ -412,6 +395,11 @@ struct LauncherView: View {
         if model.isInstalling {
             return L.t("INSTALLING")
         }
+
+        if let save = model.saves.first {
+            return save.name.uppercased()
+        }
+
         return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
     }
 

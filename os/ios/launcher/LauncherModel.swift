@@ -940,6 +940,7 @@ final class LauncherModel: ObservableObject {
         let detail: String
         let saved: String
         let played: String
+        let level: Int
         let preview: URL?
         let modified: Date
     }
@@ -1009,7 +1010,8 @@ final class LauncherModel: ObservableObject {
             let minutes = (gameTime / 600) % 60
             let hours = (gameTime / 600) / 60 % 24
             let saved = String(format: "%02d.%02d.%04d  %02d:%02d", gameDay, gameMonth, gameYear, hours, minutes)
-            let played = readPlayed(entry)
+            let sidecar = readSidecar(entry)
+            let played = sidecar.played
             let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
 
             let previewFile = entry.appendingPathComponent("preview.bmp")
@@ -1021,6 +1023,7 @@ final class LauncherModel: ObservableObject {
                                        detail: description.isEmpty ? L.t("Saved game") : description,
                                        saved: saved,
                                        played: played,
+                                       level: sidecar.level,
                                        preview: preview,
                                        modified: modified))
         }
@@ -1059,18 +1062,42 @@ final class LauncherModel: ObservableObject {
         return Int(value)
     }
 
-    private static func readPlayed(_ folder: URL) -> String {
+    private static func readSidecar(_ folder: URL) -> (played: String, level: Int) {
         let file = folder.appendingPathComponent("VaultOS.json")
         guard let data = try? Data(contentsOf: file),
-              let text = String(data: data, encoding: .utf8),
-              let key = text.range(of: "\"playSeconds\"") else {
-            return "0:00"
+              let text = String(data: data, encoding: .utf8) else {
+            return ("0:00", 0)
         }
 
-        let tail = text[key.upperBound...]
-        let digits = tail.drop { !$0.isNumber }
-        let seconds = Int(digits.prefix { $0.isNumber }) ?? 0
-        return String(format: "%d:%02d", seconds / 3600, seconds / 60 % 60)
+        let seconds = number(in: text, key: "playSeconds")
+        return (String(format: "%d:%02d", seconds / 3600, seconds / 60 % 60), number(in: text, key: "level"))
+    }
+
+    private static func number(in text: String, key: String) -> Int {
+        guard let anchor = text.range(of: "\"\(key)\"") else {
+            return 0
+        }
+
+        var seenColon = false
+        var digits = ""
+        for character in text[anchor.upperBound...] {
+            if !seenColon {
+                if character == ":" {
+                    seenColon = true
+                } else if !character.isWhitespace {
+                    return 0
+                }
+                continue
+            }
+
+            if character.isNumber {
+                digits.append(character)
+            } else if !digits.isEmpty {
+                break
+            }
+        }
+
+        return Int(digits) ?? 0
     }
 
     func play(onPlay: () -> Void) {
