@@ -1,0 +1,47 @@
+name: Prune runs
+
+on:
+  workflow_run:
+    workflows:
+      - Build iOS IPA
+    types:
+      - completed
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  actions: write
+
+concurrency:
+  group: prune-runs
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    name: Delete old runs
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Keep the newest two runs of every workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          keep=2
+          gh api "repos/$repo/actions/workflows" --paginate --jq '.workflows[].id' |
+          while read -r workflow; do
+            while :; do
+              old=$(gh api "repos/$repo/actions/workflows/$workflow/runs?per_page=100" \
+                --jq '[.workflow_runs[] | select(.status == "completed")] | sort_by(.created_at) | reverse | .['"$keep"':] | .[].id')
+              [[ -n "$old" ]] || break
+              for run in $old; do
+                gh api -X DELETE "repos/$repo/actions/runs/$run" >/dev/null
+              done
+            done
+          done
