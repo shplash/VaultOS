@@ -776,34 +776,11 @@ enum ControlLayout {
         UserDefaults.standard.set(side.rawValue, forKey: key(.tray, sideSuffix, profile: profile, game: game))
     }
 
-    /// Keeps a whole control inside the screen's safe area. A layout stored on
-    /// one landscape orientation otherwise put a control under the sensor
-    /// housing once the device was turned the other way round, where it cannot
-    /// be touched; a control that the safe area has no room for is centred.
-    static func clampedCenter(_ point: CGPoint, size: CGSize, in bounds: CGSize,
-                              insets: UIEdgeInsets) -> CGPoint {
-        let halfWidth = size.width / 2
-        let halfHeight = size.height / 2
-        let minX = insets.left + halfWidth
-        let maxX = bounds.width - insets.right - halfWidth
-        let minY = insets.top + halfHeight
-        let maxY = bounds.height - insets.bottom - halfHeight
-
-        if maxX < minX || maxY < minY {
-            return CGPoint(x: bounds.width / 2, y: bounds.height / 2)
-        }
-
-        return CGPoint(x: min(max(point.x, minX), maxX),
-                       y: min(max(point.y, minY), maxY))
-    }
-
     static func quickSaveFrame(profile: LayoutProfile, game: FalloutGame, in bounds: CGSize) -> CGRect {
         let stored = center(for: .quickSave, profile: profile, game: game)
         let size = displaySize(for: .quickSave, in: bounds, profile: profile, game: game)
-        let point = CGPoint(x: stored.x * bounds.width, y: stored.y * bounds.height)
-        let center = clampedCenter(point, size: size, in: bounds, insets: LauncherHost.safeInsets)
-        return CGRect(x: center.x - size.width / 2,
-                      y: center.y - size.height / 2,
+        return CGRect(x: stored.x * bounds.width - size.width / 2,
+                      y: stored.y * bounds.height - size.height / 2,
                       width: size.width,
                       height: size.height)
     }
@@ -1768,20 +1745,17 @@ final class GameControlsOverlay: UIView {
         let point = ControlLayout.centerPoint(for: control, profile: profile, game: game, in: bounds.size)
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
-        // The tray hangs beside QUICK SAVE, whose own frame already keeps it
-        // clear of the housing; every other control is placed inside the safe
-        // area, so one stored on the far edge of one rotation does not land
-        // under the sensor housing on the other.
+        // The whole screen, sensor housing included: the controls belong on its
+        // edges, and pulling them inside the safe-area insets squeezed the side
+        // columns into each other on a notched phone.
         let x: CGFloat
         let y: CGFloat
         if control == .tray {
             x = point.x
             y = point.y
         } else {
-            let center = ControlLayout.clampedCenter(point, size: size, in: bounds.size,
-                                                     insets: safeAreaInsets)
-            x = center.x
-            y = center.y
+            x = min(max(point.x, halfWidth), bounds.width - halfWidth)
+            y = min(max(point.y, halfHeight), bounds.height - halfHeight)
         }
         view.frame = CGRect(x: x - halfWidth, y: y - halfHeight, width: size.width, height: size.height)
     }
