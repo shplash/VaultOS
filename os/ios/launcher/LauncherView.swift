@@ -1705,6 +1705,13 @@ struct LauncherView: View {
             .padding(.bottom, Metrics.outer)
 
             Spacer(minLength: 0)
+                .background(
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            dismissKeyboard()
+                        }
+                )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .vaultPlate(corner: 20, fill: Theme.rail)
@@ -1802,14 +1809,11 @@ private struct DimensionField: View {
     let range: ClosedRange<Int>
     let accent: Color
 
-    @State private var text: String
-
     init(title: String, value: Binding<Int>, range: ClosedRange<Int>, accent: Color) {
         self.title = title
         self._value = value
         self.range = range
         self.accent = accent
-        self._text = State(initialValue: String(value.wrappedValue))
     }
 
     var body: some View {
@@ -1818,11 +1822,7 @@ private struct DimensionField: View {
                 .font(Vault.label(9))
                 .foregroundColor(Theme.faint)
 
-            TextField("", text: $text)
-                .keyboardType(.numberPad)
-                .font(Vault.label(18, weight: .semibold))
-                .foregroundColor(Theme.text)
-                .accentColor(accent)
+            NumberField(value: $value, range: range, accent: accent)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(
@@ -1833,24 +1833,108 @@ private struct DimensionField: View {
                     RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                         .stroke(Theme.hairline, lineWidth: 1)
                 )
-                .onChange(of: text) { newValue in
-                    let digits = newValue.filter { $0.isNumber }
-                    if digits != newValue {
-                        text = digits
-                        return
-                    }
-
-                    if let parsed = Int(digits), range.contains(parsed) {
-                        value = parsed
-                    }
-                }
-                .onChange(of: value) { newValue in
-                    if text != String(newValue) {
-                        text = String(newValue)
-                    }
-                }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+}
+
+private struct NumberField: UIViewRepresentable {
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    let accent: Color
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.keyboardType = .numberPad
+        field.font = VaultUI.label(18, weight: .semibold)
+        field.textColor = VaultUI.text
+        field.tintColor = UIColor(accent)
+        field.backgroundColor = .clear
+        field.text = String(value)
+        field.delegate = context.coordinator
+        field.inputAccessoryView = context.coordinator.bar()
+        context.coordinator.field = field
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.parent = self
+        guard !field.isFirstResponder else {
+            return
+        }
+        let text = String(value)
+        if field.text != text {
+            field.text = text
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(self)
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: NumberField
+        weak var field: UITextField?
+
+        init(_ parent: NumberField) {
+            self.parent = parent
+        }
+
+        func bar() -> UIToolbar {
+            let bar = UIToolbar()
+            bar.sizeToFit()
+            bar.items = [
+                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+                UIBarButtonItem(title: L.t("DONE"), style: .done, target: self, action: #selector(done)),
+            ]
+            return bar
+        }
+
+        @objc func done() {
+            field?.resignFirstResponder()
+        }
+
+        func textField(_ field: UITextField,
+                       shouldChangeCharactersIn range: NSRange,
+                       replacementString string: String) -> Bool {
+            guard string.allSatisfy({ $0.isNumber }) else {
+                return false
+            }
+            let current = field.text ?? ""
+            guard let edited = Range(range, in: current) else {
+                return false
+            }
+            let updated = current.replacingCharacters(in: edited, with: string)
+            guard !updated.isEmpty else {
+                return true
+            }
+            guard let parsed = Int(updated) else {
+                return false
+            }
+            return parsed <= parent.range.upperBound
+        }
+
+        func textFieldDidChangeSelection(_ field: UITextField) {
+            guard let parsed = Int(field.text ?? "") else {
+                return
+            }
+            if parent.range.contains(parsed) && parent.value != parsed {
+                parent.value = parsed
+            }
+        }
+
+        func textFieldDidEndEditing(_ field: UITextField) {
+            let parsed = Int(field.text ?? "") ?? parent.value
+            let clamped = min(max(parsed, parent.range.lowerBound), parent.range.upperBound)
+            field.text = String(clamped)
+            if parent.value != clamped {
+                parent.value = clamped
+            }
+        }
     }
 }
 
