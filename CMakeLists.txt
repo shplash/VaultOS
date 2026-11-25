@@ -506,10 +506,15 @@ if(IOS)
     # (include/ plus include-config-<config>/), and ${SDL2_INCLUDE_DIRS} only
     # names the source and build roots, so take the target's include interface
     # explicitly instead of guessing at the generated layout.
+    #
+    # Fallout 1's source directory goes last for the headers both engines
+    # share, such as the subtitle row: Fallout 2's own headers come first, so
+    # every name it already had keeps resolving to its own copy.
     target_include_directories(Fallout2Engine PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine"
         "${fallout2_ce_SOURCE_DIR}/src"
         "$<TARGET_PROPERTY:SDL2-static,INTERFACE_INCLUDE_DIRECTORIES>"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
     )
 
     # zlib comes from the iOS SDK; fpattern is shared with the engine already in

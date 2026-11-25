@@ -147,7 +147,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   tests:
-    name: Launcher validation tests
+    name: Native tests
     runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15-intel' }}
     timeout-minutes: 15
 
@@ -167,4 +167,16 @@ jobs:
             -lz \
             -o build-tests/launcher-tests
           ./build-tests/launcher-tests
+
+      - name: Build and run subtitle row tests
+        run: |
+          set -euo pipefail
+          mkdir -p build-tests
+          # Where the subtitle row is drawn is plain arithmetic, so every size
+          # the launcher can hand the games is checked here instead of on a
+          # device with what it takes to play the intro.
+          c++ -std=c++17 -Wall -Wextra -I src \
+            tests/movie_subtitle_test.cc \
+            -o build-tests/movie-subtitle-tests
+          ./build-tests/movie-subtitle-tests
 

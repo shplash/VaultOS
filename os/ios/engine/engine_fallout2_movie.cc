@@ -10,6 +10,7 @@
 #include "draw.h"
 #include "geometry.h"
 #include "input.h"
+#include "int/movie_subtitles.h"
 #include "memory_manager.h"
 #include "movie_effect.h"
 #include "movie_lib.h"
@@ -700,41 +701,23 @@ static void movieRenderSubtitles()
         return;
     }
 
-    // The row hangs under the movie and has to stay inside the window: on a
-    // tall screen the old bottom edge landed one row past the window's last
-    // pixel, and the fill wrote over whatever follows the window's surface.
+    // The row goes on the window's own last lines rather than below wherever
+    // the movie was fitted: measured against the window it cannot leave the
+    // surface in any window size, which is what stopped the intro on a tall one.
     const int winWidth = windowGetWidth(gMovieWindow);
     const int winHeight = windowGetHeight(gMovieWindow);
     if (winWidth < 1 || winHeight < 1) {
         return;
     }
 
-    // The window can be resized while the movie plays, so the row is measured
-    // against it on every frame rather than once when the file opens.
-    _subtitleW = winWidth;
-
-    int v1 = fontGetLineHeight();
-    int v2 = gMovieFitted
-        ? _lastMovieH + _lastMovieY
-        : (480 - _lastMovieH - _lastMovieY - v1) / 2 + _lastMovieH + _lastMovieY;
-
-    if (v2 < 0) {
-        v2 = 0;
-    } else if (v2 > winHeight - 1) {
-        v2 = winHeight - 1;
-    }
-
-    if (_subtitleH < 1) {
-        _subtitleH = v1 + 4;
-    }
-
-    if (_subtitleH > winHeight - v2) {
-        _subtitleH = winHeight - v2;
-    }
-
-    if (_subtitleH < 1) {
+    const MovieSubtitleRect row = movieSubtitleRect(winWidth, winHeight, fontGetLineHeight());
+    if (row.width < 1 || row.height < 1) {
         return;
     }
+
+    // The movie is fitted above the row by its height.
+    _subtitleW = row.width;
+    _subtitleH = row.height;
 
     int frame;
     int dropped;
@@ -747,7 +730,7 @@ static void movieRenderSubtitles()
 
         MovieSubtitleListNode* next = gMovieSubtitleHead->next;
 
-        windowFill(gMovieWindow, 0, v2, _subtitleW, _subtitleH, 0);
+        windowFill(gMovieWindow, row.x, row.y, row.width, row.height, 0);
 
         int oldFont;
         if (gMovieSubtitlesFont != -1) {
@@ -756,15 +739,15 @@ static void movieRenderSubtitles()
         }
 
         int colorIndex = (gMovieSubtitlesColorR << 10) | (gMovieSubtitlesColorG << 5) | gMovieSubtitlesColorB;
-        _windowWrapLine(gMovieWindow, gMovieSubtitleHead->text, _subtitleW, _subtitleH, 0, v2, _colorTable[colorIndex] | 0x2000000, TEXT_ALIGNMENT_CENTER);
+        _windowWrapLine(gMovieWindow, gMovieSubtitleHead->text, row.width, row.height, row.x, row.y, _colorTable[colorIndex] | 0x2000000, TEXT_ALIGNMENT_CENTER);
 
         // Rect edges are inclusive, so the row ends on its last pixel rather
         // than one past it.
         Rect rect;
-        rect.left = 0;
-        rect.top = v2;
-        rect.right = _subtitleW - 1;
-        rect.bottom = v2 + _subtitleH - 1;
+        rect.left = row.x;
+        rect.top = row.y;
+        rect.right = row.x + row.width - 1;
+        rect.bottom = row.y + row.height - 1;
         windowRefreshRect(gMovieWindow, &rect);
 
         internal_free_safe(gMovieSubtitleHead->text, __FILE__, __LINE__); // "..\\int\\MOVIE.C", 1108
