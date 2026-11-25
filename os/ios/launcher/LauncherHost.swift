@@ -445,10 +445,31 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// The phone the control layout was designed on, in points.
+    static let designScreen = CGSize(width: 852, height: 393)
+
+    /// How much bigger this screen is than that phone, for every size below.
+    /// One factor for both sides keeps each control's shape: a width taken from
+    /// the screen's width and a height from its height changes shape with the
+    /// aspect, so SKIP, ACTION, MAP, CHA and INV came out as tall blocks on a
+    /// 4:3 tablet and flat bars on a 2:1 phone.
+    static func sizeUnit(in bounds: CGSize) -> CGFloat {
+        return max(0.75, min(bounds.width / designScreen.width,
+                             bounds.height / designScreen.height))
+    }
+
     /// Base size in points before the global and per-control scale settings.
     /// The HUD-row buttons are intentionally rectangles so they fill the side
     /// strip in the same way as the proposed layout.
     func defaultSize(in bounds: CGSize, profile: LayoutProfile = .full) -> CGSize {
+        let size = designSize()
+        let unit = TouchControl.sizeUnit(in: bounds)
+        return CGSize(width: size.width * unit, height: size.height * unit)
+    }
+
+    /// This control's size on the phone the layout was designed on, in points.
+    private func designSize() -> CGSize {
+        let bounds = TouchControl.designScreen
         let square = min(bounds.width * 0.05625, bounds.height * 0.130)
         switch self {
         case .quickSave:
@@ -1394,13 +1415,15 @@ final class GameControlsOverlay: UIView {
                            accessibilityLabel: trayOpen ? "Close the save tray" : "Open the save tray")
         }
 
+        let unit = TouchControl.sizeUnit(in: bounds.size)
+
         if !quickSaveNotice.isHidden {
-            let noticeWidth = min(220, bounds.width * 0.32)
+            let noticeWidth = min(220 * unit, bounds.width * 0.32)
             quickSaveNotice.frame = CGRect(x: quickSaveButton.frame.minX,
-                                           y: quickSaveButton.frame.maxY + 6,
-                                           width: max(120, noticeWidth),
-                                           height: 42)
-            quickSaveNoticeLabel.frame = quickSaveNotice.bounds.insetBy(dx: 8, dy: 4)
+                                           y: quickSaveButton.frame.maxY + 6 * unit,
+                                           width: max(120 * unit, noticeWidth),
+                                           height: 42 * unit)
+            quickSaveNoticeLabel.frame = quickSaveNotice.bounds.insetBy(dx: 8 * unit, dy: 4 * unit)
         }
 
         movieShield.frame = bounds
@@ -1414,10 +1437,10 @@ final class GameControlsOverlay: UIView {
             layoutHelpCard()
         }
 
-        let skipWidth: CGFloat = 120
-        let skipHeight: CGFloat = 40
-        skipMovieButton.frame = CGRect(x: bounds.width - skipWidth - 44,
-                                       y: bounds.height - skipHeight - 58,
+        let skipWidth = 120 * unit
+        let skipHeight = 40 * unit
+        skipMovieButton.frame = CGRect(x: bounds.width - skipWidth - 44 * unit,
+                                       y: bounds.height - skipHeight - 58 * unit,
                                        width: skipWidth,
                                        height: skipHeight)
     }
