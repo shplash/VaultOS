@@ -287,7 +287,69 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
-    private func savesRow(game: FalloutGame, accent gameAccent: Color, width: CGFloat) -> some View {
+    private func savesColumn(game: FalloutGame, width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            headerLine(L.t("Saves"))
+
+            savesRow(game: game, width: width)
+        }
+        .frame(width: width, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func gameDataColumn(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            headerLine(L.t("Game data"))
+
+            if info.installed == 0 {
+                chipRow(model.installRows(for: game, info: info), width: width, accent: game.accent)
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    pendingImport = .language
+                    model.showImporter = true
+                } label: {
+                    Text(L.t("LANGUAGE FILES"))
+                }
+                .buttonStyle(SmallButtonStyle(accent: game.accent))
+                .disabled(model.isInstalling || info.installed == 0)
+
+                Button {
+                    pendingImport = .game
+                    model.showImporter = true
+                } label: {
+                    Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
+                }
+                .buttonStyle(SmallButtonStyle(accent: game.accent))
+                .disabled(model.isInstalling)
+            }
+
+            gameDataStatus(game: game)
+        }
+        .frame(width: width, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func gameDataStatus(game: FalloutGame) -> some View {
+        if model.isInstalling {
+            ProgressView(value: min(max(model.progress, 0), 1))
+                .accentColor(game.accent)
+
+            Text(L.message(model.statusText))
+                .font(Vault.label(10, weight: .regular))
+                .foregroundColor(Theme.faint)
+                .lineLimit(1)
+        } else if let summary = model.importSummary {
+            Text(summary)
+                .font(Vault.label(10, weight: .regular))
+                .foregroundColor(Theme.faint)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func savesRow(game: FalloutGame, width: CGFloat) -> some View {
         let cardWidth = min(120, max(84, width * 0.46))
         let cardHeight = cardWidth * 133 / 224
         let spacing: CGFloat = 8
@@ -630,56 +692,9 @@ struct LauncherView: View {
                 .frame(height: 1)
 
             HStack(alignment: .top, spacing: 18) {
-                VStack(alignment: .leading, spacing: 7) {
-                    headerLine(L.t("Saves"))
+                savesColumn(game: game, width: savesWidth)
 
-                    savesRow(game: game, accent: gameAccent, width: savesWidth)
-                }
-                .frame(width: savesWidth, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 7) {
-                    headerLine(L.t("Game data"))
-
-                    if info.installed == 0 {
-                        chipRow(chips, width: filesWidth, accent: gameAccent)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button {
-                            pendingImport = .language
-                            model.showImporter = true
-                        } label: {
-                            Text(L.t("LANGUAGE FILES"))
-                        }
-                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                        .disabled(model.isInstalling || info.installed == 0)
-
-                        Button {
-                            pendingImport = .game
-                            model.showImporter = true
-                        } label: {
-                            Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
-                        }
-                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                        .disabled(model.isInstalling)
-                    }
-
-                    if model.isInstalling {
-                        ProgressView(value: min(max(model.progress, 0), 1))
-                            .accentColor(gameAccent)
-                        Text(L.message(model.statusText))
-                            .font(Vault.label(10, weight: .regular))
-                            .foregroundColor(Theme.faint)
-                            .lineLimit(1)
-                    } else if let summary = model.importSummary {
-                        Text(summary)
-                            .font(Vault.label(10, weight: .regular))
-                            .foregroundColor(Theme.faint)
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .frame(width: filesWidth, alignment: .leading)
+                gameDataColumn(game: game, info: info, width: filesWidth)
 
                 Spacer(minLength: 0)
             }

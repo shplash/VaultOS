@@ -1,11 +1,6 @@
 name: Prune runs
 
 on:
-  workflow_run:
-    workflows:
-      - Build iOS IPA
-    types:
-      - completed
   workflow_dispatch:
 
 defaults:
