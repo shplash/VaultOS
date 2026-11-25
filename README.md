@@ -72,7 +72,7 @@ Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fa
 
 ## In the launcher
 
-- **HOME** installs the game, **LANGUAGE FILES** adds a translation you supply
+- **HOME** installs the game, **LANGUAGE FILES** adds a translation pack you supply
 - **BACK UP** writes `fo(1/2)-save-backup-(date).zip` into the game's folder. **IMPORT** replaces the saves
 
 ## Notes & Licensing
