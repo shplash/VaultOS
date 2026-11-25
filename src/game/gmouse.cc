@@ -567,6 +567,27 @@ static void gmouse_glow_items()
         Rect rect;
         if (obj_outline_object(object, OUTLINE_TYPE_ITEM, &rect) == 0) {
             tile_refresh_rect(&rect, object->elevation);
+            continue;
+        }
+
+        // A body that fell in combat still wears the combat outline's type,
+        // which keeps the glow off it until combat ends and the type is
+        // cleared. The glow takes the body over right away instead.
+        if (FID_TYPE(object->fid) != OBJ_TYPE_CRITTER
+            || (object->data.critter.combat.results & DAM_DEAD) == 0
+            || (object->outline & OUTLINE_TYPE_MASK) == 0) {
+            continue;
+        }
+
+        Rect oldRect;
+        if (obj_remove_outline(object, &oldRect) != 0) {
+            continue;
+        }
+
+        tile_refresh_rect(&oldRect, object->elevation);
+
+        if (obj_outline_object(object, OUTLINE_TYPE_ITEM, &rect) == 0) {
+            tile_refresh_rect(&rect, object->elevation);
         }
     }
 

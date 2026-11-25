@@ -1622,7 +1622,7 @@ struct LauncherView: View {
         model.targetHighlight = 1
         model.autoSaveMinutes = 5
         model.saveHaptics = true
-        model.buttonHaptics = true
+        model.buttonHaptics = false
     }
 
     private func resetControls() {

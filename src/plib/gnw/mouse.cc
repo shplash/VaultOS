@@ -448,6 +448,9 @@ static bool ios_direct_touch_active()
 }
 
 #define IOS_LIST_HOLD_MS 280
+// The barter table is the one list the player reads while scrolling it, so a
+// finger on a row waits longer there before the row is taken.
+#define IOS_LIST_HOLD_BARTER_MS 560
 #define IOS_LIST_SLOP_POINTS 6
 
 extern "C" void fallout_ios_pickup_feedback(void);
@@ -761,7 +764,10 @@ void mouse_info()
                         break;
                     }
 
-                    if (now - ios_list_start_ms >= IOS_LIST_HOLD_MS) {
+                    const unsigned int hold = ios_list_screen == IOS_SCREEN_BARTER
+                        ? IOS_LIST_HOLD_BARTER_MS
+                        : IOS_LIST_HOLD_MS;
+                    if (now - ios_list_start_ms >= hold) {
                         ios_list_pending = false;
                         fallout_ios_pickup_feedback();
                         ios_drag_start(ios_inspect, false);

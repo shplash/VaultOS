@@ -121,7 +121,7 @@ final class LauncherModel: ObservableObject {
     @Published var autoTarget = true { didSet { store(autoTarget, "autoTarget") } }
     @Published var autoSaveMinutes = 5 { didSet { store(autoSaveMinutes, "autoSaveMinutes") } }
     @Published var saveHaptics = true { didSet { store(saveHaptics, "saveHaptics") } }
-    @Published var buttonHaptics = true { didSet { store(buttonHaptics, "buttonHaptics") } }
+    @Published var buttonHaptics = false { didSet { store(buttonHaptics, "buttonHaptics") } }
     /// How the game's finished frame is scaled to the display: 0 sharp, 1 smooth,
     /// 2 enhanced. The in-game presenter reads it every frame, so it applies at
     /// once.
@@ -508,7 +508,7 @@ final class LauncherModel: ObservableObject {
         autoTarget = storedBool("autoTarget", for: game, fallback: true)
         autoSaveMinutes = min(max(storedInt("autoSaveMinutes", for: game, fallback: 5), 0), 10)
         saveHaptics = storedBool("saveHaptics", for: game, fallback: true)
-        buttonHaptics = storedBool("buttonHaptics", for: game, fallback: true)
+        buttonHaptics = storedBool("buttonHaptics", for: game, fallback: false)
         imageScaling = min(max(storedInt("imageScaling", for: game, fallback: 2), 0), 2)
         frameRate = storedInt("frameRate", for: game, fallback: 60) == 30 ? 30 : 60
         shaderVibrant = storedBool("shaderVibrant", for: game, fallback: false)
