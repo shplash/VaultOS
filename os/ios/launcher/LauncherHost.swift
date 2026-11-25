@@ -996,7 +996,6 @@ final class GameControlsOverlay: UIView {
     private var quickSaveNoticeTimer: Timer?
     private var keyboardIsUp = false
     private var pushedUp: CGFloat = 0
-    private var followApplied = false
     private var keyboardTap: UITapGestureRecognizer?
     private var keyboardSwipe: UISwipeGestureRecognizer?
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
@@ -1937,11 +1936,6 @@ final class GameControlsOverlay: UIView {
         selectionFeedback()
     }
 
-    private func setFollow(_ on: Bool) {
-        UserDefaults.standard.set(on, forKey: LauncherModel.optionKey("followPlayer", for: game))
-        fallout_ios_camera_follow(on ? 1 : 0)
-    }
-
     @objc private func keyboardWillShow(_ notification: Notification) {
         keyboardIsUp = true
 
@@ -2111,17 +2105,6 @@ final class GameControlsOverlay: UIView {
         // LOAD and SAVE only exist while the tray beside QUICK SAVE is open.
         loadButton.isHidden = !trayOpen
         savesButton.isHidden = !trayOpen
-
-        if !followApplied {
-            followApplied = true
-            let key = LauncherModel.optionKey("followPlayer", for: game)
-            let stored = UserDefaults.standard.object(forKey: key) as? Bool ?? true
-            setFollow(stored)
-        }
-
-        if currentScreen == .game {
-            fallout_ios_camera_follow_tick()
-        }
 
         let screen = ScreenMode(rawValue: Int(fallout_ios_screen())) ?? .game
         if screen != currentScreen {

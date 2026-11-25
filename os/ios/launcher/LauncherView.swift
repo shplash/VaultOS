@@ -1329,10 +1329,6 @@ struct LauncherView: View {
                       detail: "Vibrate when you press an on-screen button",
                       isOn: $model.buttonHaptics)
 
-            toggleRow("Follow the player",
-                      detail: "The view comes back to your character once you move; pan freely while you stand still",
-                      isOn: $model.followPlayer)
-
             row("Auto quick save", detail: "The game quick-saves by itself at this interval. OFF stops it.") {
                 HStack(spacing: 8) {
                     Button {
@@ -1635,7 +1631,6 @@ struct LauncherView: View {
         model.controlsOpacity = 1
         model.touchControls = true
         model.autoTarget = true
-        model.followPlayer = true
         model.buttonColour = ControlColour.white.rawValue
     }
 
