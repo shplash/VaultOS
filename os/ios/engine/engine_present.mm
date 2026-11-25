@@ -157,6 +157,7 @@ CFAbsoluteTime gPresentLast = 0;
 int gPresentTextureWidth = 0;
 int gPresentTextureHeight = 0;
 bool gPresentUnavailable = false;
+double gPresentShift = 0;
 
 void presentPrepareKeys()
 {
@@ -391,7 +392,12 @@ bool presentResourcesReady()
         [window insertSubview:gPresentView atIndex:position];
     }
 
+    gPresentView.transform = CGAffineTransformIdentity;
     gPresentView.frame = window.bounds;
+
+    if (gPresentShift > 0.5) {
+        gPresentView.transform = CGAffineTransformMakeTranslation(0, -gPresentShift);
+    }
 
     return true;
 }
@@ -438,6 +444,19 @@ bool presentResourcesReady()
 }
 
 @end
+
+void fallout_ios_present_shift(double points)
+{
+    gPresentShift = points > 0.5 ? points : 0;
+
+    if (gPresentView == nil) {
+        return;
+    }
+
+    gPresentView.transform = gPresentShift > 0.5
+        ? CGAffineTransformMakeTranslation(0, -gPresentShift)
+        : CGAffineTransformIdentity;
+}
 
 int fallout_engine_present_frame(const void* pixels, int pitch, int width, int height)
 {

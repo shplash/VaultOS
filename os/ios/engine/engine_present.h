@@ -7,6 +7,8 @@ extern "C" {
 
 int fallout_engine_present_frame(const void* pixels, int pitch, int width, int height);
 
+void fallout_ios_present_shift(double points);
+
 #ifdef __cplusplus
 }
 #endif

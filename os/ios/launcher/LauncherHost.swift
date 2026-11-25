@@ -996,7 +996,6 @@ final class GameControlsOverlay: UIView {
     private var quickSaveNoticeTimer: Timer?
     private var keyboardIsUp = false
     private var pushedUp: CGFloat = 0
-    private weak var pushedGameView: UIView?
     private var keyboardTap: UITapGestureRecognizer?
     private var keyboardSwipe: UISwipeGestureRecognizer?
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
@@ -1981,10 +1980,6 @@ final class GameControlsOverlay: UIView {
     }
 
     private func pushGameUp(by keyboardHeight: CGFloat) {
-        guard let window = self.window ?? GameControlsOverlay.sdlWindow() else {
-            return
-        }
-
         let surface = gameSurface()
         let keyboardTop = bounds.height - keyboardHeight
         let needed = keyboardHeight > 0 ? max(0, surface.maxY - keyboardTop + 12) : 0
@@ -1993,16 +1988,9 @@ final class GameControlsOverlay: UIView {
             return
         }
 
-        if pushedGameView == nil {
-            pushedGameView = window.subviews
-                .filter { $0 !== self }
-                .max { $0.bounds.width * $0.bounds.height < $1.bounds.width * $1.bounds.height }
-        }
-
         pushedUp = shift
-        let transform = shift > 0 ? CGAffineTransform(translationX: 0, y: -shift) : .identity
-        pushedGameView?.transform = transform
-        self.transform = transform
+        fallout_ios_present_shift(Double(shift))
+        refreshControls()
         setNeedsLayout()
     }
 
@@ -2061,6 +2049,16 @@ final class GameControlsOverlay: UIView {
 
         var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider]
         controls.append(contentsOf: sideButtons as [UIView])
+
+        if keyboardIsUp {
+            for control in controls {
+                control.isHidden = true
+            }
+            helpCard.isHidden = true
+            helpBackdrop.isHidden = true
+            CATransaction.flush()
+            return
+        }
 
         let movie = fallout_ios_movie_state()
         skipMovieButton.isHidden = movie == 0

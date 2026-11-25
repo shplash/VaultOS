@@ -166,6 +166,9 @@ void fallout_ios_refresh_game_controls(void);
 // Dismisses the iOS keyboard without interrupting the engine, so a window whose
 // own buttons the keyboard covers can still be closed.
 void fallout_ios_hide_keyboard(void);
+// Moves the game's presented frame up the given number of points, away from
+// the keyboard, and back down at zero.
+void fallout_ios_present_shift(double points);
 void fallout_ios_pause_game_audio(void);
 void fallout_ios_resume_game_audio(void);
 
