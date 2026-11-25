@@ -680,8 +680,8 @@ final class LauncherModel: ObservableObject {
         }
     }
 
-    /// A confirmation under the Savegames row, kept until the page or the game
-    /// changes.
+    /// A confirmation that takes the Savegames subtitle's place while it lasts,
+    /// kept until the page or the game changes.
     @Published var savesNotice: String?
 
     @Published var importSummary: String?

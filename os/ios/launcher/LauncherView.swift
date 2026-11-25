@@ -562,7 +562,11 @@ struct LauncherView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     headerLine(L.t("Saved games"))
 
-                    subheader(L.t("Keep your saves intact"))
+                    if let notice = model.savesNotice {
+                        subheader(L.message(notice))
+                    } else {
+                        subheader(L.t("Keep your saves intact"))
+                    }
 
                     HStack(spacing: 8) {
                         Button {
@@ -581,10 +585,6 @@ struct LauncherView: View {
                         }
                         .buttonStyle(SmallButtonStyle(accent: gameAccent))
                         .disabled(model.isInstalling || info.installed == 0)
-                    }
-
-                    if let notice = model.savesNotice {
-                        subheader(L.message(notice))
                     }
                 }
                 .frame(width: savesWidth, alignment: .leading)
@@ -1885,17 +1885,19 @@ private struct NumberField: UIViewRepresentable {
         }
 
         func bar() -> UIToolbar {
-            let bar = UIToolbar()
-            bar.sizeToFit()
+            let width = UIScreen.main.bounds.size.width
+            let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: width, height: 44))
             bar.items = [
                 UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
                 UIBarButtonItem(title: L.t("DONE"), style: .done, target: self, action: #selector(done)),
             ]
+            bar.sizeToFit()
             return bar
         }
 
         @objc func done() {
             field?.resignFirstResponder()
+            dismissKeyboard()
         }
 
         func textField(_ field: UITextField,
@@ -1912,7 +1914,7 @@ private struct NumberField: UIViewRepresentable {
             guard !updated.isEmpty else {
                 return true
             }
-            guard let parsed = Int(updated) else {
+            guard updated.count <= 4, let parsed = Int(updated) else {
                 return false
             }
             return parsed <= parent.range.upperBound
