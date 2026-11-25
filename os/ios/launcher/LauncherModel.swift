@@ -907,10 +907,6 @@ final class LauncherModel: ObservableObject {
             for name in LauncherModel.optionNames {
                 defaults.removeObject(forKey: LauncherModel.optionKey(name, for: game))
             }
-
-            for profile in [LayoutProfile.full, .half] {
-                ControlLayout.reset(profile: profile, game: game)
-            }
         }
 
         loadSettings(for: selectedGame)
