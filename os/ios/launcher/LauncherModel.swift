@@ -947,11 +947,18 @@ final class LauncherModel: ObservableObject {
 
     @Published var saves: [LauncherSave] = []
 
+    /// The folder the saves were looked in, shown while the list bedded in.
+    @Published var savesFolder = ""
+
     /// The save the launcher asked the engine to load, once Play is pressed.
     var launchSlot: Int?
 
     func refreshSaves() {
         saves = LauncherModel.readSaves(installDirectory: installDirectory, game: selectedGame)
+
+        let folder = LauncherModel.saveFolder(installDirectory: installDirectory, game: selectedGame)
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path
+        savesFolder = "\(folder?.path.replacingOccurrences(of: documents, with: "") ?? "no SAVEGAME") · \(saves.count)"
     }
 
     func delete(save: LauncherSave) {
@@ -963,14 +970,11 @@ final class LauncherModel: ObservableObject {
     }
 
     private static func saveFolder(installDirectory: URL, game: FalloutGame) -> URL? {
-        let data = installDirectory.appendingPathComponent("data/SAVEGAME", isDirectory: true)
-        if FileManager.default.fileExists(atPath: data.path) {
-            return data
-        }
-
-        let plain = installDirectory.appendingPathComponent("SAVEGAME", isDirectory: true)
-        if FileManager.default.fileExists(atPath: plain.path) {
-            return plain
+        for candidate in ["data/SAVEGAME", "SAVEGAME", "data/savegame", "savegame"] {
+            let url = installDirectory.appendingPathComponent(candidate, isDirectory: true)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
         }
 
         return nil
@@ -992,16 +996,12 @@ final class LauncherModel: ObservableObject {
                 continue
             }
 
-            let file = entry.appendingPathComponent("SAVE.DAT")
-            guard let data = try? Data(contentsOf: file), data.count > 131 else {
-                continue
+            let file = (try? FileManager.default.contentsOfDirectory(at: entry, includingPropertiesForKeys: nil))?.first {
+                $0.lastPathComponent.uppercased() == "SAVE.DAT"
             }
+            let data = file.flatMap { try? Data(contentsOf: $0) } ?? Data()
 
             let name = readString(data, at: 29, length: 32)
-            guard !name.isEmpty else {
-                continue
-            }
-
             let description = readString(data, at: 61, length: 30)
             let gameMonth = readShort(data, at: 101)
             let gameDay = readShort(data, at: 103)

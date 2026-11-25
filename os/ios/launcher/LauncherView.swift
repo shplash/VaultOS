@@ -18,6 +18,8 @@ struct LauncherView: View {
     @State private var musicMuted = LauncherMusic.isMuted
     /// What the ZIP picker is being opened for.
     @State private var pendingImport: LauncherImport = .game
+    @State private var savesScroll: CGFloat = 0
+    @State private var savesDragStart: CGFloat?
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
     @State private var showResetAllWarning = false
@@ -285,82 +287,102 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
-    private var savesPage: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L.t("SAVES"))
-                .font(Vault.display(22))
-                .kerning(1.4)
+    private func savesRow(game: FalloutGame, accent gameAccent: Color, width: CGFloat) -> some View {
+        let cardWidth = min(120, max(84, width * 0.46))
+        let cardHeight = cardWidth * 133 / 224
+        let spacing: CGFloat = 8
+        let count = 10
+        let content = CGFloat(count) * cardWidth + CGFloat(count - 1) * spacing
+        let limit = min(0, width - content)
 
-            if model.saves.isEmpty {
-                Text(L.t("No saves yet. Save in the game and it shows here."))
-                    .font(Vault.label(12))
-                    .foregroundColor(Theme.faint)
-            } else {
-                ForEach(model.saves) { save in
-                    Button {
-                        LauncherMusic.shared.stop()
-                        model.play(onPlay: onPlay, loadSlot: save.slot)
-                    } label: {
-                        HStack(spacing: 12) {
-                            if let url = save.preview, let image = UIImage(contentsOfFile: url.path) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .frame(width: 112, height: 66)
-                                    .clipped()
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                            .stroke(Theme.hairline, lineWidth: 1)
-                                    )
-                            } else {
-                                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                    .fill(Color.white.opacity(0.05))
-                                    .frame(width: 112, height: 66)
-                            }
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(save.name)
-                                    .font(Vault.label(13, weight: .bold))
-                                    .foregroundColor(Theme.text)
-
-                                Text(save.detail)
-                                    .font(Vault.label(11))
-                                    .foregroundColor(Theme.dim)
-
-                                Text(save.level > 0
-                                        ? "\(save.saved)  ·  \(save.played)  ·  \(L.t("LEVEL")) \(save.level)"
-                                        : "\(save.saved)  ·  \(save.played)")
-                                    .font(Vault.label(10))
-                                    .foregroundColor(Theme.faint)
-                            }
-
-                            Spacer(minLength: 0)
-
-                            Button {
-                                model.delete(save: save)
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(Theme.faint)
-                                    .frame(width: 40, height: 40)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    Rectangle()
-                        .fill(Theme.hairline)
-                        .frame(height: 1)
-                }
+        return HStack(spacing: spacing) {
+            ForEach(1...count, id: \.self) { slot in
+                saveCard(slot: slot,
+                         save: model.saves.first { $0.slot == slot },
+                         width: cardWidth,
+                         height: cardHeight)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(Metrics.sheetInset)
-        .onAppear {
-            model.refreshSaves()
+        .offset(x: min(0, max(limit, savesScroll)))
+        .frame(width: width, alignment: .leading)
+        .frame(height: cardHeight + 36, alignment: .leading)
+        .clipped()
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 8)
+                .onChanged { value in
+                    if savesDragStart == nil {
+                        savesDragStart = savesScroll
+                    }
+                    savesScroll = min(0, max(limit, (savesDragStart ?? 0) + value.translation.width))
+                }
+                .onEnded { _ in
+                    savesDragStart = nil
+                    savesScroll = min(0, max(limit, savesScroll))
+                }
+        )
+    }
+
+    private func saveCard(slot: Int,
+                          save: LauncherModel.LauncherSave?,
+                          width: CGFloat,
+                          height: CGFloat) -> some View {
+        let title = (save?.name.isEmpty == false) ? save!.name : "SLOT \(slot)"
+        let line = save.map { "\($0.played) · \(L.t("LEVEL")) \($0.level)" } ?? L.t("EMPTY")
+
+        return VStack(alignment: .leading, spacing: 4) {
+            if let url = save?.preview, let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(Theme.hairline, lineWidth: 1)
+                    )
+            } else {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+                    .frame(width: width, height: height)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(Theme.hairline, lineWidth: 1)
+                    )
+                    .overlay(
+                        Text("SLOT \(slot)")
+                            .font(Vault.label(10, weight: .bold))
+                            .foregroundColor(Theme.faint)
+                    )
+            }
+
+            Text(title)
+                .font(Vault.label(9, weight: .semibold))
+                .foregroundColor(Theme.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(line)
+                .font(Vault.label(9, weight: .regular))
+                .foregroundColor(Theme.faint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(width: width, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let save = save {
+                LauncherMusic.shared.stop()
+                model.play(onPlay: onPlay, loadSlot: save.slot)
+            }
+        }
+        .contextMenu {
+            if let save = save {
+                Button(role: .destructive) {
+                    model.delete(save: save)
+                } label: {
+                    Text(L.t("Delete"))
+                }
+            }
         }
     }
 
@@ -410,8 +432,6 @@ struct LauncherView: View {
         switch page {
         case .home:
             homePager
-        case .saves:
-            savesPage
         case .display:
             displaySheet
         case .audio:
@@ -611,9 +631,18 @@ struct LauncherView: View {
 
             HStack(alignment: .top, spacing: 18) {
                 VStack(alignment: .leading, spacing: 7) {
+                    headerLine(L.t("Saves"))
+
+                    savesRow(game: game, accent: gameAccent, width: savesWidth)
+                }
+                .frame(width: savesWidth, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 7) {
                     headerLine(L.t("Game data"))
 
-                    chipRow(chips, width: filesWidth, accent: gameAccent)
+                    if info.installed == 0 {
+                        chipRow(chips, width: filesWidth, accent: gameAccent)
+                    }
 
                     HStack(spacing: 8) {
                         Button {
@@ -651,36 +680,6 @@ struct LauncherView: View {
                     }
                 }
                 .frame(width: filesWidth, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 7) {
-                    headerLine(L.t("Saved games"))
-
-                    if let notice = model.savesNotice {
-                        subheader(L.message(notice))
-                    } else {
-                        subheader(L.t("Keep your saves intact"))
-                    }
-
-                    HStack(spacing: 8) {
-                        Button {
-                            model.backupSaves()
-                        } label: {
-                            Text(L.t("BACK UP"))
-                        }
-                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                        .disabled(model.isInstalling || info.installed == 0 || info.has_saves == 0)
-
-                        Button {
-                            saveImportCountdown = 5
-                            showSaveImportWarning = true
-                        } label: {
-                            Text(L.t("IMPORT"))
-                        }
-                        .buttonStyle(SmallButtonStyle(accent: gameAccent))
-                        .disabled(model.isInstalling || info.installed == 0)
-                    }
-                }
-                .frame(width: savesWidth, alignment: .leading)
 
                 Spacer(minLength: 0)
             }
@@ -1453,6 +1452,39 @@ struct LauncherView: View {
                       detail: "Vibrate when a save finishes",
                       divider: false,
                       isOn: $model.saveHaptics)
+
+            headerLine(L.t("Saved games"))
+
+            if let notice = model.savesNotice {
+                subheader(L.message(notice))
+            } else {
+                subheader(L.t("Keep your saves intact"))
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    model.backupSaves()
+                } label: {
+                    Text(L.t("BACK UP"))
+                }
+                .buttonStyle(SmallButtonStyle(accent: accent))
+                .disabled(model.isInstalling || model.install.installed == 0 || model.install.has_saves == 0)
+
+                Button {
+                    saveImportCountdown = 5
+                    showSaveImportWarning = true
+                } label: {
+                    Text(L.t("IMPORT"))
+                }
+                .buttonStyle(SmallButtonStyle(accent: accent))
+                .disabled(model.isInstalling || model.install.installed == 0)
+            }
+
+            Text(model.savesFolder)
+                .font(Vault.label(9, weight: .regular))
+                .foregroundColor(Theme.faint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
     }
 
@@ -1848,7 +1880,6 @@ struct LauncherView: View {
 
 private enum LauncherPage: String, CaseIterable, Identifiable {
     case home
-    case saves
     case display
     case audio
     case game
@@ -1863,7 +1894,6 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .home: return L.t("Home").uppercased()
-        case .saves: return L.t("SAVES")
         case .display: return L.t("VIDEO")
         case .audio: return L.t("AUDIO")
         case .game: return L.t("SYSTEM")
@@ -1876,7 +1906,6 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .home: return "house"
-        case .saves: return "tray.full"
         case .display: return "display"
         case .audio: return "speaker.wave.2"
         case .game: return "person"
