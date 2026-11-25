@@ -5,7 +5,7 @@
 <h1 align="center">VaultOS</h1>
 
 <p align="center">
-  Fallout and Fallout 2, on iOS
+  Fallout 1 and 2, on iOS
 </p>
 
 <p align="center">
