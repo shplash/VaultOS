@@ -20,7 +20,7 @@ set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
 project(${EXECUTABLE_NAME})
 
 # The launcher UI is written in Swift.
-set(CMAKE_Swift_LANGUAGE_VERSION 5.0)
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
 enable_language(Swift)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -521,6 +521,10 @@ if(IOS)
     )
 
     add_dependencies(${EXECUTABLE_NAME} Fallout2Engine)
+
+    if(TARGET sdl_headers_copy)
+        add_dependencies(Fallout2Engine sdl_headers_copy)
+    endif()
 endif()
 
 if(APPLE)
