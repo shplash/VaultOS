@@ -290,6 +290,29 @@ final class LauncherModel: ObservableObject {
         return (width, height)
     }
 
+    /// The preset the launcher starts on: the one nearer the screen's own
+    /// points, its pixels divided by its native scale. The game draws its
+    /// 640-wide interface at the game's resolution, so matching points is what
+    /// keeps that interface at about iOS's text sizes. On a 3x phone FULL is
+    /// already smaller than iOS draws and HALF is nearer, while a 2x tablet
+    /// draws FULL at exactly its points and HALF a third larger.
+    static func defaultPresetId() -> String {
+        let native = LauncherModel.nativeResolution()
+        let scale = max(Double(UIScreen.main.nativeScale), 1)
+        let pointsHeight = Double(native.1) / scale
+        let full = displayResolution(divisor: 2, native: native)
+        let half = displayResolution(divisor: 3, native: native)
+
+        return abs(Double(full.1) - pointsHeight) <= abs(Double(half.1) - pointsHeight)
+            ? "full"
+            : "half"
+    }
+
+    /// The size to start on, and the one RESET returns to.
+    static func defaultResolution() -> (Int, Int) {
+        return displayResolution(divisor: defaultPresetId() == "full" ? 2 : 3)
+    }
+
     var presets: [DisplayPreset] {
         let native = LauncherModel.nativeResolution()
         let full = LauncherModel.displayResolution(divisor: 2, native: native)
@@ -301,19 +324,26 @@ final class LauncherModel: ObservableObject {
         ]
     }
 
-    /// The size stored for a game. The launcher only plays at FULL or HALF, so a
-    /// size from an earlier build that offered a custom one falls back to HALF.
+    /// The size stored for a game. The launcher only plays at FULL or HALF, and
+    /// anything else - a custom size from an earlier build, or one saved on
+    /// another screen - becomes the preset this screen starts on.
     private func storedResolution(for game: FalloutGame) -> (Int, Int) {
-        let fallback = LauncherModel.displayResolution(divisor: 3)
+        let fallback = LauncherModel.defaultResolution()
         let storedWidth = storedInt("width", for: game, fallback: fallback.0)
         let storedHeight = storedInt("height", for: game, fallback: fallback.1)
 
         let presets = self.presets
         let preset = presets.first {
             abs($0.width - storedWidth) <= 2 && abs($0.height - storedHeight) <= 2
-        } ?? presets[presets.count - 1]
+        } ?? startingPreset
 
         return (preset.width, preset.height)
+    }
+
+    /// The tile the launcher starts on for this screen.
+    var startingPreset: DisplayPreset {
+        let id = LauncherModel.defaultPresetId()
+        return presets.first { $0.id == id } ?? presets[presets.count - 1]
     }
 
     func selected(preset: DisplayPreset) -> Bool {
@@ -376,21 +406,23 @@ final class LauncherModel: ObservableObject {
     }
 
     private static let displayVersionKey = "launcher.displayVersion"
-    private static let displayVersion = 2
+    private static let displayVersion = 3
 
-    /// Both games start at HALF. Earlier builds defaulted to FULL and could
-    /// have any resolution stored, so it is reset once here; a resolution the
-    /// player picks afterwards is kept.
+    /// Both games start at the preset that matches this screen's points, so a
+    /// phone starts at HALF and a tablet at FULL. Earlier builds started every
+    /// device at HALF, or at FULL before that, and could have any resolution
+    /// stored, so it is reset once here; a preset the player picks afterwards
+    /// is kept.
     private static func applyDefaultResolution() {
         let defaults = UserDefaults.standard
         guard defaults.integer(forKey: displayVersionKey) < displayVersion else {
             return
         }
 
-        let half = displayResolution(divisor: 3)
+        let start = defaultResolution()
         for game in FalloutGame.allCases {
-            defaults.set(half.0, forKey: optionKey("width", for: game))
-            defaults.set(half.1, forKey: optionKey("height", for: game))
+            defaults.set(start.0, forKey: optionKey("width", for: game))
+            defaults.set(start.1, forKey: optionKey("height", for: game))
         }
         defaults.set(displayVersion, forKey: displayVersionKey)
     }

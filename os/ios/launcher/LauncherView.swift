@@ -1195,11 +1195,14 @@ struct LauncherView: View {
                             .kerning(1.6)
                             .foregroundColor(selected ? accent : Theme.faint)
 
-                        if preset.id == "half" {
+                        // The preset this screen starts on is the one that
+                        // keeps the game's interface near iOS's text sizes:
+                        // HALF on a phone, FULL on a tablet.
+                        if preset.id == model.startingPreset.id {
                             Text(L.t("(recommended)"))
                                 .font(Vault.label(9, weight: .regular))
                                 .foregroundColor(Theme.faint)
-                        } else if preset.id == "full" {
+                        } else {
                             Text(L.t("(experimental)"))
                                 .font(Vault.label(9, weight: .regular))
                                 .foregroundColor(Theme.faint)
@@ -1596,9 +1599,7 @@ struct LauncherView: View {
     // MARK: - Resetting a page
 
     private func resetDisplay() {
-        if let half = model.presets.last {
-            model.apply(preset: half)
-        }
+        model.apply(preset: model.startingPreset)
         model.imageScaling = 2
         model.frameRate = 60
         model.shaderVibrant = false
