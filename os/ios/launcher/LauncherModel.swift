@@ -301,6 +301,17 @@ final class LauncherModel: ObservableObject {
         ]
     }
 
+    /// What the custom size accepts: the engine's own floor of 640x480 up to the
+    /// FULL preset. FULL is the sharpest size whose interface is still drawn at
+    /// a pixel size a phone can read; anything larger shrinks the game's HUD.
+    var customWidthRange: ClosedRange<Int> {
+        return 640...max(640, presets.first { $0.id == "full" }?.width ?? 640)
+    }
+
+    var customHeightRange: ClosedRange<Int> {
+        return 480...max(480, presets.first { $0.id == "full" }?.height ?? 480)
+    }
+
     func selected(preset: DisplayPreset) -> Bool {
         // A pixel or two of slack: a size saved on another screen is still
         // meant to be that preset, so the tile has to read as in use.
@@ -445,6 +456,11 @@ final class LauncherModel: ObservableObject {
         let resolution = LauncherModel.displayResolution(divisor: 3)
         width = storedInt("width", for: game, fallback: resolution.0)
         height = storedInt("height", for: game, fallback: resolution.1)
+        // A size stored by an earlier build could be anything, including the
+        // screen's own pixel size, which made the game's HUD tiny: keep what is
+        // read inside what this screen now offers.
+        width = min(max(width, customWidthRange.lowerBound), customWidthRange.upperBound)
+        height = min(max(height, customHeightRange.lowerBound), customHeightRange.upperBound)
         sound = storedBool("sound", for: game, fallback: true)
         music = storedBool("music", for: game, fallback: true)
         speech = storedBool("speech", for: game, fallback: true)

@@ -1112,11 +1112,11 @@ struct LauncherView: View {
             // half of the page, and this row is the only one being typed in.
             row("Custom size", detail: "Applied when you press Play") {
                 HStack(spacing: 10) {
-                    DimensionField(title: "W", value: $model.width, range: 640...4096, accent: accent)
+                    DimensionField(title: "W", value: $model.width, range: model.customWidthRange, accent: accent)
                     Text("×")
                         .font(Vault.body(12, weight: .medium))
                         .foregroundColor(Theme.faint)
-                    DimensionField(title: "H", value: $model.height, range: 480...4096, accent: accent)
+                    DimensionField(title: "H", value: $model.height, range: model.customHeightRange, accent: accent)
                 }
                 .frame(width: 240)
             }
