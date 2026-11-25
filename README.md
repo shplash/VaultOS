@@ -52,8 +52,6 @@ If you found VaultOS useful, a GitHub star is always appreciated.
 1. Grab the latest [release](https://github.com/shplash/vaultos/releases).
 2. Sideload it with LiveContainer, SideStore, Feather, AltStore, TrollStore etc.
 
-If installed through **LiveContainer**, turn on **"Fix File Picker"** in the app's settings or **"Files"** will not let you select the zip
-
 ## Requirements
 
 - iOS 14 or newer
@@ -72,7 +70,7 @@ Each game keeps its own files and saves: `Documents/` for Fallout, `Documents/Fa
 
 ## In the launcher
 
-- **HOME** installs the game, **LANGUAGE FILES** adds a translation pack you supply
+- **LANGUAGE FILES** adds a translation pack you supply
 - **BACK UP** writes `fo(1/2)-save-backup-(date).zip` into the game's folder. **IMPORT** replaces the saves
 
 ## Notes & Licensing
