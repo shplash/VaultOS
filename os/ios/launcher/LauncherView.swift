@@ -1221,7 +1221,7 @@ struct LauncherView: View {
                         .font(Vault.label(18, weight: .bold))
                         .foregroundColor(selected ? Theme.text : Theme.dim)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                        .minimumScaleFactor(0.85)
                 }
 
                 Spacer(minLength: 0)
@@ -1820,7 +1820,7 @@ private struct DimensionField: View {
 
             TextField("", text: $text)
                 .keyboardType(.numberPad)
-                .font(Vault.label(19, weight: .semibold))
+                .font(Vault.label(18, weight: .semibold))
                 .foregroundColor(Theme.text)
                 .accentColor(accent)
                 .padding(.horizontal, 10)
