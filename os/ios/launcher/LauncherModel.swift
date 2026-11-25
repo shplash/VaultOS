@@ -932,10 +932,156 @@ final class LauncherModel: ObservableObject {
         return false
     }
 
+    /// A save on disk, as the launcher shows it.
+    struct LauncherSave: Identifiable {
+        let id: Int
+        let slot: Int
+        let name: String
+        let detail: String
+        let saved: String
+        let played: String
+        let preview: URL?
+        let modified: Date
+    }
+
+    @Published var saves: [LauncherSave] = []
+
+    /// The save the launcher asked the engine to load, once Play is pressed.
+    var launchSlot: Int?
+
+    func refreshSaves() {
+        saves = LauncherModel.readSaves(installDirectory: installDirectory, game: selectedGame)
+    }
+
+    func delete(save: LauncherSave) {
+        if let root = LauncherModel.saveFolder(installDirectory: installDirectory, game: selectedGame) {
+            let folder = root.appendingPathComponent(String(format: "SLOT%02d", save.slot), isDirectory: true)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        refreshSaves()
+    }
+
+    private static func saveFolder(installDirectory: URL, game: FalloutGame) -> URL? {
+        let data = installDirectory.appendingPathComponent("data/SAVEGAME", isDirectory: true)
+        if FileManager.default.fileExists(atPath: data.path) {
+            return data
+        }
+
+        let plain = installDirectory.appendingPathComponent("SAVEGAME", isDirectory: true)
+        if FileManager.default.fileExists(atPath: plain.path) {
+            return plain
+        }
+
+        return nil
+    }
+
+    private static func readSaves(installDirectory: URL, game: FalloutGame) -> [LauncherSave] {
+        guard let root = saveFolder(installDirectory: installDirectory, game: game),
+              let entries = try? FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]) else {
+            return []
+        }
+
+        var result: [LauncherSave] = []
+        for entry in entries {
+            let folder = entry.lastPathComponent.uppercased()
+            guard folder.hasPrefix("SLOT"), let slot = Int(folder.dropFirst(4)) else {
+                continue
+            }
+
+            let file = entry.appendingPathComponent("SAVE.DAT")
+            guard let data = try? Data(contentsOf: file), data.count > 131 else {
+                continue
+            }
+
+            let name = readString(data, at: 29, length: 32)
+            guard !name.isEmpty else {
+                continue
+            }
+
+            let description = readString(data, at: 61, length: 30)
+            let gameMonth = readShort(data, at: 101)
+            let gameDay = readShort(data, at: 103)
+            let gameYear = readShort(data, at: 105)
+            let gameTime = readInt(data, at: 107)
+            let minutes = (gameTime / 600) % 60
+            let hours = (gameTime / 600) / 60 % 24
+            let saved = String(format: "%02d.%02d.%04d  %02d:%02d", gameDay, gameMonth, gameYear, hours, minutes)
+            let played = readPlayed(entry)
+            let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
+
+            let previewFile = entry.appendingPathComponent("preview.bmp")
+            let preview = FileManager.default.fileExists(atPath: previewFile.path) ? previewFile : nil
+
+            result.append(LauncherSave(id: slot,
+                                       slot: slot,
+                                       name: name,
+                                       detail: description.isEmpty ? L.t("Saved game") : description,
+                                       saved: saved,
+                                       played: played,
+                                       preview: preview,
+                                       modified: modified))
+        }
+
+        return result.sorted { $0.modified > $1.modified }
+    }
+
+    private static func readString(_ data: Data, at offset: Int, length: Int) -> String {
+        guard offset >= 0, offset + length <= data.count else {
+            return ""
+        }
+
+        let bytes = [UInt8](data[offset ..< offset + length])
+        return String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func readShort(_ data: Data, at offset: Int) -> Int {
+        guard offset >= 0, offset + 2 <= data.count else {
+            return 0
+        }
+
+        let low = UInt16(data[offset])
+        let high = UInt16(data[offset + 1]) << 8
+        return Int(low | high)
+    }
+
+    private static func readInt(_ data: Data, at offset: Int) -> Int {
+        guard offset >= 0, offset + 4 <= data.count else {
+            return 0
+        }
+
+        let value = UInt32(data[offset])
+            | (UInt32(data[offset + 1]) << 8)
+            | (UInt32(data[offset + 2]) << 16)
+            | (UInt32(data[offset + 3]) << 24)
+        return Int(value)
+    }
+
+    private static func readPlayed(_ folder: URL) -> String {
+        let file = folder.appendingPathComponent("VaultOS.json")
+        guard let data = try? Data(contentsOf: file),
+              let text = String(data: data, encoding: .utf8),
+              let key = text.range(of: "\"playSeconds\"") else {
+            return "0:00"
+        }
+
+        let tail = text[key.upperBound...]
+        let digits = tail.drop { !$0.isNumber }
+        let seconds = Int(digits.prefix { $0.isNumber }) ?? 0
+        return String(format: "%d:%02d", seconds / 3600, seconds / 60 % 60)
+    }
+
     func play(onPlay: () -> Void) {
+        play(onPlay: onPlay, loadSlot: nil)
+    }
+
+    func play(onPlay: () -> Void, loadSlot: Int?) {
         guard install.installed == 1, !isInstalling else {
             return
         }
+        launchSlot = loadSlot
         importSummary = nil
         if applyOptions() {
             stopProgressUpdates()

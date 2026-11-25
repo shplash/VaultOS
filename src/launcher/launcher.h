@@ -151,6 +151,10 @@ int fallout_ios_screen(void);
 // when the running engine cannot report it.
 int fallout_ios_quick_save(void);
 
+// Tells the engine which save slot to load as the game starts, so a save picked
+// in the launcher opens without going through the game's load screen.
+void fallout_ios_request_load_slot(int slot);
+
 // The rectangle, in game screen pixels, of the menu panel on screen. Returns 0
 // when the game view is up, or when the engine cannot say.
 int fallout_ios_menu_rect(int* x, int* y, int* width, int* height);

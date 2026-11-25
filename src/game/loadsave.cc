@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include <algorithm>
@@ -26,6 +27,7 @@
 #include "game/map.h"
 #include "game/object.h"
 #include "game/options.h"
+#include "game/palette.h"
 #include "game/perk.h"
 #include "game/pipboy.h"
 #include "game/proto.h"
@@ -337,6 +339,190 @@ void ResetLoadSave()
 }
 
 // 0x46D9C4
+// Real time played, counted once per game loop pass. It is added to the save's
+// own count when a slot is written, so every stretch of play lands in exactly
+// one save.
+static unsigned int play_time_ms;
+
+// The slot the launcher asked for when the game starts, -1 for none.
+static int requested_slot = -1;
+
+void loadsave_play_time_tick(void)
+{
+    static unsigned int last;
+    static bool started;
+
+    const unsigned int now = get_time();
+    if (started) {
+        play_time_ms += elapsed_time(last);
+    }
+    last = now;
+    started = true;
+}
+
+void loadsave_request_slot(int slot)
+{
+    requested_slot = slot;
+}
+
+int loadsave_pending_slot(void)
+{
+    return requested_slot;
+}
+
+int loadsave_take_pending_slot(void)
+{
+    const int slot = requested_slot;
+    requested_slot = -1;
+    return slot;
+}
+
+// The folder the save being written lives in, taken from the path the save is
+// being written to.
+static bool slot_directory(char* out, size_t size)
+{
+    if (size < 2 || gmpath[0] == '\0') {
+        return false;
+    }
+
+    strncpy(out, gmpath, size - 1);
+    out[size - 1] = '\0';
+
+    char* separator = strrchr(out, '\\');
+    const char* forward = strrchr(out, '/');
+    if (forward != NULL && (separator == NULL || forward > separator)) {
+        separator = (char*)forward;
+    }
+
+    if (separator == NULL) {
+        return false;
+    }
+
+    separator[1] = '\0';
+    return true;
+}
+
+static void put_short(unsigned char* dest, unsigned int value)
+{
+    dest[0] = (unsigned char)(value & 0xFF);
+    dest[1] = (unsigned char)((value >> 8) & 0xFF);
+}
+
+static void put_long(unsigned char* dest, unsigned int value)
+{
+    dest[0] = (unsigned char)(value & 0xFF);
+    dest[1] = (unsigned char)((value >> 8) & 0xFF);
+    dest[2] = (unsigned char)((value >> 16) & 0xFF);
+    dest[3] = (unsigned char)((value >> 24) & 0xFF);
+}
+
+// The preview the game shows on its own load screen, written out as a plain BMP
+// so the launcher can show it without knowing the game's palette format.
+static void save_preview(const char* directory)
+{
+    if (thumbnail_image[1] == NULL) {
+        return;
+    }
+
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%spreview.bmp", directory);
+
+    FILE* fp = fopen(path, "wb");
+    if (fp == NULL) {
+        return;
+    }
+
+    const int width = LS_PREVIEW_WIDTH;
+    const int height = LS_PREVIEW_HEIGHT;
+    const int row_size = width * 3;
+    const unsigned int image_size = (unsigned int)(row_size * height);
+
+    unsigned char header[54] = { 'B', 'M' };
+    put_long(header + 2, 54 + image_size);
+    put_long(header + 10, 54);
+    put_long(header + 14, 40);
+    put_long(header + 18, (unsigned int)width);
+    put_long(header + 22, (unsigned int)height);
+    put_short(header + 26, 1);
+    put_short(header + 28, 24);
+    put_long(header + 34, image_size);
+    put_long(header + 38, 2835);
+    put_long(header + 42, 2835);
+
+    fwrite(header, 1, sizeof(header), fp);
+
+    const unsigned char* palette = palette_current();
+    unsigned char row[LS_PREVIEW_WIDTH * 3];
+
+    for (int y = height - 1; y >= 0; y--) {
+        const unsigned char* source = thumbnail_image[1] + y * width;
+        for (int x = 0; x < width; x++) {
+            const unsigned char* rgb = palette + source[x] * 3;
+            row[x * 3 + 0] = (unsigned char)(rgb[2] * 255 / 63);
+            row[x * 3 + 1] = (unsigned char)(rgb[1] * 255 / 63);
+            row[x * 3 + 2] = (unsigned char)(rgb[0] * 255 / 63);
+        }
+        fwrite(row, 1, row_size, fp);
+    }
+
+    fclose(fp);
+}
+
+static unsigned int read_play_time(const char* path)
+{
+    FILE* fp = fopen(path, "rb");
+    if (fp == NULL) {
+        return 0;
+    }
+
+    char text[256];
+    const size_t length = fread(text, 1, sizeof(text) - 1, fp);
+    fclose(fp);
+    text[length] = '\0';
+
+    const char* key = strstr(text, "\"playSeconds\"");
+    if (key == NULL) {
+        return 0;
+    }
+
+    const char* colon = strchr(key, ':');
+    if (colon == NULL) {
+        return 0;
+    }
+
+    return (unsigned int)strtoul(colon + 1, NULL, 10);
+}
+
+static void save_play_time(const char* directory)
+{
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%sVaultOS.json", directory);
+
+    const unsigned int previous = read_play_time(path);
+    const unsigned int total = previous + play_time_ms / 1000;
+
+    FILE* fp = fopen(path, "wb");
+    if (fp == NULL) {
+        return;
+    }
+
+    fprintf(fp, "{\n  \"playSeconds\": %u\n}\n", total);
+    fclose(fp);
+}
+
+static void save_sidecars(void)
+{
+    char directory[COMPAT_MAX_PATH];
+    if (!slot_directory(directory, sizeof(directory))) {
+        return;
+    }
+
+    save_preview(directory);
+    save_play_time(directory);
+
+    play_time_ms = 0;
+}
+
 int SaveGame(int mode)
 {
     IosScreenScope screenScope(IOS_SCREEN_SAVES);
@@ -905,6 +1091,18 @@ int LoadGame(int mode)
     };
 
     ls_error_code = 0;
+
+    // A save the launcher picked loads straight away, without the game's own
+    // load screen: the same slot load the quick path uses.
+    const int requestedSlot = loadsave_take_pending_slot();
+    if (requestedSlot >= 0) {
+        if (LoadSlot(requestedSlot) != -1) {
+            gmouse_set_cursor(MOUSE_CURSOR_ARROW);
+            return 1;
+        }
+
+        return -1;
+    }
 
     if (!config_get_string(&game_config, GAME_CONFIG_SYSTEM_KEY, GAME_CONFIG_MASTER_PATCHES_KEY, &patches)) {
         debug_printf("\nLOADSAVE: Error reading patches config variable! Using default.\n");
@@ -1831,6 +2029,8 @@ static int SaveHeader(int slot)
     if (db_fwrite(mapName, 1, 128, flptr) != 128) {
         return -1;
     }
+
+    save_sidecars();
 
     ls_error_code = 0;
 

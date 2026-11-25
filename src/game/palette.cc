@@ -92,4 +92,9 @@ void palette_set_entries(unsigned char* palette, int start, int end)
     setSystemPaletteEntries(palette, start, end);
 }
 
+const unsigned char* palette_current(void)
+{
+    return current_palette;
+}
+
 } // namespace fallout

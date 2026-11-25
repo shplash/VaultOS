@@ -308,6 +308,13 @@ extern "C" void fallout_ios_camera_stop(void)
     }
 }
 
+extern "C" void fallout_ios_request_load_slot(int slot)
+{
+    if (g_engine != NULL && g_engine->request_load_slot != NULL) {
+        g_engine->request_load_slot(slot);
+    }
+}
+
 extern "C" void fallout_ios_right_click(void)
 {
     if (g_engine != NULL && g_engine->right_click != NULL) {

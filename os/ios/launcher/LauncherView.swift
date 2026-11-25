@@ -284,6 +284,83 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
+    private var savesPage: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L.t("SAVES"))
+                .font(Vault.display(22))
+                .kerning(1.4)
+
+            if model.saves.isEmpty {
+                Text(L.t("No saves yet. Save in the game and it shows here."))
+                    .font(Vault.label(12))
+                    .foregroundColor(Theme.faint)
+            } else {
+                ForEach(model.saves) { save in
+                    Button {
+                        LauncherMusic.shared.stop()
+                        model.play(onPlay: onPlay, loadSlot: save.slot)
+                    } label: {
+                        HStack(spacing: 12) {
+                            if let url = save.preview, let image = UIImage(contentsOfFile: url.path) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .frame(width: 112, height: 66)
+                                    .clipped()
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                            .stroke(Theme.hairline, lineWidth: 1)
+                                    )
+                            } else {
+                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                    .fill(Color.white.opacity(0.05))
+                                    .frame(width: 112, height: 66)
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(save.name)
+                                    .font(Vault.label(13, weight: .bold))
+                                    .foregroundColor(Theme.text)
+
+                                Text(save.detail)
+                                    .font(Vault.label(11))
+                                    .foregroundColor(Theme.dim)
+
+                                Text("\(save.saved)  ·  \(save.played)")
+                                    .font(Vault.label(10))
+                                    .foregroundColor(Theme.faint)
+                            }
+
+                            Spacer(minLength: 0)
+
+                            Button {
+                                model.delete(save: save)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(Theme.faint)
+                                    .frame(width: 40, height: 40)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Rectangle()
+                        .fill(Theme.hairline)
+                        .frame(height: 1)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(Metrics.sheetInset)
+        .onAppear {
+            model.refreshSaves()
+        }
+    }
+
     private var playButton: some View {
         Button {
             LauncherMusic.shared.stop()
@@ -319,6 +396,8 @@ struct LauncherView: View {
         switch page {
         case .home:
             homePager
+        case .saves:
+            savesPage
         case .display:
             displaySheet
         case .audio:
@@ -1755,6 +1834,7 @@ struct LauncherView: View {
 
 private enum LauncherPage: String, CaseIterable, Identifiable {
     case home
+    case saves
     case display
     case audio
     case game
@@ -1769,6 +1849,7 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .home: return L.t("Home").uppercased()
+        case .saves: return L.t("SAVES")
         case .display: return L.t("VIDEO")
         case .audio: return L.t("AUDIO")
         case .game: return L.t("SYSTEM")
@@ -1781,6 +1862,7 @@ private enum LauncherPage: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .home: return "house"
+        case .saves: return "tray.full"
         case .display: return "display"
         case .audio: return "speaker.wave.2"
         case .game: return "person"

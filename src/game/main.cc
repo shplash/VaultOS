@@ -142,7 +142,7 @@ int gnw_main(int argc, char** argv)
 
             mouse_show();
             debug_printf("[menu] entering loop\n");
-            int mainMenuRc = main_menu_loop();
+            int mainMenuRc = loadsave_pending_slot() >= 0 ? MAIN_MENU_LOAD_GAME : main_menu_loop();
             mouse_hide();
 
             switch (mainMenuRc) {
@@ -352,6 +352,8 @@ static void main_game_loop()
 
     while (game_user_wants_to_quit == 0) {
         sharedFpsLimiter.mark();
+
+        loadsave_play_time_tick();
 
         int keyCode = get_input();
         game_handle_input(keyCode, false);

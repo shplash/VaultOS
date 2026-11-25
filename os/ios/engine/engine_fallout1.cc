@@ -638,6 +638,11 @@ int cursor_mode_requests()
     return fallout_engine_mode_requests();
 }
 
+void request_load_slot(int slot)
+{
+    fallout::loadsave_request_slot(slot);
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout1",
@@ -664,6 +669,7 @@ const FalloutEngineAPI g_api = {
     quick_save_serial,
     action_button_rect,
     cursor_mode_requests,
+    request_load_slot,
 };
 
 } // namespace

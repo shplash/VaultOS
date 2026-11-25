@@ -16,6 +16,7 @@ final class LauncherHost {
     static let shared = LauncherHost()
 
     private var window: UIWindow?
+    private var launcherModel: LauncherModel?
     private var finished = false
     private var resignObserver: NSObjectProtocol?
     private var activeObserver: NSObjectProtocol?
@@ -79,6 +80,7 @@ final class LauncherHost {
         }
 
         let model = LauncherModel()
+        launcherModel = model
         let root = LauncherView(model: model, onPlay: { [weak self] in
             self?.finish(launchGame: true)
         })
@@ -198,6 +200,9 @@ final class LauncherHost {
         // hierarchy go away, then hand control back to the engine.
         DispatchQueue.main.async {
             closingWindow?.rootViewController = nil
+            if launchGame, let slot = launcherModel?.launchSlot {
+                fallout_ios_request_load_slot(Int32(slot))
+            }
             fallout_launcher_finish(Int32(launchGame ? 1 : 0))
         }
     }
