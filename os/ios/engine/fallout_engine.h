@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 11
+#define FALLOUT_ENGINE_ABI_VERSION 10
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -126,14 +126,6 @@ typedef struct FalloutEngineAPI {
     int (*action_button_rect)(int action, int* x, int* y, int* width, int* height);
 
     int (*cursor_mode_requests)(void);
-
-    // Keeps the player in the middle of the view once they move, leaving the
-    // view where the finger scrolled it while they stand still. 1 turns it on.
-    void (*camera_follow)(int on);
-
-    // Called once a frame while the game runs: scrolls the view when follow is
-    // on and the player has stepped away from the middle.
-    void (*camera_follow_tick)(void);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

@@ -308,20 +308,6 @@ extern "C" void fallout_ios_camera_stop(void)
     }
 }
 
-extern "C" void fallout_ios_camera_follow(int on)
-{
-    if (g_engine != NULL && g_engine->camera_follow != NULL) {
-        g_engine->camera_follow(on);
-    }
-}
-
-extern "C" void fallout_ios_camera_follow_tick(void)
-{
-    if (g_engine != NULL && g_engine->camera_follow_tick != NULL) {
-        g_engine->camera_follow_tick();
-    }
-}
-
 extern "C" void fallout_ios_right_click(void)
 {
     if (g_engine != NULL && g_engine->right_click != NULL) {
