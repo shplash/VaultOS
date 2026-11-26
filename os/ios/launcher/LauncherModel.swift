@@ -961,6 +961,10 @@ final class LauncherModel: ObservableObject {
     /// The folder the saves were looked in, shown while the list bedded in.
     @Published var savesFolder = ""
 
+    /// The game whose saves are in the list. A list read for one game is
+    /// never shown as the other's, however briefly.
+    private var savesGame: FalloutGame?
+
     /// The save the launcher asked the engine to load, once Play is pressed.
     var launchSlot: Int?
 
@@ -976,12 +980,14 @@ final class LauncherModel: ObservableObject {
 
         // A folder that cannot be listed for a moment - the device locked
         // while the app was in the background - is not a folder with no saves
-        // in it: the list stands until the folder can be read again.
-        if folder != nil && found.isEmpty && !saves.isEmpty {
+        // in it: the same game's list stands until the folder can be read
+        // again. The list of another game is never left in its place.
+        if folder != nil && found.isEmpty && !saves.isEmpty && savesGame == selectedGame {
             return
         }
 
         saves = found
+        savesGame = selectedGame
 
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path
         savesFolder = "\(folder?.path.replacingOccurrences(of: documents, with: "") ?? "no SAVEGAME") · \(saves.count)"
