@@ -335,12 +335,15 @@ struct LauncherView: View {
                              width: CGFloat,
                              rowHeight: CGFloat,
                              selected: Bool) -> some View {
-        // Exactly three slots across, however tall the box is: a slot that had
-        // to be narrow enough for the height left four of them in view.
+        // Two whole slots and a fifth of the next one: the sliver at the
+        // right edge is what says the row slides, where an edge that ended
+        // exactly at the card's would say nothing.
         let spacing: CGFloat = 8
-        let perRow = 3
-        let cardWidth = max(48, (width - CGFloat(perRow - 1) * spacing) / CGFloat(perRow))
-        let cardHeight = min(cardWidth * 133 / 224, max(40, rowHeight - 34))
+        let visible: CGFloat = 2.2
+        let cardWidth = max(48, (width - spacing) / visible)
+        // The picture carries its own name, so there is no line under it any
+        // more and it takes the whole height of the box.
+        let cardHeight = max(40, rowHeight)
         let content = CGFloat(10) * cardWidth + CGFloat(9) * spacing
         let limit = min(0, width - content)
 
@@ -438,7 +441,7 @@ struct LauncherView: View {
         }
         .offset(x: min(0, max(limit, savesScroll)))
         .frame(width: width, alignment: .leading)
-        .frame(height: cardHeight + 34, alignment: .leading)
+        .frame(height: cardHeight, alignment: .leading)
         .clipped()
     }
 
@@ -447,77 +450,39 @@ struct LauncherView: View {
                           selected: Bool,
                           width: CGFloat,
                           height: CGFloat) -> some View {
-        // The slot number is the card's own, drawn in the empty placeholder,
-        // and the title is the save's own name: the character's name is the
-        // same on every save that character made.
-        let title = save?.name ?? ""
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        // The plate sits a little in from the picture's own corners, so it
+        // reads as laid on the shot rather than as part of its frame.
+        let inset = max(4, min(width, height) * 0.03)
 
-        // A save that was written before the game kept a play time has no
-        // time to show, and `0:00 · LEVEL 0` reads as a broken save: the
-        // date it was written is what is known, so that is what is shown.
-        let line: String
-        if let save = save {
-            if let played = save.played {
-                line = save.level > 0
-                    ? "\(played) · \(L.t("LEVEL")) \(save.level)"
-                    : played
-            } else {
-                line = save.saved
-            }
-        } else {
-            line = L.t("EMPTY")
-        }
-
-        return VStack(alignment: .center, spacing: 4) {
-            if let url = save?.preview, let image = UIImage(contentsOfFile: url.path) {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: width, height: height)
-                    .clipped()
+        return Group {
+            if let save = save {
+                savePicture(save: save, width: width, height: height)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(Theme.hairline, lineWidth: 1)
+                        // The shot names itself: its name, and the time and
+                        // the level under it, so no line is needed below.
+                        savePlate(save: save, width: width - inset * 2)
+                            .padding(inset),
+                        alignment: .topLeading
                     )
             } else {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                // An empty slot is its own number and nothing else: there is
+                // no save on it to name.
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(Color.white.opacity(0.05))
                     .frame(width: width, height: height)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(Theme.hairline, lineWidth: 1)
-                    )
                     .overlay(
                         Text(verbatim: "\(slot)")
                             .font(Vault.label(11, weight: .bold))
                             .foregroundColor(Theme.faint)
                     )
             }
-
-            if !title.isEmpty {
-                Text(title)
-                    .font(Vault.label(9, weight: .semibold))
-                    .foregroundColor(Theme.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-            }
-
-            Text(line)
-                .font(Vault.label(9, weight: .regular))
-                .foregroundColor(Theme.faint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
         }
-        .frame(width: width, height: height + 34, alignment: .top)
+        // A faint grey line around every shot, and the outline a picked slot
+        // has always had on top of it: one sign of which save is chosen.
+        .overlay(shape.stroke(Color(white: 0.72).opacity(0.30), lineWidth: 1))
+        .overlay(shape.stroke(selected ? Color.white.opacity(0.72) : Color.clear, lineWidth: 1))
         .contentShape(Rectangle())
-        .overlay(
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(selected ? Color.white.opacity(0.72) : Color.clear, lineWidth: 1)
-        )
         .onTapGesture {
             guard let save = save else {
                 return
@@ -532,6 +497,80 @@ struct LauncherView: View {
                 deleteItem(save)
             }
         }
+    }
+
+    /// A save's own picture. It is drawn a point smaller than its card and
+    /// clipped to the card's corners, so the outermost row and column of the
+    /// scaled shot - the edge the palette smears along it - are not on show.
+    @ViewBuilder
+    private func savePicture(save: LauncherModel.LauncherSave,
+                             width: CGFloat,
+                             height: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+
+        if let url = save.preview, let image = UIImage(contentsOfFile: url.path) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: max(1, width - 1), height: max(1, height - 1))
+                .clipped()
+                .frame(width: width, height: height)
+                .clipShape(shape)
+        } else {
+            shape
+                .fill(Color.white.opacity(0.05))
+                .frame(width: width, height: height)
+        }
+    }
+
+    /// A save's name and what it holds, on a plate laid over its own shot:
+    /// small, see-through, and set in from the picture's corner by a little,
+    /// so the shot is still the card and the plate is read on top of it.
+    private func savePlate(save: LauncherModel.LauncherSave, width: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+
+        return VStack(alignment: .leading, spacing: 1) {
+            Text(save.name)
+                .font(Vault.label(10, weight: .semibold))
+                .foregroundColor(Theme.text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Text(saveDetail(save))
+                .font(Vault.label(9, weight: .regular))
+                .foregroundColor(Theme.faint)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        // As wide as the name needs, and no further than a little over half
+        // the card: a long name is cut rather than covering the shot.
+        .frame(maxWidth: max(40, width * 0.58), alignment: .leading)
+        .background(shape.fill(Color.black.opacity(0.34)))
+        .overlay(shape.stroke(Color.white.opacity(0.12), lineWidth: 1))
+        .overlay(
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 1)
+                .padding(.horizontal, 5),
+            alignment: .top
+        )
+    }
+
+    /// How long a save has been played and how far the character has got. A
+    /// save written before the game kept a time has no time to show, and the
+    /// date it was written is what is known, so that is what is named.
+    private func saveDetail(_ save: LauncherModel.LauncherSave) -> String {
+        var parts: [String] = []
+        if let played = save.played {
+            parts.append(played)
+        }
+
+        if save.level > 0 {
+            parts.append("\(L.t("LEVEL")) \(save.level)")
+        }
+
+        return parts.isEmpty ? save.saved : parts.joined(separator: " · ")
     }
 
     /// Deleting is a long press away on a save card. A button's role is what
@@ -690,46 +729,42 @@ struct LauncherView: View {
             let currentIndex = model.selectedGame == .fallout1 ? 0 : 1
             let raw = homeDrag
             let drag = homeAtEdge ? raw * 0.28 : raw
-            let progress = min(max(CGFloat(currentIndex) - drag / max(width, 1), 0), 1)
             let pageWidth = width
 
-            VStack(spacing: 6) {
-                ZStack(alignment: .top) {
-                    ForEach(FalloutGame.allCases) { game in
-                        let index = game == .fallout1 ? 0 : 1
-                        let relative = CGFloat(index - currentIndex)
-                        let offset = relative * (pageWidth + 6) + drag + homeNudge
-                        let isSelected = game == model.selectedGame
+            ZStack(alignment: .top) {
+                ForEach(FalloutGame.allCases) { game in
+                    let index = game == .fallout1 ? 0 : 1
+                    let relative = CGFloat(index - currentIndex)
+                    let offset = relative * (pageWidth + 6) + drag + homeNudge
+                    let isSelected = game == model.selectedGame
 
-                        homeSheet(game: game,
-                                  info: model.installInfos[game] ?? LauncherInstallInfo(),
-                                  width: pageWidth,
-                                  height: geometry.size.height - 36,
-                                  selected: isSelected)
-                            .frame(width: pageWidth, height: geometry.size.height - 36)
-                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .opacity(isSelected ? 1 : 0.45)
-                            .offset(x: offset)
-                            .allowsHitTesting(isSelected && !isPaging)
-                    }
+                    homeSheet(game: game,
+                              info: model.installInfos[game] ?? LauncherInstallInfo(),
+                              width: pageWidth,
+                              height: geometry.size.height,
+                              selected: isSelected)
+                        .frame(width: pageWidth, height: geometry.size.height)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .opacity(isSelected ? 1 : 0.45)
+                        .offset(x: offset)
+                        .allowsHitTesting(isSelected && !isPaging)
                 }
-                .frame(width: width, height: geometry.size.height - 36)
-                .clipped()
-                .contentShape(Rectangle())
-                // One gesture for the whole card: a drag that begins in the
-                // saves box slides its slots, and any other turns the page.
-                // Two gestures competing is what left the box scrolling the
-                // page instead of itself.
-                .coordinateSpace(name: LauncherView.cardSpace)
-                .simultaneousGesture(homePagingGesture(width: pageWidth))
-                .onPreferenceChange(SavesBoxKey.self) { box in
-                    savesBox = box
-                }
-
-                gameSwitcher(progress: progress)
-                    .frame(height: 30)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // The card runs from the top of the page to the bottom of the
+            // Play button beside it: the game switch that used to sit under
+            // it moved above the title, so its row is the saves' room now.
+            .frame(width: width, height: geometry.size.height)
+            .clipped()
+            .contentShape(Rectangle())
+            // One gesture for the whole card: a drag that begins in the
+            // saves box slides its slots, and any other turns the page.
+            // Two gestures competing is what left the box scrolling the
+            // page instead of itself.
+            .coordinateSpace(name: LauncherView.cardSpace)
+            .simultaneousGesture(homePagingGesture(width: pageWidth))
+            .onPreferenceChange(SavesBoxKey.self) { box in
+                savesBox = box
+            }
         }
         .padding(.horizontal, Metrics.outer)
         .padding(.top, Metrics.outer)
@@ -826,39 +861,44 @@ struct LauncherView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
 
-    private func gameSwitcher(progress: CGFloat) -> some View {
-        GeometryReader { geometry in
-            let segment = geometry.size.width / 2
+    /// The two games as one switch. It sits above the hero's title, at
+    /// exactly the width of the word FALLOUT: it reads as part of the name
+    /// rather than as a control of its own, and it never runs on into the 2
+    /// of FALLOUT 2, because its width is the first game's name whatever
+    /// the second one measures.
+    private func gameSwitcher(width: CGFloat) -> some View {
+        let segment = width / 2
+        let progress = model.selectedGame == .fallout1 ? CGFloat(0) : 1
 
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(accent.opacity(0.18))
-                    .frame(width: segment, height: 30)
-                    .offset(x: min(max(progress, 0), 1) * segment)
+        return ZStack(alignment: .leading) {
+            Capsule()
+                .fill(accent.opacity(0.18))
+                .frame(width: segment, height: LauncherView.switchHeight)
+                .offset(x: progress * segment)
 
-                HStack(spacing: 0) {
-                    ForEach(FalloutGame.allCases) { game in
-                        Button {
-                            switchHome(to: game)
-                        } label: {
-                            Text(game.title)
-                                .font(Vault.label(12, weight: .semibold))
-                                .kerning(1.2)
-                                .foregroundColor(model.selectedGame == game ? accent : Theme.faint)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 30)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(game.title)
-                        .accessibilityAddTraits(model.selectedGame == game ? .isSelected : [])
+            HStack(spacing: 0) {
+                ForEach(FalloutGame.allCases) { game in
+                    Button {
+                        switchHome(to: game)
+                    } label: {
+                        Text(game.title)
+                            .font(Vault.label(12, weight: .semibold))
+                            .kerning(1.2)
+                            .foregroundColor(model.selectedGame == game ? accent : Theme.faint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: LauncherView.switchHeight)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(game.title)
+                    .accessibilityAddTraits(model.selectedGame == game ? .isSelected : [])
                 }
             }
-            .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
         }
-        .frame(maxWidth: 340)
-        .frame(height: 30)
+        .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
+        .frame(width: width, height: LauncherView.switchHeight)
     }
 
     private func switchHome(to game: FalloutGame) {
@@ -936,11 +976,23 @@ struct LauncherView: View {
 
     private static let heroTitleSize: CGFloat = 68
 
+    /// The room the game switch takes above the title.
+    private static let switchHeight: CGFloat = 30
+
+    /// The width of the word FALLOUT in the hero's own face and spacing:
+    /// the game switch above it is exactly that wide, so it ends where the
+    /// word ends rather than stretching over the 2 of FALLOUT 2.
+    private static var heroTitleWidth: CGFloat {
+        let font = VaultUI.display(heroTitleSize)
+        let width = (("FALLOUT" as NSString).size(withAttributes: [.font: font, .kern: 1.4])).width
+        return ceil(width)
+    }
+
     private static var heroHeight: CGFloat {
         let title = VaultUI.display(heroTitleSize).lineHeight
         let tagline = VaultUI.label(14).lineHeight
         let edition = VaultUI.label(11, weight: .bold).lineHeight
-        return 14 + title + 2 + tagline + 2 + edition + 2 + 4 + 20 + 14
+        return 14 + switchHeight + 8 + title + 2 + tagline + 2 + edition + 2 + 4 + 20 + 14
     }
 
     private func hero(game: FalloutGame) -> some View {
@@ -956,6 +1008,13 @@ struct LauncherView: View {
                     .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 2) {
+                    // The switch sits above the name, as wide as the word
+                    // FALLOUT alone: it is in the column the name is drawn
+                    // in, so the two line up from the same edge.
+                    gameSwitcher(width: min(LauncherView.heroTitleWidth,
+                                            max(120, geometry.size.width * 0.62 - Metrics.sheetInset)))
+                        .padding(.bottom, 6)
+
                     Text(game.title.uppercased())
                         .font(Vault.display(LauncherView.heroTitleSize))
                         .kerning(1.4)
