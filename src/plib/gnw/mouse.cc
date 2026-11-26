@@ -337,9 +337,19 @@ static void mouse_anim()
     }
 }
 
+// Set while a list on screen is scrolling. The cursor is not drawn then: the
+// finger is doing the scrolling, and a pointer standing on the list for the
+// whole of it is in the way. Only the drawing stops - the pointer is still an
+// input point - so the wheel keeps reaching the list it started on.
+static bool ios_list_cursor_hidden;
+
 // 0x4B4B88
 void mouse_show()
 {
+    if (ios_list_cursor_hidden) {
+        return;
+    }
+
     int i;
     unsigned char* v2;
     int v7, v8;
@@ -482,6 +492,7 @@ static void ios_list_reset()
     ios_list_scrolled = false;
     ios_list_accum = 0;
     ios_list_path = 0;
+    ios_list_cursor_hidden = false;
 }
 
 static bool ios_list_point(int x, int y, int* slotHeight)
@@ -733,6 +744,12 @@ void mouse_info()
                         ios_drag_start(true, true);
                         break;
                     }
+
+                    // The pointer comes back at once where the finger is, now
+                    // that the scrolling is done.
+                    if (!mouse_is_hidden) {
+                        mouse_show();
+                    }
                 }
 
                 // The finger came up before the press went in, so what it
@@ -780,6 +797,7 @@ void mouse_info()
 
                     if (movedX > slop || movedY > slop || ios_list_path > IOS_LIST_STILL_POINTS) {
                         ios_list_scrolled = true;
+                        ios_list_cursor_hidden = true;
 
                         if (ios_list_step > 0 && !ios_list_wheel) {
                             ios_list_accum += gesture.y - ios_list_last_y;
