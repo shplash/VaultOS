@@ -297,21 +297,25 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
-    private func savesColumn(game: FalloutGame, width: CGFloat, selected: Bool) -> some View {
+    private func savesColumn(game: FalloutGame,
+                             width: CGFloat,
+                             rowHeight: CGFloat,
+                             selected: Bool) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             headerLine(L.t("Saves"))
 
-            savesRow(game: game, width: width, selected: selected)
+            savesRow(game: game, width: width, rowHeight: rowHeight, selected: selected)
         }
         .frame(width: width, alignment: .leading)
     }
 
     /// The game data, to the right of the saves. Its buttons sit under the
     /// header as one column as wide as the column itself, and take the game's
-    /// accent like everything else on the card.
+    /// accent like everything else on the card. The rows are a little tighter
+    /// than a page's, so the whole column stays inside the card.
     @ViewBuilder
     private func gameDataColumn(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 6) {
             headerLine(L.t("Game data"))
 
             if info.installed == 0 {
@@ -325,7 +329,7 @@ struct LauncherView: View {
                 Text(L.t("LANGUAGE FILES"))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(SmallButtonStyle(accent: game.accent))
+            .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: 30))
             .disabled(model.isInstalling || info.installed == 0)
 
             Button {
@@ -335,7 +339,7 @@ struct LauncherView: View {
                 Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(SmallButtonStyle(accent: game.accent))
+            .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: 30))
             .disabled(model.isInstalling)
 
             gameDataStatus(game: game)
@@ -405,9 +409,14 @@ struct LauncherView: View {
         }
     }
 
-    private func savesRow(game: FalloutGame, width: CGFloat, selected: Bool) -> some View {
-        let cardWidth = min(132, max(96, width * 0.3))
-        let cardHeight = cardWidth * 133 / 224
+    private func savesRow(game: FalloutGame,
+                          width: CGFloat,
+                          rowHeight: CGFloat,
+                          selected: Bool) -> some View {
+        // A slot takes the most the card has room for under the hero: its
+        // captions are kept whole, so nothing is cut off at the card's edge.
+        let cardHeight = max(38, min(132 * 133 / 224, rowHeight - 56))
+        let cardWidth = cardHeight * 224 / 133
         let spacing: CGFloat = 8
         let count = 10
         let content = CGFloat(count) * cardWidth + CGFloat(count - 1) * spacing
@@ -423,7 +432,7 @@ struct LauncherView: View {
         }
         .offset(x: min(0, max(limit, savesScroll)))
         .frame(width: width, alignment: .leading)
-        .frame(height: cardHeight + 36, alignment: .leading)
+        .frame(height: cardHeight + 34, alignment: .leading)
         .clipped()
         .contentShape(Rectangle())
         .gesture(
@@ -618,6 +627,7 @@ struct LauncherView: View {
                         homeSheet(game: game,
                                   info: model.installInfos[game] ?? LauncherInstallInfo(),
                                   width: pageWidth,
+                                  height: geometry.size.height - 36,
                                   selected: isSelected)
                             .frame(width: pageWidth, height: geometry.size.height - 36)
                             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -788,10 +798,14 @@ struct LauncherView: View {
     private func homeSheet(game: FalloutGame,
                            info: LauncherInstallInfo,
                            width: CGFloat,
+                           height: CGFloat,
                            selected: Bool) -> some View {
         let gameAccent = game.accent
         let buttonFont = VaultUI.label(10, weight: .semibold)
         let columns = width - Metrics.sheetInset * 2
+        // The hero holds its own height and the columns are fitted into what
+        // is left of the card, so the slots grow with it and never past it.
+        let columnsHeight = max(90, height - LauncherView.heroHeight - 1 - Metrics.gap - Metrics.outer)
         // The game data keeps to the width of its own buttons and sits at the
         // far right, so the saves have the rest of the card to run across.
         let labels = [L.t("LANGUAGE FILES"),
@@ -806,7 +820,7 @@ struct LauncherView: View {
             ? LauncherView.chipLinesWidth(model.installRows(for: game, info: info), size: 9)
             : 0
         let filesWidth = max(126, max(widest + 28, ceil(chips)) + 2)
-        let savesWidth = max(columns - filesWidth - 19, 170)
+        let savesWidth = max(columns - filesWidth - 19, 90)
         return VStack(alignment: .leading, spacing: 0) {
             hero(game: game)
 
@@ -815,7 +829,7 @@ struct LauncherView: View {
                 .frame(height: 1)
 
             HStack(alignment: .top, spacing: 0) {
-                savesColumn(game: game, width: savesWidth, selected: selected)
+                savesColumn(game: game, width: savesWidth, rowHeight: columnsHeight, selected: selected)
 
                 Rectangle()
                     .fill(Theme.hairline)
