@@ -20,6 +20,10 @@
 #include "interface.h"
 #include "item.h"
 #include "loadsave.h"
+
+// The launcher's entry points into Fallout 2's saves, which upstream's own
+// loadsave header does not carry.
+#include "engine_fallout2_saves.h"
 #include "main.h"
 #include "map.h"
 #include "mouse.h"
@@ -816,6 +820,11 @@ int cursor_mode_requests()
     return fallout_engine_mode_requests();
 }
 
+void request_load_slot(int slot)
+{
+    fallout::loadsave_request_slot(slot);
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout2",
@@ -842,7 +851,7 @@ const FalloutEngineAPI g_api = {
     quick_save_serial,
     action_button_rect,
     cursor_mode_requests,
-    NULL,
+    request_load_slot,
 };
 
 } // namespace

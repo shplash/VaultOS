@@ -1,11 +1,17 @@
 #include "loadsave.h"
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
 
+#include <zlib.h>
+
 #include <algorithm>
+
+#include "engine_fallout2_saves.h"
 
 #include "art.h"
 #include "automap.h"
@@ -58,6 +64,10 @@
 #include "version.h"
 #include "window_manager.h"
 #include "word_wrap.h"
+
+// The launcher's saves live beside the game's own files, so the notes they
+// leave are written there.
+#include "platform/ios/paths.h"
 #include "worldmap.h"
 
 namespace fallout {
@@ -874,6 +884,370 @@ static int _QuickSnapShot()
     return 1;
 }
 
+// MARK: - What the launcher needs from a save
+
+// The slot the launcher asked for, numbered as the launcher numbers it, and -1
+// for none: the game indexes its slots from zero, so SLOT01 is the first.
+static int _requestedSlot = -1;
+
+// Real time played, counted once per game loop pass and added to the save's
+// own count when a slot is written, so every stretch of play lands in exactly
+// one save.
+static unsigned int _playTimeMs;
+
+void loadsave_request_slot(int slot)
+{
+    _requestedSlot = slot - 1;
+}
+
+int loadsave_pending_slot(void)
+{
+    return _requestedSlot;
+}
+
+int loadsave_take_pending_slot(void)
+{
+    const int slot = _requestedSlot;
+    _requestedSlot = -1;
+    return slot;
+}
+
+void loadsave_play_time_tick(void)
+{
+    static unsigned int last;
+    static bool started;
+
+    const unsigned int now = getTicks();
+
+    if (started) {
+        _playTimeMs += getTicksSince(last);
+    }
+
+    last = now;
+    started = true;
+}
+
+// Everything that goes wrong here lands in a note beside the game, which the
+// Files app shows: a save that will not open, a picture that is not written, a
+// time that is not counted. Without it a failure is silent, which is how a
+// picture and a playtime could be missing with nothing to say why.
+static void saves_log(const char* format, ...)
+{
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%svaultos-saves.log", iOSGetDocumentsPath());
+
+    FILE* fp = fopen(path, "at");
+    if (fp == nullptr) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    vfprintf(fp, format, args);
+    va_end(args);
+
+    fputc('\n', fp);
+    fclose(fp);
+}
+
+static void put_long(unsigned char* dest, unsigned int value)
+{
+    dest[0] = (unsigned char)(value & 0xFF);
+    dest[1] = (unsigned char)((value >> 8) & 0xFF);
+    dest[2] = (unsigned char)((value >> 16) & 0xFF);
+    dest[3] = (unsigned char)((value >> 24) & 0xFF);
+}
+
+static void png_write_chunk(FILE* fp, const char* type, const unsigned char* data, size_t size)
+{
+    unsigned char buffer[4];
+
+    put_long(buffer, (unsigned int)size);
+    fwrite(buffer, 1, 4, fp);
+    fwrite(type, 1, 4, fp);
+    if (size > 0) {
+        fwrite(data, 1, size, fp);
+    }
+
+    unsigned int crc = (unsigned int)crc32(crc32(0L, Z_NULL, 0), (const Bytef*)type, 4);
+    if (size > 0) {
+        crc = (unsigned int)crc32(crc, (const Bytef*)data, (uInt)size);
+    }
+    put_long(buffer, crc);
+    fwrite(buffer, 1, 4, fp);
+}
+
+// The picture the game shows on its own load screen, written as a PNG: the
+// launcher shows it without the game or its palette, and PNG is the one format
+// every picture reader opens. A palette-indexed BMP was written for Fallout 1
+// before, and nothing that read it ever showed it.
+static bool write_png(const char* path, const unsigned char* pixels, const unsigned char* palette)
+{
+    if (pixels == nullptr || palette == nullptr) {
+        return false;
+    }
+
+    static unsigned char rows[(LS_PREVIEW_WIDTH * 3 + 1) * LS_PREVIEW_HEIGHT];
+    const int stride = LS_PREVIEW_WIDTH * 3 + 1;
+
+    for (int y = 0; y < LS_PREVIEW_HEIGHT; y++) {
+        unsigned char* row = rows + y * stride;
+        const unsigned char* source = pixels + y * LS_PREVIEW_WIDTH;
+
+        row[0] = 0;
+        for (int x = 0; x < LS_PREVIEW_WIDTH; x++) {
+            const unsigned char* rgb = palette + source[x] * 3;
+            row[1 + x * 3 + 0] = (unsigned char)(rgb[0] * 255 / 63);
+            row[1 + x * 3 + 1] = (unsigned char)(rgb[1] * 255 / 63);
+            row[1 + x * 3 + 2] = (unsigned char)(rgb[2] * 255 / 63);
+        }
+    }
+
+    uLongf size = compressBound((uLong)sizeof(rows));
+    unsigned char* compressed = (unsigned char*)malloc(size);
+    if (compressed == nullptr) {
+        return false;
+    }
+
+    const bool packed = compress2(compressed, &size, rows, (uLong)sizeof(rows), 6) == Z_OK;
+
+    FILE* fp = packed ? fopen(path, "wb") : nullptr;
+    if (fp == nullptr) {
+        free(compressed);
+        return false;
+    }
+
+    static const unsigned char signature[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+    fwrite(signature, 1, sizeof(signature), fp);
+
+    unsigned char header[13];
+    put_long(header + 0, (unsigned int)LS_PREVIEW_WIDTH);
+    put_long(header + 4, (unsigned int)LS_PREVIEW_HEIGHT);
+    header[8] = 8;
+    header[9] = 2;
+    header[10] = 0;
+    header[11] = 0;
+    header[12] = 0;
+
+    png_write_chunk(fp, "IHDR", header, sizeof(header));
+    png_write_chunk(fp, "IDAT", compressed, (size_t)size);
+    png_write_chunk(fp, "IEND", nullptr, 0);
+
+    fclose(fp);
+    free(compressed);
+
+    return true;
+}
+
+// The slot's own folder as a path a plain file call can use: the game writes
+// through its own file layer, relative to the data folder and with Windows
+// separators, and `fopen` knows neither.
+static bool lsgSaveSlotDirectory(int slot, char* out, size_t size)
+{
+    if (size < 2) {
+        return false;
+    }
+
+    snprintf(out, size, "%sSAVEGAME\\SLOT%.2d\\", _patches != nullptr ? _patches : "", slot + 1);
+    compat_windows_path_to_native(out);
+
+    return true;
+}
+
+static unsigned int readPlayTime(const char* path)
+{
+    FILE* fp = fopen(path, "rb");
+    if (fp == nullptr) {
+        return 0;
+    }
+
+    char text[256];
+    const size_t length = fread(text, 1, sizeof(text) - 1, fp);
+    fclose(fp);
+    text[length] = '\0';
+
+    const char* key = strstr(text, "\"playSeconds\"");
+    if (key == nullptr) {
+        return 0;
+    }
+
+    const char* colon = strchr(key, ':');
+    if (colon == nullptr) {
+        return 0;
+    }
+
+    return (unsigned int)strtoul(colon + 1, nullptr, 10);
+}
+
+static void save_preview(const char* directory, const unsigned char* pixels)
+{
+    if (pixels == nullptr) {
+        saves_log("preview: no snapshot in %s", directory);
+        return;
+    }
+
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%spreview.png", directory);
+
+    if (!write_png(path, pixels, _cmap)) {
+        saves_log("preview: could not write %s", path);
+    }
+}
+
+static void save_play_time(const char* directory)
+{
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%sVaultOS.json", directory);
+
+    const unsigned int previous = readPlayTime(path);
+    const unsigned int total = previous + _playTimeMs / 1000;
+
+    FILE* fp = fopen(path, "wb");
+    if (fp == nullptr) {
+        saves_log("time: could not write %s", path);
+        return;
+    }
+
+    fprintf(fp, "{\n  \"playSeconds\": %u,\n  \"level\": %d,\n  \"xp\": %d\n}\n",
+        total,
+        pcGetStat(PC_STAT_LEVEL),
+        pcGetStat(PC_STAT_EXPERIENCE));
+    fclose(fp);
+}
+
+// The picture and the time written beside a save, in the slot folder the game
+// has just written into, so the launcher can show them without the game.
+static void save_sidecars(int slot)
+{
+    char directory[COMPAT_MAX_PATH];
+    if (!lsgSaveSlotDirectory(slot, directory, sizeof(directory))) {
+        saves_log("save: no folder for slot %.2d", slot + 1);
+        return;
+    }
+
+    save_preview(directory, _snapshotBuf);
+    save_play_time(directory);
+
+    _playTimeMs = 0;
+}
+
+// A save written before the launcher showed pictures has none of its own: the
+// picture is inside the save, at the offset the game reads it back from, and
+// the palette it was drawn with is color.pal - so every slot without a picture
+// gets one, without the save being written again.
+void loadsave_preview_all(void)
+{
+    if (_patches == nullptr) {
+        _patches = settings.system.master_patches_path.c_str();
+    }
+
+    colorPaletteLoad("color.pal");
+
+    char root[COMPAT_MAX_PATH];
+    snprintf(root, sizeof(root), "%sSAVEGAME", _patches);
+    compat_windows_path_to_native(root);
+
+    static unsigned char thumbnail[LS_PREVIEW_SIZE];
+
+    for (int slot = 1; slot <= 10; slot++) {
+        char savePath[COMPAT_MAX_PATH];
+        snprintf(savePath, sizeof(savePath), "%s/SLOT%.2d/SAVE.DAT", root, slot);
+
+        FILE* save = fopen(savePath, "rb");
+        if (save == nullptr) {
+            continue;
+        }
+
+        char previewPath[COMPAT_MAX_PATH];
+        snprintf(previewPath, sizeof(previewPath), "%s/SLOT%.2d/preview.png", root, slot);
+
+        FILE* existing = fopen(previewPath, "rb");
+        if (existing != nullptr) {
+            fclose(existing);
+            fclose(save);
+            continue;
+        }
+
+        const bool read = fseek(save, 131, SEEK_SET) == 0
+            && fread(thumbnail, 1, sizeof(thumbnail), save) == sizeof(thumbnail);
+        fclose(save);
+
+        if (!read) {
+            saves_log("preview: could not read %s", savePath);
+            continue;
+        }
+
+        if (!write_png(previewPath, thumbnail, _cmap)) {
+            saves_log("preview: could not write %s", previewPath);
+        }
+    }
+}
+
+// The state the game's own load screen has ready before it opens a slot: the
+// messages it reads, the snapshot it skips over, the mouse it puts away and
+// the cycle it stops while the files are copied. A load that ran without any
+// of it is what left the menu on screen instead of the map.
+static bool lsgDirectStarted;
+
+static int lsgDirectStart(void)
+{
+    gLoadSaveWindowOldFont = fontGetCurrent();
+    fontSetCurrent(103);
+
+    if (!messageListInit(&gLoadSaveMessageList)) {
+        saves_log("load: no message list");
+        fontSetCurrent(gLoadSaveWindowOldFont);
+        return -1;
+    }
+
+    snprintf(_str, sizeof(_str), "%s%s", asc_5186C8, LSGAME_MSG_NAME);
+    if (!messageListLoad(&gLoadSaveMessageList, _str)) {
+        saves_log("load: could not read %s", _str);
+        messageListFree(&gLoadSaveMessageList);
+        fontSetCurrent(gLoadSaveWindowOldFont);
+        return -1;
+    }
+
+    _snapshot = (unsigned char*)internal_malloc(61632);
+    if (_snapshot == nullptr) {
+        messageListFree(&gLoadSaveMessageList);
+        fontSetCurrent(gLoadSaveWindowOldFont);
+        return -1;
+    }
+
+    _thumbnail_image = _snapshot;
+    _snapshotBuf = _snapshot + LS_PREVIEW_SIZE;
+
+    colorCycleDisable();
+    gameMouseSetCursor(MOUSE_CURSOR_ARROW);
+
+    lsgDirectStarted = true;
+    return 0;
+}
+
+static void lsgDirectEnd(void)
+{
+    if (!lsgDirectStarted) {
+        return;
+    }
+
+    lsgDirectStarted = false;
+
+    colorCycleEnable();
+    gameMouseSetCursor(MOUSE_CURSOR_ARROW);
+
+    if (_snapshot != nullptr) {
+        internal_free(_snapshot);
+        _snapshot = nullptr;
+    }
+
+    _thumbnail_image = nullptr;
+    _snapshotBuf = nullptr;
+
+    messageListFree(&gLoadSaveMessageList);
+    fontSetCurrent(gLoadSaveWindowOldFont);
+}
+
 // LoadGame
 // 0x47C640
 int lsgLoadGame(int mode)
@@ -889,6 +1263,36 @@ int lsgLoadGame(int mode)
 
     _ls_error_code = 0;
     _patches = settings.system.master_patches_path.c_str();
+
+    // A save the launcher picked opens straight away, without the game's own
+    // load screen: the same slot load the quick path uses, with the state that
+    // screen has ready before it.
+    const int requestedSlot = loadsave_take_pending_slot();
+    if (requestedSlot >= 0) {
+        int rc = -1;
+
+        if (lsgDirectStart() == -1) {
+            return -1;
+        }
+
+        _slot_cursor = requestedSlot;
+
+        // The slots are read before one is opened: the header, the map and
+        // everything a save restores are taken from that list.
+        if (_GetSlotList() == -1) {
+            saves_log("load: no slot list");
+        } else if (_LSstatus[requestedSlot] != SLOT_STATE_OCCUPIED) {
+            saves_log("load: slot %.2d is %d", requestedSlot + 1, _LSstatus[requestedSlot]);
+        } else if (lsgLoadGameInSlot(requestedSlot) == -1) {
+            saves_log("load: slot %.2d did not open", requestedSlot + 1);
+        } else {
+            rc = 1;
+        }
+
+        lsgDirectEnd();
+
+        return rc;
+    }
 
     if (mode == LOAD_SAVE_MODE_QUICK && _quick_done) {
         int quickSaveWindowX = (screenGetWidth() - LS_WINDOW_WIDTH) / 2;
@@ -1700,6 +2104,16 @@ static int lsgLoadGameInSlot(int slot)
 {
     _loadingGame = true;
 
+    // The slot asked for is the one the whole load works on: its header, the
+    // files it reads and the data it fills are all found by the slot the
+    // window would have selected, which was still the first one.
+    _slot_cursor = slot;
+
+    // The save's own time is in its sidecar; the stretch played since this
+    // session started belongs to the save that is about to be written, not to
+    // the one being opened.
+    _playTimeMs = 0;
+
     if (isInCombat()) {
         interfaceBarEndButtonsHide(false);
         _combat_over_from_load();
@@ -1892,6 +2306,10 @@ static int lsgSaveHeaderInSlot(int slot)
     if (fileWrite(mapName, 1, 128, _flptr) != 128) {
         return -1;
     }
+
+    // The picture and the time beside the save, so the launcher can show them
+    // without starting the game.
+    save_sidecars(slot);
 
     _ls_error_code = 0;
 
