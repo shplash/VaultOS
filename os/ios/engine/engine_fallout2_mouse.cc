@@ -450,6 +450,12 @@ static void iosListReset();
 
 #define IOS_LIST_HOLD_MS 280
 #define IOS_LIST_SLOP_POINTS 6
+// A finger that has travelled further than this is scrolling the list, however
+// slowly it goes. How far it has ended up from where it landed is not enough
+// on its own: a slow scroll creeps along a point or two at a time and can stay
+// inside the slop for the whole hold, which is how a slow scroll ended up
+// picking up whatever the finger was lying on.
+#define IOS_LIST_STILL_POINTS 4
 #define IOS_LIST_SLOT_WIDTH 64
 #define IOS_LIST_SLOT_HEIGHT 48
 
@@ -461,10 +467,14 @@ static bool iosListScrolled;
 static bool iosListWheel;
 static int iosListStartX;
 static int iosListStartY;
+static int iosListLastX;
 static int iosListLastY;
 static unsigned int iosListStartMs;
 static int iosListStep;
 static int iosListAccum;
+// Every point the finger has travelled since it landed on the list, counted
+// along the way rather than from where it started.
+static int iosListPath;
 static int iosListScrollX = -1;
 static int iosListScreen = -1;
 
@@ -473,6 +483,7 @@ static void iosListReset()
     iosListPending = false;
     iosListScrolled = false;
     iosListAccum = 0;
+    iosListPath = 0;
     iosListScrollX = -1;
 }
 
@@ -565,6 +576,16 @@ static void iosListFollow(int x, int y)
 {
     if (iosListPending && iosListScrollX >= 0) {
         x = iosListScrollX;
+    }
+
+    // The game scrolls the list the pointer is over, so a scroll stops dead
+    // the moment the pointer leaves it. Once one has begun the pointer stays
+    // where the finger landed on the list - a menu draws no cursor, so nothing
+    // is seen standing still - and the wheel keeps reaching that list however
+    // far the finger travels past it.
+    if (iosListPending && iosListScrolled) {
+        x = iosListStartX;
+        y = iosListStartY;
     }
 
     mouseIosMovePointer(x, y);
@@ -743,7 +764,17 @@ void _mouse_info()
                     const int movedX = abs(gesture.x - iosListStartX);
                     const int movedY = abs(gesture.y - iosListStartY);
 
-                    if (movedX > slop || movedY > slop) {
+                    // Everything the finger travels counts, however slowly it
+                    // travels: a scroll is scrolling from the first point on,
+                    // rather than waiting out the hold inside the slop and
+                    // grabbing the item the finger was lying on.
+                    iosListPath += abs(gesture.x - iosListLastX)
+                        + abs(gesture.y - iosListLastY);
+                    iosListLastX = gesture.x;
+
+                    if (movedX > slop || movedY > slop || iosListPath > IOS_LIST_STILL_POINTS) {
+                        iosListScrolled = true;
+
                         if (iosListStep > 0 && !iosListWheel) {
                             iosListAccum += gesture.y - iosListLastY;
 
@@ -755,13 +786,14 @@ void _mouse_info()
                                 _raw_buttons |= MOUSE_EVENT_WHEEL;
                                 iosListAccum -= direction * iosListStep;
                                 iosListWheel = true;
-                                iosListScrolled = true;
                             }
                         }
 
                         iosListLastY = gesture.y;
                         break;
                     }
+
+                    iosListLastY = gesture.y;
 
                     if (now - iosListStartMs >= IOS_LIST_HOLD_MS) {
                         iosListPending = false;
@@ -776,9 +808,11 @@ void _mouse_info()
                     iosListPending = true;
                     iosListScrolled = false;
                     iosListAccum = 0;
+                    iosListPath = 0;
                     iosListStep = step;
                     iosListStartX = gesture.x;
                     iosListStartY = gesture.y;
+                    iosListLastX = gesture.x;
                     iosListLastY = gesture.y;
                     iosListStartMs = SDL_GetTicks();
                     break;
