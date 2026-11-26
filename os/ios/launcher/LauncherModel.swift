@@ -1048,10 +1048,19 @@ final class LauncherModel: ObservableObject {
             let file = (try? FileManager.default.contentsOfDirectory(at: entry, includingPropertiesForKeys: nil))?.first {
                 $0.lastPathComponent.uppercased() == "SAVE.DAT"
             }
-            let data = file.flatMap { try? Data(contentsOf: $0) } ?? Data()
 
-            let name = readString(data, at: 29, length: 32)
-            let description = readString(data, at: 61, length: 30)
+            // A slot folder with no save in it is not a save. The game makes
+            // all ten slot folders as it saves, and counting those made the
+            // three saves read as ten, six of them empty.
+            guard let saveFile = file, let data = try? Data(contentsOf: saveFile) else {
+                continue
+            }
+
+            // The character's name is written beside the save's own, and the
+            // save's name is the one the player typed for it - the one worth
+            // showing, with the character's own when it has none.
+            let character = readString(data, at: 29, length: 32)
+            let saveName = readString(data, at: 61, length: 30)
             let gameMonth = readShort(data, at: 101)
             let gameDay = readShort(data, at: 103)
             let gameYear = readShort(data, at: 105)
@@ -1068,8 +1077,8 @@ final class LauncherModel: ObservableObject {
 
             result.append(LauncherSave(id: slot,
                                        slot: slot,
-                                       name: name,
-                                       detail: description.isEmpty ? L.t("Saved game") : description,
+                                       name: saveName.isEmpty ? character : saveName,
+                                       detail: character,
                                        saved: saved,
                                        played: played,
                                        level: sidecar.level,

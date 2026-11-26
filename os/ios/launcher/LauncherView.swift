@@ -20,10 +20,13 @@ struct LauncherView: View {
     @State private var pendingImport: LauncherImport = .game
     @State private var savesScroll: CGFloat = 0
     @State private var savesDragStart: CGFloat?
-    /// Where the saves row sits on the home card, in the card's own
-    /// coordinates, and whether the page drag in progress is the card's own. A
-    /// drag that starts on the row slides the slots and must not page the card.
-    @State private var savesRect: CGRect = .zero
+    /// The save the player picked. Choosing one loads nothing: CONTINUE does
+    /// that, so a slot can be looked at before a game is taken from it.
+    @State private var selectedSlot: Int?
+    /// Where the saves box sits on the home card and how far its slots can
+    /// slide, in the card's own coordinates, so the card's drag can tell a
+    /// drag across it from one on the page behind it.
+    @State private var savesBox = SavesBox()
     @State private var pagingDrag = false
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
@@ -297,59 +300,43 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
+    /// The saves, from the line under the hero to the bottom of the card. The
+    /// box has no header of its own: that line is the header, and the room it
+    /// would take is the room the slots need.
     private func savesColumn(game: FalloutGame,
                              width: CGFloat,
                              rowHeight: CGFloat,
                              selected: Bool) -> some View {
-        // The whole box scrolls the slots: from the line under the hero to the
-        // bottom of the card, up to the divider. A drag anywhere in it slides
-        // them, and the page turn beside it is left to itself.
+        // Three slots across, as wide as the box allows and as tall as its
+        // captions leave, so the row is exactly three slots wide to scroll.
         let spacing: CGFloat = 8
         let perRow = 3
         let fitWidth = max(48, (width - CGFloat(perRow - 1) * spacing) / CGFloat(perRow))
-        let fitHeight = max(38, min(132 * 133 / 224, rowHeight - 56))
+        let fitHeight = max(40, rowHeight - 34)
         let cardWidth = min(fitWidth, fitHeight * 224 / 133)
         let cardHeight = cardWidth * 133 / 224
         let content = CGFloat(10) * cardWidth + CGFloat(9) * spacing
         let limit = min(0, width - content)
 
-        return VStack(alignment: .leading, spacing: 7) {
-            headerLine(L.t("Saves"))
-
-            savesRow(game: game,
-                     width: width,
-                     cardWidth: cardWidth,
-                     cardHeight: cardHeight,
-                     limit: limit)
-        }
-        .frame(width: width, height: rowHeight, alignment: .topLeading)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 8)
-                .onChanged { value in
-                    guard abs(value.translation.width) > abs(value.translation.height) else {
-                        return
-                    }
-                    if savesDragStart == nil {
-                        savesDragStart = savesScroll
-                    }
-                    savesScroll = min(0, max(limit, (savesDragStart ?? 0) + value.translation.width))
+        return savesRow(game: game,
+                        width: width,
+                        cardWidth: cardWidth,
+                        cardHeight: cardHeight,
+                        limit: limit)
+            .frame(width: width, height: rowHeight, alignment: .topLeading)
+            .contentShape(Rectangle())
+            // The card's own drag slides these slots. Only the box on screen
+            // reports where it is: the other one is laid out a page away.
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: SavesBoxKey.self,
+                        value: selected
+                            ? SavesBox(rect: geometry.frame(in: .named(LauncherView.cardSpace)),
+                                       limit: limit)
+                            : SavesBox())
                 }
-                .onEnded { _ in
-                    savesDragStart = nil
-                    savesScroll = min(0, max(limit, savesScroll))
-                }
-        )
-        // The page turn beside this box gives way to it only where the box
-        // actually is, which is what this measures. Only the card on screen
-        // reports: the other one is laid out a page away.
-        .background(
-            GeometryReader { geometry in
-                Color.clear.preference(
-                    key: SavesBoxFrameKey.self,
-                    value: selected ? geometry.frame(in: .named(LauncherView.cardSpace)) : .zero)
-            }
-        )
+            )
     }
 
     /// The game data, to the right of the saves. Its buttons sit under the
@@ -361,8 +348,7 @@ struct LauncherView: View {
     private func gameDataColumn(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             headerLine(L.t("Game data"),
-                       badge: info.installed == 1 ? "DONE" : "NEEDED",
-                       badgeColour: game.accent)
+                       badge: info.installed == 1 ? "DONE" : "NEEDED")
 
             Button {
                 pendingImport = .language
@@ -419,6 +405,7 @@ struct LauncherView: View {
             ForEach(1...10, id: \.self) { slot in
                 saveCard(slot: slot,
                          save: model.saves.first { $0.slot == slot },
+                         selected: selectedSlot == slot,
                          width: cardWidth,
                          height: cardHeight)
             }
@@ -431,10 +418,12 @@ struct LauncherView: View {
 
     private func saveCard(slot: Int,
                           save: LauncherModel.LauncherSave?,
+                          selected: Bool,
                           width: CGFloat,
                           height: CGFloat) -> some View {
         // The slot number is the card's own, drawn in the empty placeholder,
-        // so a card without a save says only what it is and that it is empty.
+        // and the title is the save's own name: the character's name is the
+        // same on every save that character made.
         let title = save?.name ?? ""
         let line = save.map { "\($0.played) · \(L.t("LEVEL")) \($0.level)" } ?? L.t("EMPTY")
 
@@ -477,13 +466,20 @@ struct LauncherView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .frame(width: width, alignment: .leading)
+        .frame(width: width, height: height + 34, alignment: .topLeading)
         .contentShape(Rectangle())
+        .overlay(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .stroke(selected ? Color.white.opacity(0.72) : Color.clear, lineWidth: 1)
+        )
         .onTapGesture {
-            if let save = save {
-                LauncherMusic.shared.stop()
-                model.play(onPlay: onPlay, loadSlot: save.slot)
+            guard let save = save else {
+                return
             }
+
+            // Picking a slot only picks it: CONTINUE takes the game from it,
+            // and picking the one already picked lets it go.
+            selectedSlot = selectedSlot == save.slot ? nil : save.slot
         }
         .contextMenu {
             if let save = save {
@@ -515,7 +511,7 @@ struct LauncherView: View {
     private var playButton: some View {
         Button {
             LauncherMusic.shared.stop()
-            if let save = model.saves.first {
+            if let save = selectedSave ?? model.saves.first {
                 model.play(onPlay: onPlay, loadSlot: save.slot)
             } else {
                 model.play(onPlay: onPlay)
@@ -539,12 +535,21 @@ struct LauncherView: View {
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
 
+    /// The save the player picked, if it is still there.
+    private var selectedSave: LauncherModel.LauncherSave? {
+        guard let slot = selectedSlot else {
+            return nil
+        }
+
+        return model.saves.first { $0.slot == slot }
+    }
+
     private var statusText: String {
         if model.isInstalling {
             return L.t("INSTALLING")
         }
 
-        if let save = model.saves.first {
+        if let save = selectedSave ?? model.saves.first {
             return save.name.uppercased()
         }
 
@@ -605,13 +610,14 @@ struct LauncherView: View {
                 .frame(width: width, height: geometry.size.height - 36)
                 .clipped()
                 .contentShape(Rectangle())
-                // Simultaneous, not high priority: the saves row keeps its own
-                // drag, and the page turn skips only the drags that begin on
-                // it, so the slots scroll without either gesture winning.
+                // One gesture for the whole card: a drag that begins in the
+                // saves box slides its slots, and any other turns the page.
+                // Two gestures competing is what left the box scrolling the
+                // page instead of itself.
                 .coordinateSpace(name: LauncherView.cardSpace)
                 .simultaneousGesture(homePagingGesture(width: pageWidth))
-                .onPreferenceChange(SavesBoxFrameKey.self) { rect in
-                    savesRect = rect
+                .onPreferenceChange(SavesBoxKey.self) { box in
+                    savesBox = box
                 }
 
                 gameSwitcher(progress: progress)
@@ -625,13 +631,21 @@ struct LauncherView: View {
     }
 
     private func homePagingGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 12)
+        DragGesture(minimumDistance: 8)
             .onChanged { value in
-                // A drag that began on the saves row is the row's: it slides
-                // the slots and leaves the page where it is.
-                guard !savesRect.contains(value.startLocation) else {
+                // A drag that began in the saves box slides its slots: the
+                // page stays where it is, however far the finger travels.
+                if savesBox.rect.contains(value.startLocation) {
+                    if savesDragStart == nil {
+                        savesDragStart = savesScroll
+                    }
+                    savesScroll = min(0, max(savesBox.limit,
+                                             (savesDragStart ?? 0) + value.translation.width))
+                    pagingDrag = false
+                    homeDrag = 0
                     return
                 }
+
                 guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
                     return
                 }
@@ -651,8 +665,14 @@ struct LauncherView: View {
                 dragWatchdog?.cancel()
                 dragWatchdog = nil
 
-                // Ending a drag the saves row took, or one that never turned
-                // into a page drag: there is nothing here to settle.
+                // A drag the saves box took ends with the slots where the
+                // finger left them, and nothing else to settle.
+                if savesDragStart != nil {
+                    savesDragStart = nil
+                    savesScroll = min(0, max(savesBox.limit, savesScroll))
+                    return
+                }
+
                 guard pagingDrag else {
                     return
                 }
@@ -2025,14 +2045,20 @@ private extension FalloutGame {
     }
 }
 
-/// Where the saves box sits on the home card, measured in the card's own
-/// coordinates, so a page turn knows which drags belong to the box.
-private struct SavesBoxFrameKey: PreferenceKey {
-    static var defaultValue: CGRect {
-        return .zero
+/// Where the saves box sits on the home card, and how far its slots can slide,
+/// measured in the card's own coordinates, so the card's drag knows which
+/// drags belong to the box.
+private struct SavesBox: Equatable {
+    var rect: CGRect = .zero
+    var limit: CGFloat = 0
+}
+
+private struct SavesBoxKey: PreferenceKey {
+    static var defaultValue: SavesBox {
+        return SavesBox()
     }
 
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+    static func reduce(value: inout SavesBox, nextValue: () -> SavesBox) {
         value = nextValue()
     }
 }
