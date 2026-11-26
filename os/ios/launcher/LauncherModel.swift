@@ -164,6 +164,11 @@ final class LauncherModel: ObservableObject {
                 refreshInstall()
             }
 
+            // The other game's saves are its own: its folder holds them, and
+            // the list of the one just left was all the launcher had. Reading
+            // it again is what keeps Fallout 1's saves out of Fallout 2.
+            refreshSaves()
+
             loadSettings(for: selectedGame)
         }
     }

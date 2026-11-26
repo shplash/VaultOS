@@ -444,11 +444,16 @@ struct LauncherView: View {
 
         return HStack(spacing: spacing) {
             ForEach(1...10, id: \.self) { slot in
-                // The save CONTINUE would open carries the game's own colour:
-                // the one that was picked, or the newest while none is.
+                let save = model.saves.first { $0.slot == slot }
+
+                // A slot with a save on it takes the game's own colour when
+                // it is the one CONTINUE would open - the one that was
+                // picked, or the newest while none is. An empty slot is only
+                // ever a white line, and only while it is the one picked.
                 saveCard(slot: slot,
-                         save: model.saves.first { $0.slot == slot },
-                         active: slot == (selectedSlot ?? model.saves.first?.slot),
+                         save: save,
+                         active: save != nil && slot == (selectedSlot ?? model.saves.first?.slot),
+                         chosen: save == nil && slot == selectedSlot,
                          width: cardWidth,
                          height: cardHeight)
             }
@@ -462,6 +467,7 @@ struct LauncherView: View {
     private func saveCard(slot: Int,
                           save: LauncherModel.LauncherSave?,
                           active: Bool,
+                          chosen: Bool,
                           width: CGFloat,
                           height: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -501,20 +507,19 @@ struct LauncherView: View {
             }
         }
         // Both lines are drawn inside the picture's own edge: the grey one
-        // every slot has, and the game's own colour on the save that
-        // CONTINUE would open. Drawing them inside is what covers the edge
-        // of the scaled shot rather than sitting outside it.
+        // every slot has, the game's own colour on the save that CONTINUE
+        // would open, and a whiter one on an empty slot that is picked.
+        // Drawing them inside is what covers the edge of the scaled shot
+        // rather than sitting outside it.
         .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30), lineWidth: 1))
         .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1))
+        .overlay(shape.strokeBorder(chosen ? Color.white.opacity(0.9) : Color.clear, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
-            guard let save = save else {
-                return
-            }
-
-            // Picking a slot only picks it: CONTINUE takes the game from it,
-            // and picking the one already picked lets it go.
-            selectedSlot = selectedSlot == save.slot ? nil : save.slot
+            // Any slot is picked, empty or not: an empty one names the next
+            // game instead of a save to go back to, and picking the one
+            // already picked lets it go.
+            selectedSlot = selectedSlot == slot ? nil : slot
         }
         .contextMenu {
             if let save = save {
@@ -639,14 +644,19 @@ struct LauncherView: View {
 
         return Button {
             LauncherMusic.shared.stop()
-            if let save = selectedSave ?? model.saves.first {
+
+            // A slot with no save on it is the next game rather than a save
+            // to go back to, so it starts the launcher's own game: the menu
+            // it always opens, instead of loading a save that is not there.
+            if selectedSlot == nil || selectedSave != nil,
+               let save = selectedSave ?? model.saves.first {
                 model.play(onPlay: onPlay, loadSlot: save.slot)
             } else {
                 model.play(onPlay: onPlay)
             }
         } label: {
             VStack(spacing: 3) {
-                Text(L.t(model.saves.isEmpty ? "PLAY" : "CONTINUE"))
+                Text(buttonTitle)
                     .font(Vault.display(24))
                     .kerning(titleKerning)
                     .padding(.trailing, -titleKerning)
@@ -687,13 +697,31 @@ struct LauncherView: View {
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
 
-    /// The save the player picked, if it is still there.
+    /// The save the player picked, if there is one on that slot. A slot picked
+    /// with nothing on it is not a save at all.
     private var selectedSave: LauncherModel.LauncherSave? {
         guard let slot = selectedSlot else {
             return nil
         }
 
         return model.saves.first { $0.slot == slot }
+    }
+
+    /// Whether the picked slot is an empty one, which is the next game rather
+    /// than a save to go back to.
+    private var picksEmptySlot: Bool {
+        return selectedSlot != nil && selectedSave == nil
+    }
+
+    /// What the button says. It opens a save when there is one - picked, or
+    /// the newest while nothing is picked - and starts a new game on an empty
+    /// slot or with no save at all.
+    private var buttonTitle: String {
+        if model.saves.isEmpty || picksEmptySlot {
+            return L.t("PLAY")
+        }
+
+        return L.t("CONTINUE")
     }
 
     /// INSTALLING with the dots after it moving, so a long import is seen to
@@ -707,6 +735,12 @@ struct LauncherView: View {
             return installingLabel
         }
 
+        // An empty slot is the next game rather than a save to go back to, so
+        // the button names the game it starts instead of a save's name.
+        if picksEmptySlot {
+            return L.t("NEW GAME")
+        }
+
         if let save = selectedSave ?? model.saves.first {
             return save.name.uppercased()
         }
@@ -716,9 +750,9 @@ struct LauncherView: View {
 
     /// How long the save CONTINUE opens has been played and how far the
     /// character has got, under its name in the button: the two things worth
-    /// knowing before going back to it.
+    /// knowing before going back to it. A new game has neither to show.
     private var continueDetail: String? {
-        guard !model.isInstalling else {
+        guard !model.isInstalling, !picksEmptySlot else {
             return nil
         }
 
@@ -991,7 +1025,7 @@ struct LauncherView: View {
             hero(game: game)
 
             Rectangle()
-                .fill(gameAccent.opacity(0.55))
+                .fill(gameAccent.opacity(0.8))
                 .frame(height: 1)
 
             // The saves sit on the card's bottom line, which is the line the
@@ -1115,13 +1149,13 @@ struct LauncherView: View {
                     // line above them.
                     HStack(spacing: 0) {
                         plainLink("GITHUB",
-                                  symbol: "arrow.triangle.branch",
+                                  mark: "github",
                                   address: "https://github.com/shplash/vaultos")
 
                         Spacer(minLength: 10)
 
                         plainLink(L.t("SUPPORT ME"),
-                                  symbol: supportSymbol,
+                                  mark: "hand-heart",
                                   address: "https://ko-fi.com/shplash")
                     }
                     .frame(width: LauncherView.heroEditionWidth, alignment: .leading)
@@ -1136,29 +1170,22 @@ struct LauncherView: View {
         .frame(minHeight: LauncherView.heroHeight, maxHeight: .infinity)
     }
 
-    /// The mark that says a link is about supporting the work: a hand with a
-    /// heart in it on the iOS that draws one, and hands holding something
-    /// on the older ones, which the app still runs on.
-    private var supportSymbol: String {
-        if #available(iOS 16.0, *) {
-            return "hand.heart.fill"
-        }
-
-        return "hands.sparkles.fill"
-    }
-
-    private func plainLink(_ title: String, symbol: String, address: String) -> some View {
+    /// One of the two links under the edition: the mark it is drawn with, in
+    /// a small dark circle, then its name. The marks are the real ones - the
+    /// GitHub mark and Lucide's hand and heart - as vector assets, drawn as
+    /// templates so they take the light colour rather than their own dark one.
+    private func plainLink(_ title: String, mark: String, address: String) -> some View {
         Button {
             if let url = URL(string: address) {
                 UIApplication.shared.open(url)
             }
         } label: {
             HStack(spacing: 5) {
-                // A dark circle with a light mark in it: the mark says what
-                // the link is without a word, and stays white rather than
-                // taking the game's accent.
-                Image(systemName: symbol)
-                    .font(.system(size: 9, weight: .semibold))
+                Image(mark)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 10, height: 10)
                     .foregroundColor(Theme.text)
                     .frame(width: 16, height: 16)
                     .background(Circle().fill(Color.black.opacity(0.35)))
