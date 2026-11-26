@@ -149,6 +149,17 @@ struct LauncherView: View {
                 LauncherMusic.shared.playIfAvailable()
             }
         }
+        .onChange(of: model.selectedGame) { _ in
+            // A picked save belongs to the game it was picked in, and the
+            // slots it was scrolled to.
+            selectedSlot = nil
+            savesScroll = 0
+        }
+        .onChange(of: model.saves.count) { _ in
+            if selectedSave == nil {
+                selectedSlot = nil
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             // The app's Documents folder is in the Files app now, so game files
             // and saves can be dropped in while the launcher is in the
@@ -2059,7 +2070,13 @@ private struct SavesBoxKey: PreferenceKey {
     }
 
     static func reduce(value: inout SavesBox, nextValue: () -> SavesBox) {
-        value = nextValue()
+        // Both cards are laid out, and only the one on screen has a box: an
+        // empty answer never replaces a real one, or the page away would
+        // leave the card on screen with nothing to scroll.
+        let next = nextValue()
+        if next.rect != .zero {
+            value = next
+        }
     }
 }
 
