@@ -432,9 +432,11 @@ struct LauncherView: View {
 
         return HStack(spacing: spacing) {
             ForEach(1...10, id: \.self) { slot in
+                // The save CONTINUE would open carries the game's own colour:
+                // the one that was picked, or the newest while none is.
                 saveCard(slot: slot,
                          save: model.saves.first { $0.slot == slot },
-                         selected: selectedSlot == slot,
+                         active: slot == (selectedSlot ?? model.saves.first?.slot),
                          width: cardWidth,
                          height: cardHeight)
             }
@@ -447,12 +449,12 @@ struct LauncherView: View {
 
     private func saveCard(slot: Int,
                           save: LauncherModel.LauncherSave?,
-                          selected: Bool,
+                          active: Bool,
                           width: CGFloat,
                           height: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
-        // The plate sits a little in from the picture's own corners, so it
-        // reads as laid on the shot rather than as part of its frame.
+        // The plate sits the same distance in from the picture's corner on
+        // every side, so it reads as laid on the shot.
         let inset = max(4, min(width, height) * 0.03)
 
         return Group {
@@ -466,22 +468,31 @@ struct LauncherView: View {
                         alignment: .topLeading
                     )
             } else {
-                // An empty slot is its own number and nothing else: there is
-                // no save on it to name.
+                // An empty slot is a picture that is not there yet: its own
+                // mark, and EMPTY under it, both in the grey of the notes.
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(Color.white.opacity(0.05))
                     .frame(width: width, height: height)
                     .overlay(
-                        Text(verbatim: "\(slot)")
-                            .font(Vault.label(11, weight: .bold))
-                            .foregroundColor(Theme.faint)
+                        VStack(spacing: 6) {
+                            Image(systemName: "square.dashed")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(Theme.faint)
+
+                            Text(L.t("EMPTY"))
+                                .font(Vault.label(8, weight: .regular))
+                                .kerning(1.0)
+                                .foregroundColor(Theme.faint)
+                        }
                     )
             }
         }
-        // A faint grey line around every shot, and the outline a picked slot
-        // has always had on top of it: one sign of which save is chosen.
-        .overlay(shape.stroke(Color(white: 0.72).opacity(0.30), lineWidth: 1))
-        .overlay(shape.stroke(selected ? Color.white.opacity(0.72) : Color.clear, lineWidth: 1))
+        // Both lines are drawn inside the picture's own edge: the grey one
+        // every slot has, and the game's own colour on the save that
+        // CONTINUE would open. Drawing them inside is what covers the edge
+        // of the scaled shot rather than sitting outside it.
+        .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30), lineWidth: 1))
+        .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
             guard let save = save else {
@@ -499,9 +510,9 @@ struct LauncherView: View {
         }
     }
 
-    /// A save's own picture. It is drawn a point smaller than its card and
-    /// clipped to the card's corners, so the outermost row and column of the
-    /// scaled shot - the edge the palette smears along it - are not on show.
+    /// A save's own picture, drawn out to the card's edges and clipped to
+    /// its corners, so the line over it is the only thing on its outer
+    /// pixels rather than sitting outside them.
     @ViewBuilder
     private func savePicture(save: LauncherModel.LauncherSave,
                              width: CGFloat,
@@ -512,9 +523,8 @@ struct LauncherView: View {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .frame(width: max(1, width - 1), height: max(1, height - 1))
-                .clipped()
                 .frame(width: width, height: height)
+                .clipped()
                 .clipShape(shape)
         } else {
             shape
@@ -527,22 +537,26 @@ struct LauncherView: View {
     /// small, see-through, and set in from the picture's corner by a little,
     /// so the shot is still the card and the plate is read on top of it.
     private func savePlate(save: LauncherModel.LauncherSave, width: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        // Eighteen percent smaller than the card's own type, so the plate
+        // stays a note laid on the shot rather than a panel beside it.
+        let scale: CGFloat = 0.82
+        let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
 
         return VStack(alignment: .leading, spacing: 1) {
             Text(save.name)
-                .font(Vault.label(10, weight: .semibold))
+                .font(Vault.label(10 * scale, weight: .semibold))
                 .foregroundColor(Theme.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
             Text(saveDetail(save))
-                .font(Vault.label(9, weight: .regular))
+                .font(Vault.label(9 * scale, weight: .regular))
+                .kerning(0.6)
                 .foregroundColor(Theme.faint)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 7 * scale)
+        .padding(.vertical, 5 * scale)
         // As wide as the name needs, and no further than a little over half
         // the card: a long name is cut rather than covering the shot.
         .frame(maxWidth: max(40, width * 0.58), alignment: .leading)
@@ -567,10 +581,11 @@ struct LauncherView: View {
         }
 
         if save.level > 0 {
-            parts.append("\(L.t("LEVEL")) \(save.level)")
+            parts.append("\(L.t("LVL")) \(save.level)")
         }
 
-        return parts.isEmpty ? save.saved : parts.joined(separator: " · ")
+        // The two sit as close as they can without reading as one word.
+        return parts.isEmpty ? save.saved : parts.joined(separator: "·")
     }
 
     /// Deleting is a long press away on a save card. A button's role is what
@@ -599,7 +614,7 @@ struct LauncherView: View {
         // off the middle by half of it, so that space is taken back.
         let titleKerning: CGFloat = 1.6
         let nameKerning: CGFloat = 1.3
-        let detailKerning: CGFloat = 0.9
+        let detailKerning: CGFloat = 1.4
 
         return Button {
             LauncherMusic.shared.stop()
@@ -695,10 +710,11 @@ struct LauncherView: View {
         }
 
         if save.level > 0 {
-            parts.append("\(L.t("LEVEL")) \(save.level)")
+            parts.append("\(L.t("LVL")) \(save.level)")
         }
 
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        // The two sit as close as they can without reading as one word.
+        return parts.isEmpty ? nil : parts.joined(separator: "·")
     }
 
     // MARK: - Pages
@@ -976,6 +992,11 @@ struct LauncherView: View {
 
     private static let heroTitleSize: CGFloat = 68
 
+    /// The tagline and the edition under the name, a little larger than they
+    /// were so they read as part of the branding rather than as notes on it.
+    private static let heroTaglineSize: CGFloat = 16
+    private static let heroEditionSize: CGFloat = 12
+
     /// The room the game switch takes above the title.
     private static let switchHeight: CGFloat = 30
 
@@ -990,9 +1011,12 @@ struct LauncherView: View {
 
     private static var heroHeight: CGFloat {
         let title = VaultUI.display(heroTitleSize).lineHeight
-        let tagline = VaultUI.label(14).lineHeight
-        let edition = VaultUI.label(11, weight: .bold).lineHeight
-        return 14 + switchHeight + 8 + title + 2 + tagline + 2 + edition + 2 + 4 + 20 + 14
+        let tagline = VaultUI.label(heroTaglineSize).lineHeight
+        let edition = VaultUI.label(heroEditionSize, weight: .bold).lineHeight
+        // The tagline is pulled six points up under the name, and the links
+        // are pushed back down by the same six, so they stay where they were
+        // while the two lines above them grew.
+        return 14 + switchHeight + 8 + title + 2 - 6 + tagline + 2 + edition + 2 + 7 + 20 + 14
     }
 
     private func hero(game: FalloutGame) -> some View {
@@ -1023,12 +1047,13 @@ struct LauncherView: View {
                         .minimumScaleFactor(0.5)
 
                     Text(L.t(game.tagline))
-                        .font(Vault.body(14))
+                        .font(Vault.body(LauncherView.heroTaglineSize))
                         .foregroundColor(Theme.dim)
                         .lineLimit(1)
+                        .padding(.top, -6)
 
                     Text(L.t("COMMUNITY EDITION"))
-                        .font(Vault.label(11, weight: .bold))
+                        .font(Vault.label(LauncherView.heroEditionSize, weight: .bold))
                         .kerning(2.4)
                         .foregroundColor(game.accent)
 
@@ -1036,7 +1061,7 @@ struct LauncherView: View {
                         plainLink("GITHUB", address: "https://github.com/shplash/vaultos")
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
                     }
-                    .padding(.top, 4)
+                    .padding(.top, 7)
                 }
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -1055,7 +1080,7 @@ struct LauncherView: View {
         } label: {
             HStack(spacing: 4) {
                 Text(title)
-                    .font(Vault.label(10, weight: .semibold))
+                    .font(Vault.label(LauncherView.heroEditionSize, weight: .semibold))
                     .kerning(1.0)
 
                 Image(systemName: "arrow.up.right")
