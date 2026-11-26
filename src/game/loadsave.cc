@@ -378,28 +378,33 @@ int loadsave_take_pending_slot(void)
     return slot;
 }
 
-// The folder the save being written lives in, taken from the path the save is
-// being written to.
+// The folder the save being written lives in, as a path a plain file call can
+// use. The game's own file layer writes relative to the data folder and with
+// Windows separators, and it is the one that creates the slot folders - so
+// `fopen`, which knows neither, wrote nothing at all, and the preview and the
+// saved time never appeared.
 static bool slot_directory(char* out, size_t size)
 {
     if (size < 2 || gmpath[0] == '\0') {
         return false;
     }
 
-    strncpy(out, gmpath, size - 1);
-    out[size - 1] = '\0';
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%s%s", patches != NULL ? patches : "", gmpath);
+    compat_windows_path_to_native(path);
 
-    char* separator = strrchr(out, '\\');
-    const char* forward = strrchr(out, '/');
-    if (forward != NULL && (separator == NULL || forward > separator)) {
-        separator = (char*)forward;
-    }
-
+    char* separator = strrchr(path, '/');
     if (separator == NULL) {
         return false;
     }
 
     separator[1] = '\0';
+
+    if (strlen(path) >= size) {
+        return false;
+    }
+
+    strcpy(out, path);
     return true;
 }
 
@@ -1100,6 +1105,19 @@ int LoadGame(int mode)
     // load screen: the same slot load the quick path uses.
     const int requestedSlot = loadsave_take_pending_slot();
     if (requestedSlot >= 0) {
+        if (!config_get_string(&game_config, GAME_CONFIG_SYSTEM_KEY, GAME_CONFIG_MASTER_PATCHES_KEY, &patches)) {
+            debug_printf("\nLOADSAVE: Error reading patches config variable! Using default.\n");
+            patches = emgpath;
+        }
+
+        // The slots are read before one is loaded. The header, the map and
+        // everything a save restores are taken from that list, and without it
+        // the load failed and the main menu came back instead of the map.
+        slot_cursor = requestedSlot;
+        if (GetSlotList() == -1) {
+            return -1;
+        }
+
         if (LoadSlot(requestedSlot) != -1) {
             gmouse_set_cursor(MOUSE_CURSOR_ARROW);
             return 1;
@@ -1857,7 +1875,12 @@ static int LoadSlot(int slot)
 
     loadingGame = 1;
 
-    snprintf(gmpath, sizeof(gmpath), "%s\\%s%.2d\\", "SAVEGAME", "SLOT", slot_cursor + 1);
+    // The slot asked for is the one the whole load works on: its header, the
+    // files it reads and the data it fills are all found by the slot the
+    // window would have selected, which was still the first one.
+    slot_cursor = slot;
+
+    snprintf(gmpath, sizeof(gmpath), "%s\\%s%.2d\\", "SAVEGAME", "SLOT", slot + 1);
     strcat(gmpath, "SAVE.DAT");
 
     LoadSaveSlotData* ptr = &(LSData[slot]);
