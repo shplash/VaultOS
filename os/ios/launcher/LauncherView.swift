@@ -687,12 +687,13 @@ struct LauncherView: View {
                         .multilineTextAlignment(.center)
                 }
             }
+            // The button keeps one height whether a save's line sits under
+            // its name or not. The height is set inside the style rather
+            // than outside it, so the fill behind the words is that height
+            // too, instead of the words being centred in a taller space.
+            .frame(maxWidth: .infinity, minHeight: LauncherView.continueHeight - 20)
         }
         .buttonStyle(PrimaryButtonStyle(accent: accent))
-        // The button is a fixed height, so the row of saves beside it is the
-        // same height and sits on the same line, whether or not there is a
-        // save to name under CONTINUE.
-        .frame(height: LauncherView.continueHeight)
         .disabled(model.install.installed == 0 || model.isInstalling)
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
@@ -1165,15 +1166,15 @@ struct LauncherView: View {
                                 .renderingMode(.template)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: LauncherView.linkDisc * 0.62,
-                                       height: LauncherView.linkDisc * 0.62)
+                                .frame(width: LauncherView.linkDisc * 0.84,
+                                       height: LauncherView.linkDisc * 0.84)
                         }
 
                         Spacer(minLength: 10)
 
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash") {
                             Image(systemName: "heart.fill")
-                                .font(.system(size: LauncherView.linkDisc * 0.55))
+                                .font(.system(size: LauncherView.linkDisc * 0.70))
                                 .offset(y: 1)
                         }
                     }
