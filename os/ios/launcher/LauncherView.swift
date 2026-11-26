@@ -1067,6 +1067,15 @@ struct LauncherView: View {
     /// The room the game switch takes above the title.
     private static let switchHeight: CGFloat = 30
 
+    /// The diameter of the two link discs, which is the size the circle
+    /// behind those marks has always been. Everything a disc is made of is a
+    /// share of this one number.
+    private static let linkDisc: CGFloat = 16
+
+    /// How tall each link is to a finger, which is wider than the disc and
+    /// the word it draws.
+    private static let linkTapHeight: CGFloat = 44
+
     /// The height CONTINUE is drawn at. The row of saves beside it is the
     /// same height and sits on the same bottom line, so the two read as one
     /// band across the launcher rather than as two blocks that do not meet.
@@ -1147,19 +1156,33 @@ struct LauncherView: View {
                     // The two links under the edition, each with its own
                     // mark in a small dark circle, set to the width of the
                     // line above them.
+                    // The two links under the edition, each a frosted disc
+                    // with its own mark cut out of it, set to the width of
+                    // the line above them.
                     HStack(spacing: 0) {
-                        plainLink("GITHUB",
-                                  mark: "github",
-                                  address: "https://github.com/shplash/vaultos")
+                        plainLink("GITHUB", address: "https://github.com/shplash/vaultos") {
+                            Image("github-mark")
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: LauncherView.linkDisc * 0.62,
+                                       height: LauncherView.linkDisc * 0.62)
+                        }
 
                         Spacer(minLength: 10)
 
-                        plainLink(L.t("SUPPORT ME"),
-                                  mark: "hand-heart",
-                                  address: "https://ko-fi.com/shplash")
+                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash") {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: LauncherView.linkDisc * 0.55))
+                                .offset(y: 1)
+                        }
                     }
                     .frame(width: LauncherView.heroEditionWidth, alignment: .leading)
-                    .padding(.top, 7)
+                    // The buttons reach further up and down than the marks
+                    // they draw, so a finger finds them; the row is pulled up
+                    // by what the tap area adds, which leaves the marks
+                    // themselves where they were.
+                    .padding(.top, -5)
                 }
                 .padding(.top, 14)
                 .padding(.bottom, 14)
@@ -1170,26 +1193,20 @@ struct LauncherView: View {
         .frame(minHeight: LauncherView.heroHeight, maxHeight: .infinity)
     }
 
-    /// One of the two links under the edition: the mark it is drawn with, in
-    /// a small dark circle, then its name. The marks are the real ones - the
-    /// GitHub mark and Lucide's hand and heart - as vector assets, drawn as
-    /// templates so they take the light colour rather than their own dark one.
-    private func plainLink(_ title: String, mark: String, address: String) -> some View {
-        Button {
+    /// One of the two links under the edition: one frosted disc with its mark
+    /// cut out of it, then the link's name. The disc is the whole icon -
+    /// there is no ring and no glyph drawn on top of it - and the button is
+    /// taller than the disc so a finger can find it.
+    private func plainLink<Glyph: View>(_ title: String,
+                                        address: String,
+                                        @ViewBuilder glyph: () -> Glyph) -> some View {
+        return Button {
             if let url = URL(string: address) {
                 UIApplication.shared.open(url)
             }
         } label: {
             HStack(spacing: 5) {
-                Image(mark)
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 10, height: 10)
-                    .foregroundColor(Theme.text)
-                    .frame(width: 16, height: 16)
-                    .background(Circle().fill(Color.black.opacity(0.35)))
-                    .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 1))
+                CutoutIconDisc(diameter: LauncherView.linkDisc, glyph: glyph)
 
                 Text(title)
                     .font(Vault.label(10, weight: .semibold))
@@ -1198,7 +1215,7 @@ struct LauncherView: View {
                     .fixedSize()
             }
             .foregroundColor(Theme.dim)
-            .frame(height: 20)
+            .frame(minHeight: LauncherView.linkTapHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -2580,6 +2597,48 @@ private struct DisabledDim: ViewModifier {
 
     func body(content: Content) -> some View {
         content.opacity(isEnabled ? 1 : 0.4)
+    }
+}
+
+/// A link's mark as GitHub draws its own logo: one solid frosted disc with
+/// the glyph cut out of it, so the dark page shows through where the mark
+/// is, rather than a glyph being drawn on top of a circle. The disc is the
+/// whole icon - there is no ring around it and no second circle behind it.
+private struct CutoutIconDisc<Glyph: View>: View {
+    let diameter: CGFloat
+    let glyph: Glyph
+
+    init(diameter: CGFloat, @ViewBuilder glyph: () -> Glyph) {
+        self.diameter = diameter
+        self.glyph = glyph()
+    }
+
+    var body: some View {
+        ZStack {
+            // The material is newer than the iOS this app still runs on, so
+            // the older systems get a grey of the same weight instead.
+            if #available(iOS 15.0, *) {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+            } else {
+                Circle()
+                    .fill(Color(white: 0.34))
+            }
+
+            Circle()
+                .fill(Color.white.opacity(0.24))
+        }
+        .frame(width: diameter, height: diameter)
+        // The disc is the mask, and the glyph is taken out of it rather than
+        // drawn over it: what is left of the disc shows, and the page shows
+        // through the mark.
+        .mask(
+            Rectangle()
+                .overlay(glyph.blendMode(.destinationOut))
+                .compositingGroup()
+        )
+        .clipShape(Circle())
     }
 }
 
