@@ -1,10 +1,13 @@
 #include "game/loadsave.h"
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+
+#include <zlib.h>
 
 #include <algorithm>
 
@@ -43,6 +46,7 @@
 #include "game/wordwrap.h"
 #include "game/worldmap.h"
 #include "platform_compat.h"
+#include "platform/ios/paths.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
 #include "plib/gnw/debug.h"
@@ -363,7 +367,9 @@ void loadsave_play_time_tick(void)
 
 void loadsave_request_slot(int slot)
 {
-    requested_slot = slot;
+    // The launcher numbers its slots as the folders are numbered, one to ten,
+    // and the game indexes them from zero: SLOT01 is the first.
+    requested_slot = slot - 1;
 }
 
 int loadsave_pending_slot(void)
@@ -408,12 +414,6 @@ static bool slot_directory(char* out, size_t size)
     return true;
 }
 
-static void put_short(unsigned char* dest, unsigned int value)
-{
-    dest[0] = (unsigned char)(value & 0xFF);
-    dest[1] = (unsigned char)((value >> 8) & 0xFF);
-}
-
 static void put_long(unsigned char* dest, unsigned int value)
 {
     dest[0] = (unsigned char)(value & 0xFF);
@@ -422,56 +422,123 @@ static void put_long(unsigned char* dest, unsigned int value)
     dest[3] = (unsigned char)((value >> 24) & 0xFF);
 }
 
-// The preview the game shows on its own load screen, written out as a plain BMP
-// so the launcher can show it without knowing the game's palette format.
-static void save_preview(const char* directory)
+// Everything that goes wrong here lands in a note beside the game, which the
+// Files app shows: a save that will not open, a picture that is not written, a
+// time that is not counted. Without it a failure is silent, which is how a
+// picture and a playtime could be missing with nothing to say why.
+static void saves_log(const char* format, ...)
 {
-    if (thumbnail_image[1] == NULL) {
-        return;
-    }
-
     char path[COMPAT_MAX_PATH];
-    snprintf(path, sizeof(path), "%spreview.bmp", directory);
+    snprintf(path, sizeof(path), "%svaultos-saves.log", iOSGetDocumentsPath());
 
-    FILE* fp = fopen(path, "wb");
+    FILE* fp = fopen(path, "at");
     if (fp == NULL) {
         return;
     }
 
-    const int width = LS_PREVIEW_WIDTH;
-    const int height = LS_PREVIEW_HEIGHT;
-    const int row_size = width * 3;
-    const unsigned int image_size = (unsigned int)(row_size * height);
+    va_list args;
+    va_start(args, format);
+    vfprintf(fp, format, args);
+    va_end(args);
 
-    unsigned char header[54] = { 'B', 'M' };
-    put_long(header + 2, 54 + image_size);
-    put_long(header + 10, 54);
-    put_long(header + 14, 40);
-    put_long(header + 18, (unsigned int)width);
-    put_long(header + 22, (unsigned int)height);
-    put_short(header + 26, 1);
-    put_short(header + 28, 24);
-    put_long(header + 34, image_size);
-    put_long(header + 38, 2835);
-    put_long(header + 42, 2835);
+    fputc('\n', fp);
+    fclose(fp);
+}
 
-    fwrite(header, 1, sizeof(header), fp);
+static void png_write_chunk(FILE* fp, const char* type, const unsigned char* data, size_t size)
+{
+    unsigned char buffer[4];
 
-    const unsigned char* palette = palette_current();
-    unsigned char row[LS_PREVIEW_WIDTH * 3];
-
-    for (int y = height - 1; y >= 0; y--) {
-        const unsigned char* source = thumbnail_image[1] + y * width;
-        for (int x = 0; x < width; x++) {
-            const unsigned char* rgb = palette + source[x] * 3;
-            row[x * 3 + 0] = (unsigned char)(rgb[2] * 255 / 63);
-            row[x * 3 + 1] = (unsigned char)(rgb[1] * 255 / 63);
-            row[x * 3 + 2] = (unsigned char)(rgb[0] * 255 / 63);
-        }
-        fwrite(row, 1, row_size, fp);
+    put_long(buffer, (unsigned int)size);
+    fwrite(buffer, 1, 4, fp);
+    fwrite(type, 1, 4, fp);
+    if (size > 0) {
+        fwrite(data, 1, size, fp);
     }
 
+    unsigned int crc = (unsigned int)crc32(crc32(0L, Z_NULL, 0), (const Bytef*)type, 4);
+    if (size > 0) {
+        crc = (unsigned int)crc32(crc, (const Bytef*)data, (uInt)size);
+    }
+    put_long(buffer, crc);
+    fwrite(buffer, 1, 4, fp);
+}
+
+// The picture the game shows on its own load screen, written as a PNG: the
+// launcher shows it without the game or its palette, and PNG is the one format
+// every picture reader opens. A palette-indexed BMP was written before, and
+// nothing that read it ever showed it.
+static bool write_png(const char* path, const unsigned char* pixels, const unsigned char* palette)
+{
+    if (pixels == NULL || palette == NULL) {
+        return false;
+    }
+
+    static unsigned char rows[(LS_PREVIEW_WIDTH * 3 + 1) * LS_PREVIEW_HEIGHT];
+    const int stride = LS_PREVIEW_WIDTH * 3 + 1;
+
+    for (int y = 0; y < LS_PREVIEW_HEIGHT; y++) {
+        unsigned char* row = rows + y * stride;
+        const unsigned char* source = pixels + y * LS_PREVIEW_WIDTH;
+
+        row[0] = 0;
+        for (int x = 0; x < LS_PREVIEW_WIDTH; x++) {
+            const unsigned char* rgb = palette + source[x] * 3;
+            row[1 + x * 3 + 0] = (unsigned char)(rgb[0] * 255 / 63);
+            row[1 + x * 3 + 1] = (unsigned char)(rgb[1] * 255 / 63);
+            row[1 + x * 3 + 2] = (unsigned char)(rgb[2] * 255 / 63);
+        }
+    }
+
+    uLongf size = compressBound((uLong)sizeof(rows));
+    unsigned char* compressed = (unsigned char*)malloc(size);
+    if (compressed == NULL) {
+        return false;
+    }
+
+    const bool packed = compress2(compressed, &size, rows, (uLong)sizeof(rows), 6) == Z_OK;
+
+    FILE* fp = packed ? fopen(path, "wb") : NULL;
+    if (fp == NULL) {
+        free(compressed);
+        return false;
+    }
+
+    static const unsigned char signature[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+    fwrite(signature, 1, sizeof(signature), fp);
+
+    unsigned char header[13];
+    put_long(header + 0, (unsigned int)LS_PREVIEW_WIDTH);
+    put_long(header + 4, (unsigned int)LS_PREVIEW_HEIGHT);
+    header[8] = 8;
+    header[9] = 2;
+    header[10] = 0;
+    header[11] = 0;
+    header[12] = 0;
+
+    png_write_chunk(fp, "IHDR", header, sizeof(header));
+    png_write_chunk(fp, "IDAT", compressed, (size_t)size);
+    png_write_chunk(fp, "IEND", NULL, 0);
+
     fclose(fp);
+    free(compressed);
+
+    return true;
+}
+
+static void save_preview(const char* directory)
+{
+    if (thumbnail_image[1] == NULL) {
+        saves_log("preview: no snapshot in %s", directory);
+        return;
+    }
+
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%spreview.png", directory);
+
+    if (!write_png(path, thumbnail_image[1], palette_current())) {
+        saves_log("preview: could not write %s", path);
+    }
 }
 
 static unsigned int read_play_time(const char* path)
@@ -523,6 +590,7 @@ static void save_sidecars(void)
 {
     char directory[COMPAT_MAX_PATH];
     if (!slot_directory(directory, sizeof(directory))) {
+        saves_log("save: no folder for %s", gmpath);
         return;
     }
 
@@ -530,6 +598,72 @@ static void save_sidecars(void)
     save_play_time(directory);
 
     play_time_ms = 0;
+}
+
+// A save written before the launcher showed pictures has none of its own: the
+// picture is inside the save, at the offset the game reads it back from, and
+// the palette it was drawn with is color.pal - so every slot without a picture
+// gets one, without the save being written again.
+void loadsave_preview_all(void)
+{
+    if (patches == NULL) {
+        if (!config_get_string(&game_config, GAME_CONFIG_SYSTEM_KEY, GAME_CONFIG_MASTER_PATCHES_KEY, &patches)) {
+            patches = emgpath;
+        }
+    }
+
+    unsigned char palette[768];
+    DB_FILE* color = db_fopen("color.pal", "rb");
+    if (color == NULL) {
+        saves_log("preview: color.pal is missing");
+        return;
+    }
+
+    const bool hasPalette = db_fread(palette, 1, sizeof(palette), color) == sizeof(palette);
+    db_fclose(color);
+    if (!hasPalette) {
+        saves_log("preview: color.pal is unreadable");
+        return;
+    }
+
+    char root[COMPAT_MAX_PATH];
+    snprintf(root, sizeof(root), "%s%s", patches, "SAVEGAME");
+    compat_windows_path_to_native(root);
+
+    static unsigned char thumbnail[LS_PREVIEW_SIZE];
+
+    for (int slot = 1; slot <= 10; slot++) {
+        char savePath[COMPAT_MAX_PATH];
+        snprintf(savePath, sizeof(savePath), "%s/SLOT%.2d/SAVE.DAT", root, slot);
+
+        FILE* save = fopen(savePath, "rb");
+        if (save == NULL) {
+            continue;
+        }
+
+        char previewPath[COMPAT_MAX_PATH];
+        snprintf(previewPath, sizeof(previewPath), "%s/SLOT%.2d/preview.png", root, slot);
+
+        FILE* existing = fopen(previewPath, "rb");
+        if (existing != NULL) {
+            fclose(existing);
+            fclose(save);
+            continue;
+        }
+
+        const bool read = fseek(save, 131, SEEK_SET) == 0
+            && fread(thumbnail, 1, sizeof(thumbnail), save) == sizeof(thumbnail);
+        fclose(save);
+
+        if (!read) {
+            saves_log("preview: could not read %s", savePath);
+            continue;
+        }
+
+        if (!write_png(previewPath, thumbnail, palette)) {
+            saves_log("preview: could not write %s", previewPath);
+        }
+    }
 }
 
 int SaveGame(int mode)
@@ -1087,6 +1221,81 @@ static int QuickSnapShot()
     return 1;
 }
 
+// The state the game's own load screen has ready before it opens a slot: the
+// messages it reads, the snapshot it skips over, the mouse it puts away and
+// the cycle it stops while the files are copied. A load that ran without any
+// of it gave up, and the main menu came back instead of the map.
+static bool lsg_direct_mouse_was_on;
+static bool lsg_direct_started;
+
+static int lsg_direct_start(void)
+{
+    fontsave = text_curr();
+    text_font(103);
+
+    if (!message_init(&lsgame_msgfl)) {
+        saves_log("load: no message list");
+        text_font(fontsave);
+        return -1;
+    }
+
+    snprintf(str, sizeof(str), "%s%s", msg_path, LSGAME_MSG_NAME);
+    if (!message_load(&lsgame_msgfl, str)) {
+        saves_log("load: could not read %s", str);
+        message_exit(&lsgame_msgfl);
+        text_font(fontsave);
+        return -1;
+    }
+
+    snapshot = (unsigned char*)mem_malloc(61632);
+    if (snapshot == NULL) {
+        message_exit(&lsgame_msgfl);
+        text_font(fontsave);
+        return -1;
+    }
+
+    thumbnail_image[0] = snapshot;
+    thumbnail_image[1] = snapshot + LS_PREVIEW_SIZE;
+
+    lsg_direct_mouse_was_on = gmouse_3d_is_on();
+    if (lsg_direct_mouse_was_on) {
+        gmouse_3d_off();
+    }
+
+    cycle_disable();
+    gmouse_set_cursor(MOUSE_CURSOR_ARROW);
+
+    lsg_direct_started = true;
+    return 0;
+}
+
+static void lsg_direct_end(void)
+{
+    if (!lsg_direct_started) {
+        return;
+    }
+
+    lsg_direct_started = false;
+
+    cycle_enable();
+    gmouse_set_cursor(MOUSE_CURSOR_ARROW);
+
+    if (lsg_direct_mouse_was_on) {
+        gmouse_3d_on();
+    }
+
+    if (snapshot != NULL) {
+        mem_free(snapshot);
+        snapshot = NULL;
+    }
+
+    thumbnail_image[0] = NULL;
+    thumbnail_image[1] = NULL;
+
+    message_exit(&lsgame_msgfl);
+    text_font(fontsave);
+}
+
 // 0x46E754
 int LoadGame(int mode)
 {
@@ -1102,7 +1311,8 @@ int LoadGame(int mode)
     ls_error_code = 0;
 
     // A save the launcher picked loads straight away, without the game's own
-    // load screen: the same slot load the quick path uses.
+    // load screen: the same slot load the quick path uses, with the state that
+    // screen has ready before it.
     const int requestedSlot = loadsave_take_pending_slot();
     if (requestedSlot >= 0) {
         if (!config_get_string(&game_config, GAME_CONFIG_SYSTEM_KEY, GAME_CONFIG_MASTER_PATCHES_KEY, &patches)) {
@@ -1110,20 +1320,29 @@ int LoadGame(int mode)
             patches = emgpath;
         }
 
-        // The slots are read before one is loaded. The header, the map and
-        // everything a save restores are taken from that list, and without it
-        // the load failed and the main menu came back instead of the map.
-        slot_cursor = requestedSlot;
-        if (GetSlotList() == -1) {
+        int rc = -1;
+
+        if (lsg_direct_start() == -1) {
             return -1;
         }
 
-        if (LoadSlot(requestedSlot) != -1) {
-            gmouse_set_cursor(MOUSE_CURSOR_ARROW);
-            return 1;
+        // The slots are read before one is opened. The header, the map and
+        // everything a save restores are taken from that list.
+        slot_cursor = requestedSlot;
+
+        if (GetSlotList() == -1) {
+            saves_log("load: no slot list");
+        } else if (LSstatus[requestedSlot] != SLOT_STATE_OCCUPIED) {
+            saves_log("load: slot %.2d is %d", requestedSlot + 1, LSstatus[requestedSlot]);
+        } else if (LoadSlot(requestedSlot) == -1) {
+            saves_log("load: slot %.2d did not open", requestedSlot + 1);
+        } else {
+            rc = 1;
         }
 
-        return -1;
+        lsg_direct_end();
+
+        return rc;
     }
 
     if (!config_get_string(&game_config, GAME_CONFIG_SYSTEM_KEY, GAME_CONFIG_MASTER_PATCHES_KEY, &patches)) {
@@ -1874,6 +2093,11 @@ static int LoadSlot(int slot)
     }
 
     loadingGame = 1;
+
+    // The save's own time is in its sidecar; the stretch played since this
+    // session started belongs to the save that is about to be written, not to
+    // the one being opened.
+    play_time_ms = 0;
 
     // The slot asked for is the one the whole load works on: its header, the
     // files it reads and the data it fills are all found by the slot the

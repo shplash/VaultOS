@@ -111,13 +111,45 @@ int gnw_main(int argc, char** argv)
 
     debug_printf("[vaultos] engine initialised\n");
 
-    // Both startup movies play on iOS again. They were skipped while this app
-    // was dying here; the two causes are fixed in this build - the interface's
-    // -1 hand slot that the on-screen controls read, and the decoder's motion
-    // copies that read outside the previous frame.
-    debug_printf("[vaultos] startup movies\n");
-    gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
-    gmovie_play(MOVIE_INTRO, 0);
+    // A save picked in the launcher opens its own map: the logo, the intro and
+    // the menu are all skipped, because the load happens before the menu
+    // exists. The menu used to be made first, the load ran on a game that was
+    // never set up for it, and the menu was all that was left on screen.
+    const bool opensSave = loadsave_pending_slot() >= 0;
+
+    // Pictures for the saves written before the launcher showed any: the
+    // picture is inside each save, and the game owns the palette.
+    loadsave_preview_all();
+
+    if (opensSave) {
+        main_loadgame_new();
+        loadColorTable("color.pal");
+        palette_fade_to(cmap);
+
+        if (LoadGame(LOAD_SAVE_MODE_FROM_MAIN_MENU) != -1) {
+            main_game_loop();
+            palette_fade_to(white_palette);
+
+            // NOTE: Uninline.
+            main_unload_new();
+
+            // NOTE: Uninline.
+            main_reset_system();
+
+            if (main_show_death_scene != 0) {
+                main_death_scene();
+                main_show_death_scene = 0;
+            }
+        }
+    } else {
+        // Both startup movies play on iOS again. They were skipped while this
+        // app was dying here; the two causes are fixed in this build - the
+        // interface's -1 hand slot that the on-screen controls read, and the
+        // decoder's motion copies that read outside the previous frame.
+        debug_printf("[vaultos] startup movies\n");
+        gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
+        gmovie_play(MOVIE_INTRO, 0);
+    }
 
     int menuResult = main_menu_create();
     debug_printf("[vaultos] main menu create returned %d\n", menuResult);

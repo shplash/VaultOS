@@ -470,6 +470,7 @@ if(IOS)
     )
     list(REMOVE_ITEM FALLOUT2_CE_SOURCES
         "${fallout2_ce_SOURCE_DIR}/src/win32.cc"
+        "${fallout2_ce_SOURCE_DIR}/src/main.cc"
         "${fallout2_ce_SOURCE_DIR}/src/movie.cc"
         "${fallout2_ce_SOURCE_DIR}/src/game_movie.cc"
         "${fallout2_ce_SOURCE_DIR}/src/combat.cc"
@@ -486,6 +487,7 @@ if(IOS)
 
     add_library(Fallout2Engine SHARED
         ${FALLOUT2_CE_SOURCES}
+        "os/ios/engine/engine_fallout2_main.cc"
         "os/ios/engine/engine_fallout2_game_movie.cc"
         "os/ios/engine/engine_fallout2_movie.cc"
         "os/ios/engine/engine_fallout2_combat.cc"

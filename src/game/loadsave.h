@@ -29,6 +29,11 @@ int LoadGame(int mode);
 // save as its own playtime, so the launcher can show it.
 void loadsave_play_time_tick(void);
 
+// A picture for every save that has none: the picture is inside the save and
+// the palette is the game's own, so the saves written before the launcher
+// showed any get one without being written again.
+void loadsave_preview_all(void);
+
 // The slot the launcher asked to load as the game starts. The request is kept
 // until the game asks for it, so both the boot path and the load path can see
 // it; |loadsave_take_pending_slot| answers it once and clears it.

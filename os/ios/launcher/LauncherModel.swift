@@ -939,13 +939,19 @@ final class LauncherModel: ObservableObject {
         let name: String
         let detail: String
         let saved: String
-        let played: String
+        /// The time played, when the save has a time: a save written before
+        /// the game kept one has none, and `nil` says so rather than `0:00`.
+        let played: String?
         let level: Int
         let preview: URL?
         let modified: Date
     }
 
     @Published var saves: [LauncherSave] = []
+
+    /// The folder each game's saves were found in, kept once it is known: the
+    /// search walks the game's data folder, and the folder does not move.
+    private var saveFolders: [FalloutGame: URL] = [:]
 
     /// The folder the saves were looked in, shown while the list bedded in.
     @Published var savesFolder = ""
@@ -954,18 +960,39 @@ final class LauncherModel: ObservableObject {
     var launchSlot: Int?
 
     func refreshSaves() {
-        saves = LauncherModel.readSaves(installDirectory: installDirectory, game: selectedGame)
+        let folder = LauncherModel.saveFolder(installDirectory: installDirectory,
+                                              game: selectedGame,
+                                              known: saveFolders[selectedGame])
+        if let folder = folder {
+            saveFolders[selectedGame] = folder
+        }
 
-        let folder = LauncherModel.saveFolder(installDirectory: installDirectory, game: selectedGame)
+        let found = LauncherModel.readSaves(folder: folder)
+
+        // A folder that cannot be listed for a moment - the device locked
+        // while the app was in the background - is not a folder with no saves
+        // in it: the list stands until the folder can be read again.
+        if folder != nil && found.isEmpty && !saves.isEmpty {
+            return
+        }
+
+        saves = found
+
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path
         savesFolder = "\(folder?.path.replacingOccurrences(of: documents, with: "") ?? "no SAVEGAME") · \(saves.count)"
     }
 
     func delete(save: LauncherSave) {
-        if let root = LauncherModel.saveFolder(installDirectory: installDirectory, game: selectedGame) {
+        if let root = saveFolders[selectedGame] ?? LauncherModel.saveFolder(installDirectory: installDirectory,
+                                                                            game: selectedGame,
+                                                                            known: nil) {
             let folder = root.appendingPathComponent(String(format: "SLOT%02d", save.slot), isDirectory: true)
             try? FileManager.default.removeItem(at: folder)
         }
+
+        // The save is gone from the list at once, so the row does not show it
+        // again if the folder cannot be read for a moment.
+        saves = saves.filter { $0.slot != save.slot }
         refreshSaves()
     }
 
@@ -974,16 +1001,22 @@ final class LauncherModel: ObservableObject {
     /// and can write the slots into another - so the folder actually holding
     /// slots is the one to read, and a folder the short list does not spell is
     /// found by its name instead.
-    private static func saveFolder(installDirectory: URL, game: FalloutGame) -> URL? {
-        let known = ["data/SAVEGAME", "SAVEGAME", "data/savegame", "savegame"]
+    private static func saveFolder(installDirectory: URL,
+                                   game: FalloutGame,
+                                   known: URL?) -> URL? {
+        if let known = known, FileManager.default.fileExists(atPath: known.path) {
+            return known
+        }
+
+        let candidates = ["data/SAVEGAME", "SAVEGAME", "data/savegame", "savegame"]
             .map { installDirectory.appendingPathComponent($0, isDirectory: true) }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
 
-        if let folder = known.first(where: { hasSlots(in: $0) }) {
+        if let folder = candidates.first(where: { hasSlots(in: $0) }) {
             return folder
         }
 
-        if let folder = known.first {
+        if let folder = candidates.first {
             return folder
         }
 
@@ -1029,8 +1062,8 @@ final class LauncherModel: ObservableObject {
         return result
     }
 
-    private static func readSaves(installDirectory: URL, game: FalloutGame) -> [LauncherSave] {
-        guard let root = saveFolder(installDirectory: installDirectory, game: game),
+    private static func readSaves(folder: URL?) -> [LauncherSave] {
+        guard let root = folder,
               let entries = try? FileManager.default.contentsOfDirectory(
                 at: root,
                 includingPropertiesForKeys: [.contentModificationDateKey],
@@ -1049,12 +1082,15 @@ final class LauncherModel: ObservableObject {
                 $0.lastPathComponent.uppercased() == "SAVE.DAT"
             }
 
-            // A slot folder with no save in it is not a save. The game makes
-            // all ten slot folders as it saves, and counting those made the
-            // three saves read as ten, six of them empty.
-            guard let saveFile = file, let data = try? Data(contentsOf: saveFile) else {
+            // The file is what makes a slot a save. What is inside it can be
+            // out of reach for a moment - the device locked while the app was
+            // in the background - and the save is still there then, so it is
+            // read again next time rather than dropped from the list.
+            guard let saveFile = file else {
                 continue
             }
+
+            let data = (try? Data(contentsOf: saveFile)) ?? Data()
 
             // The character's name is written beside the save's own, and the
             // save's name is the one the player typed for it - the one worth
@@ -1072,8 +1108,18 @@ final class LauncherModel: ObservableObject {
             let played = sidecar.played
             let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
 
-            let previewFile = entry.appendingPathComponent("preview.bmp")
-            let preview = FileManager.default.fileExists(atPath: previewFile.path) ? previewFile : nil
+            // The game writes the picture as a PNG; the BMP an older build
+            // wrote is still read, so a save made with it keeps its picture.
+            let previewPNG = entry.appendingPathComponent("preview.png")
+            let previewBMP = entry.appendingPathComponent("preview.bmp")
+            let preview: URL?
+            if FileManager.default.fileExists(atPath: previewPNG.path) {
+                preview = previewPNG
+            } else if FileManager.default.fileExists(atPath: previewBMP.path) {
+                preview = previewBMP
+            } else {
+                preview = nil
+            }
 
             result.append(LauncherSave(id: slot,
                                        slot: slot,
@@ -1120,15 +1166,22 @@ final class LauncherModel: ObservableObject {
         return Int(value)
     }
 
-    private static func readSidecar(_ folder: URL) -> (played: String, level: Int) {
+    /// The time and level the game wrote beside a save. A save written before
+    /// it kept them has neither, which is said by the time being absent rather
+    /// than by `0:00`, so the card can show the date instead.
+    private static func readSidecar(_ folder: URL) -> (played: String?, level: Int) {
         let file = folder.appendingPathComponent("VaultOS.json")
         guard let data = try? Data(contentsOf: file),
               let text = String(data: data, encoding: .utf8) else {
-            return ("0:00", 0)
+            return (nil, 0)
         }
 
         let seconds = number(in: text, key: "playSeconds")
-        return (String(format: "%d:%02d", seconds / 3600, seconds / 60 % 60), number(in: text, key: "level"))
+        let level = number(in: text, key: "level")
+
+        // A time of zero is still a time: the save was opened and played for
+        // less than a minute, so it shows as 0:00 rather than as its date.
+        return (String(format: "%d:%02d", seconds / 3600, seconds / 60 % 60), level)
     }
 
     private static func number(in text: String, key: String) -> Int {

@@ -166,6 +166,13 @@ struct LauncherView: View {
             // background. Look at both again when it comes back to the front.
             model.refreshInstall()
             model.refreshSaves()
+
+            // A save's own files can be out of reach for the moment the app
+            // is let back in, while the device finishes unlocking: read them
+            // again once that has settled.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                model.refreshSaves()
+            }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             // Only the save-import countdown needs a tick. Without it this ran a
@@ -318,14 +325,12 @@ struct LauncherView: View {
                              width: CGFloat,
                              rowHeight: CGFloat,
                              selected: Bool) -> some View {
-        // Three slots across, as wide as the box allows and as tall as its
-        // captions leave, so the row is exactly three slots wide to scroll.
+        // Exactly three slots across, however tall the box is: a slot that had
+        // to be narrow enough for the height left four of them in view.
         let spacing: CGFloat = 8
         let perRow = 3
-        let fitWidth = max(48, (width - CGFloat(perRow - 1) * spacing) / CGFloat(perRow))
-        let fitHeight = max(40, rowHeight - 34)
-        let cardWidth = min(fitWidth, fitHeight * 224 / 133)
-        let cardHeight = cardWidth * 133 / 224
+        let cardWidth = max(48, (width - CGFloat(perRow - 1) * spacing) / CGFloat(perRow))
+        let cardHeight = min(cardWidth * 133 / 224, max(40, rowHeight - 34))
         let content = CGFloat(10) * cardWidth + CGFloat(9) * spacing
         let limit = min(0, width - content)
 
@@ -436,12 +441,28 @@ struct LauncherView: View {
         // and the title is the save's own name: the character's name is the
         // same on every save that character made.
         let title = save?.name ?? ""
-        let line = save.map { "\($0.played) · \(L.t("LEVEL")) \($0.level)" } ?? L.t("EMPTY")
 
-        return VStack(alignment: .leading, spacing: 4) {
+        // A save that was written before the game kept a play time has no
+        // time to show, and `0:00 · LEVEL 0` reads as a broken save: the
+        // date it was written is what is known, so that is what is shown.
+        let line: String
+        if let save = save {
+            if let played = save.played {
+                line = save.level > 0
+                    ? "\(played) · \(L.t("LEVEL")) \(save.level)"
+                    : played
+            } else {
+                line = save.saved
+            }
+        } else {
+            line = L.t("EMPTY")
+        }
+
+        return VStack(alignment: .center, spacing: 4) {
             if let url = save?.preview, let image = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: image)
                     .resizable()
+                    .aspectRatio(contentMode: .fill)
                     .frame(width: width, height: height)
                     .clipped()
                     .overlay(
@@ -469,6 +490,8 @@ struct LauncherView: View {
                     .foregroundColor(Theme.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
             }
 
             Text(line)
@@ -476,8 +499,10 @@ struct LauncherView: View {
                 .foregroundColor(Theme.faint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
-        .frame(width: width, height: height + 34, alignment: .topLeading)
+        .frame(width: width, height: height + 34, alignment: .top)
         .contentShape(Rectangle())
         .overlay(
             RoundedRectangle(cornerRadius: 5, style: .continuous)
