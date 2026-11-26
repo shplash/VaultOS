@@ -446,6 +446,14 @@ static void saves_log(const char* format, ...)
         return;
     }
 
+    char stamp[32];
+    const time_t now = time(NULL);
+    struct tm* local = localtime(&now);
+    if (local != NULL) {
+        strftime(stamp, sizeof(stamp), "%d.%m %H:%M:%S", local);
+        fprintf(fp, "%s  ", stamp);
+    }
+
     va_list args;
     va_start(args, format);
     vfprintf(fp, format, args);
@@ -548,6 +556,8 @@ static void save_preview(const char* directory)
 
     if (!write_png(path, thumbnail_image[1], palette_current())) {
         saves_log("preview: could not write %s", path);
+    } else {
+        saves_log("preview: wrote %s", path);
     }
 }
 
@@ -586,6 +596,7 @@ static void save_play_time(const char* directory)
 
     FILE* fp = fopen(path, "wb");
     if (fp == NULL) {
+        saves_log("time: could not write %s", path);
         return;
     }
 
@@ -594,6 +605,8 @@ static void save_play_time(const char* directory)
         stat_pc_get(PC_STAT_LEVEL),
         stat_pc_get(PC_STAT_EXPERIENCE));
     fclose(fp);
+
+    saves_log("time: wrote %s", path);
 }
 
 static void save_sidecars(void)
@@ -606,6 +619,8 @@ static void save_sidecars(void)
 
     save_preview(directory);
     save_play_time(directory);
+
+    saves_log("save: %s", directory);
 
     play_time_ms = 0;
 }
@@ -1351,6 +1366,8 @@ int LoadGame(int mode)
         }
 
         lsg_direct_end();
+
+        debug_printf("[vaultos] load slot %.2d returned %d\n", requestedSlot + 1, rc);
 
         return rc;
     }

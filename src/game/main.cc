@@ -116,6 +116,7 @@ int gnw_main(int argc, char** argv)
     // exists. The menu used to be made first, the load ran on a game that was
     // never set up for it, and the menu was all that was left on screen.
     const bool opensSave = loadsave_pending_slot() >= 0;
+    debug_printf("[vaultos] opens save %.2d\n", opensSave ? loadsave_pending_slot() + 1 : 0);
 
     // Pictures for the saves written before the launcher showed any: the
     // picture is inside each save, and the game owns the palette.

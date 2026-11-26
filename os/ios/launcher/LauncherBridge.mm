@@ -33,6 +33,11 @@ static bool g_should_launch_game = true;
 // The engine selected for this run. Null until Play is tapped.
 static const FalloutEngineAPI* g_engine = NULL;
 
+// The save the launcher picked, kept until the engine that opens it is loaded.
+// The request was made before any engine existed, so it was dropped and the
+// game started on its own with its intros and its menu.
+static int g_requested_slot;
+
 // MARK: - Launcher run loop
 
 extern "C" void fallout_ios_run_launcher_loop(void)
@@ -267,6 +272,12 @@ int fallout_ios_launch_selected_engine(int argc, char** argv)
 
     g_engine = engine;
 
+    // The save the launcher picked, given to the engine now that it exists.
+    if (g_requested_slot > 0 && engine->request_load_slot != NULL) {
+        engine->request_load_slot(g_requested_slot);
+        g_requested_slot = 0;
+    }
+
     NSString* installDirectory = installDirectoryForGame(identifier);
     [[NSFileManager defaultManager] createDirectoryAtPath:installDirectory
                               withIntermediateDirectories:YES
@@ -310,6 +321,8 @@ extern "C" void fallout_ios_camera_stop(void)
 
 extern "C" void fallout_ios_request_load_slot(int slot)
 {
+    g_requested_slot = slot;
+
     if (g_engine != NULL && g_engine->request_load_slot != NULL) {
         g_engine->request_load_slot(slot);
     }

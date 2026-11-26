@@ -941,6 +941,14 @@ static void saves_log(const char* format, ...)
         return;
     }
 
+    char stamp[32];
+    const time_t now = time(nullptr);
+    struct tm* local = localtime(&now);
+    if (local != nullptr) {
+        strftime(stamp, sizeof(stamp), "%d.%m %H:%M:%S", local);
+        fprintf(fp, "%s  ", stamp);
+    }
+
     va_list args;
     va_start(args, format);
     vfprintf(fp, format, args);
@@ -1106,6 +1114,8 @@ static void save_preview(const char* directory, const unsigned char* pixels)
 
     if (!write_png(path, pixels, _cmap)) {
         saves_log("preview: could not write %s", path);
+    } else {
+        saves_log("preview: wrote %s", path);
     }
 }
 
@@ -1128,6 +1138,8 @@ static void save_play_time(const char* directory)
         pcGetStat(PC_STAT_LEVEL),
         pcGetStat(PC_STAT_EXPERIENCE));
     fclose(fp);
+
+    saves_log("time: wrote %s", path);
 }
 
 // The picture and the time written beside a save, in the slot folder the game
@@ -1142,6 +1154,8 @@ static void save_sidecars(int slot)
 
     save_preview(directory, _snapshotBuf);
     save_play_time(directory);
+
+    saves_log("save: %s", directory);
 
     _playTimeMs = 0;
 }
