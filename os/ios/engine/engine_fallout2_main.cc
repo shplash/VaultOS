@@ -96,11 +96,33 @@ int falloutMain(int argc, char** argv)
     loadsave_preview_all();
 
     if (opensSave) {
+        // The game's waiting cursor is a planet on a grey plate of its own,
+        // and on a display that holds nothing else it reads as a stray box in
+        // the middle of the screen. The screen is painted in the back colour
+        // instead, and the cursor stays down until the map is there: opening
+        // a save directly is the one load with no screen of the game's own to
+        // sit on.
+        int wash = windowCreate(0, 0, screenGetWidth(), screenGetHeight(), _colorTable[0], WINDOW_MODAL | WINDOW_MOVE_ON_TOP);
+        if (wash != -1) {
+            windowRefresh(wash);
+        }
+
         main_loadgame_new();
         colorPaletteLoad("color.pal");
         paletteFadeTo(_cmap);
 
-        if (lsgLoadGame(LOAD_SAVE_MODE_FROM_MAIN_MENU) != -1) {
+        mouseHideCursor();
+        int loaded = lsgLoadGame(LOAD_SAVE_MODE_FROM_MAIN_MENU);
+
+        if (wash != -1) {
+            windowDestroy(wash);
+        }
+
+        if (loaded == -1) {
+            // The save did not open: the pointer comes back, so the menu
+            // below is reached with a cursor rather than without one.
+            mouseShowCursor();
+        } else {
             mainLoop();
             paletteFadeTo(gPaletteWhite);
 

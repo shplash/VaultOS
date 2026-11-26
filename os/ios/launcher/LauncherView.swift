@@ -555,7 +555,14 @@ struct LauncherView: View {
     }
 
     private var playButton: some View {
-        Button {
+        // Every line sits on the button's own middle. A kerned line carries
+        // the space after its last letter as well, which pushes the letters
+        // off the middle by half of it, so that space is taken back.
+        let titleKerning: CGFloat = 1.6
+        let nameKerning: CGFloat = 1.3
+        let detailKerning: CGFloat = 0.9
+
+        return Button {
             LauncherMusic.shared.stop()
             if let save = selectedSave ?? model.saves.first {
                 model.play(onPlay: onPlay, loadSlot: save.slot)
@@ -563,17 +570,37 @@ struct LauncherView: View {
                 model.play(onPlay: onPlay)
             }
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 Text(L.t(model.saves.isEmpty ? "PLAY" : "CONTINUE"))
                     .font(Vault.display(24))
-                    .kerning(1.6)
+                    .kerning(titleKerning)
+                    .padding(.trailing, -titleKerning)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
 
                 Text(statusText)
                     .font(Vault.label(10, weight: .bold))
-                    .kerning(1.3)
+                    .kerning(nameKerning)
+                    .foregroundColor(Vault.ink.opacity(0.62))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .foregroundColor(Vault.ink.opacity(0.62))
+                    .padding(.trailing, -nameKerning)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+
+                // The save's own time played and level, under its name and in
+                // a thinner face, so the name still reads first.
+                if let detail = continueDetail {
+                    Text(detail)
+                        .font(Vault.label(9, weight: .regular))
+                        .kerning(detailKerning)
+                        .foregroundColor(Vault.ink.opacity(0.46))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.trailing, -detailKerning)
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+                }
             }
         }
         .buttonStyle(PrimaryButtonStyle(accent: accent))
@@ -606,6 +633,33 @@ struct LauncherView: View {
         }
 
         return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
+    }
+
+    /// How long the save CONTINUE opens has been played and how far the
+    /// character has got, under its name in the button: the two things worth
+    /// knowing before going back to it.
+    private var continueDetail: String? {
+        guard !model.isInstalling else {
+            return nil
+        }
+
+        guard let save = selectedSave ?? model.saves.first else {
+            return nil
+        }
+
+        // A save written before the game kept a play time has no time to
+        // show, and `0:00 · LEVEL 0` reads as a broken save: only what the
+        // save carries is listed.
+        var parts: [String] = []
+        if let played = save.played {
+            parts.append(played)
+        }
+
+        if save.level > 0 {
+            parts.append("\(L.t("LEVEL")) \(save.level)")
+        }
+
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     // MARK: - Pages
