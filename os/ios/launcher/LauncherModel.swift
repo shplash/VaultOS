@@ -943,9 +943,6 @@ final class LauncherModel: ObservableObject {
         /// the game kept one has none, and `nil` says so rather than `0:00`.
         let played: String?
         let level: Int
-        /// The map the character was left on, as the save's own header names
-        /// it. A save that names none has none, rather than a guess.
-        let location: String?
         let preview: URL?
         let modified: Date
     }
@@ -1107,14 +1104,6 @@ final class LauncherModel: ObservableObject {
             // showing, with the character's own when it has none.
             let character = readString(data, at: 29, length: 32)
             let saveName = readString(data, at: 61, length: 30)
-
-            // The map is the one part of the header after the names that is
-            // text - the dates around it are the game's own and read as
-            // numbers - and it is written as a save file's name, `V13ENT.SAV`,
-            // whose extension is not part of the map's name.
-            let map = readString(data, at: 115, length: 16)
-            let location = map.isEmpty ? nil : LauncherModel.mapName(map)
-
             let sidecar = readSidecar(entry)
             let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
 
@@ -1143,7 +1132,6 @@ final class LauncherModel: ObservableObject {
                                        saved: saved,
                                        played: sidecar.played,
                                        level: sidecar.level,
-                                       location: location,
                                        preview: preview,
                                        modified: modified))
         }
@@ -1158,16 +1146,6 @@ final class LauncherModel: ObservableObject {
 
         let bytes = [UInt8](data[offset ..< offset + length])
         return String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// A map as the save's header names it, without the file's extension:
-    /// `V13ENT.SAV` is the map `V13ENT`.
-    private static func mapName(_ name: String) -> String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.count > 4, trimmed.uppercased().hasSuffix(".SAV") {
-            return String(trimmed.dropLast(4))
-        }
-        return trimmed
     }
 
     /// The time and level the game wrote beside a save. A save written before

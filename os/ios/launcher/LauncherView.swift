@@ -18,20 +18,16 @@ struct LauncherView: View {
     @State private var musicMuted = LauncherMusic.isMuted
     /// What the ZIP picker is being opened for.
     @State private var pendingImport: LauncherImport = .game
-    /// How far the strip of the other saves has been dragged, and where a drag
-    /// on it began, in the card's own points.
-    @State private var stripScroll: CGFloat = 0
-    @State private var stripDragStart: CGFloat?
+    @State private var savesScroll: CGFloat = 0
+    @State private var savesDragStart: CGFloat?
     /// The save the player picked. Choosing one loads nothing: CONTINUE does
     /// that, so a slot can be looked at before a game is taken from it.
     @State private var selectedSlot: Int?
-    /// Where each save's card sits on the home card, and where the featured
-    /// picture sits, in the card's own coordinates, so a card that is tapped
-    /// is seen to grow into the picture rather than swap for it.
-    @State private var saveCards: [Int: CGRect] = [:]
-    @State private var savePictureBox = CGRect.zero
-    /// The card on its way from the strip to the featured picture.
-    @State private var saveFlight: SaveFlight?
+    /// Where the saves box sits on the home card and how far its slots can
+    /// slide, in the card's own coordinates, so the card's drag can tell a
+    /// drag across it from one on the page behind it.
+    @State private var savesBox = SavesBox()
+    @State private var pagingDrag = false
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
     /// How many dots follow INSTALLING while an import is going.
@@ -41,6 +37,13 @@ struct LauncherView: View {
     /// is shown once in a note over the About page.
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
+    @State private var homeDrag: CGFloat = 0
+    @State private var homeAtEdge = false
+    @State private var hasSwipedHome = false
+    @State private var dragWatchdog: DispatchWorkItem?
+    @State private var homeNudge: CGFloat = 0
+    @State private var isPaging = false
+    @State private var swipeHintTask: DispatchWorkItem?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var accent: Color {
@@ -54,8 +57,7 @@ struct LauncherView: View {
     private static let smallestLayout = CGSize(width: 560, height: 320)
 
     /// The name of the space the home card's positions are measured in, so a
-    /// save card that is tapped is seen to grow into the featured picture
-    /// from where it sat.
+    /// page turn can tell a drag on the saves row from one across the card.
     private static let cardSpace = "launcher.homeCard"
 
     /// What the display keeps for the sensor housing and the home indicator. The
@@ -122,16 +124,27 @@ struct LauncherView: View {
         .onAppear {
             model.refreshInstall()
             model.refreshSaves()
+            scheduleSwipeHint()
             if !musicMuted {
                 LauncherMusic.shared.playIfAvailable()
             }
         }
         .onDisappear {
+            swipeHintTask?.cancel()
+            swipeHintTask = nil
+            dragWatchdog?.cancel()
+            dragWatchdog = nil
             model.saveSettingsNow()
         }
         .onChange(of: page) { _ in
             model.savesNotice = nil
             model.importSummary = nil
+            if page == .home {
+                scheduleSwipeHint()
+            } else {
+                swipeHintTask?.cancel()
+                swipeHintTask = nil
+            }
         }
         .onChange(of: model.install.installed) { installed in
             if installed == 1 {
@@ -140,12 +153,9 @@ struct LauncherView: View {
         }
         .onChange(of: model.selectedGame) { _ in
             // A picked save belongs to the game it was picked in, and the
-            // strip it was scrolled to.
+            // slots it was scrolled to.
             selectedSlot = nil
-            stripScroll = 0
-            saveCards = [:]
-            savePictureBox = .zero
-            saveFlight = nil
+            savesScroll = 0
         }
         .onChange(of: model.saves.count) { _ in
             if selectedSave == nil {
@@ -318,392 +328,210 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
-    /// How far an import has got, in the row under the game's own files: a
-    /// bar while it is going, and what it did once it has stopped.
+    /// The saves, from the line under the hero to the bottom of the card. The
+    /// box has no header of its own: that line is the header, and the room it
+    /// would take is the room the slots need.
+    private func savesColumn(game: FalloutGame,
+                             width: CGFloat,
+                             rowHeight: CGFloat,
+                             selected: Bool) -> some View {
+        // Exactly three slots across, however tall the box is: a slot that had
+        // to be narrow enough for the height left four of them in view.
+        let spacing: CGFloat = 8
+        let perRow = 3
+        let cardWidth = max(48, (width - CGFloat(perRow - 1) * spacing) / CGFloat(perRow))
+        let cardHeight = min(cardWidth * 133 / 224, max(40, rowHeight - 34))
+        let content = CGFloat(10) * cardWidth + CGFloat(9) * spacing
+        let limit = min(0, width - content)
+
+        return savesRow(game: game,
+                        width: width,
+                        cardWidth: cardWidth,
+                        cardHeight: cardHeight,
+                        limit: limit)
+            .frame(width: width, height: rowHeight, alignment: .topLeading)
+            .contentShape(Rectangle())
+            // The card's own drag slides these slots. Only the box on screen
+            // reports where it is: the other one is laid out a page away.
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: SavesBoxKey.self,
+                        value: selected
+                            ? SavesBox(rect: geometry.frame(in: .named(LauncherView.cardSpace)),
+                                       limit: limit)
+                            : SavesBox())
+                }
+            )
+    }
+
+    /// The game data, to the right of the saves. Its buttons sit under the
+    /// header as one column as wide as the column itself, and take the game's
+    /// accent like everything else on the card. The header says whether the
+    /// game's files are in place. The rows are a little tighter than a page's,
+    /// so the whole column stays inside the card.
     @ViewBuilder
-    private func gameDataStatus(game: FalloutGame) -> some View {
-        if model.isInstalling || model.importSummary != nil {
-            VStack(alignment: .leading, spacing: 4) {
-                if model.isInstalling {
-                    ProgressView(value: min(max(model.progress, 0), 1))
-                        .accentColor(game.accent)
+    private func gameDataColumn(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            headerLine(L.t("Game data"),
+                       badge: info.installed == 1 ? "DONE" : "NEEDED")
 
-                    Text(installingLabel)
-                        .font(Vault.label(10, weight: .regular))
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(1)
-                } else if let summary = model.importSummary {
-                    Text(summary)
-                        .font(Vault.label(10, weight: .regular))
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            Button {
+                pendingImport = .language
+                model.showImporter = true
+            } label: {
+                Text(L.t("LANGUAGE FILES"))
+                    .frame(maxWidth: .infinity)
             }
-            .padding(.vertical, 8)
-        }
-    }
+            .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: 30))
+            .disabled(model.isInstalling || info.installed == 0)
 
-    // MARK: - The saves
-
-    /// The picture every save is written with, as wide as it is tall: the game
-    /// renders it 224 by 133, so a card drawn at that ratio shows all of it
-    /// rather than a cropped middle.
-    private static let saveArtRatio: CGFloat = 224 / 133
-
-    /// The save that is open: the picture the game wrote on the left, at its
-    /// own ratio, and everything the save holds on the right, so no detail is
-    /// behind a menu.
-    private func featuredCard(save: LauncherModel.LauncherSave?, width: CGFloat) -> some View {
-        GeometryReader { geometry in
-            let gap: CGFloat = 14
-            let inner = max(80, geometry.size.width - 22)
-            let room = max(56, geometry.size.height - 22 - 20)
-            let artWidth = min(inner * 0.5, room * LauncherView.saveArtRatio)
-            let artHeight = artWidth / LauncherView.saveArtRatio
-            let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
-
-            HStack(alignment: .top, spacing: gap) {
-                VStack(alignment: .leading, spacing: 6) {
-                    savePicture(save: save,
-                                game: model.selectedGame,
-                                width: artWidth,
-                                height: artHeight)
-                        .background(
-                            GeometryReader { box in
-                                Color.clear.preference(key: SavePictureKey.self,
-                                                       value: box.frame(in: .named(LauncherView.cardSpace)))
-                            }
-                        )
-
-                    if let save = save {
-                        Text(LauncherView.slotTitle(save.slot))
-                            .font(Vault.label(9, weight: .bold))
-                            .kerning(1.1)
-                            .foregroundColor(Theme.faint)
-                            .lineLimit(1)
-                    }
-                }
-
-                saveInfo(save: save, width: max(64, inner - artWidth - gap))
+            Button {
+                pendingImport = .game
+                model.showImporter = true
+            } label: {
+                Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP"))
+                    .frame(maxWidth: .infinity)
             }
-            // The save sits in the middle of the plate, so a card given more
-            // height than its save needs stays a plate around it rather than
-            // a panel with a gap under it.
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            .padding(11)
-            // The outline a picked slot was drawn with, kept as the one sign
-            // of which save is open: no second indicator competes with it.
-            .background(shape.fill(Color.white.opacity(0.025)))
-            .overlay(shape.stroke(Color.white.opacity(0.72), lineWidth: 1))
-        }
-    }
+            .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: 30))
+            .disabled(model.isInstalling)
 
-    /// What a save knows about itself, as one panel: the character, the level,
-    /// the map the game was left on, how long it has been played and when it
-    /// was written. A save that does not carry one of them leaves it out
-    /// rather than showing a made-up value.
-    private func saveInfo(save: LauncherModel.LauncherSave?, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(save?.name ?? L.t("NO SAVES YET"))
-                .font(Vault.body(17, weight: .semibold))
-                .foregroundColor(save == nil ? Theme.dim : Theme.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-
-            if let save = save {
-                if !save.detail.isEmpty, save.detail != save.name {
-                    Text(save.detail)
-                        .font(Vault.label(10, weight: .regular))
-                        .foregroundColor(Theme.dim)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.top, 2)
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: 16) {
-                    if save.level > 0 {
-                        detailLine(L.t("LEVEL"), value: "\(save.level)")
-                    }
-
-                    if let location = save.location {
-                        detailLine(L.t("LOCATION"), value: location)
-                    }
-                }
-                .padding(.top, 9)
-
-                if let played = save.played {
-                    detailLine(L.t("PLAYED"), value: played)
-                        .padding(.top, 7)
-                }
-
-                detailLine(L.t("SAVED"), value: save.saved)
-                    .padding(.top, 7)
-            } else {
-                Text(L.t("PLAY starts a new game."))
-                    .font(Vault.label(10))
-                    .foregroundColor(Theme.faint)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
-            }
+            gameDataStatus(game: game)
         }
         .frame(width: width, alignment: .leading)
     }
 
-    /// One of the things a save holds: what it is called, and what it is, on
-    /// one line so a short card still shows all of them.
-    private func detailLine(_ label: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text(label)
-                .font(Vault.label(8, weight: .bold))
-                .kerning(1.0)
+    @ViewBuilder
+    private func gameDataStatus(game: FalloutGame) -> some View {
+        if model.isInstalling {
+            ProgressView(value: min(max(model.progress, 0), 1))
+                .accentColor(game.accent)
+
+            Text(installingLabel)
+                .font(Vault.label(10, weight: .regular))
                 .foregroundColor(Theme.faint)
                 .lineLimit(1)
-                .fixedSize()
-
-            Text(verbatim: value)
-                .font(Vault.label(11, weight: .regular))
-                .foregroundColor(Theme.dim)
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
+        } else if let summary = model.importSummary {
+            Text(summary)
+                .font(Vault.label(10, weight: .regular))
+                .foregroundColor(Theme.faint)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// A save's own picture, or the game's still while a save has none, so a
-    /// slot is never an empty grey box.
-    private func savePicture(save: LauncherModel.LauncherSave?,
-                             game: FalloutGame,
-                             width: CGFloat,
-                             height: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+    private func savesRow(game: FalloutGame,
+                          width: CGFloat,
+                          cardWidth: CGFloat,
+                          cardHeight: CGFloat,
+                          limit: CGFloat) -> some View {
+        let spacing: CGFloat = 8
 
-        return Group {
-            if let save = save,
-               let url = save.preview,
-               let image = UIImage(contentsOfFile: url.path) {
+        return HStack(spacing: spacing) {
+            ForEach(1...10, id: \.self) { slot in
+                saveCard(slot: slot,
+                         save: model.saves.first { $0.slot == slot },
+                         selected: selectedSlot == slot,
+                         width: cardWidth,
+                         height: cardHeight)
+            }
+        }
+        .offset(x: min(0, max(limit, savesScroll)))
+        .frame(width: width, alignment: .leading)
+        .frame(height: cardHeight + 34, alignment: .leading)
+        .clipped()
+    }
+
+    private func saveCard(slot: Int,
+                          save: LauncherModel.LauncherSave?,
+                          selected: Bool,
+                          width: CGFloat,
+                          height: CGFloat) -> some View {
+        // The slot number is the card's own, drawn in the empty placeholder,
+        // and the title is the save's own name: the character's name is the
+        // same on every save that character made.
+        let title = save?.name ?? ""
+
+        // A save that was written before the game kept a play time has no
+        // time to show, and `0:00 · LEVEL 0` reads as a broken save: the
+        // date it was written is what is known, so that is what is shown.
+        let line: String
+        if let save = save {
+            if let played = save.played {
+                line = save.level > 0
+                    ? "\(played) · \(L.t("LEVEL")) \(save.level)"
+                    : played
+            } else {
+                line = save.saved
+            }
+        } else {
+            line = L.t("EMPTY")
+        }
+
+        return VStack(alignment: .center, spacing: 4) {
+            if let url = save?.preview, let image = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-            } else if let art = artwork(for: game) {
-                Image(uiImage: art)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .saturation(0.55)
-                    .opacity(0.45)
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(Theme.hairline, lineWidth: 1)
+                    )
             } else {
-                Color.white.opacity(0.04)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+                    .frame(width: width, height: height)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(Theme.hairline, lineWidth: 1)
+                    )
+                    .overlay(
+                        Text(verbatim: "\(slot)")
+                            .font(Vault.label(11, weight: .bold))
+                            .foregroundColor(Theme.faint)
+                    )
             }
-        }
-        .frame(width: width, height: height)
-        .clipShape(shape)
-        .overlay(shape.stroke(Theme.hairline, lineWidth: 1))
-    }
 
-    /// The saves that are not open, in a strip under the featured one. The
-    /// strip shows the cards that fit whole and the edge of the next one, so
-    /// it is seen to go on; a drag slides it to the rest.
-    private func saveStrip(width: CGFloat) -> some View {
-        let slots = otherSlots
-        let cardWidth = LauncherView.stripCardWidth(width: width)
-        let limit = LauncherView.stripLimit(width: width, cards: slots.count)
-        let hasMore = stripScroll > limit + 1
-
-        return HStack(alignment: .top, spacing: Metrics.gap) {
-            ForEach(slots, id: \.self) { slot in
-                collapsedCard(slot: slot,
-                              save: model.saves.first { $0.slot == slot },
-                              width: cardWidth)
-            }
-        }
-        .offset(x: min(0, max(limit, stripScroll)))
-        .frame(width: width, height: LauncherView.stripHeight(width: width), alignment: .topLeading)
-        .clipped()
-        .simultaneousGesture(stripGesture(width: width))
-        .overlay(
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Theme.faint)
-                    .frame(width: 16)
-                    .opacity(hasMore ? 1 : 0)
-            },
-            alignment: .trailing
-        )
-    }
-
-    /// A save that is not open: its picture small, its slot and its name
-    /// under it, and a chevron saying it opens. Tapping it makes it the
-    /// featured save, and the one that was featured takes its place here.
-    private func collapsedCard(slot: Int,
-                               save: LauncherModel.LauncherSave?,
-                               width: CGFloat) -> some View {
-        let height = width / LauncherView.saveArtRatio
-
-        return VStack(alignment: .leading, spacing: 5) {
-            savePicture(save: save, game: model.selectedGame, width: width, height: height)
-                // The slot is over the picture's corner, so the sliver of the
-                // next card says which save it is without its picture.
-                .overlay(
-                    Text(verbatim: String(format: "%02d", slot))
-                        .font(Vault.label(9, weight: .bold))
-                        .foregroundColor(Theme.text)
-                        .padding(.horizontal, 5)
-                        .frame(height: 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(Color.black.opacity(0.55))
-                        )
-                        .padding(5),
-                    alignment: .topLeading
-                )
-                .background(
-                    GeometryReader { box in
-                        Color.clear.preference(key: SaveCardKey.self,
-                                               value: [slot: box.frame(in: .named(LauncherView.cardSpace))])
-                    }
-                )
-
-            HStack(spacing: 4) {
-                Text(save?.name ?? L.t("EMPTY"))
+            if !title.isEmpty {
+                Text(title)
                     .font(Vault.label(9, weight: .semibold))
-                    .foregroundColor(save == nil ? Theme.faint : Theme.text)
+                    .foregroundColor(Theme.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(Theme.faint)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
             }
-            .frame(width: width, alignment: .leading)
+
+            Text(line)
+                .font(Vault.label(9, weight: .regular))
+                .foregroundColor(Theme.faint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
-        .frame(width: width, alignment: .topLeading)
+        .frame(width: width, height: height + 34, alignment: .top)
         .contentShape(Rectangle())
+        .overlay(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .stroke(selected ? Color.white.opacity(0.72) : Color.clear, lineWidth: 1)
+        )
         .onTapGesture {
-            feature(slot)
+            guard let save = save else {
+                return
+            }
+
+            // Picking a slot only picks it: CONTINUE takes the game from it,
+            // and picking the one already picked lets it go.
+            selectedSlot = selectedSlot == save.slot ? nil : save.slot
         }
         .contextMenu {
             if let save = save {
                 deleteItem(save)
             }
         }
-    }
-
-    /// How many save cards the strip sets side by side before the one that
-    /// only peeks: as many as the page has room for, so a card keeps a card's
-    /// width in every layout rather than shrinking into a sliver.
-    private static func stripColumns(width: CGFloat) -> CGFloat {
-        let columns = ((width - LauncherView.stripPeek) / 104).rounded()
-        return min(max(columns, 2), 6)
-    }
-
-    /// How much of the next card is left showing at the edge of the page.
-    private static let stripPeek: CGFloat = 24
-
-    /// The width the strip gives a card: the cards and the one that peeks
-    /// share the page between them.
-    private static func stripCardWidth(width: CGFloat) -> CGFloat {
-        let columns = stripColumns(width: width)
-        let share = (width - stripPeek - (columns - 1) * Metrics.gap) / columns
-        return max(44, share)
-    }
-
-    /// How far the strip may slide, which is nothing while every card fits.
-    private static func stripLimit(width: CGFloat, cards: Int) -> CGFloat {
-        guard cards > 0 else {
-            return 0
-        }
-
-        let cardWidth = stripCardWidth(width: width)
-        let content = CGFloat(cards) * cardWidth + CGFloat(cards - 1) * Metrics.gap
-        return min(0, width - content)
-    }
-
-    /// The room the strip takes: a card's picture and the line under it.
-    private static func stripHeight(width: CGFloat) -> CGFloat {
-        return stripCardWidth(width: width) / saveArtRatio + 22
-    }
-
-    /// The saves that are not open, in slot order, so the strip never
-    /// rearranges itself for no reason.
-    private var otherSlots: [Int] {
-        let featured = featuredSlot
-        return model.saves.map { $0.slot }.filter { $0 != featured }.sorted()
-    }
-
-    /// The save that is open: the one the player picked, or the newest one
-    /// while nothing has been picked yet.
-    private var featuredSlot: Int? {
-        return selectedSave?.slot ?? model.saves.first?.slot
-    }
-
-    /// The save the featured card shows.
-    private var featuredSave: LauncherModel.LauncherSave? {
-        guard let slot = featuredSlot else {
-            return nil
-        }
-
-        return model.saves.first { $0.slot == slot }
-    }
-
-    private static func slotTitle(_ slot: Int) -> String {
-        return L.t("SLOT") + " " + String(format: "%02d", slot)
-    }
-
-    /// Opens a save that was tapped. Where its card sat and where the
-    /// featured picture sits are both known, so the card is seen to grow into
-    /// the picture while the save it replaces takes its place in the strip.
-    private func feature(_ slot: Int) {
-        guard slot != featuredSlot else {
-            return
-        }
-
-        if !reduceMotion, let from = saveCards[slot], savePictureBox != .zero {
-            let save = model.saves.first { $0.slot == slot }
-            saveFlight = SaveFlight(slot: slot, preview: save?.preview, from: from, to: savePictureBox)
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + SaveFlightView.duration) {
-                if saveFlight?.slot == slot {
-                    saveFlight = nil
-                }
-            }
-        }
-
-        // The strip's cards slide into the room the tapped one leaves, while
-        // the featured panel changes under the picture on its way there.
-        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .spring(response: 0.36, dampingFraction: 0.9)) {
-            selectedSlot = slot
-        }
-    }
-
-    private func stripGesture(width: CGFloat) -> some Gesture {
-        let limit = LauncherView.stripLimit(width: width, cards: otherSlots.count)
-
-        return DragGesture(minimumDistance: 6)
-            .onChanged { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else {
-                    return
-                }
-
-                if stripDragStart == nil {
-                    stripDragStart = stripScroll
-                }
-
-                stripScroll = min(0, max(limit, (stripDragStart ?? 0) + value.translation.width))
-            }
-            .onEnded { value in
-                stripDragStart = nil
-
-                // A short flick carries on where the finger was going, as a
-                // strip of cards of the system's own would.
-                let predicted = value.predictedEndTranslation.width - value.translation.width
-                withAnimation(reduceMotion ? .easeOut(duration: 0.18) : .spring(response: 0.4, dampingFraction: 0.9)) {
-                    stripScroll = min(0, max(limit, stripScroll + predicted))
-                }
-            }
     }
 
     /// Deleting is a long press away on a save card. A button's role is what
@@ -786,7 +614,7 @@ struct LauncherView: View {
     private var content: some View {
         switch page {
         case .home:
-            homeCard
+            homePager
         case .display:
             displaySheet
         case .audio:
@@ -802,173 +630,308 @@ struct LauncherView: View {
         }
     }
 
-    // MARK: - Home
-
-    /// The home page: the game that is open and the way to the other one at
-    /// the top, the save that is open under it, and the rest of the saves in a
-    /// strip along the bottom. The strip is the last thing above the Play
-    /// button in the rail beside it, so the saves run down towards Play
-    /// instead of a switch of their own taking a row at the bottom.
-    private var homeCard: some View {
+    private var homePager: some View {
         GeometryReader { geometry in
-            let inner = max(140, geometry.size.width - Metrics.sheetInset * 2)
-            // A card as short as a phone's in landscape has no room for the
-            // tagline of its own: it goes beside the name instead, and the
-            // saves keep the height below it.
-            let short = geometry.size.height < 460
+            let width = geometry.size.width
+            let currentIndex = model.selectedGame == .fallout1 ? 0 : 1
+            let raw = homeDrag
+            let drag = homeAtEdge ? raw * 0.28 : raw
+            let progress = min(max(CGFloat(currentIndex) - drag / max(width, 1), 0), 1)
+            let pageWidth = width
 
-            VStack(alignment: .leading, spacing: 0) {
-                homeHeader(game: model.selectedGame, width: inner, short: short)
+            VStack(spacing: 6) {
+                ZStack(alignment: .top) {
+                    ForEach(FalloutGame.allCases) { game in
+                        let index = game == .fallout1 ? 0 : 1
+                        let relative = CGFloat(index - currentIndex)
+                        let offset = relative * (pageWidth + 6) + drag + homeNudge
+                        let isSelected = game == model.selectedGame
 
-                Rectangle()
-                    .fill(accent.opacity(0.55))
-                    .frame(height: 1)
-                    .padding(.top, Metrics.gap)
-
-                featuredCard(save: featuredSave, width: inner)
-                    .padding(.top, Metrics.gap)
-
-                if !otherSlots.isEmpty {
-                    saveStrip(width: inner)
-                        .padding(.top, Metrics.gap)
+                        homeSheet(game: game,
+                                  info: model.installInfos[game] ?? LauncherInstallInfo(),
+                                  width: pageWidth,
+                                  height: geometry.size.height - 36,
+                                  selected: isSelected)
+                            .frame(width: pageWidth, height: geometry.size.height - 36)
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .opacity(isSelected ? 1 : 0.45)
+                            .offset(x: offset)
+                            .allowsHitTesting(isSelected && !isPaging)
+                    }
                 }
+                .frame(width: width, height: geometry.size.height - 36)
+                .clipped()
+                .contentShape(Rectangle())
+                // One gesture for the whole card: a drag that begins in the
+                // saves box slides its slots, and any other turns the page.
+                // Two gestures competing is what left the box scrolling the
+                // page instead of itself.
+                .coordinateSpace(name: LauncherView.cardSpace)
+                .simultaneousGesture(homePagingGesture(width: pageWidth))
+                .onPreferenceChange(SavesBoxKey.self) { box in
+                    savesBox = box
+                }
+
+                gameSwitcher(progress: progress)
+                    .frame(height: 30)
             }
-            .padding(.horizontal, Metrics.sheetInset)
-            .padding(.top, 14)
-            .padding(.bottom, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .vaultPlate(corner: 20, fill: Theme.rail)
-            .coordinateSpace(name: LauncherView.cardSpace)
-            .overlay(saveFlightView, alignment: .topLeading)
-            .onPreferenceChange(SaveCardKey.self) { cards in
-                saveCards = cards
-            }
-            .onPreferenceChange(SavePictureKey.self) { box in
-                savePictureBox = box
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .padding(.leading, Metrics.outer)
-        .padding(.trailing, Metrics.outer)
+        .padding(.horizontal, Metrics.outer)
         .padding(.top, Metrics.outer)
         .padding(.bottom, Metrics.outer + screenInsets.bottom)
     }
 
-    /// The card on its way from the strip to the featured picture, drawn over
-    /// both so it is not cut off by the strip it left.
-    private var saveFlightView: some View {
-        return Group {
-            if let flight = saveFlight {
-                SaveFlightView(preview: flight.preview,
-                               from: flight.from,
-                               to: flight.to)
+    private func homePagingGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                // A drag that began in the saves box slides its slots: the
+                // page stays where it is, however far the finger travels.
+                if savesBox.rect.contains(value.startLocation) {
+                    if savesDragStart == nil {
+                        savesDragStart = savesScroll
+                    }
+                    savesScroll = min(0, max(savesBox.limit,
+                                             (savesDragStart ?? 0) + value.translation.width))
+                    pagingDrag = false
+                    homeDrag = 0
+                    return
+                }
+
+                guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
+                    return
+                }
+                pagingDrag = true
+                homeDrag = value.translation.width
+                homeAtEdge = (model.selectedGame == .fallout1 && value.translation.width > 0)
+                    || (model.selectedGame == .fallout2 && value.translation.width < 0)
+                isPaging = true
+                scheduleDragWatchdog()
+                if !hasSwipedHome {
+                    hasSwipedHome = true
+                    swipeHintTask?.cancel()
+                    swipeHintTask = nil
+                }
             }
-        }
+            .onEnded { value in
+                dragWatchdog?.cancel()
+                dragWatchdog = nil
+
+                // A drag the saves box took ends with the slots where the
+                // finger left them, and nothing else to settle.
+                if savesDragStart != nil {
+                    savesDragStart = nil
+                    savesScroll = min(0, max(savesBox.limit, savesScroll))
+                    return
+                }
+
+                guard pagingDrag else {
+                    return
+                }
+                pagingDrag = false
+
+                var target = model.selectedGame
+                if abs(value.translation.width) > abs(value.translation.height) * 1.2 {
+                    let index = model.selectedGame == .fallout1 ? 0 : 1
+                    let raw = value.translation.width
+                    let atEdge = (index == 0 && raw > 0) || (index == 1 && raw < 0)
+                    let drag = atEdge ? raw * 0.28 : raw
+                    let predicted = value.predictedEndTranslation.width
+                    let direction = abs(predicted) > abs(drag) ? predicted : drag
+                    let shouldChange = abs(drag) > width * 0.22 || abs(predicted) > width * 0.35
+                    let nextIndex = shouldChange ? min(max(index + (direction < 0 ? 1 : -1), 0), 1) : index
+                    target = nextIndex == 0 ? FalloutGame.fallout1 : .fallout2
+                }
+
+                withAnimation(reduceMotion ? .easeOut(duration: 0.18) : .spring(response: 0.34, dampingFraction: 0.86)) {
+                    homeDrag = 0
+                    if target != model.selectedGame {
+                        model.selectedGame = target
+                    }
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                    isPaging = false
+                }
+            }
     }
 
-    /// The game's name and edition, the two games as words under it, and the
-    /// way to the project beside them. None of it is a switch: the game that
-    /// is open is the one the saves under it belong to.
-    private func homeHeader(game: FalloutGame, width: CGFloat, short: Bool) -> some View {
-        let titleSize = min(short ? 34 : 44, max(24, width * 0.155))
-        // The tagline, the edition and the links cannot share a narrow column
-        // without one of them being cut, so the links wait for the room.
-        let showLinks = width >= 440
-
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(game.title.uppercased())
-                    .font(Vault.display(titleSize))
-                    .kerning(1.4)
-                    .foregroundColor(Theme.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-
-                if short {
-                    Text(L.t(game.tagline))
-                        .font(Vault.body(12))
-                        .foregroundColor(Theme.dim)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-
-                Text(L.t("COMMUNITY EDITION"))
-                    .font(Vault.label(9, weight: .bold))
-                    .kerning(1.8)
-                    .foregroundColor(accent)
-                    .lineLimit(1)
-                    .fixedSize()
-
-                Spacer(minLength: 0)
-
-                if showLinks {
-                    plainLink("GITHUB", address: "https://github.com/shplash/vaultos")
-                    plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
-                }
+    private func scheduleDragWatchdog() {
+        dragWatchdog?.cancel()
+        let task = DispatchWorkItem {
+            isPaging = false
+            pagingDrag = false
+            guard abs(homeDrag) > 0.5 else {
+                return
             }
-
-            if !short {
-                Text(L.t(game.tagline))
-                    .font(Vault.body(12))
-                    .foregroundColor(Theme.dim)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .padding(.top, 2)
+            withAnimation(reduceMotion ? .easeOut(duration: 0.18) : .spring(response: 0.32, dampingFraction: 0.86)) {
+                homeDrag = 0
             }
-
-            HStack(alignment: .center, spacing: 18) {
-                ForEach(FalloutGame.allCases) { item in
-                    gameTab(item, selected: item == game)
-                }
-
-                Spacer(minLength: 0)
-
-                if model.install.installed == 0 {
-                    Text(L.t("FILES NEEDED"))
-                        .font(Vault.label(9, weight: .bold))
-                        .kerning(1.2)
-                        .foregroundColor(Theme.faint)
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-            }
-            .padding(.top, short ? 7 : 9)
         }
+        dragWatchdog = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
 
-    /// A game as a word of its own, in its accent when it is the one open and
-    /// with a line under it: a tab, rather than a button filling a capsule.
-    private func gameTab(_ game: FalloutGame, selected: Bool) -> some View {
-        Button {
-            selectGame(game)
-        } label: {
-            Text(game.title.uppercased())
-                .font(Vault.label(12, weight: selected ? .bold : .regular))
-                .kerning(1.4)
-                .foregroundColor(selected ? accent : Theme.faint)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.bottom, 5)
-                .overlay(
-                    Rectangle()
-                        .fill(selected ? accent : Color.clear)
-                        .frame(height: 2),
-                    alignment: .bottom
-                )
-                .contentShape(Rectangle())
+    private func gameSwitcher(progress: CGFloat) -> some View {
+        GeometryReader { geometry in
+            let segment = geometry.size.width / 2
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(accent.opacity(0.18))
+                    .frame(width: segment, height: 30)
+                    .offset(x: min(max(progress, 0), 1) * segment)
+
+                HStack(spacing: 0) {
+                    ForEach(FalloutGame.allCases) { game in
+                        Button {
+                            switchHome(to: game)
+                        } label: {
+                            Text(game.title)
+                                .font(Vault.label(12, weight: .semibold))
+                                .kerning(1.2)
+                                .foregroundColor(model.selectedGame == game ? accent : Theme.faint)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 30)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(game.title)
+                        .accessibilityAddTraits(model.selectedGame == game ? .isSelected : [])
+                    }
+                }
+            }
+            .overlay(Capsule().stroke(Theme.hairline, lineWidth: 1))
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(game.title)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .frame(maxWidth: 340)
+        .frame(height: 30)
     }
 
-    private func selectGame(_ game: FalloutGame) {
-        guard game != model.selectedGame else {
-            return
-        }
-
+    private func switchHome(to game: FalloutGame) {
         withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 0.82)) {
             model.selectedGame = game
         }
+    }
+
+    private func scheduleSwipeHint() {
+        guard page == .home,
+              !reduceMotion,
+              !UserDefaults.standard.bool(forKey: "launcher.swipeHintShown") else { return }
+        let task = DispatchWorkItem {
+            guard !hasSwipedHome, page == .home else { return }
+            UserDefaults.standard.set(true, forKey: "launcher.swipeHintShown")
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.55)) {
+                homeNudge = -24
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
+                    homeNudge = 0
+                }
+            }
+        }
+        swipeHintTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
+    }
+
+    private func homeSheet(game: FalloutGame,
+                           info: LauncherInstallInfo,
+                           width: CGFloat,
+                           height: CGFloat,
+                           selected: Bool) -> some View {
+        let gameAccent = game.accent
+        let buttonFont = VaultUI.label(10, weight: .semibold)
+        let columns = width - Metrics.sheetInset * 2
+        // The hero holds its own height and the columns are fitted into what
+        // is left of the card, so the slots grow with it and never past it.
+        let columnsHeight = max(90, height - LauncherView.heroHeight - 1 - Metrics.gap - Metrics.outer)
+        // The game data keeps to the width of its own buttons and sits at the
+        // far right, so the saves have the rest of the card to run across.
+        let labels = [L.t("LANGUAGE FILES"),
+                      L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP")]
+        let widest = labels.reduce(CGFloat(0)) { widest, name in
+            max(widest, ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width))
+        }
+        // A button carries its own padding, so the column is as wide as the
+        // widest label and nothing in it is cut off at the card's edge.
+        let filesWidth = max(126, widest + 30)
+        let savesWidth = max(columns - filesWidth - 19, 90)
+        return VStack(alignment: .leading, spacing: 0) {
+            hero(game: game)
+
+            Rectangle()
+                .fill(gameAccent.opacity(0.55))
+                .frame(height: 1)
+
+            HStack(alignment: .top, spacing: 0) {
+                savesColumn(game: game, width: savesWidth, rowHeight: columnsHeight, selected: selected)
+
+                Rectangle()
+                    .fill(Theme.hairline)
+                    .frame(width: 1)
+
+                gameDataColumn(game: game, info: info, width: filesWidth)
+                    .padding(.leading, 18)
+            }
+            .padding(.horizontal, Metrics.sheetInset)
+            .padding(.top, Metrics.gap)
+            .padding(.bottom, Metrics.outer)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .vaultPlate(corner: 20, fill: Theme.rail)
+    }
+
+    private static let heroTitleSize: CGFloat = 68
+
+    private static var heroHeight: CGFloat {
+        let title = VaultUI.display(heroTitleSize).lineHeight
+        let tagline = VaultUI.label(14).lineHeight
+        let edition = VaultUI.label(11, weight: .bold).lineHeight
+        return 14 + title + 2 + tagline + 2 + edition + 2 + 4 + 20 + 14
+    }
+
+    private func hero(game: FalloutGame) -> some View {
+        GeometryReader { geometry in
+            let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
+            let artHeight = artWidth * 3 / 4
+
+            ZStack(alignment: .leading) {
+                heroArt(game: game, width: artWidth, height: artHeight)
+                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .trailing)
+                    .id(game)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(game.title.uppercased())
+                        .font(Vault.display(LauncherView.heroTitleSize))
+                        .kerning(1.4)
+                        .foregroundColor(Theme.text)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+
+                    Text(L.t(game.tagline))
+                        .font(Vault.body(14))
+                        .foregroundColor(Theme.dim)
+                        .lineLimit(1)
+
+                    Text(L.t("COMMUNITY EDITION"))
+                        .font(Vault.label(11, weight: .bold))
+                        .kerning(2.4)
+                        .foregroundColor(game.accent)
+
+                    HStack(spacing: 8) {
+                        plainLink("GITHUB", address: "https://github.com/shplash/vaultos")
+                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(.top, 14)
+                .padding(.bottom, 14)
+                .padding(.leading, Metrics.sheetInset)
+                .frame(maxWidth: geometry.size.width * 0.62, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .frame(minHeight: LauncherView.heroHeight, maxHeight: .infinity)
     }
 
     private func plainLink(_ title: String, address: String) -> some View {
@@ -991,6 +954,37 @@ struct LauncherView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open \(title)")
+    }
+
+    private func heroArt(game: FalloutGame, width: CGFloat, height: CGFloat) -> some View {
+        Group {
+            if let image = artwork(for: game) {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .saturation(0.82)
+                    .brightness(-0.03)
+                    .overlay(Color(red: 0.40, green: 0.25, blue: 0.11).opacity(0.16))
+                    .overlay(
+                        LinearGradient(colors: [Color.clear, Theme.rail.opacity(0.92)],
+                                       startPoint: .center, endPoint: .bottom)
+                    )
+                    .overlay(
+                        RadialGradient(colors: [Color.clear, Color.black.opacity(0.45)],
+                                       center: .center, startRadius: width * 0.22, endRadius: width * 0.64)
+                    )
+                    .mask(
+                        LinearGradient(gradient: Gradient(stops: [
+                            .init(color: Color.black.opacity(0), location: 0),
+                            .init(color: Color.black.opacity(0.55), location: 0.30),
+                            .init(color: Color.black, location: 0.58)
+                        ]), startPoint: .leading, endPoint: .trailing)
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private static var artworkCache: [FalloutGame: UIImage] = [:]
@@ -1575,37 +1569,6 @@ struct LauncherView: View {
 
     private var gameSheet: some View {
         sheet(title: "SYSTEM", detail: "Language, movement, haptics and saving", onReset: resetGame) {
-            // The game's own files sit here rather than on the home card:
-            // that card is all saves now, and importing is a setting of the
-            // game like the ones below it.
-            row("Game data",
-                detail: model.install.installed == 1
-                    ? L.t("Your game files are in place")
-                    : L.t("Import the game's ZIP to play"),
-                badge: L.t(model.install.installed == 1 ? "DONE" : "NEEDED")) {
-                HStack(spacing: 8) {
-                    Button {
-                        pendingImport = .language
-                        model.showImporter = true
-                    } label: {
-                        Text(L.t("LANGUAGE FILES"))
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent, minHeight: 30))
-                    .disabled(model.isInstalling || model.install.installed == 0)
-
-                    Button {
-                        pendingImport = .game
-                        model.showImporter = true
-                    } label: {
-                        Text(L.t(model.install.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP"))
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent, minHeight: 30))
-                    .disabled(model.isInstalling)
-                }
-            }
-
-            gameDataStatus(game: model.selectedGame)
-
             row("Language", detail: "Game text, voice, this launcher and the buttons") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
@@ -1783,6 +1746,29 @@ struct LauncherView: View {
                       detail: "Switch to attack mode by itself when a fight starts.",
                       divider: false,
                       isOn: $model.autoTarget)
+        }
+    }
+
+    private func headerLine(_ title: String,
+                            badge: String? = nil,
+                            badgeColour: Color? = nil) -> some View {
+        return HStack(spacing: 6) {
+            Text(title)
+                .font(Vault.body(12, weight: .medium))
+                .foregroundColor(Theme.text)
+                .lineLimit(1)
+
+            // A note beside the header, in the game's own colour.
+            if let badge = badge {
+                Text(L.t(badge))
+                    .font(Vault.label(9, weight: .bold))
+                    .kerning(0.8)
+                    .foregroundColor(badgeColour ?? Theme.faint)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+
+            Spacer(minLength: 0)
         }
     }
 
@@ -2111,102 +2097,27 @@ private extension FalloutGame {
     }
 }
 
-/// Where each save's card sits on the home card, measured in the card's own
-/// coordinates, so a card that is tapped is seen to grow from where it sat.
-private struct SaveCardKey: PreferenceKey {
-    static var defaultValue: [Int: CGRect] {
-        return [:]
-    }
-
-    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
-        value.merge(nextValue()) { _, next in next }
-    }
+/// Where the saves box sits on the home card, and how far its slots can slide,
+/// measured in the card's own coordinates, so the card's drag knows which
+/// drags belong to the box.
+private struct SavesBox: Equatable {
+    var rect: CGRect = .zero
+    var limit: CGFloat = 0
 }
 
-/// Where the featured save's picture sits, for the same reason: a card that
-/// is tapped grows into it.
-private struct SavePictureKey: PreferenceKey {
-    static var defaultValue: CGRect {
-        return .zero
+private struct SavesBoxKey: PreferenceKey {
+    static var defaultValue: SavesBox {
+        return SavesBox()
     }
 
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        // Both a save with a picture and one without report a box, and an
-        // empty answer - nothing laid out - never replaces a real one.
+    static func reduce(value: inout SavesBox, nextValue: () -> SavesBox) {
+        // Both cards are laid out, and only the one on screen has a box: an
+        // empty answer never replaces a real one, or the page away would
+        // leave the card on screen with nothing to scroll.
         let next = nextValue()
-        if next != .zero {
+        if next.rect != .zero {
             value = next
         }
-    }
-}
-
-/// A save's card on its way from the strip to the featured picture.
-private struct SaveFlight {
-    let slot: Int
-    let preview: URL?
-    let from: CGRect
-    let to: CGRect
-}
-
-/// The card that is travelling: it is drawn over both places rather than in
-/// either, so the save turns from a card into the featured picture in one
-/// movement instead of one card fading out as another fades in.
-private struct SaveFlightView: View {
-    /// How long the card takes to reach the picture, and how long it is kept
-    /// after that so it is never seen to vanish before it lands.
-    static let duration: Double = 0.48
-
-    let preview: URL?
-    let from: CGRect
-    let to: CGRect
-
-    @State private var progress: CGFloat = 0
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-
-        return Group {
-            if let preview = preview, let image = UIImage(contentsOfFile: preview.path) {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Color.white.opacity(0.06)
-            }
-        }
-        .frame(width: from.width, height: from.height)
-        .clipShape(shape)
-        .overlay(shape.stroke(Theme.hairline, lineWidth: 1))
-        .modifier(SaveFlightPath(from: from, to: to, progress: progress))
-        .offset(x: from.minX, y: from.minY)
-        .allowsHitTesting(false)
-        .onAppear {
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) {
-                progress = 1
-            }
-        }
-    }
-}
-
-/// Carries the travelling card from where it was tapped to the featured
-/// picture: its middle moves there and its width grows to the picture's, so
-/// the card and the picture are the same thing at both ends of the move.
-private struct SaveFlightPath: GeometryEffect {
-    let from: CGRect
-    let to: CGRect
-    var progress: CGFloat
-
-    var animatableData: CGFloat {
-        get { return progress }
-        set { progress = newValue }
-    }
-
-    func effectValue(size: CGSize) -> ProjectionTransform {
-        let travel = min(max(progress, 0), 1)
-        let scale = 1 + (to.width / max(from.width, 1) - 1) * travel
-        let x = (to.midX - from.midX) * travel + size.width / 2 * (1 - scale)
-        let y = (to.midY - from.midY) * travel + size.height / 2 * (1 - scale)
-        return ProjectionTransform(CGAffineTransform(translationX: x, y: y).scaledBy(x: scale, y: scale))
     }
 }
 
