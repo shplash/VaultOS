@@ -1161,9 +1161,15 @@ final class LauncherModel: ObservableObject {
         let seconds = number(in: text, key: "playSeconds")
         let level = number(in: text, key: "level")
 
-        // A time of zero is still a time: the save was opened and played for
-        // less than a minute, so it shows as 0:00 rather than as its date.
-        return (String(format: "%d:%02d", seconds / 3600, seconds / 60 % 60), level)
+        // Minutes, and hours once there are any, so `1:05` cannot be read as
+        // one minute five seconds or as an hour and five minutes.
+        let hours = seconds / 3600
+        let minutes = seconds / 60 % 60
+        let played = hours > 0
+            ? "\(hours)h \(String(format: "%02d", minutes))m"
+            : "\(minutes) " + L.t("MIN")
+
+        return (played, level)
     }
 
     private static func number(in text: String, key: String) -> Int {

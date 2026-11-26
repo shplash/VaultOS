@@ -1102,6 +1102,26 @@ static unsigned int readPlayTime(const char* path)
     return (unsigned int)strtoul(colon + 1, nullptr, 10);
 }
 
+// The palette the game's own load screen draws a save's picture with, and the
+// one every picture here is written with. The palette on screen is not the one
+// the picture was taken with - a load screen, a fade - and a thumbnail drawn
+// with the wrong palette is speckled noise.
+static const unsigned char* previewPalette(void)
+{
+    static unsigned char palette[768];
+    static bool loaded;
+
+    if (!loaded) {
+        File* color = fileOpen("color.pal", "rb");
+        if (color != nullptr) {
+            loaded = fileRead(palette, 1, sizeof(palette), color) == sizeof(palette);
+            fileClose(color);
+        }
+    }
+
+    return loaded ? palette : nullptr;
+}
+
 static void save_preview(const char* directory, const unsigned char* pixels)
 {
     if (pixels == nullptr) {
@@ -1109,10 +1129,16 @@ static void save_preview(const char* directory, const unsigned char* pixels)
         return;
     }
 
+    const unsigned char* palette = previewPalette();
+    if (palette == nullptr) {
+        saves_log("preview: color.pal is unreadable");
+        return;
+    }
+
     char path[COMPAT_MAX_PATH];
     snprintf(path, sizeof(path), "%spreview.png", directory);
 
-    if (!write_png(path, pixels, _cmap)) {
+    if (!write_png(path, pixels, palette)) {
         saves_log("preview: could not write %s", path);
     } else {
         saves_log("preview: wrote %s", path);
@@ -1160,17 +1186,22 @@ static void save_sidecars(int slot)
     _playTimeMs = 0;
 }
 
-// A save written before the launcher showed pictures has none of its own: the
-// picture is inside the save, at the offset the game reads it back from, and
-// the palette it was drawn with is color.pal - so every slot without a picture
-// gets one, without the save being written again.
+// The picture a save is shown with is the one inside it, at the offset the game
+// reads it back from, drawn with color.pal - the game's own load screen shows
+// it exactly so. Writing it here gives every save that picture, a save made
+// before the launcher showed any included, and replaces one taken while saving
+// that may have been drawn with the wrong palette.
 void loadsave_preview_all(void)
 {
     if (_patches == nullptr) {
         _patches = settings.system.master_patches_path.c_str();
     }
 
-    colorPaletteLoad("color.pal");
+    const unsigned char* palette = previewPalette();
+    if (palette == nullptr) {
+        saves_log("preview: color.pal is unreadable");
+        return;
+    }
 
     char root[COMPAT_MAX_PATH];
     save_path(root, sizeof(root), "SAVEGAME");
@@ -1190,13 +1221,6 @@ void loadsave_preview_all(void)
         char previewPath[COMPAT_MAX_PATH];
         snprintf(previewPath, sizeof(previewPath), "%s/SLOT%.2d/preview.png", root, slot);
 
-        FILE* existing = fopen(previewPath, "rb");
-        if (existing != nullptr) {
-            fclose(existing);
-            fclose(save);
-            continue;
-        }
-
         const bool read = fseek(save, 131, SEEK_SET) == 0
             && fread(thumbnail, 1, sizeof(thumbnail), save) == sizeof(thumbnail);
         fclose(save);
@@ -1206,8 +1230,10 @@ void loadsave_preview_all(void)
             continue;
         }
 
-        if (!write_png(previewPath, thumbnail, _cmap)) {
+        if (!write_png(previewPath, thumbnail, palette)) {
             saves_log("preview: could not write %s", previewPath);
+        } else {
+            saves_log("preview: wrote %s", previewPath);
         }
     }
 }

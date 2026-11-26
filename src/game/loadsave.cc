@@ -544,6 +544,26 @@ static bool write_png(const char* path, const unsigned char* pixels, const unsig
     return true;
 }
 
+// The palette the game's own load screen draws a save's picture with, and the
+// one every picture here is written with. The palette on screen is not the one
+// the picture was taken with - a load screen, a fade - and a thumbnail drawn
+// with the wrong palette is speckled noise.
+static const unsigned char* preview_palette(void)
+{
+    static unsigned char palette[768];
+    static bool loaded;
+
+    if (!loaded) {
+        DB_FILE* color = db_fopen("color.pal", "rb");
+        if (color != NULL) {
+            loaded = db_fread(palette, 1, sizeof(palette), color) == sizeof(palette);
+            db_fclose(color);
+        }
+    }
+
+    return loaded ? palette : NULL;
+}
+
 static void save_preview(const char* directory)
 {
     if (thumbnail_image[1] == NULL) {
@@ -551,10 +571,16 @@ static void save_preview(const char* directory)
         return;
     }
 
+    const unsigned char* palette = preview_palette();
+    if (palette == NULL) {
+        saves_log("preview: color.pal is unreadable");
+        return;
+    }
+
     char path[COMPAT_MAX_PATH];
     snprintf(path, sizeof(path), "%spreview.png", directory);
 
-    if (!write_png(path, thumbnail_image[1], palette_current())) {
+    if (!write_png(path, thumbnail_image[1], palette)) {
         saves_log("preview: could not write %s", path);
     } else {
         saves_log("preview: wrote %s", path);
@@ -625,10 +651,11 @@ static void save_sidecars(void)
     play_time_ms = 0;
 }
 
-// A save written before the launcher showed pictures has none of its own: the
-// picture is inside the save, at the offset the game reads it back from, and
-// the palette it was drawn with is color.pal - so every slot without a picture
-// gets one, without the save being written again.
+// The picture a save is shown with is the one inside it, at the offset the game
+// reads it back from, drawn with color.pal - the game's own load screen shows
+// it exactly so. Writing it here gives every save that picture, a save made
+// before the launcher showed any included, and replaces one taken while saving
+// that may have been drawn with the wrong palette.
 void loadsave_preview_all(void)
 {
     if (patches == NULL) {
@@ -637,16 +664,8 @@ void loadsave_preview_all(void)
         }
     }
 
-    unsigned char palette[768];
-    DB_FILE* color = db_fopen("color.pal", "rb");
-    if (color == NULL) {
-        saves_log("preview: color.pal is missing");
-        return;
-    }
-
-    const bool hasPalette = db_fread(palette, 1, sizeof(palette), color) == sizeof(palette);
-    db_fclose(color);
-    if (!hasPalette) {
+    const unsigned char* palette = preview_palette();
+    if (palette == NULL) {
         saves_log("preview: color.pal is unreadable");
         return;
     }
@@ -668,13 +687,6 @@ void loadsave_preview_all(void)
 
         char previewPath[COMPAT_MAX_PATH];
         snprintf(previewPath, sizeof(previewPath), "%s/SLOT%.2d/preview.png", root, slot);
-
-        FILE* existing = fopen(previewPath, "rb");
-        if (existing != NULL) {
-            fclose(existing);
-            fclose(save);
-            continue;
-        }
 
         const bool read = fseek(save, 131, SEEK_SET) == 0
             && fread(thumbnail, 1, sizeof(thumbnail), save) == sizeof(thumbnail);
