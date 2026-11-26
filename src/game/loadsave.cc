@@ -463,11 +463,22 @@ static void saves_log(const char* format, ...)
     fclose(fp);
 }
 
+// A PNG stores every number in it - a chunk's length, its checksum, a picture's
+// width and height - most significant byte first. The save file's own numbers go
+// the other way, and writing a PNG with them made one that no reader takes.
+static void put_be(unsigned char* dest, unsigned int value)
+{
+    dest[0] = (unsigned char)((value >> 24) & 0xFF);
+    dest[1] = (unsigned char)((value >> 16) & 0xFF);
+    dest[2] = (unsigned char)((value >> 8) & 0xFF);
+    dest[3] = (unsigned char)(value & 0xFF);
+}
+
 static void png_write_chunk(FILE* fp, const char* type, const unsigned char* data, size_t size)
 {
     unsigned char buffer[4];
 
-    put_long(buffer, (unsigned int)size);
+    put_be(buffer, (unsigned int)size);
     fwrite(buffer, 1, 4, fp);
     fwrite(type, 1, 4, fp);
     if (size > 0) {
@@ -478,7 +489,7 @@ static void png_write_chunk(FILE* fp, const char* type, const unsigned char* dat
     if (size > 0) {
         crc = (unsigned int)crc32(crc, (const Bytef*)data, (uInt)size);
     }
-    put_long(buffer, crc);
+    put_be(buffer, crc);
     fwrite(buffer, 1, 4, fp);
 }
 
@@ -526,8 +537,8 @@ static bool write_png(const char* path, const unsigned char* pixels, const unsig
     fwrite(signature, 1, sizeof(signature), fp);
 
     unsigned char header[13];
-    put_long(header + 0, (unsigned int)LS_PREVIEW_WIDTH);
-    put_long(header + 4, (unsigned int)LS_PREVIEW_HEIGHT);
+    put_be(header + 0, (unsigned int)LS_PREVIEW_WIDTH);
+    put_be(header + 4, (unsigned int)LS_PREVIEW_HEIGHT);
     header[8] = 8;
     header[9] = 2;
     header[10] = 0;

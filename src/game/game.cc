@@ -196,7 +196,12 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
     debug_printf("[init] palette\n");
 
     if (!game_in_mapper) {
-        game_splash_screen();
+        // A save picked in the launcher opens its own map, so the game's own
+        // splash - a test card of static and colours, which on a device reads
+        // as a broken picture - is skipped and the map comes up straight away.
+        if (loadsave_pending_slot() < 0) {
+            game_splash_screen();
+        }
         debug_printf("[init] splash\n");
     }
 
