@@ -1154,9 +1154,6 @@ struct LauncherView: View {
                         .foregroundColor(game.accent)
                         .padding(.top, -2)
 
-                    // The two links under the edition, each with its own
-                    // mark in a small dark circle, set to the width of the
-                    // line above them.
                     // The two links under the edition, each a frosted disc
                     // with its own mark cut out of it, set to the width of
                     // the line above them.
@@ -1173,12 +1170,15 @@ struct LauncherView: View {
                         Spacer(minLength: 10)
 
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash") {
+                            // The mug's art reaches into its box's corners,
+                            // which a circle cuts: a little smaller than the
+                            // octocat, its corners stay inside the disc.
                             Image("coffee-mark")
                                 .renderingMode(.template)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: LauncherView.linkDisc * 0.84,
-                                       height: LauncherView.linkDisc * 0.84)
+                                .frame(width: LauncherView.linkDisc * 0.76,
+                                       height: LauncherView.linkDisc * 0.76)
                         }
                     }
                     .frame(width: LauncherView.heroEditionWidth, alignment: .leading)
@@ -1401,7 +1401,6 @@ struct LauncherView: View {
                     tip("shplash", "The iOS app, its launcher and touch controls.")
                     tip("Engines", "Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License.")
                     tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
-                    tip("Icons", "The GitHub mark from Primer's Octicons, under the MIT licence, and the coffee from Font Awesome Free, under the CC BY 4.0 licence.")
                     tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
                     footnote("The app contains no game data; bring your own installation.")
                 }
