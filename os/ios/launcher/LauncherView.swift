@@ -368,38 +368,50 @@ struct LauncherView: View {
             )
     }
 
-    /// The game data, to the right of the saves. Its buttons sit under the
-    /// header as one column as wide as the column itself, and take the game's
-    /// accent like everything else on the card. The header says whether the
-    /// game's files are in place. The rows are a little tighter than a page's,
-    /// so the whole column stays inside the card.
+    /// The game data, to the right of the saves. Its heading sits on the
+    /// same line as the top of the saves, and its buttons share what the
+    /// column has under it, so the block ends where the saves end rather
+    /// than past them. While an import is going or has just been reported,
+    /// its bar and its message take the buttons' place: they are the only
+    /// thing to say then, and the buttons are disabled for as long as it
+    /// lasts anyway.
     @ViewBuilder
-    private func gameDataColumn(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private func gameDataColumn(game: FalloutGame,
+                                info: LauncherInstallInfo,
+                                width: CGFloat,
+                                height: CGFloat) -> some View {
+        // The heading's own line, and the two gaps above, between and below
+        // the buttons, are what the buttons cannot have.
+        let spacing: CGFloat = 4
+        let buttonHeight = max(22, (height - 14 - spacing * 2) / 2)
+
+        VStack(alignment: .leading, spacing: spacing) {
             headerLine(L.t("Game data"),
                        badge: info.installed == 1 ? "DONE" : "NEEDED")
 
-            Button {
-                pendingImport = .language
-                model.showImporter = true
-            } label: {
-                Text(L.t("LANGUAGE FILES"))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: 30))
-            .disabled(model.isInstalling || info.installed == 0)
+            if model.isInstalling || model.importSummary != nil {
+                gameDataStatus(game: game)
+            } else {
+                Button {
+                    pendingImport = .language
+                    model.showImporter = true
+                } label: {
+                    Text(L.t("LANGUAGE FILES"))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: buttonHeight))
+                .disabled(model.isInstalling || info.installed == 0)
 
-            Button {
-                pendingImport = .game
-                model.showImporter = true
-            } label: {
-                Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP"))
-                    .frame(maxWidth: .infinity)
+                Button {
+                    pendingImport = .game
+                    model.showImporter = true
+                } label: {
+                    Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP"))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: buttonHeight))
+                .disabled(model.isInstalling)
             }
-            .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: 30))
-            .disabled(model.isInstalling)
-
-            gameDataStatus(game: game)
         }
         .frame(width: width, alignment: .leading)
     }
@@ -468,18 +480,19 @@ struct LauncherView: View {
                         alignment: .topLeading
                     )
             } else {
-                // An empty slot is a picture that is not there yet: its own
-                // mark, and EMPTY under it, both in the grey of the notes.
+                // An empty slot is a save that is not there yet: a save's own
+                // mark and EMPTY SLOT under it, both in the grey of the
+                // notes, so it reads as a place for a save and nothing else.
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(Color.white.opacity(0.05))
                     .frame(width: width, height: height)
                     .overlay(
-                        VStack(spacing: 6) {
-                            Image(systemName: "square.dashed")
-                                .font(.system(size: 20, weight: .regular))
+                        VStack(spacing: 5) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 18, weight: .regular))
                                 .foregroundColor(Theme.faint)
 
-                            Text(L.t("EMPTY"))
+                            Text(L.t("EMPTY SLOT"))
                                 .font(Vault.label(8, weight: .regular))
                                 .kerning(1.0)
                                 .foregroundColor(Theme.faint)
@@ -534,13 +547,21 @@ struct LauncherView: View {
     }
 
     /// A save's name and what it holds, on a plate laid over its own shot:
-    /// small, see-through, and set in from the picture's corner by a little,
-    /// so the shot is still the card and the plate is read on top of it.
+    /// small, see-through, and as wide as the time and the level need, so it
+    /// stays a note on the shot rather than a band across it.
     private func savePlate(save: LauncherModel.LauncherSave, width: CGFloat) -> some View {
         // Eighteen percent smaller than the card's own type, so the plate
         // stays a note laid on the shot rather than a panel beside it.
         let scale: CGFloat = 0.82
         let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
+        let detail = saveDetail(save)
+        let detailWidth = ceil((detail as NSString).size(withAttributes: [
+            .font: VaultUI.label(9 * scale),
+            .kern: 0.6
+        ]).width)
+        // The plate takes the row's width and its own padding, and no more:
+        // a name too long for it is cut rather than widening it.
+        let plateWidth = min(max(40, detailWidth + 15 * scale), max(40, width))
 
         return VStack(alignment: .leading, spacing: 1) {
             Text(save.name)
@@ -549,17 +570,17 @@ struct LauncherView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            Text(saveDetail(save))
+            Text(detail)
                 .font(Vault.label(9 * scale, weight: .regular))
                 .kerning(0.6)
                 .foregroundColor(Theme.faint)
                 .lineLimit(1)
         }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 7 * scale)
         .padding(.vertical, 5 * scale)
-        // As wide as the name needs, and no further than a little over half
-        // the card: a long name is cut rather than covering the shot.
-        .frame(maxWidth: max(40, width * 0.58), alignment: .leading)
+        .frame(width: plateWidth)
         .background(shape.fill(Color.black.opacity(0.34)))
         .overlay(shape.stroke(Color.white.opacity(0.12), lineWidth: 1))
         .overlay(
@@ -658,6 +679,10 @@ struct LauncherView: View {
             }
         }
         .buttonStyle(PrimaryButtonStyle(accent: accent))
+        // The button is a fixed height, so the row of saves beside it is the
+        // same height and sits on the same line, whether or not there is a
+        // save to name under CONTINUE.
+        .frame(height: LauncherView.continueHeight)
         .disabled(model.install.installed == 0 || model.isInstalling)
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
@@ -951,9 +976,6 @@ struct LauncherView: View {
         let gameAccent = game.accent
         let buttonFont = VaultUI.label(10, weight: .semibold)
         let columns = width - Metrics.sheetInset * 2
-        // The hero holds its own height and the columns are fitted into what
-        // is left of the card, so the slots grow with it and never past it.
-        let columnsHeight = max(90, height - LauncherView.heroHeight - 1 - Metrics.gap - Metrics.outer)
         // The game data keeps to the width of its own buttons and sits at the
         // far right, so the saves have the rest of the card to run across.
         let labels = [L.t("LANGUAGE FILES"),
@@ -972,22 +994,33 @@ struct LauncherView: View {
                 .fill(gameAccent.opacity(0.55))
                 .frame(height: 1)
 
+            // The saves sit on the card's bottom line, which is the line the
+            // Play button beside them ends on: the room the header leaves is
+            // what stands above them, and the fade at the card's bottom is
+            // what they and everything above them end in.
+            Spacer(minLength: Metrics.gap)
+
             HStack(alignment: .top, spacing: 0) {
-                savesColumn(game: game, width: savesWidth, rowHeight: columnsHeight, selected: selected)
+                savesColumn(game: game,
+                            width: savesWidth,
+                            rowHeight: LauncherView.continueHeight,
+                            selected: selected)
 
                 Rectangle()
                     .fill(Theme.hairline)
                     .frame(width: 1)
 
-                gameDataColumn(game: game, info: info, width: filesWidth)
+                gameDataColumn(game: game,
+                               info: info,
+                               width: filesWidth,
+                               height: LauncherView.continueHeight)
                     .padding(.leading, 18)
             }
+            .frame(height: LauncherView.continueHeight)
             .padding(.horizontal, Metrics.sheetInset)
-            .padding(.top, Metrics.gap)
-            .padding(.bottom, Metrics.outer)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .vaultPlate(corner: 20, fill: Theme.rail)
+        .homePlate(corner: 20)
     }
 
     private static let heroTitleSize: CGFloat = 68
@@ -1000,6 +1033,17 @@ struct LauncherView: View {
     /// The room the game switch takes above the title.
     private static let switchHeight: CGFloat = 30
 
+    /// The height CONTINUE is drawn at. The row of saves beside it is the
+    /// same height and sits on the same bottom line, so the two read as one
+    /// band across the launcher rather than as two blocks that do not meet.
+    private static var continueHeight: CGFloat {
+        let title = VaultUI.display(24).lineHeight
+        let name = VaultUI.label(10, weight: .bold).lineHeight
+        let detail = VaultUI.label(9, weight: .regular).lineHeight
+        // Two gaps between the three lines, and the button's own padding.
+        return title + name + detail + 6 + 20
+    }
+
     /// The width of the word FALLOUT in the hero's own face and spacing:
     /// the game switch above it is exactly that wide, so it ends where the
     /// word ends rather than stretching over the 2 of FALLOUT 2.
@@ -1009,14 +1053,22 @@ struct LauncherView: View {
         return ceil(width)
     }
 
+    /// The width of the COMMUNITY EDITION line in its own face and spacing:
+    /// the two links under it are set to the same width, so the row reads as
+    /// belonging to that line rather than to the card.
+    private static var heroEditionWidth: CGFloat {
+        let font = VaultUI.label(heroEditionSize, weight: .bold)
+        let width = ((L.t("COMMUNITY EDITION") as NSString).size(withAttributes: [.font: font, .kern: 2.4])).width
+        return ceil(width)
+    }
+
     private static var heroHeight: CGFloat {
         let title = VaultUI.display(heroTitleSize).lineHeight
         let tagline = VaultUI.label(heroTaglineSize).lineHeight
         let edition = VaultUI.label(heroEditionSize, weight: .bold).lineHeight
-        // The tagline is pulled six points up under the name, and the links
-        // are pushed back down by the same six, so they stay where they were
-        // while the two lines above them grew.
-        return 14 + switchHeight + 8 + title + 2 - 6 + tagline + 2 + edition + 2 + 7 + 20 + 14
+        // The tagline is pulled twelve points up under the name and the
+        // edition two more, so the three lines read as one block.
+        return 14 + switchHeight + 8 + title + 2 - 12 + tagline + 2 - 2 + edition + 2 + 7 + 20 + 14
     }
 
     private func hero(game: FalloutGame) -> some View {
@@ -1050,17 +1102,29 @@ struct LauncherView: View {
                         .font(Vault.body(LauncherView.heroTaglineSize))
                         .foregroundColor(Theme.dim)
                         .lineLimit(1)
-                        .padding(.top, -6)
+                        .padding(.top, -12)
 
                     Text(L.t("COMMUNITY EDITION"))
                         .font(Vault.label(LauncherView.heroEditionSize, weight: .bold))
                         .kerning(2.4)
                         .foregroundColor(game.accent)
+                        .padding(.top, -2)
 
-                    HStack(spacing: 8) {
-                        plainLink("GITHUB", address: "https://github.com/shplash/vaultos")
-                        plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash")
+                    // The two links under the edition, each with its own
+                    // mark in a small dark circle, set to the width of the
+                    // line above them.
+                    HStack(spacing: 0) {
+                        plainLink("GITHUB",
+                                  symbol: "arrow.triangle.branch",
+                                  address: "https://github.com/shplash/vaultos")
+
+                        Spacer(minLength: 10)
+
+                        plainLink(L.t("SUPPORT ME"),
+                                  symbol: supportSymbol,
+                                  address: "https://ko-fi.com/shplash")
                     }
+                    .frame(width: LauncherView.heroEditionWidth, alignment: .leading)
                     .padding(.top, 7)
                 }
                 .padding(.top, 14)
@@ -1072,19 +1136,39 @@ struct LauncherView: View {
         .frame(minHeight: LauncherView.heroHeight, maxHeight: .infinity)
     }
 
-    private func plainLink(_ title: String, address: String) -> some View {
+    /// The mark that says a link is about supporting the work: a hand with a
+    /// heart in it on the iOS that draws one, and hands holding something
+    /// on the older ones, which the app still runs on.
+    private var supportSymbol: String {
+        if #available(iOS 16.0, *) {
+            return "hand.heart.fill"
+        }
+
+        return "hands.sparkles.fill"
+    }
+
+    private func plainLink(_ title: String, symbol: String, address: String) -> some View {
         Button {
             if let url = URL(string: address) {
                 UIApplication.shared.open(url)
             }
         } label: {
-            HStack(spacing: 4) {
-                Text(title)
-                    .font(Vault.label(LauncherView.heroEditionSize, weight: .semibold))
-                    .kerning(1.0)
+            HStack(spacing: 5) {
+                // A dark circle with a light mark in it: the mark says what
+                // the link is without a word, and stays white rather than
+                // taking the game's accent.
+                Image(systemName: symbol)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                    .frame(width: 16, height: 16)
+                    .background(Circle().fill(Color.black.opacity(0.35)))
+                    .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 1))
 
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 9, weight: .bold))
+                Text(title)
+                    .font(Vault.label(10, weight: .semibold))
+                    .kerning(1.0)
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .foregroundColor(Theme.dim)
             .frame(height: 20)
@@ -2289,6 +2373,35 @@ private extension View {
             .background(shape.fill(Color.white.opacity(0.04)))
             .background(shape.fill(Theme.alert))
             .overlay(shape.stroke(Color.white.opacity(0.14), lineWidth: 1))
+    }
+
+    /// The home card's own plate: its top and sides are the rail's fill, then
+    /// its fill and the line down its sides both fade out to nothing, so the
+    /// card ends in the black behind it rather than on a hard edge. Only the
+    /// light along its top is drawn as it is on every other plate.
+    func homePlate(corner: CGFloat = 20) -> some View {
+        let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
+        let fill = LinearGradient(stops: [
+            .init(color: Theme.rail, location: 0),
+            .init(color: Theme.rail, location: 0.58),
+            .init(color: Theme.rail.opacity(0), location: 0.98)
+        ], startPoint: .top, endPoint: .bottom)
+        let edge = LinearGradient(stops: [
+            .init(color: Color.white.opacity(0.09), location: 0),
+            .init(color: Color.white.opacity(0.09), location: 0.50),
+            .init(color: Color.white.opacity(0), location: 0.90)
+        ], startPoint: .top, endPoint: .bottom)
+
+        return self
+            .background(shape.fill(fill))
+            .overlay(shape.stroke(edge, lineWidth: 1))
+            .overlay(
+                Rectangle()
+                    .fill(Vault.edgeLight)
+                    .frame(height: 1)
+                    .padding(.horizontal, corner),
+                alignment: .top
+            )
     }
 }
 
