@@ -969,15 +969,64 @@ final class LauncherModel: ObservableObject {
         refreshSaves()
     }
 
+    /// The folder the game writes its saves into. The game can leave an empty
+    /// SAVEGAME folder behind - it creates one where its data folder points
+    /// and can write the slots into another - so the folder actually holding
+    /// slots is the one to read, and a folder the short list does not spell is
+    /// found by its name instead.
     private static func saveFolder(installDirectory: URL, game: FalloutGame) -> URL? {
-        for candidate in ["data/SAVEGAME", "SAVEGAME", "data/savegame", "savegame"] {
-            let url = installDirectory.appendingPathComponent(candidate, isDirectory: true)
-            if FileManager.default.fileExists(atPath: url.path) {
-                return url
+        let known = ["data/SAVEGAME", "SAVEGAME", "data/savegame", "savegame"]
+            .map { installDirectory.appendingPathComponent($0, isDirectory: true) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+
+        if let folder = known.first(where: { hasSlots(in: $0) }) {
+            return folder
+        }
+
+        if let folder = known.first {
+            return folder
+        }
+
+        return folders(in: installDirectory, depth: 2).first {
+            $0.lastPathComponent.caseInsensitiveCompare("SAVEGAME") == .orderedSame
+                && hasSlots(in: $0)
+        }
+    }
+
+    private static func hasSlots(in folder: URL) -> Bool {
+        let entries = try? FileManager.default.contentsOfDirectory(
+            at: folder,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles])
+
+        return (entries ?? []).contains { $0.lastPathComponent.uppercased().hasPrefix("SLOT") }
+    }
+
+    /// The folders inside one, down to a depth and no further: the game's data
+    /// folder holds hundreds of files, and nothing below this holds saves.
+    private static func folders(in directory: URL, depth: Int) -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles],
+            errorHandler: { _, _ in true }) else {
+            return []
+        }
+
+        var result: [URL] = []
+        for case let url as URL in enumerator {
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else {
+                continue
+            }
+
+            result.append(url)
+
+            if enumerator.level >= depth {
+                enumerator.skipDescendants()
             }
         }
 
-        return nil
+        return result
     }
 
     private static func readSaves(installDirectory: URL, game: FalloutGame) -> [LauncherSave] {
