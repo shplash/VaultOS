@@ -1039,6 +1039,18 @@ static bool write_png(const char* path, const unsigned char* pixels, const unsig
     return true;
 }
 
+// The game's own file layer joins its data folder and a file with a separator
+// of its own; a plain path does not, and "DATA" and "SAVEGAME" became
+// "DATASAVEGAME" - which is why the picture was never written at all.
+static void save_path(char* out, size_t size, const char* name)
+{
+    const char* root = _patches != nullptr ? _patches : "";
+    const size_t length = strlen(root);
+    const bool separated = length > 0 && (root[length - 1] == '\\' || root[length - 1] == '/');
+
+    snprintf(out, size, "%s%s%s", root, separated ? "" : "/", name);
+}
+
 // The slot's own folder as a path a plain file call can use: the game writes
 // through its own file layer, relative to the data folder and with Windows
 // separators, and `fopen` knows neither.
@@ -1048,7 +1060,10 @@ static bool lsgSaveSlotDirectory(int slot, char* out, size_t size)
         return false;
     }
 
-    snprintf(out, size, "%sSAVEGAME\\SLOT%.2d\\", _patches != nullptr ? _patches : "", slot + 1);
+    char name[32];
+    snprintf(name, sizeof(name), "SAVEGAME\\SLOT%.2d\\", slot + 1);
+
+    save_path(out, size, name);
     compat_windows_path_to_native(out);
 
     return true;
@@ -1144,7 +1159,7 @@ void loadsave_preview_all(void)
     colorPaletteLoad("color.pal");
 
     char root[COMPAT_MAX_PATH];
-    snprintf(root, sizeof(root), "%sSAVEGAME", _patches);
+    save_path(root, sizeof(root), "SAVEGAME");
     compat_windows_path_to_native(root);
 
     static unsigned char thumbnail[LS_PREVIEW_SIZE];

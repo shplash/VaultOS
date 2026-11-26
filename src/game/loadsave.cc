@@ -384,11 +384,21 @@ int loadsave_take_pending_slot(void)
     return slot;
 }
 
+// The game's own file layer joins its data folder and a file with a separator
+// of its own; a plain path does not, and "DATA" and "SAVEGAME" became
+// "DATASAVEGAME" - which is why the picture was never written at all.
+static void save_path(char* out, size_t size, const char* name)
+{
+    const char* root = patches != NULL ? patches : "";
+    const size_t length = strlen(root);
+    const bool separated = length > 0 && (root[length - 1] == '\\' || root[length - 1] == '/');
+
+    snprintf(out, size, "%s%s%s", root, separated ? "" : "/", name);
+}
+
 // The folder the save being written lives in, as a path a plain file call can
 // use. The game's own file layer writes relative to the data folder and with
-// Windows separators, and it is the one that creates the slot folders - so
-// `fopen`, which knows neither, wrote nothing at all, and the preview and the
-// saved time never appeared.
+// Windows separators, and it is the one that creates the slot folders.
 static bool slot_directory(char* out, size_t size)
 {
     if (size < 2 || gmpath[0] == '\0') {
@@ -396,7 +406,7 @@ static bool slot_directory(char* out, size_t size)
     }
 
     char path[COMPAT_MAX_PATH];
-    snprintf(path, sizeof(path), "%s%s", patches != NULL ? patches : "", gmpath);
+    save_path(path, sizeof(path), gmpath);
     compat_windows_path_to_native(path);
 
     char* separator = strrchr(path, '/');
@@ -627,7 +637,7 @@ void loadsave_preview_all(void)
     }
 
     char root[COMPAT_MAX_PATH];
-    snprintf(root, sizeof(root), "%s%s", patches, "SAVEGAME");
+    save_path(root, sizeof(root), "SAVEGAME");
     compat_windows_path_to_native(root);
 
     static unsigned char thumbnail[LS_PREVIEW_SIZE];

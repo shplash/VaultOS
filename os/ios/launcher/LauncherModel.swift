@@ -1008,7 +1008,7 @@ final class LauncherModel: ObservableObject {
             return known
         }
 
-        let candidates = ["data/SAVEGAME", "SAVEGAME", "data/savegame", "savegame"]
+        let candidates = ["data/SAVEGAME", "SAVEGAME", "DATA/SAVEGAME", "data/savegame", "savegame"]
             .map { installDirectory.appendingPathComponent($0, isDirectory: true) }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
 
@@ -1062,6 +1062,13 @@ final class LauncherModel: ObservableObject {
         return result
     }
 
+    /// How a save's own date is shown when it has no play time to show.
+    private static let saveDate: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd.MM.yyyy  HH:mm"
+        return formatter
+    }()
+
     private static func readSaves(folder: URL?) -> [LauncherSave] {
         guard let root = folder,
               let entries = try? FileManager.default.contentsOfDirectory(
@@ -1097,16 +1104,13 @@ final class LauncherModel: ObservableObject {
             // showing, with the character's own when it has none.
             let character = readString(data, at: 29, length: 32)
             let saveName = readString(data, at: 61, length: 30)
-            let gameMonth = readShort(data, at: 101)
-            let gameDay = readShort(data, at: 103)
-            let gameYear = readShort(data, at: 105)
-            let gameTime = readInt(data, at: 107)
-            let minutes = (gameTime / 600) % 60
-            let hours = (gameTime / 600) / 60 % 24
-            let saved = String(format: "%02d.%02d.%04d  %02d:%02d", gameDay, gameMonth, gameYear, hours, minutes)
             let sidecar = readSidecar(entry)
-            let played = sidecar.played
             let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
+
+            // The date the save was written, from the file itself: the dates
+            // inside the save's own header are the game's, and reading them
+            // wrong gave a line of numbers that meant nothing.
+            let saved = LauncherModel.saveDate.string(from: modified)
 
             // The game writes the picture as a PNG; the BMP an older build
             // wrote is still read, so a save made with it keeps its picture.
@@ -1126,7 +1130,7 @@ final class LauncherModel: ObservableObject {
                                        name: saveName.isEmpty ? character : saveName,
                                        detail: character,
                                        saved: saved,
-                                       played: played,
+                                       played: sidecar.played,
                                        level: sidecar.level,
                                        preview: preview,
                                        modified: modified))
@@ -1142,28 +1146,6 @@ final class LauncherModel: ObservableObject {
 
         let bytes = [UInt8](data[offset ..< offset + length])
         return String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func readShort(_ data: Data, at offset: Int) -> Int {
-        guard offset >= 0, offset + 2 <= data.count else {
-            return 0
-        }
-
-        let low = UInt16(data[offset])
-        let high = UInt16(data[offset + 1]) << 8
-        return Int(low | high)
-    }
-
-    private static func readInt(_ data: Data, at offset: Int) -> Int {
-        guard offset >= 0, offset + 4 <= data.count else {
-            return 0
-        }
-
-        let value = UInt32(data[offset])
-            | (UInt32(data[offset + 1]) << 8)
-            | (UInt32(data[offset + 2]) << 16)
-            | (UInt32(data[offset + 3]) << 24)
-        return Int(value)
     }
 
     /// The time and level the game wrote beside a save. A save written before

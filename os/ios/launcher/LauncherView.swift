@@ -30,6 +30,8 @@ struct LauncherView: View {
     @State private var pagingDrag = false
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
+    /// How many dots follow INSTALLING while an import is going.
+    @State private var installingDots = 0
     @State private var showResetAllWarning = false
     /// The update check runs only while the player waits for it, and its answer
     /// is shown once in a note over the About page.
@@ -175,6 +177,14 @@ struct LauncherView: View {
             }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            // The dots after INSTALLING move, so a long import is seen to be
+            // going rather than stopped.
+            if model.isInstalling {
+                installingDots = (installingDots + 1) % 3
+            } else {
+                installingDots = 0
+            }
+
             // Only the save-import countdown needs a tick. Without it this ran a
             // full redraw of the launcher every second for as long as it was open.
             guard showSaveImportWarning && saveImportCountdown > 0 else {
@@ -397,7 +407,7 @@ struct LauncherView: View {
             ProgressView(value: min(max(model.progress, 0), 1))
                 .accentColor(game.accent)
 
-            Text(L.message(model.statusText))
+            Text(installingLabel)
                 .font(Vault.label(10, weight: .regular))
                 .foregroundColor(Theme.faint)
                 .lineLimit(1)
@@ -580,9 +590,15 @@ struct LauncherView: View {
         return model.saves.first { $0.slot == slot }
     }
 
+    /// INSTALLING with the dots after it moving, so a long import is seen to
+    /// be going rather than stopped.
+    private var installingLabel: String {
+        return L.t("INSTALLING") + String(repeating: ".", count: installingDots + 1)
+    }
+
     private var statusText: String {
         if model.isInstalling {
-            return L.t("INSTALLING")
+            return installingLabel
         }
 
         if let save = selectedSave ?? model.saves.first {
