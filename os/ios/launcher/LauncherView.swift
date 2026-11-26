@@ -20,6 +20,11 @@ struct LauncherView: View {
     @State private var pendingImport: LauncherImport = .game
     @State private var savesScroll: CGFloat = 0
     @State private var savesDragStart: CGFloat?
+    /// Where the saves row sits on the home card, in the card's own
+    /// coordinates, and whether the page drag in progress is the card's own. A
+    /// drag that starts on the row slides the slots and must not page the card.
+    @State private var savesRect: CGRect = .zero
+    @State private var pagingDrag = false
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
     @State private var showResetAllWarning = false
@@ -45,6 +50,10 @@ struct LauncherView: View {
     /// launcher instead keeps every control reachable on a window this small,
     /// and leaves it untouched at the size of a phone or tablet.
     private static let smallestLayout = CGSize(width: 560, height: 320)
+
+    /// The name of the space the home card's positions are measured in, so a
+    /// page turn can tell a drag on the saves row from one across the card.
+    private static let cardSpace = "launcher.homeCard"
 
     /// What the display keeps for the sensor housing and the home indicator. The
     /// launcher draws edge to edge and keeps its content inside these, so it
@@ -288,47 +297,93 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
-    private func savesColumn(game: FalloutGame, width: CGFloat) -> some View {
+    private func savesColumn(game: FalloutGame, width: CGFloat, selected: Bool) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             headerLine(L.t("Saves"))
 
-            savesRow(game: game, width: width)
+            savesRow(game: game, width: width, selected: selected)
         }
         .frame(width: width, alignment: .leading)
     }
 
+    /// The game data, to the right of the saves. Its buttons sit under the
+    /// header as one column as wide as the column itself, and take the game's
+    /// accent like everything else on the card.
     @ViewBuilder
     private func gameDataColumn(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             headerLine(L.t("Game data"))
 
             if info.installed == 0 {
-                chipRow(model.installRows(for: game, info: info), width: width, accent: game.accent)
+                chipLines(model.installRows(for: game, info: info), accent: game.accent)
             }
 
-            HStack(spacing: 8) {
-                Button {
-                    pendingImport = .language
-                    model.showImporter = true
-                } label: {
-                    Text(L.t("LANGUAGE FILES"))
-                }
-                .buttonStyle(SmallButtonStyle(accent: game.accent))
-                .disabled(model.isInstalling || info.installed == 0)
-
-                Button {
-                    pendingImport = .game
-                    model.showImporter = true
-                } label: {
-                    Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
-                }
-                .buttonStyle(SmallButtonStyle(accent: game.accent))
-                .disabled(model.isInstalling)
+            Button {
+                pendingImport = .language
+                model.showImporter = true
+            } label: {
+                Text(L.t("LANGUAGE FILES"))
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(SmallButtonStyle(accent: game.accent))
+            .disabled(model.isInstalling || info.installed == 0)
+
+            Button {
+                pendingImport = .game
+                model.showImporter = true
+            } label: {
+                Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP"))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SmallButtonStyle(accent: game.accent))
+            .disabled(model.isInstalling)
 
             gameDataStatus(game: game)
         }
         .frame(width: width, alignment: .leading)
+    }
+
+    /// The files a game still needs, two to a line under the header. The lines
+    /// stay left aligned with each other, and the column is measured from the
+    /// widest of them, so nothing is cut off to make room for the saves.
+    private func chipLines(_ items: [(String, Bool)], accent: Color) -> some View {
+        let size: CGFloat = 9
+        let rows = LauncherView.chipRows(items)
+
+        return VStack(alignment: .leading, spacing: 3) {
+            ForEach(rows.indices, id: \.self) { row in
+                HStack(spacing: 8) {
+                    ForEach(rows[row].indices, id: \.self) { item in
+                        fileChip(rows[row][item].0,
+                                 present: rows[row][item].1,
+                                 accent: accent,
+                                 size: size)
+                    }
+                }
+            }
+        }
+    }
+
+    private static func chipRows(_ items: [(String, Bool)]) -> [[(String, Bool)]] {
+        return stride(from: 0, to: items.count, by: 2).map { start in
+            Array(items[start ..< min(start + 2, items.count)])
+        }
+    }
+
+    /// How wide the widest line of chips comes out, so the column can be laid
+    /// out before the chips are.
+    private static func chipLinesWidth(_ items: [(String, Bool)], size: CGFloat) -> CGFloat {
+        let font = VaultUI.label(size)
+        var widest: CGFloat = 0
+
+        for row in chipRows(items) {
+            let chips = row.reduce(CGFloat(0)) { total, item in
+                total + 14 + ceil((item.0 as NSString).size(withAttributes: [.font: font]).width)
+            }
+            widest = max(widest, chips + CGFloat(max(row.count - 1, 0)) * 8)
+        }
+
+        return widest
     }
 
     @ViewBuilder
@@ -350,8 +405,8 @@ struct LauncherView: View {
         }
     }
 
-    private func savesRow(game: FalloutGame, width: CGFloat) -> some View {
-        let cardWidth = min(120, max(84, width * 0.46))
+    private func savesRow(game: FalloutGame, width: CGFloat, selected: Bool) -> some View {
+        let cardWidth = min(132, max(96, width * 0.3))
         let cardHeight = cardWidth * 133 / 224
         let spacing: CGFloat = 8
         let count = 10
@@ -374,6 +429,9 @@ struct LauncherView: View {
         .gesture(
             DragGesture(minimumDistance: 8)
                 .onChanged { value in
+                    guard abs(value.translation.width) > abs(value.translation.height) else {
+                        return
+                    }
                     if savesDragStart == nil {
                         savesDragStart = savesScroll
                     }
@@ -384,13 +442,25 @@ struct LauncherView: View {
                     savesScroll = min(0, max(limit, savesScroll))
                 }
         )
+        // The page turn beside this row gives way to it only where the row
+        // actually is, which is what this measures. Only the card on screen
+        // reports: the other one is laid out a page away.
+        .background(
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: SavesRowFrameKey.self,
+                    value: selected ? geometry.frame(in: .named(LauncherView.cardSpace)) : .zero)
+            }
+        )
     }
 
     private func saveCard(slot: Int,
                           save: LauncherModel.LauncherSave?,
                           width: CGFloat,
                           height: CGFloat) -> some View {
-        let title = (save?.name.isEmpty == false) ? save!.name : "SLOT \(slot)"
+        // The slot number is the card's own, drawn in the empty placeholder,
+        // so a card without a save says only what it is and that it is empty.
+        let title = save?.name ?? ""
         let line = save.map { "\($0.played) · \(L.t("LEVEL")) \($0.level)" } ?? L.t("EMPTY")
 
         return VStack(alignment: .leading, spacing: 4) {
@@ -412,17 +482,19 @@ struct LauncherView: View {
                             .stroke(Theme.hairline, lineWidth: 1)
                     )
                     .overlay(
-                        Text("SLOT \(slot)")
-                            .font(Vault.label(10, weight: .bold))
+                        Text(verbatim: "\(slot)")
+                            .font(Vault.label(11, weight: .bold))
                             .foregroundColor(Theme.faint)
                     )
             }
 
-            Text(title)
-                .font(Vault.label(9, weight: .semibold))
-                .foregroundColor(Theme.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            if !title.isEmpty {
+                Text(title)
+                    .font(Vault.label(9, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
 
             Text(line)
                 .font(Vault.label(9, weight: .regular))
@@ -545,7 +617,8 @@ struct LauncherView: View {
 
                         homeSheet(game: game,
                                   info: model.installInfos[game] ?? LauncherInstallInfo(),
-                                  width: pageWidth)
+                                  width: pageWidth,
+                                  selected: isSelected)
                             .frame(width: pageWidth, height: geometry.size.height - 36)
                             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                             .opacity(isSelected ? 1 : 0.45)
@@ -556,7 +629,14 @@ struct LauncherView: View {
                 .frame(width: width, height: geometry.size.height - 36)
                 .clipped()
                 .contentShape(Rectangle())
-                .highPriorityGesture(homePagingGesture(width: pageWidth))
+                // Simultaneous, not high priority: the saves row keeps its own
+                // drag, and the page turn skips only the drags that begin on
+                // it, so the slots scroll without either gesture winning.
+                .coordinateSpace(name: LauncherView.cardSpace)
+                .simultaneousGesture(homePagingGesture(width: pageWidth))
+                .onPreferenceChange(SavesRowFrameKey.self) { rect in
+                    savesRect = rect
+                }
 
                 gameSwitcher(progress: progress)
                     .frame(height: 30)
@@ -571,9 +651,15 @@ struct LauncherView: View {
     private func homePagingGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
+                // A drag that began on the saves row is the row's: it slides
+                // the slots and leaves the page where it is.
+                guard !savesRect.contains(value.startLocation) else {
+                    return
+                }
                 guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
                     return
                 }
+                pagingDrag = true
                 homeDrag = value.translation.width
                 homeAtEdge = (model.selectedGame == .fallout1 && value.translation.width > 0)
                     || (model.selectedGame == .fallout2 && value.translation.width < 0)
@@ -588,6 +674,13 @@ struct LauncherView: View {
             .onEnded { value in
                 dragWatchdog?.cancel()
                 dragWatchdog = nil
+
+                // Ending a drag the saves row took, or one that never turned
+                // into a page drag: there is nothing here to settle.
+                guard pagingDrag else {
+                    return
+                }
+                pagingDrag = false
 
                 var target = model.selectedGame
                 if abs(value.translation.width) > abs(value.translation.height) * 1.2 {
@@ -619,6 +712,7 @@ struct LauncherView: View {
         dragWatchdog?.cancel()
         let task = DispatchWorkItem {
             isPaging = false
+            pagingDrag = false
             guard abs(homeDrag) > 0.5 else {
                 return
             }
@@ -691,15 +785,28 @@ struct LauncherView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
     }
 
-    private func homeSheet(game: FalloutGame, info: LauncherInstallInfo, width: CGFloat) -> some View {
+    private func homeSheet(game: FalloutGame,
+                           info: LauncherInstallInfo,
+                           width: CGFloat,
+                           selected: Bool) -> some View {
         let gameAccent = game.accent
         let buttonFont = VaultUI.label(10, weight: .semibold)
         let columns = width - Metrics.sheetInset * 2
-        let savesButtons = [L.t("BACK UP"), L.t("IMPORT")].reduce(CGFloat(8)) { total, name in
-            total + ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width) + 28
+        // The game data keeps to the width of its own buttons and sits at the
+        // far right, so the saves have the rest of the card to run across.
+        let labels = [L.t("LANGUAGE FILES"),
+                      L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME ZIP")]
+        let widest = labels.reduce(CGFloat(0)) { widest, name in
+            max(widest, ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width))
         }
-        let savesWidth = max(152, savesButtons)
-        let filesWidth = max(columns - savesWidth - 18, 150)
+        // A button carries its own padding and the chips carry their marks, so
+        // the column is as wide as the widest of the two and nothing in it is
+        // cut off at the card's edge.
+        let chips = info.installed == 0
+            ? LauncherView.chipLinesWidth(model.installRows(for: game, info: info), size: 9)
+            : 0
+        let filesWidth = max(126, max(widest + 28, ceil(chips)) + 2)
+        let savesWidth = max(columns - filesWidth - 19, 170)
         return VStack(alignment: .leading, spacing: 0) {
             hero(game: game)
 
@@ -707,12 +814,15 @@ struct LauncherView: View {
                 .fill(gameAccent.opacity(0.55))
                 .frame(height: 1)
 
-            HStack(alignment: .top, spacing: 18) {
-                savesColumn(game: game, width: savesWidth)
+            HStack(alignment: .top, spacing: 0) {
+                savesColumn(game: game, width: savesWidth, selected: selected)
+
+                Rectangle()
+                    .fill(Theme.hairline)
+                    .frame(width: 1)
 
                 gameDataColumn(game: game, info: info, width: filesWidth)
-
-                Spacer(minLength: 0)
+                    .padding(.leading, 18)
             }
             .padding(.horizontal, Metrics.sheetInset)
             .padding(.top, Metrics.gap)
@@ -1481,41 +1591,33 @@ struct LauncherView: View {
 
             toggleRow("Haptic on save",
                       detail: "Vibrate when a save finishes",
-                      divider: false,
                       isOn: $model.saveHaptics)
 
-            headerLine(L.t("Saved games"))
+            // The saves are a row like the others, with their count in grey
+            // beside the title and the two buttons at the right.
+            row("Saved games",
+                detail: model.savesNotice.map { L.message($0) } ?? L.t("Keep your saves intact"),
+                badge: "· \(model.saves.count)",
+                divider: false) {
+                HStack(spacing: 8) {
+                    Button {
+                        model.backupSaves()
+                    } label: {
+                        Text(L.t("BACK UP"))
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.isInstalling || model.install.installed == 0 || model.install.has_saves == 0)
 
-            if let notice = model.savesNotice {
-                subheader(L.message(notice))
-            } else {
-                subheader(L.t("Keep your saves intact"))
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    model.backupSaves()
-                } label: {
-                    Text(L.t("BACK UP"))
+                    Button {
+                        saveImportCountdown = 5
+                        showSaveImportWarning = true
+                    } label: {
+                        Text(L.t("IMPORT"))
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent))
+                    .disabled(model.isInstalling || model.install.installed == 0)
                 }
-                .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling || model.install.installed == 0 || model.install.has_saves == 0)
-
-                Button {
-                    saveImportCountdown = 5
-                    showSaveImportWarning = true
-                } label: {
-                    Text(L.t("IMPORT"))
-                }
-                .buttonStyle(SmallButtonStyle(accent: accent))
-                .disabled(model.isInstalling || model.install.installed == 0)
             }
-
-            Text(model.savesFolder)
-                .font(Vault.label(9, weight: .regular))
-                .foregroundColor(Theme.faint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
         }
     }
 
@@ -1599,14 +1701,6 @@ struct LauncherView: View {
         }
     }
 
-    private func subheader(_ text: String) -> some View {
-        return Text(text)
-            .font(Vault.label(9))
-            .kerning(0.2)
-            .foregroundColor(Theme.faint)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
     private func headerLine(_ title: String) -> some View {
         return HStack(spacing: 8) {
             Text(title)
@@ -1615,29 +1709,6 @@ struct LauncherView: View {
                 .lineLimit(1)
 
             Spacer(minLength: 0)
-        }
-    }
-
-    private func chipRow(_ items: [(String, Bool)], width: CGFloat, accent: Color) -> some View {
-        let gap: CGFloat = 8
-        var size: CGFloat = 7
-
-        for candidate in [CGFloat(9), 8, 7] {
-            let font = VaultUI.label(candidate)
-            let chips = items.reduce(CGFloat(0)) { total, item in
-                total + 14 + ceil((item.0 as NSString).size(withAttributes: [.font: font]).width)
-            }
-            let total = chips + gap * CGFloat(max(items.count - 1, 0))
-            size = candidate
-            if total <= width {
-                break
-            }
-        }
-
-        return HStack(spacing: gap) {
-            ForEach(items.indices, id: \.self) { index in
-                fileChip(items[index].0, present: items[index].1, accent: accent, size: size)
-            }
         }
     }
 
@@ -1867,12 +1938,26 @@ struct LauncherView: View {
         .padding(.bottom, Metrics.outer + screenInsets.bottom)
     }
 
-    private func row<C: View>(_ title: String, detail: String?, divider: Bool = true, @ViewBuilder control: () -> C) -> some View {
+    private func row<C: View>(_ title: String,
+                              detail: String?,
+                              badge: String? = nil,
+                              divider: Bool = true,
+                              @ViewBuilder control: () -> C) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(L.t(title))
-                    .font(Vault.body(13, weight: .medium))
-                    .foregroundColor(Theme.text)
+                HStack(spacing: 6) {
+                    Text(L.t(title))
+                        .font(Vault.body(13, weight: .medium))
+                        .foregroundColor(Theme.text)
+
+                    // A grey note beside the title, for a count that belongs
+                    // to the row rather than to a line of its own.
+                    if let badge = badge {
+                        Text(verbatim: badge)
+                            .font(Vault.label(11, weight: .regular))
+                            .foregroundColor(Theme.faint)
+                    }
+                }
 
                 if let detail = detail {
                     Text(L.t(detail))
@@ -1964,6 +2049,18 @@ private extension FalloutGame {
         case .fallout2:
             return Vault.teal
         }
+    }
+}
+
+/// Where the saves row sits on the home card, measured in the card's own
+/// coordinates, so a page turn knows which drags belong to the row.
+private struct SavesRowFrameKey: PreferenceKey {
+    static var defaultValue: CGRect {
+        return .zero
+    }
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
     }
 }
 
