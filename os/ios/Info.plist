@@ -22,12 +22,8 @@
     <string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
-    <key>NSHighResolutionCapable</key>
-    <string>True</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UIFileSharingEnabled</key>
