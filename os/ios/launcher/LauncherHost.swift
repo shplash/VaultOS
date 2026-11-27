@@ -955,14 +955,30 @@ final class GameControlsOverlay: UIView {
         symbol: "bubble.right",
         iconPointSize: 16
     )
+    private let amountAssembly = VaultPanelView()
+    private let amountDivider = UIView()
     private let amountAllButton = LabeledControlButton(
         title: "ALL",
         symbol: "hand.point.up.left",
-        iconPointSize: 16
+        iconPointSize: 16,
+        layout: .horizontal
     )
     private let amountDoneButton = LabeledControlButton(
         title: "DONE",
         symbol: "checkmark",
+        iconPointSize: 16,
+        layout: .horizontal
+    )
+    private let stepAssembly = VaultPanelView()
+    private let stepDivider = UIView()
+    private let amountPlusButton = LabeledControlButton(
+        title: "",
+        symbol: "plus",
+        iconPointSize: 16
+    )
+    private let amountMinusButton = LabeledControlButton(
+        title: "",
+        symbol: "minus",
         iconPointSize: 16
     )
     private var menuRectCache: CGRect?
@@ -1288,21 +1304,40 @@ final class GameControlsOverlay: UIView {
         talkButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(talkButton)
 
-        // ALL and DONE beside the engine's own "MOVE ITEMS" window, so a
-        // quantity can be given or taken without reaching into the panel.
-        amountAllButton.isHidden = true
-        amountAllButton.tag = 28
-        amountAllButton.accessibilityLabel = "Give all"
-        amountAllButton.backgroundOpacity = 0.9
-        amountAllButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
-        addSubview(amountAllButton)
+        // Two joined plates beside the engine's own "MOVE ITEMS" window, each
+        // the size of BACK: ALL over DONE, then + over −. A half draws no plate
+        // of its own; the assembly behind it supplies the fill and the divider.
+        for (assembly, divider) in [(amountAssembly, amountDivider), (stepAssembly, stepDivider)] {
+            assembly.isHidden = true
+            assembly.fill = ControlTheme.panel
+            assembly.edge = ControlTheme.border
+            assembly.lineWidth = 1.25
+            assembly.innerEdge = ControlTheme.innerEdge
+            assembly.innerInset = 2
+            assembly.shadowOpacity = 0.25
+            assembly.corner = 10
+            addSubview(assembly)
 
-        amountDoneButton.isHidden = true
-        amountDoneButton.tag = 29
-        amountDoneButton.accessibilityLabel = "Done"
-        amountDoneButton.backgroundOpacity = 0.9
-        amountDoneButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
-        addSubview(amountDoneButton)
+            divider.isHidden = true
+            divider.isUserInteractionEnabled = false
+            divider.backgroundColor = ControlTheme.border.withAlphaComponent(0.7)
+            addSubview(divider)
+        }
+
+        for (button, tag, label) in [
+            (amountAllButton, 28, "Give all"),
+            (amountDoneButton, 29, "Done"),
+            (amountPlusButton, 30, "One more"),
+            (amountMinusButton, 31, "One less"),
+        ] {
+            button.isHidden = true
+            button.tag = tag
+            button.accessibilityLabel = label
+            button.backgroundOpacity = 0.9
+            button.drawsOwnPlate = false
+            button.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+            addSubview(button)
+        }
 
         keyboardIsUp = false
 
@@ -1462,16 +1497,24 @@ final class GameControlsOverlay: UIView {
         }
 
         if currentScreen == .pickAmount {
-            // BACK keeps its place left of the window; ALL and DONE stack the
-            // same distance out on its right, each the size of BACK.
-            let stackHeight = side * 2 + gap
-            let top = min(max(clampTop, box.midY - stackHeight / 2), max(clampTop, clampBottom - stackHeight))
+            // BACK keeps its place left of the window. On its right stand two
+            // joined plates the size of BACK: ALL over DONE, then + over −.
+            let pairHeight = side * 2 + gap
+            let top = min(max(clampTop, box.midY - pairHeight / 2), max(clampTop, clampBottom - pairHeight))
             let backY = min(max(clampTop, box.midY - side / 2), max(clampTop, clampBottom - side))
             let rightX = min(max(box.maxX + gap, clampLeft), clampRight)
             let leftX = min(max(box.minX - gap - side, clampLeft), clampRight)
             backButton.frame = CGRect(x: leftX, y: backY, width: side, height: side)
-            amountAllButton.frame = CGRect(x: rightX, y: top, width: side, height: side)
-            amountDoneButton.frame = CGRect(x: rightX, y: top + side + gap, width: side, height: side)
+
+            let half = side / 2
+            placeJoined(amountAssembly, amountDivider, at: CGRect(x: rightX, y: top, width: side, height: side))
+            amountAllButton.frame = CGRect(x: rightX, y: top, width: side, height: half)
+            amountDoneButton.frame = CGRect(x: rightX, y: top + half, width: side, height: half)
+
+            let stepY = top + side + gap
+            placeJoined(stepAssembly, stepDivider, at: CGRect(x: rightX, y: stepY, width: side, height: side))
+            amountPlusButton.frame = CGRect(x: rightX, y: stepY, width: side, height: half)
+            amountMinusButton.frame = CGRect(x: rightX, y: stepY + half, width: side, height: half)
             return
         }
 
@@ -1518,6 +1561,13 @@ final class GameControlsOverlay: UIView {
         helpButton.frame = clampFrame(CGRect(x: rightX, y: max(clampTop, box.minY + 4),
                                              width: helpSide, height: helpSide))
         helpButton.layer.cornerRadius = max(6, helpSide * 0.20)
+    }
+
+    /// A plate split in half by a divider, with one press above it and one below.
+    private func placeJoined(_ assembly: VaultPanelView, _ divider: UIView, at frame: CGRect) {
+        assembly.frame = frame
+        assembly.corner = max(6, min(18, frame.height * 0.20))
+        divider.frame = CGRect(x: frame.minX, y: frame.midY, width: frame.width, height: 1)
     }
 
     private func placeSaveAssembly() {
@@ -2037,6 +2087,8 @@ final class GameControlsOverlay: UIView {
         talkButton.controlOpacity = value
         amountAllButton.controlOpacity = value
         amountDoneButton.controlOpacity = value
+        amountPlusButton.controlOpacity = value
+        amountMinusButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }
@@ -2048,7 +2100,7 @@ final class GameControlsOverlay: UIView {
         // engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider, amountAllButton, amountDoneButton]
+        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider, amountAssembly, amountDivider, stepAssembly, stepDivider, amountAllButton, amountDoneButton, amountPlusButton, amountMinusButton]
         controls.append(contentsOf: sideButtons as [UIView])
 
         if keyboardIsUp {
@@ -2064,7 +2116,7 @@ final class GameControlsOverlay: UIView {
         let movie = fallout_ios_movie_state()
         skipMovieButton.isHidden = movie == 0
         skipMovieButton.requiresHold = movie != 1
-        skipMovieButton.holdSeconds = movie == 3 ? 1 : 2
+        skipMovieButton.holdSeconds = 2
         movieShield.isHidden = movie == 0
         if movie != 0 {
             movieWasPlaying = true
@@ -2139,6 +2191,12 @@ final class GameControlsOverlay: UIView {
         helpButton.isHidden = !itemScreen
         amountAllButton.isHidden = true
         amountDoneButton.isHidden = true
+        amountPlusButton.isHidden = true
+        amountMinusButton.isHidden = true
+        amountAssembly.isHidden = true
+        amountDivider.isHidden = true
+        stepAssembly.isHidden = true
+        stepDivider.isHidden = true
         if !itemScreen {
             helpCard.isHidden = true
             helpBackdrop.isHidden = true
@@ -2185,10 +2243,16 @@ final class GameControlsOverlay: UIView {
             helpButton.isHidden = !itemScreen
 
             // The "MOVE ITEMS" window is the only menu whose quantity is set
-            // from outside: its own loop takes the two presses.
-            let pickAmount = screen == .pickAmount
-            amountAllButton.isHidden = !(pickAmount && fallout_ios_action_available(28) != 0)
-            amountDoneButton.isHidden = !(pickAmount && fallout_ios_action_available(29) != 0)
+            // from outside: its own loop takes the four presses.
+            let pickAmount = screen == .pickAmount && fallout_ios_action_available(28) != 0
+            amountAssembly.isHidden = !pickAmount
+            stepAssembly.isHidden = !pickAmount
+            amountDivider.isHidden = !pickAmount
+            stepDivider.isHidden = !pickAmount
+            amountAllButton.isHidden = !pickAmount
+            amountDoneButton.isHidden = !pickAmount
+            amountPlusButton.isHidden = !pickAmount
+            amountMinusButton.isHidden = !pickAmount
 
             if fallout_ios_action_available(21) == 0 {
                 backButton.isHidden = true

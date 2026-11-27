@@ -357,6 +357,11 @@ if(APPLE)
         target_sources(${EXECUTABLE_NAME} PUBLIC ${RESOURCES})
         set_source_files_properties(${RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
+        # The licences the app has to hand out with itself, in their own folder.
+        file(GLOB NOTICE_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/os/ios/Notices/*")
+        target_sources(${EXECUTABLE_NAME} PUBLIC ${NOTICE_RESOURCES})
+        set_source_files_properties(${NOTICE_RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION "Notices")
+
         set_target_properties(${EXECUTABLE_NAME} PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/os/ios/Info.plist"
             XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"

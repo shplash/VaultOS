@@ -1,0 +1,10 @@
+Donate heart icon, from the Boxicons Filled set
+https://www.svgrepo.com/svg/334622/donate-heart/
+
+Author: Boxicons, https://github.com/atisawd/boxicons
+Licence: CC Attribution 4.0, https://creativecommons.org/licenses/by/4.0/
+
+Donate heart by boxicons is licensed under a CC Attribution licence. This
+notice is the attribution that licence asks for. The artwork is used in
+os/ios/AppIcon.xcassets/donate-mark.imageset/donate.svg, as the mark inside
+the launcher's SUPPORT ME link.

@@ -3248,10 +3248,10 @@ private struct TouchControlEditor: View {
 // MARK: - Launcher log
 
 /// What the launcher itself did: each picker, what it handed back and what each
-/// import was given. Kept in `vaultos-launcher.log` beside the game data,
-/// separate from the engine's `vaultos-log.txt`, which it truncates on every
-/// start. Nothing here is for the player: it exists so a picker that does
-/// nothing can be read instead of guessed at.
+/// import was given. Kept in `VaultOS/vaultos-launcher.log`, separate from the
+/// engine's `vaultos-log.txt`, which it truncates on every start. Nothing here
+/// is for the player: it exists so a picker that does nothing can be read
+/// instead of guessed at.
 enum LauncherLog {
     static func write(_ message: String) {
         NSLog("VaultOS: %@", message)
@@ -3261,12 +3261,19 @@ enum LauncherLog {
             return
         }
 
+        // The launcher's own files sit in a folder, so the Documents list keeps
+        // to the two game folders and their saves.
+        let folder = documents.appendingPathComponent("VaultOS", isDirectory: true)
+        if !manager.fileExists(atPath: folder.path) {
+            try? manager.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+
         let stamp = ISO8601DateFormatter().string(from: Date())
         guard let data = "\(stamp) \(message)\n".data(using: .utf8) else {
             return
         }
 
-        let file = documents.appendingPathComponent("vaultos-launcher.log")
+        let file = folder.appendingPathComponent("vaultos-launcher.log")
         if let handle = try? FileHandle(forWritingTo: file) {
             handle.seekToEndOfFile()
             handle.write(data)
