@@ -21,10 +21,8 @@ enum LauncherLanguage: String, CaseIterable {
         }
     }
 
-    /// The language chosen on the GAME page for the game the app is showing.
-    /// The launcher draws its own text in it and the in-game overlay draws the
-    /// control labels in it, so one setting governs the launcher, the controls
-    /// and the game itself.
+    /// The language chosen on the GAME page for the game on screen: the
+    /// launcher, the control labels and the game itself all use it.
     static var selected: LauncherLanguage {
         let defaults = UserDefaults.standard
         let identifier = defaults.string(forKey: "launcher.game") ?? FalloutGame.fallout1.rawValue
@@ -46,10 +44,9 @@ enum L {
         return table[language]?[english] ?? english
     }
 
-    /// Text that comes from the installer, which reports some of its problems
-    /// with a file name or a folder in the middle. Those are matched on their
-    /// fixed head and tail so the names stay as they are and the sentence
-    /// around them is translated. Anything not matched stays as it was sent.
+    /// Text from the installer, which names files and folders in the middle of a
+    /// message: the fixed head and tail are matched so those names stay as they
+    /// are and only the sentence around them is translated.
     static func message(_ english: String) -> String {
         let language = LauncherLanguage.selected
         if language == .english {

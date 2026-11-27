@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
 #
-# Builds and runs the host-side tests. None of them needs the iOS SDK, SDL or
-# either engine - the launcher core is plain C++, and where a subtitle row is
-# drawn is plain arithmetic - so they run natively with the system compiler.
-#
-# Both workflows that produce a binary call this: the CI build and the release.
-# Keeping the commands here rather than copying them into each workflow is what
-# stops the two from drifting apart, which is how a release ends up shipped
-# without the tests the build ran.
+# Builds and runs the host-side tests: they need neither the iOS SDK, SDL nor
+# either engine, so they run natively with the system compiler. Both workflows
+# that produce a binary call this, so the two cannot drift apart.
 
 set -euo pipefail
 

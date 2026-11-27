@@ -4,10 +4,9 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-// The launcher is one fixed window: a rail of pages down the left, the selected
-// page as a single sheet of rows to its right, and Play always at the bottom of
-// the rail. Nothing scrolls, because a scroll view inside the engine's nested
-// run loop was what kept hanging the launcher.
+// Fixed window: a page rail, the selected page as a sheet of rows, and Play at
+// the bottom of the rail. Nothing scrolls; a scroll view in the engine's nested
+// run loop hung the launcher.
 struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     let onPlay: () -> Void
@@ -20,12 +19,10 @@ struct LauncherView: View {
     @State private var pendingImport: LauncherImport = .game
     @State private var savesScroll: CGFloat = 0
     @State private var savesDragStart: CGFloat?
-    /// The save the player picked. Choosing one loads nothing: CONTINUE does
-    /// that, so a slot can be looked at before a game is taken from it.
+    /// The picked save. Picking loads nothing; CONTINUE does that.
     @State private var selectedSlot: Int?
-    /// Where the saves box sits on the home card and how far its slots can
-    /// slide, in the card's own coordinates, so the card's drag can tell a
-    /// drag across it from one on the page behind it.
+    /// The saves box's frame and slide limit in card coordinates, so a drag on
+    /// it is not mistaken for a page turn.
     @State private var savesBox = SavesBox()
     @State private var pagingDrag = false
     @State private var showSaveImportWarning = false
@@ -33,8 +30,7 @@ struct LauncherView: View {
     /// How many dots follow INSTALLING while an import is going.
     @State private var installingDots = 0
     @State private var showResetAllWarning = false
-    /// The update check runs only while the player waits for it, and its answer
-    /// is shown once in a note over the About page.
+    /// Set while the update check runs; the answer is shown once over About.
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
     @State private var homeDrag: CGFloat = 0
@@ -50,19 +46,16 @@ struct LauncherView: View {
         return model.selectedGame.accent
     }
 
-    /// The launcher is drawn for the space it is given and never scrolls, so
-    /// below this size it would have to clip a page to fit. Scaling the whole
-    /// launcher instead keeps every control reachable on a window this small,
-    /// and leaves it untouched at the size of a phone or tablet.
+    /// Below this size the launcher scales instead of clipping a page to fit.
+    /// A phone or tablet is always above it, so nothing scales there.
     private static let smallestLayout = CGSize(width: 560, height: 320)
 
-    /// The name of the space the home card's positions are measured in, so a
-    /// page turn can tell a drag on the saves row from one across the card.
+    /// Coordinate space of the home card, so a saves drag can be told from a
+    /// page turn.
     private static let cardSpace = "launcher.homeCard"
 
-    /// What the display keeps for the sensor housing and the home indicator. The
-    /// launcher draws edge to edge and keeps its content inside these, so it
-    /// fills the screen on every device rather than leaving bands around itself.
+    /// What the display keeps for the sensor housing and home indicator. The
+    /// launcher draws edge to edge and keeps its content inside these.
     private var screenInsets: EdgeInsets {
         let insets = LauncherHost.safeInsets
         return EdgeInsets(top: insets.top,
@@ -90,10 +83,8 @@ struct LauncherView: View {
                 .scaleEffect(scale)
             }
         }
-        // The launcher is the app's own screen, like the game after it: it covers
-        // the whole display and keeps its content inside the edges. Leaving the
-        // safe area to SwiftUI instead shrank the launcher into a box with black
-        // bands around it on every device with a cut-out.
+        // Edge to edge like the game: leaving the safe area to SwiftUI shrank
+        // the launcher into a box with black bands on cut-out devices.
         .ignoresSafeArea()
         .overlay(
             Group {
@@ -152,8 +143,8 @@ struct LauncherView: View {
             }
         }
         .onChange(of: model.selectedGame) { _ in
-            // A picked save belongs to the game it was picked in, and the
-            // slots it was scrolled to.
+            // A picked save belongs to the game and scroll position it was
+            // picked in.
             selectedSlot = nil
             savesScroll = 0
         }
@@ -163,30 +154,27 @@ struct LauncherView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // The app's Documents folder is in the Files app now, so game files
-            // and saves can be dropped in while the launcher is in the
-            // background. Look at both again when it comes back to the front.
+            // The Documents folder is in the Files app, so files can be dropped
+            // in while the launcher is in the background: look again on return.
             model.refreshInstall()
             model.refreshSaves()
 
-            // A save's own files can be out of reach for the moment the app
-            // is let back in, while the device finishes unlocking: read them
-            // again once that has settled.
+            // Saves can still be locked for a moment after the app is let back
+            // in while the device unlocks: read them again once that settles.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 model.refreshSaves()
             }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            // The dots after INSTALLING move, so a long import is seen to be
-            // going rather than stopped.
+            // Move the dots so a long import is seen to be running.
             if model.isInstalling {
                 installingDots = (installingDots + 1) % 3
             } else {
                 installingDots = 0
             }
 
-            // Only the save-import countdown needs a tick. Without it this ran a
-            // full redraw of the launcher every second for as long as it was open.
+            // Only the countdown needs a tick; without this the launcher redrew
+            // every second.
             guard showSaveImportWarning && saveImportCountdown > 0 else {
                 return
             }
@@ -197,8 +185,8 @@ struct LauncherView: View {
                 return
             }
 
-            // One picker serves all three imports, and what it was opened for
-            // has to be read now: its answer arrives later.
+            // One picker serves all three imports; its kind must be read now
+            // because the answer arrives later.
             model.showImporter = false
             presentImporter(for: pendingImport)
         }
@@ -240,9 +228,8 @@ struct LauncherView: View {
 
     // MARK: - Importing
 
-    /// Opens the document picker in copy mode for whichever import asked for
-    /// it, and hands what comes back to the model. LauncherDocumentPicker
-    /// explains why the copy matters.
+    /// Opens the picker in copy mode and hands the choice to the model.
+    /// LauncherDocumentPicker explains why the copy matters.
     private func presentImporter(for kind: LauncherImport) {
         LauncherLog.write("picker opened for \(kind)")
 
@@ -328,21 +315,18 @@ struct LauncherView: View {
         .frame(maxHeight: 52)
     }
 
-    /// The saves, from the line under the hero to the bottom of the card. The
-    /// box has no header of its own: that line is the header, and the room it
-    /// would take is the room the slots need.
+    /// The saves, from the hero's divider to the card's bottom. That divider is
+    /// the header, so the slots get the room a header would take.
     private func savesColumn(game: FalloutGame,
                              width: CGFloat,
                              rowHeight: CGFloat,
                              selected: Bool) -> some View {
-        // Two whole slots and a fifth of the next one: the sliver at the
-        // right edge is what says the row slides, where an edge that ended
-        // exactly at the card's would say nothing.
+        // Two whole slots and a fifth: the sliver at the right edge is what
+        // shows the row slides.
         let spacing: CGFloat = 8
         let visible: CGFloat = 2.2
         let cardWidth = max(48, (width - spacing) / visible)
-        // The picture carries its own name, so there is no line under it any
-        // more and it takes the whole height of the box.
+        // The picture carries its own name, so a card takes the full row height.
         let cardHeight = max(40, rowHeight)
         let content = CGFloat(10) * cardWidth + CGFloat(9) * spacing
         let limit = min(0, width - content)
@@ -354,8 +338,8 @@ struct LauncherView: View {
                         limit: limit)
             .frame(width: width, height: rowHeight, alignment: .topLeading)
             .contentShape(Rectangle())
-            // The card's own drag slides these slots. Only the box on screen
-            // reports where it is: the other one is laid out a page away.
+            // Only the box on screen reports its frame; the other card is laid
+            // out a page away.
             .background(
                 GeometryReader { geometry in
                     Color.clear.preference(
@@ -368,20 +352,16 @@ struct LauncherView: View {
             )
     }
 
-    /// The game data, to the right of the saves. Its heading sits on the
-    /// same line as the top of the saves, and its buttons share what the
-    /// column has under it, so the block ends where the saves end rather
-    /// than past them. While an import is going or has just been reported,
-    /// its bar and its message take the buttons' place: they are the only
-    /// thing to say then, and the buttons are disabled for as long as it
-    /// lasts anyway.
+    /// The game data, right of the saves and ending where they end. While an
+    /// import runs or has just been reported, the bar and message take the
+    /// buttons' place.
     @ViewBuilder
     private func gameDataColumn(game: FalloutGame,
                                 info: LauncherInstallInfo,
                                 width: CGFloat,
                                 height: CGFloat) -> some View {
-        // The heading's own line, and the two gaps above, between and below
-        // the buttons, are what the buttons cannot have.
+        // The heading's line and the two gaps around the buttons come out of
+        // the height.
         let spacing: CGFloat = 4
         let buttonHeight = max(22, (height - 14 - spacing * 2) / 2)
 
@@ -446,10 +426,8 @@ struct LauncherView: View {
             ForEach(1...10, id: \.self) { slot in
                 let save = model.saves.first { $0.slot == slot }
 
-                // A slot with a save on it takes the game's own colour when
-                // it is the one CONTINUE would open - the one that was
-                // picked, or the newest while none is. An empty slot is only
-                // ever a white line, and only while it is the one picked.
+                // The game's colour marks the save CONTINUE would open (picked,
+                // or the newest); an empty slot is white only while picked.
                 saveCard(slot: slot,
                          save: save,
                          active: save != nil && slot == (selectedSlot ?? model.saves.first?.slot),
@@ -471,24 +449,23 @@ struct LauncherView: View {
                           width: CGFloat,
                           height: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
-        // The plate sits the same distance in from the picture's corner on
-        // every side, so it reads as laid on the shot.
+        // Inset equally from every corner so the plate reads as laid on the
+        // shot.
         let inset = max(4, min(width, height) * 0.03)
 
         return Group {
             if let save = save {
                 savePicture(save: save, width: width, height: height)
                     .overlay(
-                        // The shot names itself: its name, and the time and
-                        // the level under it, so no line is needed below.
+                        // The shot carries its name, time and level, so no line
+                        // is needed below.
                         savePlate(save: save, width: width - inset * 2)
                             .padding(inset),
                         alignment: .topLeading
                     )
             } else {
-                // An empty slot is a save that is not there yet: a save's own
-                // mark and EMPTY SLOT under it, both in the grey of the
-                // notes, so it reads as a place for a save and nothing else.
+                // An empty slot: a save mark and EMPTY SLOT in the notes'
+                // grey.
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(Color.white.opacity(0.05))
                     .frame(width: width, height: height)
@@ -506,19 +483,16 @@ struct LauncherView: View {
                     )
             }
         }
-        // Both lines are drawn inside the picture's own edge: the grey one
-        // every slot has, the game's own colour on the save that CONTINUE
-        // would open, and a whiter one on an empty slot that is picked.
-        // Drawing them inside is what covers the edge of the scaled shot
-        // rather than sitting outside it.
+        // Borders are drawn inside the picture's edge: grey on every slot, the
+        // game's colour on the save CONTINUE opens, white on a picked empty
+        // slot. Drawn inside, they cover the scaled shot's edge.
         .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30), lineWidth: 1))
         .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1))
         .overlay(shape.strokeBorder(chosen ? Color.white.opacity(0.9) : Color.clear, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
-            // Any slot is picked, empty or not: an empty one names the next
-            // game instead of a save to go back to, and picking the one
-            // already picked lets it go.
+            // Any slot can be picked, empty or not; picking it again lets it
+            // go.
             selectedSlot = selectedSlot == slot ? nil : slot
         }
         .contextMenu {
@@ -528,9 +502,8 @@ struct LauncherView: View {
         }
     }
 
-    /// A save's own picture, drawn out to the card's edges and clipped to
-    /// its corners, so the line over it is the only thing on its outer
-    /// pixels rather than sitting outside them.
+    /// The save's picture, filling the card and clipped to its corners, so the
+    /// border lands on its outer pixels.
     @ViewBuilder
     private func savePicture(save: LauncherModel.LauncherSave,
                              width: CGFloat,
@@ -551,12 +524,11 @@ struct LauncherView: View {
         }
     }
 
-    /// A save's name and what it holds, on a plate laid over its own shot:
-    /// small, see-through, and as wide as the time and the level need, so it
-    /// stays a note on the shot rather than a band across it.
+    /// The save's name and detail on a small plate over its shot, as wide as
+    /// the detail needs.
     private func savePlate(save: LauncherModel.LauncherSave, width: CGFloat) -> some View {
-        // Eighteen percent smaller than the card's own type, so the plate
-        // stays a note laid on the shot rather than a panel beside it.
+        // Eighteen percent under the card's own type, so the plate stays a
+        // note on the shot.
         let scale: CGFloat = 0.82
         let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
         let detail = saveDetail(save)
@@ -564,8 +536,8 @@ struct LauncherView: View {
             .font: VaultUI.label(9 * scale),
             .kern: 0.6
         ]).width)
-        // The plate takes the row's width and its own padding, and no more:
-        // a name too long for it is cut rather than widening it.
+        // The row's width plus the plate's padding, and no more: a long name
+        // is cut instead of widening it.
         let plateWidth = min(max(40, detailWidth + 15 * scale), max(40, width))
 
         return VStack(alignment: .leading, spacing: 1) {
@@ -597,9 +569,8 @@ struct LauncherView: View {
         )
     }
 
-    /// How long a save has been played and how far the character has got. A
-    /// save written before the game kept a time has no time to show, and the
-    /// date it was written is what is known, so that is what is named.
+    /// Play time and level, or the date for saves written before the game kept
+    /// a time.
     private func saveDetail(_ save: LauncherModel.LauncherSave) -> String {
         var parts: [String] = []
         if let played = save.played {
@@ -610,13 +581,11 @@ struct LauncherView: View {
             parts.append("\(L.t("LVL")) \(save.level)")
         }
 
-        // The two sit as close as they can without reading as one word.
+        // Close, but not tight enough to read as one word.
         return parts.isEmpty ? save.saved : parts.joined(separator: "·")
     }
 
-    /// Deleting is a long press away on a save card. A button's role is what
-    /// marks the item as destructive, and roles start at iOS 15 while the app
-    /// still runs on iOS 14: there the item is a plain one and says the same.
+    /// Destructive roles need iOS 15; on iOS 14 the item is a plain button.
     @ViewBuilder
     private func deleteItem(_ save: LauncherModel.LauncherSave) -> some View {
         if #available(iOS 15.0, *) {
@@ -635,9 +604,8 @@ struct LauncherView: View {
     }
 
     private var playButton: some View {
-        // Every line sits on the button's own middle. A kerned line carries
-        // the space after its last letter as well, which pushes the letters
-        // off the middle by half of it, so that space is taken back.
+        // Kerning includes the space after the last letter, which pushes the
+        // line off centre by half of it; take it back with trailing padding.
         let titleKerning: CGFloat = 1.6
         let nameKerning: CGFloat = 1.3
         let detailKerning: CGFloat = 1.4
@@ -645,9 +613,8 @@ struct LauncherView: View {
         return Button {
             LauncherMusic.shared.stop()
 
-            // A slot with no save on it is the next game rather than a save
-            // to go back to, so it starts the launcher's own game: the menu
-            // it always opens, instead of loading a save that is not there.
+            // An empty slot starts the game rather than loading a save that is
+            // not there.
             if selectedSlot == nil || selectedSave != nil,
                let save = selectedSave ?? model.saves.first {
                 model.play(onPlay: onPlay, loadSlot: save.slot)
@@ -673,8 +640,7 @@ struct LauncherView: View {
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
 
-                // The save's own time played and level, under its name and in
-                // a thinner face, so the name still reads first.
+                // Time played and level under the name, in a thinner face.
                 if let detail = continueDetail {
                     Text(detail)
                         .font(Vault.label(9, weight: .regular))
@@ -687,10 +653,8 @@ struct LauncherView: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            // The button keeps one height whether a save's line sits under
-            // its name or not. The height is set inside the style rather
-            // than outside it, so the fill behind the words is that height
-            // too, instead of the words being centred in a taller space.
+            // The height is set inside the style so the fill is that height
+            // too, and PLAY stays as tall as CONTINUE without a detail line.
             .frame(maxWidth: .infinity, minHeight: LauncherView.continueHeight - 20)
         }
         .buttonStyle(PrimaryButtonStyle(accent: accent))
@@ -698,8 +662,7 @@ struct LauncherView: View {
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
 
-    /// The save the player picked, if there is one on that slot. A slot picked
-    /// with nothing on it is not a save at all.
+    /// The save on the picked slot, if it has one.
     private var selectedSave: LauncherModel.LauncherSave? {
         guard let slot = selectedSlot else {
             return nil
@@ -708,15 +671,13 @@ struct LauncherView: View {
         return model.saves.first { $0.slot == slot }
     }
 
-    /// Whether the picked slot is an empty one, which is the next game rather
-    /// than a save to go back to.
+    /// Whether the picked slot is empty, which means the next game rather than a
+    /// save to go back to.
     private var picksEmptySlot: Bool {
         return selectedSlot != nil && selectedSave == nil
     }
 
-    /// What the button says. It opens a save when there is one - picked, or
-    /// the newest while nothing is picked - and starts a new game on an empty
-    /// slot or with no save at all.
+    /// PLAY on an empty pick or with no saves, CONTINUE otherwise.
     private var buttonTitle: String {
         if model.saves.isEmpty || picksEmptySlot {
             return L.t("PLAY")
@@ -725,8 +686,7 @@ struct LauncherView: View {
         return L.t("CONTINUE")
     }
 
-    /// INSTALLING with the dots after it moving, so a long import is seen to
-    /// be going rather than stopped.
+    /// INSTALLING with the dots that show a long import still running.
     private var installingLabel: String {
         return L.t("INSTALLING") + String(repeating: ".", count: installingDots + 1)
     }
@@ -736,8 +696,7 @@ struct LauncherView: View {
             return installingLabel
         }
 
-        // An empty slot is the next game rather than a save to go back to, so
-        // the button names the game it starts instead of a save's name.
+        // An empty slot names the game it starts instead of a save.
         if picksEmptySlot {
             return L.t("NEW GAME")
         }
@@ -749,9 +708,7 @@ struct LauncherView: View {
         return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
     }
 
-    /// How long the save CONTINUE opens has been played and how far the
-    /// character has got, under its name in the button: the two things worth
-    /// knowing before going back to it. A new game has neither to show.
+    /// The save's play time and level under its name; a new game has neither.
     private var continueDetail: String? {
         guard !model.isInstalling, !picksEmptySlot else {
             return nil
@@ -761,9 +718,8 @@ struct LauncherView: View {
             return nil
         }
 
-        // A save written before the game kept a play time has no time to
-        // show, and `0:00 · LEVEL 0` reads as a broken save: only what the
-        // save carries is listed.
+        // Saves from before play time was kept would read as `0:00 · LEVEL 0`,
+        // so only what they carry is listed.
         var parts: [String] = []
         if let played = save.played {
             parts.append(played)
@@ -773,7 +729,7 @@ struct LauncherView: View {
             parts.append("\(L.t("LVL")) \(save.level)")
         }
 
-        // The two sit as close as they can without reading as one word.
+        // Close, but not tight enough to read as one word.
         return parts.isEmpty ? nil : parts.joined(separator: "·")
     }
 
@@ -826,16 +782,14 @@ struct LauncherView: View {
                         .allowsHitTesting(isSelected && !isPaging)
                 }
             }
-            // The card runs from the top of the page to the bottom of the
-            // Play button beside it: the game switch that used to sit under
-            // it moved above the title, so its row is the saves' room now.
+            // The card runs from the top of the page to the bottom of Play beside
+            // it.
             .frame(width: width, height: geometry.size.height)
             .clipped()
             .contentShape(Rectangle())
-            // One gesture for the whole card: a drag that begins in the
-            // saves box slides its slots, and any other turns the page.
-            // Two gestures competing is what left the box scrolling the
-            // page instead of itself.
+            // One gesture for the whole card: a drag that begins in the saves box
+            // slides its slots, any other turns the page. Two competing gestures
+            // left the box scrolling the page instead of itself.
             .coordinateSpace(name: LauncherView.cardSpace)
             .simultaneousGesture(homePagingGesture(width: pageWidth))
             .onPreferenceChange(SavesBoxKey.self) { box in
@@ -850,8 +804,8 @@ struct LauncherView: View {
     private func homePagingGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
-                // A drag that began in the saves box slides its slots: the
-                // page stays where it is, however far the finger travels.
+                // A drag that began in the saves box slides its slots and leaves
+                // the page alone.
                 if savesBox.rect.contains(value.startLocation) {
                     if savesDragStart == nil {
                         savesDragStart = savesScroll
@@ -882,8 +836,8 @@ struct LauncherView: View {
                 dragWatchdog?.cancel()
                 dragWatchdog = nil
 
-                // A drag the saves box took ends with the slots where the
-                // finger left them, and nothing else to settle.
+                // The slots stay where the finger left them, with nothing to
+                // settle.
                 if savesDragStart != nil {
                     savesDragStart = nil
                     savesScroll = min(0, max(savesBox.limit, savesScroll))
@@ -937,11 +891,8 @@ struct LauncherView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: task)
     }
 
-    /// The two games as one switch. It sits above the hero's title, at
-    /// exactly the width of the word FALLOUT: it reads as part of the name
-    /// rather than as a control of its own, and it never runs on into the 2
-    /// of FALLOUT 2, because its width is the first game's name whatever
-    /// the second one measures.
+    /// The two games as one switch, exactly as wide as the word FALLOUT, so it
+    /// reads as part of the title and never reaches into the 2.
     private func gameSwitcher(width: CGFloat) -> some View {
         let segment = width / 2
         let progress = model.selectedGame == .fallout1 ? CGFloat(0) : 1
@@ -1011,15 +962,14 @@ struct LauncherView: View {
         let gameAccent = game.accent
         let buttonFont = VaultUI.label(10, weight: .semibold)
         let columns = width - Metrics.sheetInset * 2
-        // The game data keeps to the width of its own buttons and sits at the
-        // far right, so the saves have the rest of the card to run across.
+        // The game data is as wide as its buttons and sits at the far right.
         let labels = [L.t("LANGUAGE FILES"),
                       L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP")]
         let widest = labels.reduce(CGFloat(0)) { widest, name in
             max(widest, ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width))
         }
-        // A button carries its own padding, so the column is as wide as the
-        // widest label and nothing in it is cut off at the card's edge.
+        // A button carries its own padding, so the column fits the widest label
+        // without clipping at the card's edge.
         let filesWidth = max(126, widest + 30)
         let savesWidth = max(columns - filesWidth - 19, 90)
         return VStack(alignment: .leading, spacing: 0) {
@@ -1029,10 +979,8 @@ struct LauncherView: View {
                 .fill(gameAccent.opacity(0.8))
                 .frame(height: 1)
 
-            // The saves sit on the card's bottom line, which is the line the
-            // Play button beside them ends on: the room the header leaves is
-            // what stands above them, and the fade at the card's bottom is
-            // what they and everything above them end in.
+            // The saves sit on the card's bottom line, the line Play beside them
+            // ends on.
             Spacer(minLength: Metrics.gap)
 
             HStack(alignment: .top, spacing: 0) {
@@ -1060,46 +1008,40 @@ struct LauncherView: View {
 
     private static let heroTitleSize: CGFloat = 68
 
-    /// The tagline and the edition under the name, a little larger than they
-    /// were so they read as part of the branding rather than as notes on it.
+    /// Tagline and edition sizes: large enough to read as branding, not as notes.
     private static let heroTaglineSize: CGFloat = 16
     private static let heroEditionSize: CGFloat = 12
 
     /// The room the game switch takes above the title.
     private static let switchHeight: CGFloat = 30
 
-    /// The diameter of the two link discs, which is the size the circle
-    /// behind those marks has always been. Everything a disc is made of is a
-    /// share of this one number.
+    /// Diameter of the two link discs; everything about a disc is a share of
+    /// this one number.
     private static let linkDisc: CGFloat = 16
 
-    /// How tall each link is to a finger, which is wider than the disc and
-    /// the word it draws.
+    /// Tap height of a link, taller than the disc and the word it draws.
     private static let linkTapHeight: CGFloat = 44
 
-    /// The height CONTINUE is drawn at. The row of saves beside it is the
-    /// same height and sits on the same bottom line, so the two read as one
-    /// band across the launcher rather than as two blocks that do not meet.
+    /// The height CONTINUE is drawn at; the saves row beside it matches, so the
+    /// two read as one band across the launcher.
     private static var continueHeight: CGFloat {
         let title = VaultUI.display(24).lineHeight
         let name = VaultUI.label(10, weight: .bold).lineHeight
         let detail = VaultUI.label(9, weight: .regular).lineHeight
-        // Two gaps between the three lines, and the button's own padding.
+        // Two gaps between the three lines, plus the button's own padding.
         return title + name + detail + 6 + 20
     }
 
-    /// The width of the word FALLOUT in the hero's own face and spacing:
-    /// the game switch above it is exactly that wide, so it ends where the
-    /// word ends rather than stretching over the 2 of FALLOUT 2.
+    /// Width of the word FALLOUT, which the game switch above it matches so it
+    /// ends where the word ends.
     private static var heroTitleWidth: CGFloat {
         let font = VaultUI.display(heroTitleSize)
         let width = (("FALLOUT" as NSString).size(withAttributes: [.font: font, .kern: 1.4])).width
         return ceil(width)
     }
 
-    /// The width of the COMMUNITY EDITION line in its own face and spacing:
-    /// the two links under it are set to the same width, so the row reads as
-    /// belonging to that line rather than to the card.
+    /// Width of COMMUNITY EDITION, which the two links under it match so the row
+    /// belongs to that line.
     private static var heroEditionWidth: CGFloat {
         let font = VaultUI.label(heroEditionSize, weight: .bold)
         let width = ((L.t("COMMUNITY EDITION") as NSString).size(withAttributes: [.font: font, .kern: 2.4])).width
@@ -1110,8 +1052,8 @@ struct LauncherView: View {
         let title = VaultUI.display(heroTitleSize).lineHeight
         let tagline = VaultUI.label(heroTaglineSize).lineHeight
         let edition = VaultUI.label(heroEditionSize, weight: .bold).lineHeight
-        // The tagline is pulled twelve points up under the name and the
-        // edition two more, so the three lines read as one block.
+        // The tagline is pulled twelve points up under the name and the edition
+        // two more, so the three lines read as one block.
         return 14 + switchHeight + 8 + title + 2 - 12 + tagline + 2 - 2 + edition + 2 + 7 + 20 + 14
     }
 
@@ -1128,9 +1070,8 @@ struct LauncherView: View {
                     .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    // The switch sits above the name, as wide as the word
-                    // FALLOUT alone: it is in the column the name is drawn
-                    // in, so the two line up from the same edge.
+                    // The switch sits in the name's column, as wide as FALLOUT
+                    // alone, so both start at the same edge.
                     gameSwitcher(width: min(LauncherView.heroTitleWidth,
                                             max(120, geometry.size.width * 0.62 - Metrics.sheetInset)))
                         .padding(.bottom, 6)
@@ -1154,9 +1095,8 @@ struct LauncherView: View {
                         .foregroundColor(game.accent)
                         .padding(.top, -2)
 
-                    // The two links under the edition, each a frosted disc
-                    // with its own mark cut out of it, set to the width of
-                    // the line above them.
+                    // The two links, each a frosted disc with its mark cut out,
+                    // set to the width of the line above.
                     HStack(spacing: 0) {
                         plainLink("GITHUB", address: "https://github.com/shplash/vaultos") {
                             Image("github-mark")
@@ -1179,10 +1119,9 @@ struct LauncherView: View {
                         }
                     }
                     .frame(width: LauncherView.heroEditionWidth, alignment: .leading)
-                    // The buttons reach further up and down than the marks
-                    // they draw, so a finger finds them; the row is pulled up
-                    // by what the tap area adds, which leaves the marks
-                    // themselves where they were.
+                    // The tap area reaches further up and down than the marks it
+                    // draws; pulling the row up by that much leaves the marks
+                    // where they were.
                     .padding(.top, -5)
                 }
                 .padding(.top, 14)
@@ -1194,10 +1133,9 @@ struct LauncherView: View {
         .frame(minHeight: LauncherView.heroHeight, maxHeight: .infinity)
     }
 
-    /// One of the two links under the edition: one frosted disc with its mark
-    /// cut out of it, then the link's name. The disc is the whole icon -
-    /// there is no ring and no glyph drawn on top of it - and the button is
-    /// taller than the disc so a finger can find it.
+    /// A link under the edition: a frosted disc with its mark cut out, then the
+    /// name. The disc is the whole icon, and the button is taller than it so a
+    /// finger can find it.
     private func plainLink<Glyph: View>(_ title: String,
                                         address: String,
                                         @ViewBuilder glyph: () -> Glyph) -> some View {
@@ -1359,10 +1297,8 @@ struct LauncherView: View {
 
     /// Where to report things, and who to credit for the rest.
     ///
-    /// The links sit in the header, outside the scroll view: the way to a bug
-    /// report can never scroll out of reach, and only the credits - text nobody
-    /// taps, in a fixed order - move. This is the launcher's only scroll view,
-    /// and it holds static rows only.
+    /// The links stay in the header, outside the scroll view, so a bug report
+    /// can never scroll out of reach. Only the credits scroll.
     private var aboutSheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             sheetHeader("INFO", detail: "Who made this, and what it is built on") {
@@ -1396,8 +1332,8 @@ struct LauncherView: View {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 0) {
                     tip("shplash", "The iOS app, its launcher and touch controls.")
-                    // The licence asks a modified copy of the software to say so
-                    // where it is handed to anyone: this row is that notice.
+                    // The licence asks a modified copy to say so: this is that
+                    // notice.
                     tip("Engines", "A modified version of Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License. The launcher, the iOS port and the touch controls are added here.")
                     tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
                     tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
@@ -1429,15 +1365,13 @@ struct LauncherView: View {
         wikiLink(title, address: address, primary: primary)
     }
 
-    /// What the update check came back with: one line, and the release page when
-    /// there is something newer to get.
+    /// The update check's answer: one line, and the release page if newer.
     private struct UpdateOutcome: Equatable {
         let message: String
         let address: String?
     }
 
-    /// Asks GitHub for the newest release. It sits with the other page links and
-    /// takes the game's accent like them.
+    /// Asks GitHub for the newest release, styled like the other page links.
     private var checkForUpdatesButton: some View {
         Button {
             checkForUpdates()
@@ -1471,9 +1405,8 @@ struct LauncherView: View {
         .accessibilityLabel(L.t("Reset all settings"))
     }
 
-    /// The check's answer, shown as a small popup over the launcher rather than a
-    /// row on the page: a row would make the About page taller and bring in a
-    /// slider's worth of layout shift.
+    /// Shown as a popup: a row on the page would make About taller and shift
+    /// the layout.
     private var updateOutcomeAlert: Binding<Bool> {
         Binding(
             get: { updateOutcome != nil },
@@ -1485,16 +1418,14 @@ struct LauncherView: View {
         )
     }
 
-    /// Asks GitHub for the newest release and compares it with the version this
-    /// build reports. A check that could not be made says so instead of looking
-    /// like a build that is up to date.
+    /// Compares this build with the newest release; a check that could not be
+    /// made says so instead of looking up to date.
     private func checkForUpdates() {
         guard !isCheckingForUpdates else {
             return
         }
-        // The list, not releases/latest: that endpoint skips prereleases and
-        // drafts, and this project publishes its builds as a draft, so it could
-        // only ever answer 404.
+        // The list, not releases/latest: that skips drafts and prereleases,
+        // which is all this project publishes.
         guard let url = URL(string: "https://api.github.com/repos/shplash/vaultos/releases?per_page=1") else {
             return
         }
@@ -1518,10 +1449,8 @@ struct LauncherView: View {
         }.resume()
     }
 
-    /// Reads the newest release out of GitHub's list and compares its tag with
-    /// this build. Anything unexpected - no network, a rate limit, a shape that
-    /// changed - ends as a plain failure rather than a wrong answer, and an
-    /// empty list is said plainly instead of being reported as an error.
+    /// Compares the newest release's tag with this build. No network, a rate
+    /// limit or an unexpected shape is a plain failure, not a wrong answer.
     private static func outcomeFromGitHub(data: Data?,
                                           error: Error?,
                                           current: String) -> UpdateOutcome {
@@ -1549,8 +1478,8 @@ struct LauncherView: View {
         return UpdateOutcome(message: "\(L.t("Up to date")) · \(current)", address: address)
     }
 
-    /// Compares version strings number by number, so 1.10 comes after 1.9, and a
-    /// missing part counts as zero: 1.0 and 1.0.0 are the same release.
+    /// Compares versions number by number, so 1.10 comes after 1.9; a missing
+    /// part counts as zero.
     private static func compareVersions(_ lhs: String, _ rhs: String) -> Int {
         let left = versionNumbers(lhs)
         let right = versionNumbers(rhs)
@@ -1747,9 +1676,8 @@ struct LauncherView: View {
                             .kerning(1.6)
                             .foregroundColor(selected ? accent : Theme.faint)
 
-                        // The preset this screen starts on is the one that
-                        // keeps the game's interface near iOS's text sizes:
-                        // HALF on a phone, FULL on a tablet.
+                        // HALF on a phone, FULL on a tablet: the preset this
+                        // screen starts on.
                         if preset.id == model.startingPreset.id {
                             Text(L.t("(recommended)"))
                                 .font(Vault.label(9, weight: .regular))
@@ -1820,8 +1748,6 @@ struct LauncherView: View {
                       ))
         }
     }
-
-    // Channel switching is done with the volume sliders; 0% mutes a channel.
 
     private func volumeRow(_ title: String, value: Binding<Double>) -> some View {
         row(title, detail: nil) {
@@ -1912,8 +1838,7 @@ struct LauncherView: View {
                       detail: "Vibrate when a save finishes",
                       isOn: $model.saveHaptics)
 
-            // The saves are a row like the others, with their count in grey
-            // beside the title and the two buttons at the right.
+            // The saves row, with its count beside the title.
             row("Saved games",
                 detail: model.savesNotice.map { L.message($0) } ?? L.t("Keep your saves intact"),
                 badge: "· \(model.saves.count)",
@@ -1947,8 +1872,7 @@ struct LauncherView: View {
                       isOn: $model.touchControls)
 
             // The layout, colour and opacity rows are greyed, not hidden, while
-            // the controls are off: there is nothing on the screen to edit,
-            // colour or dim then.
+            // the controls are off: there is nothing to edit then.
             row("Button layout", detail: "Move and resize the buttons. Best judged over the game itself.") {
                 Button {
                     showControlEditor = true
@@ -2009,7 +1933,7 @@ struct LauncherView: View {
                         .frame(width: 38, alignment: .trailing)
                 }
             }
-            // Greyed out, not hidden, while the on-screen controls are off.
+            // Greyed while the controls are off, like the rows above.
             .disabled(!model.touchControls)
             .opacity(model.touchControls ? 1 : 0.4)
 
@@ -2043,8 +1967,8 @@ struct LauncherView: View {
         }
     }
 
-    /// Backing the saves up is harmless; putting a backup back replaces them, so
-    /// that one waits out a countdown with the warning on screen.
+    /// Importing replaces the saves, so it waits out a countdown with the
+    /// warning on screen. Backing up is harmless.
     private var saveImportWarning: some View {
         ZStack {
             Color.black.opacity(0.62)
@@ -2266,8 +2190,7 @@ struct LauncherView: View {
                         .font(Vault.body(13, weight: .medium))
                         .foregroundColor(Theme.text)
 
-                    // A grey note beside the title, for a count that belongs
-                    // to the row rather than to a line of its own.
+                    // A grey count beside the title.
                     if let badge = badge {
                         Text(verbatim: badge)
                             .font(Vault.label(11, weight: .regular))
@@ -2368,9 +2291,8 @@ private extension FalloutGame {
     }
 }
 
-/// Where the saves box sits on the home card, and how far its slots can slide,
-/// measured in the card's own coordinates, so the card's drag knows which
-/// drags belong to the box.
+/// The saves box's frame and slide limit in the card's coordinates, so the
+/// card's drag knows which drags belong to the box.
 private struct SavesBox: Equatable {
     var rect: CGRect = .zero
     var limit: CGFloat = 0
@@ -2382,9 +2304,8 @@ private struct SavesBoxKey: PreferenceKey {
     }
 
     static func reduce(value: inout SavesBox, nextValue: () -> SavesBox) {
-        // Both cards are laid out, and only the one on screen has a box: an
-        // empty answer never replaces a real one, or the page away would
-        // leave the card on screen with nothing to scroll.
+        // Only the card on screen has a box: an empty answer never replaces a
+        // real one.
         let next = nextValue()
         if next.rect != .zero {
             value = next
@@ -2404,8 +2325,7 @@ private enum Metrics {
 
 private enum Theme {
     static let background = Vault.hull
-    /// The rail's own fill. The home sheet uses it too, so the panel and the
-    /// bar are one surface instead of a blue-grey plate over a darker one.
+    /// The rail's fill, used by the home sheet too so both read as one surface.
     static let rail = Vault.plate.opacity(0.55)
     static let alert = Color(white: 0.072)
     static let line = Vault.hairline
@@ -2424,10 +2344,8 @@ private extension View {
             .overlay(shape.stroke(Color.white.opacity(0.14), lineWidth: 1))
     }
 
-    /// The home card's own plate: its top and sides are the rail's fill, then
-    /// its fill and the line down its sides both fade out to nothing, so the
-    /// card ends in the black behind it rather than on a hard edge. Only the
-    /// light along its top is drawn as it is on every other plate.
+    /// The home card's plate: the rail's fill and edges that both fade out at
+    /// the bottom, so the card ends in the black instead of on a hard edge.
     func homePlate(corner: CGFloat = 20) -> some View {
         let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         let fill = LinearGradient(stops: [
@@ -2485,9 +2403,6 @@ private struct LauncherBackdrop: View {
         .ignoresSafeArea()
     }
 }
-
-// The home hero uses the game's own still; the drawn vault-door motif was
-// replaced by it.
 
 private struct PillToggle: View {
     let isOn: Bool
@@ -2605,10 +2520,8 @@ private struct DisabledDim: ViewModifier {
     }
 }
 
-/// A link's mark as GitHub draws its own logo: one solid frosted disc with
-/// the glyph cut out of it, so the dark page shows through where the mark
-/// is, rather than a glyph being drawn on top of a circle. The disc is the
-/// whole icon - there is no ring around it and no second circle behind it.
+/// A link's mark cut out of a frosted disc: the page shows through the glyph.
+/// The disc is the whole icon, with no ring around it.
 private struct CutoutIconDisc<Glyph: View>: View {
     let diameter: CGFloat
     let glyph: Glyph
@@ -2620,8 +2533,8 @@ private struct CutoutIconDisc<Glyph: View>: View {
 
     var body: some View {
         ZStack {
-            // The material is newer than the iOS this app still runs on, so
-            // the older systems get a grey of the same weight instead.
+            // ultraThinMaterial needs iOS 15; older systems get a flat grey of
+            // the same weight.
             if #available(iOS 15.0, *) {
                 Circle()
                     .fill(.ultraThinMaterial)
@@ -2635,9 +2548,8 @@ private struct CutoutIconDisc<Glyph: View>: View {
                 .fill(Color.white.opacity(0.24))
         }
         .frame(width: diameter, height: diameter)
-        // The disc is the mask, and the glyph is taken out of it rather than
-        // drawn over it: what is left of the disc shows, and the page shows
-        // through the mark.
+        // The disc is the mask and the glyph is cut out of it, so the page
+        // shows through the mark.
         .mask(
             Rectangle()
                 .overlay(glyph.blendMode(.destinationOut))
@@ -2692,9 +2604,8 @@ private struct TouchControlEditor: View {
         _scales = State(initialValue: ControlLayout.allScales(profile: profile, game: game))
     }
 
-    /// The editor's own chrome is drawn in the colour the player picked for the
-    /// controls, so the tool and the thing it edits look alike. The game's own
-    /// accent stays on the launcher pages, where it marks the game.
+    /// The colour the player picked for the controls, so the editor and the
+    /// controls look alike. The game's accent stays on the launcher pages.
     private var accent: Color {
         return model.controlColour.color
     }
@@ -2722,11 +2633,9 @@ private struct TouchControlEditor: View {
                         .opacity(model.controlsOpacity)
                 }
 
-                // One centred bar across the top holds the editor's controls and
-                // its own HIDE/SHOW toggle. The toggle sits at the same place in
-                // both states - the middle of the top edge - so it never moves
-                // when the bar is hidden or shown. Hiding removes the bar and
-                // leaves only the toggle.
+                // One centred bar across the top holds the controls and the
+                // HIDE/SHOW toggle, which stays in the same place in both
+                // states; hiding removes only the bar.
                 VStack(spacing: 0) {
                     if !barsHidden {
                         chrome(in: geometry.size)
@@ -2756,15 +2665,13 @@ private struct TouchControlEditor: View {
         }
     }
 
-    /// The capsule's width is fixed so its label never moves the bar: HIDE BARS
-    /// and SHOW BARS are the same nine characters in the monospaced face it is
-    /// drawn in, and the label shrinks rather than spilling out if that changes.
+    /// Fixed so the label never moves the bar: HIDE BARS and SHOW BARS are the
+    /// same length in the monospaced face it is drawn in.
     private static let toggleWidth: CGFloat = 116
 
-    /// Hides the editor's own bars to give the whole screen to the layout. It is
-    /// a filled capsule with a word on it, deliberately unlike the controls it
-    /// sits among. It stays in the middle of the top edge in both states, so
-    /// the player never has to look for it.
+    /// Hides the editor's bars to give the whole screen to the layout. A filled
+    /// capsule, deliberately unlike the controls, in the middle of the top edge
+    /// in both states.
     private var barsToggle: some View {
         Button {
             barsHidden.toggle()
@@ -2791,15 +2698,10 @@ private struct TouchControlEditor: View {
         .accessibilityLabel(L.t(barsHidden ? "SHOW BARS" : "HIDE BARS"))
     }
 
-    /// The editor's own controls, in one bar across the top. The controls it
-    /// edits sit on the right and along the bottom, so the bar keeps to the
-    /// middle of the top edge and leaves the corners free.
-    ///
-    /// The bar is only as wide as its two rows are: a fixed share of the screen
-    /// left most of it empty, which made a small tool look like a wide toolbar.
-    ///
-    /// Hiding the bars takes this bar away and nothing else: only the toggle is
-    /// left, in the same place, so the whole screen is free to lay out.
+    /// The editor's controls in one bar across the middle of the top edge, so
+    /// the corners stay free for the controls it edits. The bar is only as wide
+    /// as its two rows: a fixed share of the screen left most of it empty.
+    /// Hiding the bars takes this bar away and leaves the toggle in place.
     private func chrome(in size: CGSize) -> some View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 0) {
@@ -2874,9 +2776,8 @@ private struct TouchControlEditor: View {
                     .foregroundColor(Theme.dim)
                     .frame(width: 30, alignment: .leading)
 
-                // SIZE belongs to the control that was pressed, and it keeps its
-                // place in the row either way: the panel never changes shape
-                // under the player's finger, it only lights up.
+                // SIZE keeps its place whether a control is selected or not, so
+                // the panel never changes shape under the finger.
                 Text(L.t("SIZE"))
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .kerning(1.1)
@@ -2898,8 +2799,8 @@ private struct TouchControlEditor: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        // Its own two rows decide the width, so nothing is left over at the
-        // sides. The toggle below it follows the same width in both states.
+        // The two rows decide the width; the toggle below follows it in both
+        // states.
         .fixedSize(horizontal: true, vertical: false)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -3038,12 +2939,9 @@ private struct TouchControlEditor: View {
         }
     }
 
-    /// The game's own screen, drawn where the renderer puts it, with the
-    /// interface bar marked in the place the game actually draws it: 640 by 100
-    /// game pixels, centred horizontally and sitting on the bottom edge in both
-    /// engines. The editor view is not the game screen, so both are mapped
-    /// through the same aspect fit SDL applies, which is why the marker no
-    /// longer drifts away from the real bar when the resolution changes.
+    /// The game's screen as the renderer places it, with the 640x100 interface
+    /// bar marked at the bottom edge, both through the aspect fit SDL applies so
+    /// the marker stays on the real bar at any resolution.
     private func previewSurface(_ size: CGSize) -> some View {
         let screen = gameScreen(in: size)
         let bar = interfaceBar(in: size)
@@ -3064,8 +2962,7 @@ private struct TouchControlEditor: View {
                 .frame(width: screen.width, height: screen.height)
                 .offset(x: screen.minX, y: screen.minY)
 
-            // A plain opaque red rectangle for the in-game HUD: the exact
-            // footprint the controls have to avoid. No fake interface.
+            // Flat red for the in-game HUD footprint the controls must avoid.
             ZStack {
                 Rectangle()
                     .fill(Color.red.opacity(0.85))
@@ -3085,9 +2982,8 @@ private struct TouchControlEditor: View {
         .allowsHitTesting(false)
     }
 
-    /// The interface bar's size in game pixels. Both engines draw the same
-    /// 640 by 100 bar; Fallout 2's optional leather side panels are switched
-    /// off in the app, so the bar is all that is left of the HUD.
+    /// The 640x100 bar both engines draw. Fallout 2's leather side panels are
+    /// switched off in the app, so the bar is all that is left of the HUD.
     private static let interfaceBarSize = CGSize(width: 640, height: 100)
 
     private func gameScreen(in size: CGSize) -> CGRect {
@@ -3106,10 +3002,8 @@ private struct TouchControlEditor: View {
         let scale = screen.width / max(CGFloat(model.width), 1)
         let barWidth = min(screen.width, TouchControlEditor.interfaceBarSize.width * scale)
 
-        // The bar is 100 game pixels tall at every resolution, so past the HALF
-        // default it becomes a thin sliver of a bigger game screen. The marker
-        // keeps the height it has at that default, which is the room the
-        // controls need to keep clear of the HUD however large the game is set.
+        // Past the HALF default the bar is a sliver of a bigger screen, so the
+        // marker keeps its HALF height: the room the controls need to clear.
         let half = LauncherModel.displayResolution(divisor: 3)
         let height = min(CGFloat(model.height), CGFloat(half.1))
         let barHeight = min(screen.height,
@@ -3135,8 +3029,7 @@ private struct TouchControlEditor: View {
         let controlSize = editorSize(for: control, in: size)
         let halfWidth = controlSize.width / 2
         let halfHeight = controlSize.height / 2
-        // The whole screen here too, so a control can still be dragged to the
-        // edge it belongs on.
+        // Clamped to the whole screen, so a control can be dragged to the edge.
         return CGPoint(
             x: min(max(point.x, halfWidth), size.width - halfWidth),
             y: min(max(point.y, halfHeight), size.height - halfHeight)
@@ -3152,9 +3045,8 @@ private struct TouchControlEditor: View {
                       height: controlSize.height)
     }
 
-    /// QUICK SAVE and the chevron share one plate in the game, with a divider
-    /// between them, so the editor draws the pair the same way rather than as
-    /// two buttons that are not what the player will see.
+    /// QUICK SAVE and the chevron share one plate in the game, so the editor
+    /// draws the pair the same way.
     private func saveAssembly(in size: CGSize) -> (frame: CGRect, dividerX: CGFloat) {
         let quick = frame(for: .quickSave, in: size)
         let tray = frame(for: .tray, in: size)
@@ -3282,8 +3174,8 @@ private struct TouchControlEditor: View {
         return "\(Int((scale * 100).rounded()))%"
     }
 
-    /// Drives the panel's size slider. With nothing selected it has nothing to
-    /// move, so the slider is disabled and this binding holds its thumb still.
+    /// Drives the size slider; with nothing selected the slider is disabled and
+    /// this holds its thumb still.
     private func scaleBinding(for control: TouchControl?) -> Binding<Double> {
         Binding(
             get: {
@@ -3355,13 +3247,10 @@ private struct TouchControlEditor: View {
 
 // MARK: - Launcher log
 
-/// A line-by-line record of what the launcher itself did: what the picker was
-/// opened for, what it handed back, whether that file could be read, and what
-/// each import was given. It lives beside the game data as
-/// `vaultos-launcher.log`, separate from the engine's `vaultos-log.txt` because
-/// the engine truncates its own file on every start.
-///
-/// Nothing here is for the player. It exists so that a picker which does
+/// What the launcher itself did: each picker, what it handed back and what each
+/// import was given. Kept in `vaultos-launcher.log` beside the game data,
+/// separate from the engine's `vaultos-log.txt`, which it truncates on every
+/// start. Nothing here is for the player: it exists so a picker that does
 /// nothing can be read instead of guessed at.
 enum LauncherLog {
     static func write(_ message: String) {
@@ -3392,12 +3281,9 @@ enum LauncherLog {
 
 /// The document picker, in copy mode.
 ///
-/// `UIDocumentPickerViewController(forOpeningContentTypes:asCopy: true)` copies
-/// the chosen archive into the app's own temporary directory before handing it
-/// over, so the import never depends on a security scope the app is allowed to
-/// open - the difference between working and doing nothing on a sideloaded
-/// install. SwiftUI's `fileImporter` has no copy mode on iOS 14, which is why
-/// this is UIKit.
+/// `asCopy: true` copies the chosen file into the app's own temporary directory
+/// first, so the import never depends on a security scope a sideloaded install
+/// may not open. `fileImporter` has no copy mode on iOS 14, hence UIKit.
 final class LauncherDocumentPicker: NSObject, UIDocumentPickerDelegate {
     static let shared = LauncherDocumentPicker()
 

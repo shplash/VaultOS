@@ -3,26 +3,17 @@
 
 // The contract between the launcher application and an engine.
 //
-// Fallout 1 CE and Fallout 2 CE are separate programs that share most of their
-// global symbol names (game_init, gnw_main, db_init, ...) and their global
-// state. They cannot be linked into one image: the second definition of every
-// such symbol wins or the link fails.
+// Fallout 1 CE and Fallout 2 CE share most global symbol names and their global
+// state, so they cannot be linked into one image: the second definition of a
+// symbol wins, or the link fails. The app therefore holds one engine image at a
+// time. Fallout 1 is linked into the executable and entered through
+// engine_fallout1.cc; Fallout 2 is built as Fallout2Engine.framework and
+// dlopen'ed through engine_fallout2.cc when the player picks it.
 //
-// The application therefore contains exactly one engine image at a time:
-//
-//   * Fallout 1 CE is linked into the launcher executable and always present.
-//     It is entered through engine_fallout1.cc.
-//   * Fallout 2 CE is built as Fallout2Engine.framework and loaded with dlopen
-//     only when the player picks Fallout 2. It is entered through
-//     engine_fallout2.cc.
-//
-// Each engine has its own copy of the globals in this ABI, so switching games
-// never shares mutable engine state. Only SDL is shared: the framework binds
-// its SDL calls to the instance already owned by the application, so a process
-// has one SDL event pump, one video subsystem and one set of UIKit classes.
-//
-// Everything the launcher needs from an engine goes through this small C ABI,
-// which keeps the launcher independent of either engine's headers.
+// Each engine gets its own copy of the globals in this ABI, so switching games
+// never shares mutable engine state. Only SDL is shared: the framework binds its
+// SDL calls to the instance the app already owns. Everything the launcher needs
+// from an engine goes through this small C ABI.
 
 #include <stdint.h>
 
@@ -42,16 +33,13 @@ typedef struct FalloutEngineHost {
     void (*menu_music_start)(void);
     void (*menu_music_stop)(void);
 
-    // Lets the touch overlay refresh what it offers - which controls are
-    // available, whether reload and attack mode exist, what the action button
-    // says. Called from the engine's own loop, on the main thread between
-    // frames, which is the only place it is safe: the overlay must never be
-    // asked to do this from a timer of its own interrupting the engine.
+    // Lets the overlay refresh what it offers: which controls are available,
+    // whether reload and attack mode exist, what the action button says. Called
+    // from the engine's own loop between frames, never from a timer.
     void (*refresh_controls)(void);
 
-    // Takes the iOS keyboard off the screen without touching what the game is
-    // doing, so a window whose own buttons the keyboard covers can still be
-    // closed. Called by the engine when Return is pressed.
+    // Takes the keyboard off the screen without touching the game, so a window
+    // whose buttons it covers can still be closed. Called when Return is pressed.
     void (*hide_keyboard)(void);
 
     // Minutes between the launcher's timed quick saves, 0 for off.
@@ -69,9 +57,9 @@ typedef struct FalloutEngineAPI {
     // Stores the host callbacks. Called once before run().
     void (*set_host)(const FalloutEngineHost* host);
 
-    // Sets the engine's install directory. The engine changes into this
-    // directory when it starts, so every relative path it uses (config files,
-    // SAVEGAME, data folder, master.dat) stays inside its own installation.
+    // Sets the install directory; the engine changes into it, so every relative
+    // path (config files, SAVEGAME, data, master.dat) stays inside its own
+    // installation.
     void (*set_install_dir)(const char* path);
 
     // Starts the engine. Blocks until the player exits the game.

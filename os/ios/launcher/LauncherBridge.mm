@@ -1,16 +1,14 @@
 // Launcher side of the dual-engine app.
 //
-// The application executable owns the launcher UI, the installation core, the
-// in-game overlay and the Fallout 1 engine. Fallout 2 lives in
-// Fallout2Engine.framework and is loaded with dlopen only when the player picks
-// Fallout 2, so the two codebases never become one image and never share engine
-// globals. Only one engine is started per process; switching games restarts the
-// application, which keeps a running engine from having to unwind itself.
+// The executable owns the launcher UI, the installation core, the in-game
+// overlay and the Fallout 1 engine. Fallout 2 lives in Fallout2Engine.framework
+// and is loaded with dlopen only when the player picks it, so the two codebases
+// never become one image and never share engine globals. Only one engine is
+// started per process: switching games restarts the application.
 //
 // The application's SDL is the only SDL in the process: the framework resolves
 // its SDL symbols from the executable (see CMakeLists.txt), so the launcher's
-// UIKit setup, event pump and video subsystem are reused by whichever engine
-// starts.
+// UIKit setup, event pump and video subsystem are reused by either engine.
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <Foundation/Foundation.h>
@@ -25,17 +23,16 @@
 #include "host/host.h"
 #include "launcher/launcher.h"
 
-// Set by the Swift launcher when the user taps Play. `SDL_main` checks it after
-// the launcher closes; keeping it false lets the app return without booting an
-// engine.
+// Set by the Swift launcher when Play is tapped. `SDL_main` checks it after the
+// launcher closes, so keeping it false lets the app return without booting.
 static bool g_should_launch_game = true;
 
 // The engine selected for this run. Null until Play is tapped.
 static const FalloutEngineAPI* g_engine = NULL;
 
-// The save the launcher picked, kept until the engine that opens it is loaded.
-// The request was made before any engine existed, so it was dropped and the
-// game started on its own with its intros and its menu.
+// The save the launcher picked, kept until the engine that opens it is loaded. A
+// request made before any engine existed is dropped, and the game then starts on
+// its own with its intros and menu.
 static int g_requested_slot;
 
 // MARK: - Launcher run loop
@@ -141,9 +138,8 @@ static NSString* documentsDirectory(void)
 }
 
 // Fallout 1 keeps the Documents folder it has always used, so existing
-// installations and saves stay where they are. Fallout 2 gets its own folder,
-// which gives it a separate working directory, configuration, install data and
-// SAVEGAME.
+// installations and saves stay put. Fallout 2 gets its own folder, which gives it
+// a separate working directory, configuration, install data and SAVEGAME.
 static NSString* installDirectoryForGame(NSString* identifier)
 {
     NSString* documents = documentsDirectory();
@@ -287,12 +283,11 @@ int fallout_ios_launch_selected_engine(int argc, char** argv)
     engine->set_host(&g_host);
     engine->set_install_dir([installDirectory fileSystemRepresentation]);
 
-    // Fallout 1 installs the overlay itself, from svga_init, once its window
-    // exists. Installing it before the engine starts attached UIKit views to
-    // SDL's window while SDL was still creating it, which is the sort of
-    // re-entrancy that ends in a crash whose log stops wherever it happened to
-    // be. Fallout 2 never calls back after creating its window, so it keeps
-    // being set up from here.
+    // Fallout 1 installs the overlay itself from svga_init, once its window
+    // exists. Installing it earlier attached UIKit views to SDL's window while
+    // SDL was still creating it, which is the re-entrancy that crashed with a
+    // log stopping wherever it happened to be. Fallout 2 never calls back after
+    // creating its window, so it is set up from here.
     if (![identifier isEqualToString:@"fallout1"]) {
         host_install_controls();
     }

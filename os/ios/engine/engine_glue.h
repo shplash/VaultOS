@@ -1,10 +1,9 @@
 #ifndef FALLOUT_IOS_ENGINE_GLUE_H_
 #define FALLOUT_IOS_ENGINE_GLUE_H_
 
-// Small helpers shared by the Fallout 1 and Fallout 2 engine adapters. The file
-// is compiled once for the engine in the application (Fallout 1) and once for
-// the engine in Fallout2Engine.framework (Fallout 2); each image gets its own
-// copy, so the two never share install paths or host callbacks.
+// Helpers shared by both engine adapters. Compiled once into the app's engine and
+// once into Fallout2Engine.framework, so each image has its own install path and
+// host callbacks.
 
 #include "fallout_engine.h"
 
@@ -23,14 +22,13 @@ void fallout_engine_menu_music_start();
 void fallout_engine_menu_music_stop();
 
 // Asks the host to refresh the touch controls, at most a few times a second.
-// The engine calls it from its own input loop, which is the only safe place:
-// the main thread, between frames, never from a timer interrupting the engine.
+// Called from the engine's own input loop: the main thread, between frames, never
+// from a timer.
 void fallout_engine_refresh_controls(void);
 
-// The same refresh without the rate limit. Used at the moment a movie ends:
-// the overlay has to drop the skip button before the engine blocks on the
-// loading screen that follows, and the last few frames of the movie have
-// already used up the limited call.
+// The same refresh without the rate limit, for the moment a movie ends: the skip
+// button has to go before the engine blocks on the loading screen, and the movie's
+// last frames have used up the limited call.
 void fallout_engine_refresh_controls_now(void);
 
 void fallout_engine_hide_keyboard(void);
