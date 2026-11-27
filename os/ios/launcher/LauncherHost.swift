@@ -1510,8 +1510,8 @@ final class GameControlsOverlay: UIView {
 
             let half = side / 2
             placeJoined(amountAssembly, amountDivider, at: CGRect(x: rightX, y: top, width: side, height: side))
-            amountAllButton.frame = CGRect(x: rightX, y: top, width: side, height: half)
-            amountDoneButton.frame = CGRect(x: rightX, y: top + half, width: side, height: half)
+            amountDoneButton.frame = CGRect(x: rightX, y: top, width: side, height: half)
+            amountAllButton.frame = CGRect(x: rightX, y: top + half, width: side, height: half)
 
             let stepY = top + side + gap
             placeJoined(stepAssembly, stepDivider, at: CGRect(x: rightX, y: stepY, width: side, height: side))
