@@ -155,28 +155,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build and run launcher tests
-        run: |
-          set -euo pipefail
-          mkdir -p build-tests
-          # The launcher core is portable C++ and needs no SDL or engine code,
-          # so it can be tested natively instead of through the iOS build.
-          c++ -std=c++17 -Wall -Wextra -I src \
-            tests/launcher_validation_test.cc \
-            src/launcher/launcher_core.cc \
-            -lz \
-            -o build-tests/launcher-tests
-          ./build-tests/launcher-tests
-
-      - name: Build and run subtitle row tests
-        run: |
-          set -euo pipefail
-          mkdir -p build-tests
-          # Where the subtitle row is drawn is plain arithmetic, so every size
-          # the launcher can hand the games is checked here instead of on a
-          # device with what it takes to play the intro.
-          c++ -std=c++17 -Wall -Wextra -I src \
-            tests/movie_subtitle_test.cc \
-            -o build-tests/movie-subtitle-tests
-          ./build-tests/movie-subtitle-tests
+      - name: Build and run host tests
+        # The same script the release workflow runs, so the two cannot drift into
+        # a release that ships without the tests this build passes.
+        run: bash .github/scripts/run-tests.sh
 

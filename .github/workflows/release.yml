@@ -16,8 +16,25 @@ permissions:
   contents: write
 
 jobs:
+  # The host tests the CI build runs. A release is a build like any other: what
+  # ships has to be what those tests passed, and the release must not be the one
+  # binary that was never checked.
+  tests:
+    name: Host tests
+
+    runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15-intel' }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Build and run host tests
+        run: bash .github/scripts/run-tests.sh
+
   ios:
     name: iOS
+    needs: tests
 
     runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15-intel' }}
 
@@ -35,13 +52,24 @@ jobs:
           fi
           xcodebuild -version
 
-      - name: Cache cmake build
-        uses: actions/cache@v4
+      - name: Restore CMake build tree
+        id: build-cache
+        uses: actions/cache/restore@v4
         with:
+          # Keyed the way the CI build keys its tree. The old fixed key restored
+          # whatever had been saved first, so every later release built on top of
+          # a tree from a different commit - and configured for it.
           path: build
-          key: vaultos-ios-cmake-release-v1
+          key: ios-cmake-release-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'third_party/**') }}
+          restore-keys: |
+            ios-cmake-release-${{ runner.os }}-
 
       - name: Configure
+        env:
+          # Through the environment rather than written into the command: a tag
+          # is free text, and one holding a quote or a backtick would otherwise
+          # be run as shell.
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
           cmake \
@@ -55,10 +83,17 @@ jobs:
             -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -D VAULTOS_BUILD_SHA=${{ github.sha }} \
             -D VAULTOS_BUILD=${{ github.run_number }} \
-            -D VAULTOS_VERSION=${{ github.event.release.tag_name }} \
+            -D VAULTOS_VERSION="$RELEASE_TAG" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
             -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+
+      - name: Save configured build tree
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: ios-cmake-release-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'third_party/**') }}
 
       - name: Build
         run: cmake --build build --config RelWithDebInfo --parallel 3
@@ -77,10 +112,11 @@ jobs:
         run: bash .github/scripts/verify-ipa.sh build/vaultos.ipa
 
       - name: Upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
           cp build/vaultos.ipa VaultOS.ipa
-          gh release upload "${{ github.event.release.tag_name }}" VaultOS.ipa
+          gh release upload "$RELEASE_TAG" VaultOS.ipa
           rm VaultOS.ipa
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
