@@ -131,6 +131,21 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
 // ignored; the caller is expected to have warned about the replacement.
 int launcher_import_saves(const char* zip_path, const char* install_dir);
 
+// The size every log the app leaves for the player is kept within: once one
+// grows past the limit it is cut back to the last KEEP bytes.
+enum {
+    LAUNCHER_LOG_LIMIT_BYTES = 128 * 1024,
+    LAUNCHER_LOG_KEEP_BYTES = 32 * 1024,
+};
+
+// Keeps a log the app leaves for the player to read from growing without limit.
+// A failure that repeats writes a line every time it is tried, and the file sits
+// in Documents where the player browses their own game files. Past `limit` bytes
+// it is cut back to its newest `keep` bytes, from the start of a line, so what is
+// left is whole entries and they are the most recent ones. A file that is
+// missing, unreadable or already short enough is left alone.
+void launcher_trim_log(const char* path, int32_t limit, int32_t keep);
+
 // iOS game controls (implemented in Swift, input helpers in Objective-C++).
 void fallout_ios_install_game_controls(void);
 void fallout_ios_camera_pan(double x, double y);

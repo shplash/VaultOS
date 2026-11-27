@@ -45,6 +45,7 @@
 #include "game/version.h"
 #include "game/wordwrap.h"
 #include "game/worldmap.h"
+#include "launcher/launcher.h"
 #include "platform_compat.h"
 #include "platform/ios/paths.h"
 #include "plib/color/color.h"
@@ -440,6 +441,10 @@ static void saves_log(const char* format, ...)
 {
     char path[COMPAT_MAX_PATH];
     snprintf(path, sizeof(path), "%svaultos-saves.log", iOSGetDocumentsPath());
+
+    // Bounded before anything is added: this note is written on every failure,
+    // and it sits in the folder the player browses their saves in.
+    launcher_trim_log(path, LAUNCHER_LOG_LIMIT_BYTES, LAUNCHER_LOG_KEEP_BYTES);
 
     FILE* fp = fopen(path, "at");
     if (fp == NULL) {

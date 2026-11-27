@@ -10,6 +10,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <mutex>
 #include <string>
@@ -1624,6 +1625,61 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     g_progress_done.store(g_progress_total.load());
     set_status("Saves restored.");
     return LAUNCHER_OK;
+}
+
+// A repeated failure writes a line every time it is tried, so a note left beside
+// the game for the player to read has to be bounded somewhere. It is bounded
+// here rather than in each writer, so both engines keep the same limit.
+void launcher_trim_log(const char* path, int32_t limit, int32_t keep)
+{
+    if (path == NULL || path[0] == '\0' || limit <= 0 || keep <= 0 || keep >= limit) {
+        return;
+    }
+
+    std::error_code ec;
+    const fs::path target(path);
+    const uintmax_t size = fs::file_size(target, ec);
+    if (ec || size <= static_cast<uintmax_t>(limit)) {
+        return;
+    }
+
+    std::ifstream input(target, std::ios::binary);
+    if (!input) {
+        return;
+    }
+
+    input.seekg(static_cast<std::streamoff>(size - static_cast<uintmax_t>(keep)));
+    std::string tail((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    input.close();
+
+    // From the start of a line, so the note still reads as whole entries.
+    const size_t newline = tail.find('\n');
+    if (newline != std::string::npos && newline + 1 < tail.size()) {
+        tail.erase(0, newline + 1);
+    }
+
+    // Written beside the log and renamed over it. The engine trims a note because
+    // something has just gone wrong, which is the worst moment to empty the file
+    // it is about to write to.
+    const fs::path temporary = target.string() + ".trim";
+    {
+        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            return;
+        }
+
+        output.write(tail.data(), static_cast<std::streamsize>(tail.size()));
+        if (!output) {
+            output.close();
+            fs::remove(temporary, ec);
+            return;
+        }
+    }
+
+    fs::rename(temporary, target, ec);
+    if (ec) {
+        fs::remove(temporary, ec);
+    }
 }
 
 int launcher_write_options(const char* install_dir, const LauncherOptions* options)

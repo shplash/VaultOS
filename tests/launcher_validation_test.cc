@@ -94,6 +94,46 @@ static void check_translation_tables()
     }
 }
 
+// A note the engines leave beside the game for the player to read is capped, and
+// what is left of it is the newest whole lines. Without the cap a failure that
+// repeats writes this file on every attempt, forever.
+static void check_log_trim(const fs::path& root)
+{
+    const fs::path log = root / "vaultos-saves.log";
+
+    const int lines = 20000;
+    std::string contents;
+    for (int index = 0; index < lines; index++) {
+        contents += "line " + std::to_string(index) + "\n";
+    }
+
+    write_file(log, contents);
+    CHECK(fs::file_size(log) > static_cast<std::uintmax_t>(LAUNCHER_LOG_LIMIT_BYTES));
+
+    launcher_trim_log(log.string().c_str(), LAUNCHER_LOG_LIMIT_BYTES, LAUNCHER_LOG_KEEP_BYTES);
+    CHECK(fs::file_size(log) <= static_cast<std::uintmax_t>(LAUNCHER_LOG_KEEP_BYTES));
+    // The newest entry is kept, the oldest is gone, and the cut fell on a line
+    // boundary rather than in the middle of one.
+    CHECK(file_contains(log, "line " + std::to_string(lines - 1) + "\n"));
+    CHECK(!file_contains(log, "line 0\n"));
+
+    std::ifstream stream(log.string(), std::ios::binary);
+    std::string first;
+    std::getline(stream, first);
+    CHECK(first.rfind("line ", 0) == 0);
+    stream.close();
+
+    // A note that is already short enough, and one that was never written, are
+    // both left alone.
+    write_file(log, "short\n");
+    launcher_trim_log(log.string().c_str(), LAUNCHER_LOG_LIMIT_BYTES, LAUNCHER_LOG_KEEP_BYTES);
+    CHECK(file_contains(log, "short"));
+
+    const fs::path missing = root / "never-written.log";
+    launcher_trim_log(missing.string().c_str(), LAUNCHER_LOG_LIMIT_BYTES, LAUNCHER_LOG_KEEP_BYTES);
+    CHECK(!fs::exists(missing));
+}
+
 static void scan(const fs::path& directory, int game, LauncherInstallInfo* info)
 {
     launcher_scan(directory.string().c_str(), game, info);
@@ -227,6 +267,8 @@ int main()
     std::error_code ec;
     fs::remove_all(root, ec);
     fs::create_directories(root, ec);
+
+    check_log_trim(root);
 
     // A Fallout 1 installation: master.dat, critter.dat and data, no patch.
     const fs::path fallout1 = root / "Fallout";

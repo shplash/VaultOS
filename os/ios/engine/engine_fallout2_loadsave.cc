@@ -66,7 +66,8 @@
 #include "word_wrap.h"
 
 // The launcher's saves live beside the game's own files, so the notes they
-// leave are written there.
+// leave are written there, cut back to the size the launcher keeps them within.
+#include "launcher/launcher.h"
 #include "platform/ios/paths.h"
 #include "worldmap.h"
 
@@ -935,6 +936,10 @@ static void saves_log(const char* format, ...)
 {
     char path[COMPAT_MAX_PATH];
     snprintf(path, sizeof(path), "%svaultos-saves.log", iOSGetDocumentsPath());
+
+    // Bounded before anything is added: this note is written on every failure,
+    // and it sits in the folder the player browses their saves in.
+    launcher_trim_log(path, LAUNCHER_LOG_LIMIT_BYTES, LAUNCHER_LOG_KEEP_BYTES);
 
     FILE* fp = fopen(path, "at");
     if (fp == nullptr) {
