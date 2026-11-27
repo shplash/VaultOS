@@ -120,8 +120,9 @@ int64_t launcher_language_pack_largest(void);
 
 // Zips the installation's SAVEGAME folder into a new archive in the game's
 // Backups folder and writes its full path into `out_path`, NUL terminated.
-// `game` is one of LAUNCHER_GAME_* and only names the archive
-// (fo1-/fo2-save-backup-...). An older backup is never replaced. Returns
+// `game` is one of LAUNCHER_GAME_* and names the backup
+// (d(day)-m(month)-(time)-fo(1/2)-bkup-(year)-#(number).zip). A backup that
+// is already there is never replaced: a new one takes the next number. Returns
 // LAUNCHER_ERROR when there is nothing to back up or the file cannot be
 // written.
 int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path, int32_t out_size);

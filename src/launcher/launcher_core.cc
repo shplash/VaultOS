@@ -1340,7 +1340,9 @@ static void write_u32(std::string& out, uint32_t value)
     out.push_back(static_cast<char>((value >> 24) & 0xff));
 }
 
-static std::string backup_stamp()
+// d(day)-m(month)-(time)-fo(1/2)-bkup-(year)-#(number): the newest backup
+// sorts by name, and no two backups ever share one.
+static std::string backup_name(int game, int number)
 {
     const std::time_t now = std::time(nullptr);
     std::tm parts = {};
@@ -1350,11 +1352,48 @@ static std::string backup_stamp()
     localtime_r(&now, &parts);
 #endif
 
-    char stamp[32];
-    if (std::strftime(stamp, sizeof(stamp), "%Y-%m-%d-%H%M", &parts) == 0) {
+    char name[64];
+    if (std::snprintf(name, sizeof(name), "d%02d-m%02d-%02d%02d-%s-bkup-%04d-#%d",
+            parts.tm_mday,
+            parts.tm_mon + 1,
+            parts.tm_hour,
+            parts.tm_min,
+            game == LAUNCHER_GAME_FALLOUT2 ? "fo2" : "fo1",
+            parts.tm_year + 1900,
+            number) <= 0) {
         return "saves";
     }
-    return stamp;
+    return name;
+}
+
+// One past the highest number in the folder, so a backup that is already there
+// is never replaced by a new one.
+static int next_backup_number(const fs::path& folder)
+{
+    int highest = 0;
+
+    std::error_code ec;
+    for (fs::directory_iterator it(folder, ec), end; it != end; it.increment(ec)) {
+        if (ec) {
+            break;
+        }
+
+        const std::string name = it->path().filename().string();
+        const size_t marker = name.rfind("-#");
+        if (marker == std::string::npos) {
+            continue;
+        }
+
+        int number = 0;
+        for (size_t index = marker + 2; index < name.size() && name[index] >= '0' && name[index] <= '9'; index++) {
+            number = number * 10 + (name[index] - '0');
+        }
+        if (number > highest) {
+            highest = number;
+        }
+    }
+
+    return highest + 1;
 }
 
 // Every file under a SAVEGAME folder, as a path relative to that folder.
@@ -1518,14 +1557,7 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
         return LAUNCHER_ERROR;
     }
 
-    const std::string base = std::string(game == LAUNCHER_GAME_FALLOUT2 ? "fo2-save-backup-" : "fo1-save-backup-")
-        + backup_stamp();
-    fs::path target = backups / (base + ".zip");
-    std::error_code exists_ec;
-    for (int suffix = 2; fs::exists(target, exists_ec) && suffix < 1000; suffix++) {
-        exists_ec.clear();
-        target = backups / (base + "-" + std::to_string(suffix) + ".zip");
-    }
+    const fs::path target = backups / (backup_name(game, next_backup_number(backups)) + ".zip");
 
     FILE* file = std::fopen(target.string().c_str(), "wb");
     if (file == NULL) {

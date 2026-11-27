@@ -2039,7 +2039,7 @@ struct LauncherView: View {
                     .foregroundColor(Theme.dim)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(L.t("Back up first: Home > Saved games > BACK UP, and IMPORT brings a backup back."))
+                Text(L.t("Back up first: SYSTEM > Saved games > BACK UP, and IMPORT restores your backup."))
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(Theme.faint)
                     .fixedSize(horizontal: false, vertical: true)
