@@ -240,6 +240,10 @@ int screen()
 
     const int mode = fallout::GameMode::getCurrentGameMode();
 
+    // The menu, which is also what the death scene reports: showDeath runs from
+    // main.cc after the map is unloaded, so there is no game view left by then.
+    // That is what covers the death scene here - with no game loaded, the
+    // launcher takes its controls away as it does for the menu.
     if (mode == 0 && !in_game()) {
         return 16;
     }
@@ -648,9 +652,14 @@ int quick_save_serial()
 
 int auto_save_ready()
 {
+    // The venue has to be one the player could save in themselves: the game
+    // view, nothing playing over it, no combat, and a bar a script has not
+    // locked - which is what a cutscene does while it runs. Fallout 1 asks the
+    // same questions of intface_is_enabled.
     return in_game() != 0
             && screen() == 0
             && !fallout::isInCombat()
+            && fallout::interfaceBarEnabled()
         ? 1
         : 0;
 }

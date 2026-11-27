@@ -459,6 +459,10 @@ static void mouseIosMovePointer(int x, int y)
 static void iosListReset();
 
 #define IOS_LIST_HOLD_MS 280
+// The barter table is the one list the player reads while scrolling it, so a
+// finger on a row waits longer there before the row is taken. Fallout 1 holds
+// its own barter rows for the same 560 ms, so the two games feel alike.
+#define IOS_LIST_HOLD_BARTER_MS 560
 #define IOS_LIST_SLOP_POINTS 6
 // A finger that has travelled further than this is scrolling the list, however
 // slowly it goes. How far it has ended up from where it landed is not enough
@@ -468,6 +472,50 @@ static void iosListReset();
 #define IOS_LIST_STILL_POINTS 4
 #define IOS_LIST_SLOT_WIDTH 64
 #define IOS_LIST_SLOT_HEIGHT 48
+
+// The item grids Fallout 2 draws in its inventory, loot and barter windows, as
+// offsets from the corner of the window that holds them, plus where the game
+// puts those windows on a screen that is not the original 640x480.
+//
+// Fallout 2 gives no way to ask where a slot is - its layout lives in
+// inventory.cc as private defines and struct fields - so the numbers are
+// mirrored here under the names they have there: INVENTORY_WINDOW_WIDTH,
+// INVENTORY_LOOT_*, INVENTORY_SCROLLER_*, INVENTORY_TRADE_* and
+// INVENTORY_SLOT_*. A newer pin that moves a slot changes inventory.cc, and this
+// list is what to compare it against.
+#define IOS_ORIGINAL_SCREEN_WIDTH 640
+#define IOS_ORIGINAL_SCREEN_HEIGHT 480
+#define IOS_INVENTORY_WINDOW_WIDTH 499
+#define IOS_INVENTORY_WINDOW_HEIGHT 377
+#define IOS_INVENTORY_WINDOW_X 80
+#define IOS_INVENTORY_WINDOW_Y 0
+#define IOS_LOOT_WINDOW_WIDTH 537
+#define IOS_LOOT_WINDOW_HEIGHT 376
+#define IOS_INVENTORY_SCROLLER_X 46
+#define IOS_INVENTORY_SCROLLER_Y 35
+#define IOS_LOOT_LEFT_SCROLLER_X 180
+#define IOS_LOOT_LEFT_SCROLLER_Y 37
+#define IOS_LOOT_RIGHT_SCROLLER_X 297
+#define IOS_LOOT_RIGHT_SCROLLER_Y 37
+// The barter table is drawn inside the dialogue's background, which is the size
+// of the original screen, so its own corner is offset from the middle of that.
+#define IOS_TRADE_BACKGROUND_WIDTH IOS_ORIGINAL_SCREEN_WIDTH
+#define IOS_TRADE_BACKGROUND_HEIGHT IOS_ORIGINAL_SCREEN_HEIGHT
+#define IOS_TRADE_WINDOW_X 80
+#define IOS_TRADE_WINDOW_Y 290
+#define IOS_TRADE_SCROLLER_TRACKING_Y 10
+#define IOS_TRADE_LEFT_SCROLLER_X 29
+#define IOS_TRADE_INNER_LEFT_SCROLLER_X 165
+#define IOS_TRADE_INNER_RIGHT_SCROLLER_X 250
+#define IOS_TRADE_RIGHT_SCROLLER_X 388
+// What a wheel is aimed at while a barter table scrolls: the pointer stands on
+// the scroller itself, which is the one the game's own wheel handling reads.
+#define IOS_TRADE_LEFT_WHEEL_X 32
+#define IOS_TRADE_RIGHT_WHEEL_X 427
+// gInventorySlotsCount: six rows in the inventory and a loot window, three in
+// the barter table.
+#define IOS_INVENTORY_LIST_ROWS 6
+#define IOS_TRADE_LIST_ROWS 3
 
 extern int iosScreenValue();
 extern "C" void fallout_ios_pickup_feedback(void);
@@ -524,28 +572,38 @@ static bool iosListPoint(int x, int y, int* slotHeight)
     const int screenHeight = screenGetHeight();
 
     if (current == 3) {
-        const int left = (screenWidth - 640) / 2 + 80;
-        const int top = (screenHeight - 480) / 2 + 290;
+        const int left = (screenWidth - IOS_TRADE_BACKGROUND_WIDTH) / 2 + IOS_TRADE_WINDOW_X;
+        const int top = (screenHeight - IOS_TRADE_BACKGROUND_HEIGHT) / 2 + IOS_TRADE_WINDOW_Y;
 
-        return iosListHit(x, y, left + 29, top + 10, 3, left + 32, slotHeight)
-            || iosListHit(x, y, left + 165, top + 10, 3, -1, slotHeight)
-            || iosListHit(x, y, left + 250, top + 10, 3, -1, slotHeight)
-            || iosListHit(x, y, left + 388, top + 10, 3, left + 427, slotHeight);
+        return iosListHit(x, y, left + IOS_TRADE_LEFT_SCROLLER_X, top + IOS_TRADE_SCROLLER_TRACKING_Y, IOS_TRADE_LIST_ROWS, left + IOS_TRADE_LEFT_WHEEL_X, slotHeight)
+            || iosListHit(x, y, left + IOS_TRADE_INNER_LEFT_SCROLLER_X, top + IOS_TRADE_SCROLLER_TRACKING_Y, IOS_TRADE_LIST_ROWS, -1, slotHeight)
+            || iosListHit(x, y, left + IOS_TRADE_INNER_RIGHT_SCROLLER_X, top + IOS_TRADE_SCROLLER_TRACKING_Y, IOS_TRADE_LIST_ROWS, -1, slotHeight)
+            || iosListHit(x, y, left + IOS_TRADE_RIGHT_SCROLLER_X, top + IOS_TRADE_SCROLLER_TRACKING_Y, IOS_TRADE_LIST_ROWS, left + IOS_TRADE_RIGHT_WHEEL_X, slotHeight);
     }
 
     if (current == 2) {
-        const int left = screenWidth != 640 ? (screenWidth - 537) / 2 : 80;
-        const int top = screenHeight != 480 ? (screenHeight - 376) / 2 : 0;
+        // Loot keeps the game's own corner at the original resolution and is
+        // centred on anything else.
+        const int left = screenWidth != IOS_ORIGINAL_SCREEN_WIDTH
+            ? (screenWidth - IOS_LOOT_WINDOW_WIDTH) / 2
+            : IOS_INVENTORY_WINDOW_X;
+        const int top = screenHeight != IOS_ORIGINAL_SCREEN_HEIGHT
+            ? (screenHeight - IOS_LOOT_WINDOW_HEIGHT) / 2
+            : IOS_INVENTORY_WINDOW_Y;
 
-        return iosListHit(x, y, left + 180, top + 37, 6, -1, slotHeight)
-            || iosListHit(x, y, left + 297, top + 37, 6, -1, slotHeight);
+        return iosListHit(x, y, left + IOS_LOOT_LEFT_SCROLLER_X, top + IOS_LOOT_LEFT_SCROLLER_Y, IOS_INVENTORY_LIST_ROWS, -1, slotHeight)
+            || iosListHit(x, y, left + IOS_LOOT_RIGHT_SCROLLER_X, top + IOS_LOOT_RIGHT_SCROLLER_Y, IOS_INVENTORY_LIST_ROWS, -1, slotHeight);
     }
 
     if (current == 1) {
-        const int left = screenWidth != 640 ? (screenWidth - 499) / 2 : 80;
-        const int top = screenHeight != 480 ? (screenHeight - 377) / 2 : 0;
+        const int left = screenWidth != IOS_ORIGINAL_SCREEN_WIDTH
+            ? (screenWidth - IOS_INVENTORY_WINDOW_WIDTH) / 2
+            : IOS_INVENTORY_WINDOW_X;
+        const int top = screenHeight != IOS_ORIGINAL_SCREEN_HEIGHT
+            ? (screenHeight - IOS_INVENTORY_WINDOW_HEIGHT) / 2
+            : IOS_INVENTORY_WINDOW_Y;
 
-        return iosListHit(x, y, left + 46, top + 35, 6, -1, slotHeight);
+        return iosListHit(x, y, left + IOS_INVENTORY_SCROLLER_X, top + IOS_INVENTORY_SCROLLER_Y, IOS_INVENTORY_LIST_ROWS, -1, slotHeight);
     }
 
     int left = 0;
@@ -813,7 +871,10 @@ void _mouse_info()
 
                     iosListLastY = gesture.y;
 
-                    if (now - iosListStartMs >= IOS_LIST_HOLD_MS) {
+                    const unsigned int hold = iosListScreen == 3
+                        ? IOS_LIST_HOLD_BARTER_MS
+                        : IOS_LIST_HOLD_MS;
+                    if (now - iosListStartMs >= hold) {
                         iosListPending = false;
                         fallout_ios_pickup_feedback();
                         iosDragBegin(iosInspect, false);
