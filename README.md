@@ -51,13 +51,16 @@ itself, or one folder around it (`Fallout/`, `Fallout2/`).
 
 Each game keeps its own files and saves: `Documents/` for Fallout,
 `Documents/Fallout2/` for Fallout 2, both show up in the Files app. Saves live in
-`data/SAVEGAME` inside that folder, one `SLOT01`, `SLOT02`… per save.
+`data/SAVEGAME` inside that folder, one `SLOT01`, `SLOT02`… per save. Backups go
+to `Backups/` in that same folder, `fo1-save-backup-(date).zip` for Fallout and
+`fo2-save-backup-(date).zip` for Fallout 2, one file per backup: an older one is
+never replaced.
 
 ## In the launcher
 
 - **LANGUAGE FILES** adds a translation pack you supply
-- **BACK UP** writes `fo(1/2)-save-backup-(date).zip` into the game's folder.
-  **IMPORT** replaces the saves
+- **BACK UP** writes `Backups/fo(1/2)-save-backup-(date).zip` into the game's
+  folder. **IMPORT** replaces the saves
 
 ## Notes
 

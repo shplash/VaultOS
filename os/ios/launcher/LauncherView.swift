@@ -27,6 +27,8 @@ struct LauncherView: View {
     @State private var pagingDrag = false
     @State private var showSaveImportWarning = false
     @State private var saveImportCountdown = 0
+    @State private var showNewGameWarning = false
+    @State private var newGameCountdown = 0
     /// How many dots follow INSTALLING while an import is going.
     @State private var installingDots = 0
     @State private var showResetAllWarning = false
@@ -90,6 +92,9 @@ struct LauncherView: View {
             Group {
                 if showSaveImportWarning {
                     saveImportWarning
+                }
+                if showNewGameWarning {
+                    newGameWarning
                 }
                 if showResetAllWarning {
                     resetAllWarning
@@ -173,12 +178,14 @@ struct LauncherView: View {
                 installingDots = 0
             }
 
-            // Only the countdown needs a tick; without this the launcher redrew
-            // every second.
-            guard showSaveImportWarning && saveImportCountdown > 0 else {
-                return
+            // Only the countdowns need a tick; without this the launcher
+            // redrew every second.
+            if showSaveImportWarning && saveImportCountdown > 0 {
+                saveImportCountdown -= 1
             }
-            saveImportCountdown -= 1
+            if showNewGameWarning && newGameCountdown > 0 {
+                newGameCountdown -= 1
+            }
         }
         .onChange(of: model.showImporter) { shown in
             guard shown else {
@@ -611,15 +618,17 @@ struct LauncherView: View {
         let detailKerning: CGFloat = 1.4
 
         return Button {
-            LauncherMusic.shared.stop()
-
             // An empty slot starts the game rather than loading a save that is
             // not there.
             if selectedSlot == nil || selectedSave != nil,
                let save = selectedSave ?? model.saves.first {
+                LauncherMusic.shared.stop()
                 model.play(onPlay: onPlay, loadSlot: save.slot)
             } else {
-                model.play(onPlay: onPlay)
+                // A new game shares this game's slots rather than making its
+                // own, so it asks first, with the music still playing.
+                newGameCountdown = 5
+                showNewGameWarning = true
             }
         } label: {
             VStack(spacing: 3) {
@@ -2003,6 +2012,57 @@ struct LauncherView: View {
                     }
                     .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
                     .disabled(saveImportCountdown > 0)
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 440)
+            .warningPlate()
+            .padding(24)
+        }
+    }
+
+    /// A new game keeps the same slots, so it asks before it starts: its first
+    /// save would otherwise take a slot that holds a game already.
+    private var newGameWarning: some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(L.t("Start a new game?").uppercased())
+                    .font(Vault.display(20))
+                    .kerning(0.8)
+                    .foregroundColor(Theme.text)
+
+                Text(L.t("A new game is not a separate save: it shares this game's slots, so a quick save can replace one that is already there."))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(L.t("Back up first: Home > Saved games > BACK UP, and IMPORT brings a backup back."))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Theme.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+
+                    Button(L.t("CANCEL")) {
+                        showNewGameWarning = false
+                        newGameCountdown = 0
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
+
+                    Button(newGameCountdown > 0
+                        ? "\(L.t("PLAY")) \(newGameCountdown)"
+                        : L.t("PLAY")) {
+                        showNewGameWarning = false
+                        newGameCountdown = 0
+                        LauncherMusic.shared.stop()
+                        model.play(onPlay: onPlay)
+                    }
+                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
+                    .disabled(newGameCountdown > 0)
                 }
             }
             .padding(22)

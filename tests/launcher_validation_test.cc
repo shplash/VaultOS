@@ -459,7 +459,15 @@ int main()
                   static_cast<int32_t>(sizeof(backup))) == LAUNCHER_OK);
         CHECK(backup[0] != '\0');
         CHECK(fs::path(backup).filename().string().find("fo1-save-backup-") == 0);
+        CHECK(fs::path(backup).parent_path().filename().string() == "Backups");
         CHECK(fs::exists(fs::path(backup)));
+
+        // A second backup lands beside the first rather than over it.
+        char second[1024] = { 0 };
+        CHECK(launcher_backup_saves(fallout1.string().c_str(), LAUNCHER_GAME_FALLOUT1, second,
+                  static_cast<int32_t>(sizeof(second))) == LAUNCHER_OK);
+        CHECK(std::string(second) != std::string(backup));
+        CHECK(fs::exists(fs::path(second)));
 
         // The newer saves are replaced by the ones in the backup, so a slot that
         // is not in it must be gone afterwards.

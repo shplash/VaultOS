@@ -1507,9 +1507,26 @@ int launcher_backup_saves(const char* install_dir, int32_t game, char* out_path,
     write_u32(archive, directory_offset);
     write_u16(archive, 0);          // comment length
 
-    const fs::path target = root
-        / (std::string(game == LAUNCHER_GAME_FALLOUT2 ? "fo2-save-backup-" : "fo1-save-backup-")
-            + backup_stamp() + ".zip");
+    // A folder of its own, so the game folder keeps only the game, and a
+    // backup is never replaced: a second one inside the same minute takes the
+    // next free name.
+    const fs::path backups = root / "Backups";
+    std::error_code folder_ec;
+    fs::create_directories(backups, folder_ec);
+    if (folder_ec) {
+        fail("Cannot create " + backups.string() + ".");
+        return LAUNCHER_ERROR;
+    }
+
+    const std::string base = std::string(game == LAUNCHER_GAME_FALLOUT2 ? "fo2-save-backup-" : "fo1-save-backup-")
+        + backup_stamp();
+    fs::path target = backups / (base + ".zip");
+    std::error_code exists_ec;
+    for (int suffix = 2; fs::exists(target, exists_ec) && suffix < 1000; suffix++) {
+        exists_ec.clear();
+        target = backups / (base + "-" + std::to_string(suffix) + ".zip");
+    }
+
     FILE* file = std::fopen(target.string().c_str(), "wb");
     if (file == NULL) {
         fail("Cannot write " + target.string() + ". The device may be out of storage.");
