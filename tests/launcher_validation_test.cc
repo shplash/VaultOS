@@ -1,11 +1,10 @@
-// Host-side tests for the launcher's game-specific installation validation and
-// the separation of the two installations.
+// Host-side tests for the launcher's installation validation and the separation
+// of the two installations.
 //
-// These do not need iOS, SDL or either engine: the launcher core is plain C++
-// and can be compiled with the system compiler, which is what CI does. They
-// cover what a build cannot: that Fallout 1 and Fallout 2 layouts are validated
-// differently, that the configuration goes to the right files, and that
-// savegames are never touched.
+// No iOS, SDL or engine code is needed: the launcher core is plain C++ and CI
+// compiles it with the system compiler. These cover what a build cannot: that the
+// two games' layouts are validated differently, that settings go to the right
+// files, and that savegames are never touched.
 
 #include <algorithm>
 #include <cstdint>
@@ -94,9 +93,9 @@ static void check_translation_tables()
     }
 }
 
-// A note the engines leave beside the game for the player to read is capped, and
-// what is left of it is the newest whole lines. Without the cap a failure that
-// repeats writes this file on every attempt, forever.
+// The note the engines leave beside the game is capped, and what is left of it is
+// the newest whole lines: without the cap a repeating failure writes the file on
+// every attempt.
 static void check_log_trim(const fs::path& root)
 {
     const fs::path log = root / "vaultos-saves.log";
@@ -361,10 +360,8 @@ int main()
         CHECK(!fs::exists(fallout2 / "fallout.cfg"));
     }
 
-    // An archive that is not one of the games is refused before anything is
-    // extracted. This is the path a stray archive takes when it is picked
-    // alongside the game's own ZIP: the installation and the savegames stay as
-    // they were, so no game file the engine reads can be replaced by it.
+    // An archive that is neither game is refused before anything is extracted:
+    // the installation and the savegames stay as they were.
     {
         const fs::path junk = root / "holiday photos.zip";
         write_zip(junk, { { "readme.txt", "these are not game files" } });
@@ -382,8 +379,7 @@ int main()
     }
 
     // A Fallout 2 archive offered to Fallout 1 is refused too, so its
-    // patch000.dat can never land in a Fallout 1 folder, and the files already
-    // installed are left alone.
+    // patch000.dat can never land in a Fallout 1 folder.
     {
         const fs::path fallout2Zip = root / "Fallout2 install.zip";
         write_zip(fallout2Zip, {

@@ -416,17 +416,15 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
 
 if(IOS)
     # Fallout 2 CE is built as Fallout2Engine.framework and loaded with dlopen
-    # only when the player selects Fallout 2. Both engines define thousands of
-    # identical C++ symbols (namespace fallout, global state, SDL entry points),
-    # so a single executable cannot contain both. A framework gives the second
-    # engine its own image, its own globals and its own shutdown path, while
-    # still shipping inside this one application.
+    # only when the player selects it. Both engines define thousands of identical
+    # C++ symbols (namespace fallout, global state, SDL entry points), so one
+    # executable cannot hold both: the framework gives the second engine its own
+    # image, globals and shutdown path, still inside this application.
     #
-    # SDL is deliberately NOT duplicated: the launcher executable already owns
-    # the one SDL instance and the UIKit classes it installs. Exporting the
-    # executable's symbols (and force-loading all of SDL so none of it is
-    # dropped by the linker) lets the framework bind to that same SDL, so only
-    # one event pump and one set of SDL globals exist in the process.
+    # SDL is deliberately NOT duplicated: the executable owns the one SDL instance
+    # and the UIKit classes it installs. Exporting the executable's symbols (and
+    # force-loading all of SDL so none of it is dropped by the linker) lets the
+    # framework bind to that same SDL, so the process has one event pump.
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES ENABLE_EXPORTS TRUE)
     target_link_options(${EXECUTABLE_NAME} PRIVATE
         "-Wl,-export_dynamic"
@@ -460,12 +458,12 @@ if(IOS)
         message(FATAL_ERROR "Fallout 2 CE sources are missing from ${fallout2_ce_SOURCE_DIR}.")
     endif()
 
-    # Upstream's own CMakeLists builds a second application bundle with its own
-    # copies of SDL, zlib and fpattern. Only its engine sources are wanted here,
-    # so every translation unit under src/ is compiled. win32.cc is excluded
-    # because it owns the standalone entry point and gProgramIsActive, both
-    # provided by the adapter; platform/ios/paths.mm is a .mm file and is
-    # provided by engine_paths.cc.
+    # Only upstream's engine sources are wanted: its CMakeLists would build a
+    # second application bundle with its own copies of SDL, zlib and fpattern.
+    # Every translation unit under src/ is compiled except win32.cc, which owns
+    # the standalone entry point and gProgramIsActive (the adapter provides
+    # both), and platform/ios/paths.mm (a .mm file, provided by
+    # engine_paths.cc).
     file(GLOB FALLOUT2_CE_SOURCES CONFIGURE_DEPENDS
         "${fallout2_ce_SOURCE_DIR}/src/*.cc"
     )
@@ -505,14 +503,12 @@ if(IOS)
 
     # The framework does not link SDL (it resolves SDL from the application at
     # load time), so it cannot inherit SDL's include directories from the
-    # SDL2-static target. SDL 2.26 generates its headers into the build tree
-    # (include/ plus include-config-<config>/), and ${SDL2_INCLUDE_DIRS} only
-    # names the source and build roots, so take the target's include interface
-    # explicitly instead of guessing at the generated layout.
+    # SDL2-static target: SDL 2.26 generates its headers into the build tree,
+    # and ${SDL2_INCLUDE_DIRS} names only the source and build roots.
     #
-    # Fallout 1's source directory goes last for the headers both engines
-    # share, such as the subtitle row: Fallout 2's own headers come first, so
-    # every name it already had keeps resolving to its own copy.
+    # Fallout 1's source directory goes last for the headers both engines share,
+    # such as the subtitle row: Fallout 2's own come first, so every name it
+    # already had keeps resolving to its own copy.
     target_include_directories(Fallout2Engine PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/os/ios/engine"
         "${fallout2_ce_SOURCE_DIR}/src"
@@ -551,11 +547,11 @@ if(APPLE)
     if(IOS)
         install(TARGETS ${EXECUTABLE_NAME} DESTINATION "Payload")
 
-        # The framework has to live in the application's Frameworks directory.
-        # Installing it after the application bundle puts it inside the bundle
-        # CPack packages. A POST_BUILD copy cannot be used here: the Xcode
-        # generator leaves ${EFFECTIVE_PLATFORM_NAME} unexpanded in the shell
-        # command, so the source path would not exist.
+        # The framework has to live in the application's Frameworks directory,
+        # so install it after the application bundle, inside the bundle CPack
+        # packages. A POST_BUILD copy cannot be used: the Xcode generator
+        # leaves ${EFFECTIVE_PLATFORM_NAME} unexpanded in the shell command,
+        # so the source path would not exist.
         install(TARGETS Fallout2Engine
             FRAMEWORK
             DESTINATION "Payload/${EXECUTABLE_NAME}.app/Frameworks"

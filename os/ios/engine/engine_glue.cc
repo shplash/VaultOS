@@ -68,10 +68,8 @@ void fallout_engine_refresh_controls(void)
         return;
     }
 
-    // The engine reaches this from its input loop, which runs many times a
-    // frame in some screens. The overlay only needs a handful of updates a
-    // second, and each one is UIKit work, so most calls do nothing. Fifty
-    // milliseconds is quick enough that a menu opening is noticed at once.
+    // Rate limit: the input loop runs many times a frame on some screens, and
+    // each refresh is UIKit work. 50 ms still notices a menu opening at once.
     static Uint32 lastRefresh = 0;
     Uint32 now = SDL_GetTicks();
     if (lastRefresh != 0 && now - lastRefresh < 50) {

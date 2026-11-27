@@ -1,8 +1,8 @@
 // Fallout 2 CE engine adapter.
 //
-// This file is compiled into Fallout2Engine.framework only. It provides the
-// entry point that src/win32.cc normally provides for a standalone app, plus
-// the in-game touch controls, without modifying the upstream engine sources.
+// Compiled into Fallout2Engine.framework only. It provides the entry point that
+// src/win32.cc normally provides, plus the in-game touch controls, without
+// modifying the upstream engine sources.
 
 #include <SDL.h>
 
@@ -81,9 +81,8 @@ int run(int argc, char** argv)
 
     // Fallout 2 draws leather side panels beside the interface bar whenever the
     // bar is narrower than the screen. A panel image id of zero makes
-    // sidePanelsInit skip them, so the gaps stay the game's own black, the way
-    // Fallout 1 looks. The bar itself is untouched, so every HUD button keeps
-    // its position and the on-screen controls stay aligned with it.
+    // sidePanelsInit skip them, so the gaps stay the game's own black the way
+    // Fallout 1 looks; the bar itself is untouched.
     fallout::gInterfaceSidePanelsImageId = 0;
 
     fallout::gProgramIsActive = true;
@@ -241,9 +240,8 @@ int screen()
     const int mode = fallout::GameMode::getCurrentGameMode();
 
     // The menu, which is also what the death scene reports: showDeath runs from
-    // main.cc after the map is unloaded, so there is no game view left by then.
-    // That is what covers the death scene here - with no game loaded, the
-    // launcher takes its controls away as it does for the menu.
+    // main.cc after the map is unloaded, so no game view is left by then and
+    // the launcher takes its controls away as it does for the menu.
     if (mode == 0 && !in_game()) {
         return 16;
     }
@@ -652,10 +650,9 @@ int quick_save_serial()
 
 int auto_save_ready()
 {
-    // The venue has to be one the player could save in themselves: the game
-    // view, nothing playing over it, no combat, and a bar a script has not
-    // locked - which is what a cutscene does while it runs. Fallout 1 asks the
-    // same questions of intface_is_enabled.
+    // The venue has to be one the player could save in: the game view, nothing
+    // playing over it, no combat, and a bar a script has not locked (as a
+    // cutscene does). Fallout 1 asks the same of intface_is_enabled.
     return in_game() != 0
             && screen() == 0
             && !fallout::isInCombat()
@@ -741,12 +738,11 @@ int dialogue_window_rect(int* x, int* y, int* width, int* height)
     return window_rect_of(fallout::windowGetWindow(id), x, y, width, height);
 }
 
-// The window of the menu the player is looking at, in game pixels. Fallout 2
-// will not hand out its window list, so ask its manager which window is under a
-// few points inside the game view and take the first that is not the game view
-// itself. The points start in the middle and cover the lower half, the upper
-// half and both sides, so a panel that sits off centre - the barter table and
-// the dialogue reply are both in the bottom half - is found as well.
+// The window the player is looking at, in game pixels. Fallout 2 will not hand
+// out its window list, so the manager is asked which window is under a few points
+// in the game view, the first that is not the game view itself: middle, lower
+// half, upper half and both sides, so an off-centre panel (the barter table, the
+// dialogue reply) is found too.
 int menu_rect(int* x, int* y, int* width, int* height)
 {
     const int current = screen();
