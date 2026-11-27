@@ -201,6 +201,10 @@ static int initial_saves_next = -1;
 // asked for the save.
 static int save_automatic(int slot, bool quiet);
 
+// Whether a slot holds a save: the launcher can delete one of the three
+// automatic saves, so the game writes a missing one again.
+static bool save_in_slot(int slot);
+
 // 0x505964
 static bool bk_enable = false;
 
@@ -397,6 +401,23 @@ void loadsave_play_time_tick(void)
         initial_saves_next++;
         if (initial_saves_next > LOADSAVE_SLOT_BACKGROUND) {
             initial_saves_next = -1;
+        }
+    }
+
+    // A game that is running writes any of the three automatic saves the
+    // launcher deleted back, so the slot the next CONTINUE needs is never left
+    // empty. Five seconds apart, so a save that cannot be written is not tried
+    // on every pass of the loop.
+    if (initial_saves_next < 0 && play_time_ms >= 2000 && !loadingGame && obj_dude != NULL) {
+        static unsigned int last_check;
+        if (last_check == 0 || now - last_check >= 5000) {
+            last_check = now;
+            for (int slot = LOADSAVE_SLOT_QUICK; slot <= LOADSAVE_SLOT_BACKGROUND; slot++) {
+                if (!save_in_slot(slot)) {
+                    save_automatic(slot, true);
+                    break;
+                }
+            }
         }
     }
 }
@@ -750,6 +771,21 @@ void loadsave_preview_all(void)
             saves_log("preview: could not write %s", previewPath);
         }
     }
+}
+
+// Whether a slot holds a save. The launcher can delete one of the three
+// automatic saves, so the game writes a missing one again rather than leaving
+// the slot empty for the next CONTINUE.
+static bool save_in_slot(int slot)
+{
+    if (slot < 0 || slot >= LOADSAVE_SLOT_COUNT) {
+        return false;
+    }
+
+    snprintf(str, sizeof(str), "%s\\%s%.2d\\%s", "SAVEGAME", "SLOT", slot + 1, "SAVE.DAT");
+
+    dir_entry entry;
+    return db_dir_entry(str, &entry) == 0;
 }
 
 // One of the three automatic saves, written with no screen: the slot is the one

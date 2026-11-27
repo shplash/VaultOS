@@ -228,6 +228,10 @@ static int initialSavesNext = -1;
 // asked for the save.
 static int saveAutomatic(int slot, bool quiet);
 
+// Whether a slot holds a save: the launcher can delete one of the three
+// automatic saves, so the game writes a missing one again.
+static bool saveInSlot(int slot);
+
 // 0x5193C0
 static bool gLoadSaveWindowIsoWasEnabled = false;
 
@@ -395,6 +399,21 @@ void _ResetLoadSave()
     MapDirErase("MAPS\\", "SAV");
     MapDirErase(PROTO_DIR_NAME "\\" CRITTERS_DIR_NAME "\\", PROTO_FILE_EXT);
     MapDirErase(PROTO_DIR_NAME "\\" ITEMS_DIR_NAME "\\", PROTO_FILE_EXT);
+}
+
+// Whether a slot holds a save. The launcher can delete one of the three
+// automatic saves, so the game writes a missing one again rather than leaving
+// the slot empty for the next CONTINUE.
+static bool saveInSlot(int slot)
+{
+    if (slot < 0 || slot >= LOADSAVE_SLOT_COUNT) {
+        return false;
+    }
+
+    snprintf(_str, sizeof(_str), "%s\\%s%.2d\\%s", "SAVEGAME", "SLOT", slot + 1, "SAVE.DAT");
+
+    int fileSize;
+    return dbGetFileSize(_str, &fileSize) == 0;
 }
 
 // One of the three automatic saves, written with no screen: the slot is the one
@@ -994,6 +1013,23 @@ void loadsave_play_time_tick(void)
         initialSavesNext++;
         if (initialSavesNext > LOADSAVE_SLOT_BACKGROUND) {
             initialSavesNext = -1;
+        }
+    }
+
+    // A game that is running writes any of the three automatic saves the
+    // launcher deleted back, so the slot the next CONTINUE needs is never left
+    // empty. Five seconds apart, so a save that cannot be written is not tried
+    // on every pass of the loop.
+    if (initialSavesNext < 0 && _playTimeMs >= 2000 && !_isLoadingGame() && gDude != nullptr) {
+        static unsigned int lastCheck;
+        if (lastCheck == 0 || getTicksSince(lastCheck) >= 5000) {
+            lastCheck = now;
+            for (int slot = LOADSAVE_SLOT_QUICK; slot <= LOADSAVE_SLOT_BACKGROUND; slot++) {
+                if (!saveInSlot(slot)) {
+                    saveAutomatic(slot, true);
+                    break;
+                }
+            }
         }
     }
 }

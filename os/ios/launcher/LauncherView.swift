@@ -21,6 +21,8 @@ struct LauncherView: View {
     @State private var savesDragStart: CGFloat?
     /// The picked save. Picking loads nothing; CONTINUE does that.
     @State private var selectedSlot: Int?
+    /// The save a hold asked to delete, until that is answered.
+    @State private var deleteCandidate: LauncherModel.LauncherSave?
     /// The saves box's frame and slide limit in card coordinates, so a drag on
     /// it is not mistaken for a page turn.
     @State private var savesBox = SavesBox()
@@ -98,6 +100,9 @@ struct LauncherView: View {
                 }
                 if showResetAllWarning {
                     resetAllWarning
+                }
+                if let save = deleteCandidate {
+                    deleteWarning(save)
                 }
             }
         )
@@ -203,23 +208,29 @@ struct LauncherView: View {
             model.showImporter = false
             presentImporter(for: pendingImport)
         }
+        // One alert, not two: SwiftUI shows only the last alert a view declares,
+        // so a second one hid the install failure behind the update check's own.
         .alert(
             isPresented: Binding(
-                get: { model.errorMessage != nil },
+                get: { model.errorMessage != nil || updateOutcome != nil },
                 set: { shown in
                     if !shown {
                         model.dismissError()
+                        updateOutcome = nil
                     }
                 }
             )
-        ) {
-            Alert(
-                title: Text(model.selectedGame.title),
-                message: Text(L.message(model.errorMessage ?? "")),
-                dismissButton: .default(Text("OK"))
-            )
-        }
-        .alert(isPresented: updateOutcomeAlert) { () -> Alert in
+        ) { () -> Alert in
+            // A failed install comes first: it is the one that loses a game's
+            // files if it is missed.
+            if let failure = model.errorMessage {
+                return Alert(
+                    title: Text(model.selectedGame.title),
+                    message: Text(L.message(failure)),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+
             let outcome = updateOutcome ?? UpdateOutcome(message: "", address: nil)
             if let address = outcome.address, let url = URL(string: address) {
                 return Alert(
@@ -435,15 +446,24 @@ struct LauncherView: View {
                           limit: CGFloat) -> some View {
         let spacing: CGFloat = 8
 
+        // The saves in the order they were written, newest first, and after
+        // them the empty slots in slot order: the save CONTINUE opens is the
+        // first card in the row, not one somewhere inside it.
+        let saved = model.saves
+        var slots = saved.map { $0.slot }
+        for slot in 1...10 where !slots.contains(slot) {
+            slots.append(slot)
+        }
+
         return HStack(spacing: spacing) {
-            ForEach(1...10, id: \.self) { slot in
-                let save = model.saves.first { $0.slot == slot }
+            ForEach(slots, id: \.self) { slot in
+                let save = saved.first { $0.slot == slot }
 
                 // The game's colour marks the save CONTINUE would open (picked,
                 // or the newest); an empty slot is white only while picked.
                 saveCard(slot: slot,
                          save: save,
-                         active: save != nil && slot == (selectedSlot ?? model.saves.first?.slot),
+                         active: save != nil && slot == (selectedSlot ?? saved.first?.slot),
                          chosen: save == nil && slot == selectedSlot,
                          width: cardWidth,
                          height: cardHeight)
@@ -465,67 +485,75 @@ struct LauncherView: View {
         // Inset equally from every corner so the plate reads as laid on the
         // shot.
         let inset = max(4, min(width, height) * 0.03)
+        // The line under the shot keeps its own height, so every card is the
+        // same height whether it holds a save or not.
+        let stampHeight = max(9, min(12, height * 0.14))
+        let pictureHeight = max(20, height - stampHeight - 2)
 
-        return Group {
-            if let save = save {
-                savePicture(save: save, width: width, height: height)
-                    .overlay(
-                        // The shot carries its name, time and level, so no line
-                        // is needed below.
-                        savePlate(save: save, width: width - inset * 2)
-                            .padding(inset),
-                        alignment: .topLeading
-                    )
-                    .overlay(
-                        // When it was saved, in the device's own date order and
-                        // clock: a quiet grey line under the shot.
-                        Text("\(L.t("Saved")) \(save.saved)")
-                            .font(Vault.label(7.5, weight: .regular))
-                            .kerning(0.4)
-                            .foregroundColor(.white.opacity(0.55))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .padding(.horizontal, inset)
-                            .padding(.bottom, inset * 0.5),
-                        alignment: .bottomLeading
-                    )
-            } else {
-                // An empty slot: a save mark and EMPTY SLOT in the notes'
-                // grey.
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
-                    .frame(width: width, height: height)
-                    .overlay(
-                        VStack(spacing: 5) {
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.system(size: 18, weight: .regular))
-                                .foregroundColor(Theme.faint)
+        return VStack(spacing: 2) {
+            Group {
+                if let save = save {
+                    savePicture(save: save, width: width, height: pictureHeight)
+                        .overlay(
+                            // The shot carries its name, time and level.
+                            savePlate(save: save, width: width - inset * 2)
+                                .padding(inset),
+                            alignment: .topLeading
+                        )
+                } else {
+                    // An empty slot: a save mark and EMPTY SLOT in the notes'
+                    // grey.
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.white.opacity(0.05))
+                        .frame(width: width, height: pictureHeight)
+                        .overlay(
+                            VStack(spacing: 5) {
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundColor(Theme.faint)
 
-                            Text(L.t("EMPTY SLOT"))
-                                .font(Vault.label(8, weight: .regular))
-                                .kerning(1.0)
-                                .foregroundColor(Theme.faint)
-                        }
-                    )
+                                Text(L.t("EMPTY SLOT"))
+                                    .font(Vault.label(8, weight: .regular))
+                                    .kerning(1.0)
+                                    .foregroundColor(Theme.faint)
+                            }
+                        )
+                }
             }
+            .frame(width: width, height: pictureHeight)
+            // Borders are drawn inside the picture's edge: grey on every slot,
+            // the game's colour on the save CONTINUE opens, white on a picked
+            // empty slot. Drawn inside, they cover the scaled shot's edge.
+            .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30), lineWidth: 1))
+            .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1))
+            .overlay(shape.strokeBorder(chosen ? Color.white.opacity(0.9) : Color.clear, lineWidth: 1))
+
+            // When it was saved, under the shot and in the same grey as the
+            // level and time on it. An empty slot keeps the line blank, so the
+            // cards still line up.
+            Text(save?.saved ?? " ")
+                .font(Vault.label(max(7, stampHeight * 0.8), weight: .regular))
+                .kerning(0.3)
+                .foregroundColor(Theme.faint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .opacity(save == nil ? 0 : 1)
         }
-        // Borders are drawn inside the picture's edge: grey on every slot, the
-        // game's colour on the save CONTINUE opens, white on a picked empty
-        // slot. Drawn inside, they cover the scaled shot's edge.
-        .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30), lineWidth: 1))
-        .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1))
-        .overlay(shape.strokeBorder(chosen ? Color.white.opacity(0.9) : Color.clear, lineWidth: 1))
+        .frame(width: width, height: height, alignment: .top)
         .contentShape(Rectangle())
         .onTapGesture {
             // Any slot can be picked, empty or not; picking it again lets it
             // go.
             selectedSlot = selectedSlot == slot ? nil : slot
         }
-        .contextMenu {
+        // A hold asks in the launcher's own plate: the system's menu put a
+        // border round the card, faded it in and out, and drew over the game
+        // data beside it.
+        .highPriorityGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
             if let save = save {
-                deleteItem(save)
+                deleteCandidate = save
             }
-        }
+        })
     }
 
     /// The save's picture, filling the card and clipped to its corners, so the
@@ -624,27 +652,49 @@ struct LauncherView: View {
         case LAUNCHER_SAVE_AUTO:
             return L.t("AUTO SAVE")
         case LAUNCHER_SAVE_BACKGROUND:
-            return L.t("BACKGROUND SAVE")
+            return L.t("GUARD SAVE")
         default:
             return save.name
         }
     }
 
-    /// Destructive roles need iOS 15; on iOS 14 the item is a plain button.
-    @ViewBuilder
-    private func deleteItem(_ save: LauncherModel.LauncherSave) -> some View {
-        if #available(iOS 15.0, *) {
-            Button(role: .destructive) {
-                model.delete(save: save)
-            } label: {
-                Text(L.t("Delete"))
+    /// A hold asks before the save goes: the launcher deletes the slot, and the
+    /// game writes its own three saves again while it runs.
+    private func deleteWarning(_ save: LauncherModel.LauncherSave) -> some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(L.t("Delete this save?").uppercased())
+                    .font(Vault.display(20))
+                    .kerning(0.8)
+                    .foregroundColor(Theme.text)
+
+                Text(L.t("The save is taken out of this installation. The game writes its own three automatic saves again the next time it runs."))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+
+                    Button(L.t("CANCEL")) {
+                        deleteCandidate = nil
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
+
+                    Button(L.t("DELETE")) {
+                        deleteCandidate = nil
+                        model.delete(save: save)
+                    }
+                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
+                }
             }
-        } else {
-            Button {
-                model.delete(save: save)
-            } label: {
-                Text(L.t("Delete"))
-            }
+            .padding(22)
+            .frame(maxWidth: 440)
+            .warningPlate()
+            .padding(24)
         }
     }
 
@@ -1454,19 +1504,6 @@ struct LauncherView: View {
         }
         .buttonStyle(ChipStyle(accent: accent, look: .quiet))
         .accessibilityLabel(L.t("Reset all settings"))
-    }
-
-    /// Shown as a popup: a row on the page would make About taller and shift
-    /// the layout.
-    private var updateOutcomeAlert: Binding<Bool> {
-        Binding(
-            get: { updateOutcome != nil },
-            set: { shown in
-                if !shown {
-                    updateOutcome = nil
-                }
-            }
-        )
     }
 
     /// Compares this build with the newest release; a check that could not be

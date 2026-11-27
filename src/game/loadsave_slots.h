@@ -6,10 +6,12 @@
 //
 //   1. QUICK SAVE is written only when the player presses Quick Save.
 //   2. AUTO SAVE is written by the launcher's timer.
-//   3. BACKGROUND SAVE is written when the app leaves the foreground.
+//   3. GUARD SAVE is written when the app leaves the foreground.
 //
 // None of the three is written by another, and the save window never reaches
-// them: a manual save always writes one of the player's own slots.
+// them: a manual save always writes one of the player's own slots. A game that
+// is running writes one of them again if it went missing, so a delete in the
+// launcher is not permanent.
 
 enum {
     LOADSAVE_SLOT_QUICK = 0,
@@ -28,7 +30,7 @@ static inline const char* loadsave_slot_name(int slot)
     case LOADSAVE_SLOT_AUTO:
         return "Auto Save";
     case LOADSAVE_SLOT_BACKGROUND:
-        return "Background Save";
+        return "Guard Save";
     default:
         return nullptr;
     }

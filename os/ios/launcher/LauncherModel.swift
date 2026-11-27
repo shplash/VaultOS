@@ -1062,13 +1062,20 @@ final class LauncherModel: ObservableObject {
         return result
     }
 
-    /// How a save's own date is shown when it has no play time to show. The
-    /// date and the time follow the device's region and its 12 or 24-hour
-    /// setting, rather than one order written into the app.
-    private static let saveDate: DateFormatter = {
+    /// How a save's own time is shown: the time first, then the date, each in
+    /// the device's own order and its 12 or 24-hour setting, separated by a dot
+    /// rather than a comma.
+    private static let saveClock: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    private static let saveDay: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
-        formatter.timeStyle = .short
+        formatter.timeStyle = .none
         return formatter
     }()
 
@@ -1109,7 +1116,9 @@ final class LauncherModel: ObservableObject {
 
             // The file's own date, not the game's header dates, which read as
             // meaningless numbers.
-            let saved = LauncherModel.saveDate.string(from: modified)
+            let saved = LauncherModel.saveClock.string(from: modified)
+                + " • "
+                + LauncherModel.saveDay.string(from: modified)
 
             // The game writes a PNG; the BMP an earlier build wrote is still
             // read.

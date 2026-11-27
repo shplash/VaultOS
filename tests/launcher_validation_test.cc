@@ -848,7 +848,7 @@ static void check_save_slots()
 
     CHECK(std::string(loadsave_slot_name(LOADSAVE_SLOT_QUICK)) == "Quick Save");
     CHECK(std::string(loadsave_slot_name(LOADSAVE_SLOT_AUTO)) == "Auto Save");
-    CHECK(std::string(loadsave_slot_name(LOADSAVE_SLOT_BACKGROUND)) == "Background Save");
+    CHECK(std::string(loadsave_slot_name(LOADSAVE_SLOT_BACKGROUND)) == "Guard Save");
     CHECK(loadsave_slot_name(LOADSAVE_SLOT_MANUAL_FIRST) == nullptr);
 
     // A manual save is kept on the player's own slots, whichever slot it asks
@@ -875,6 +875,7 @@ static void check_launcher_saves()
 
     CHECK(launcher_save_kind("Quick Save") == LAUNCHER_SAVE_QUICK);
     CHECK(launcher_save_kind("Auto Save") == LAUNCHER_SAVE_AUTO);
+    CHECK(launcher_save_kind("Guard Save") == LAUNCHER_SAVE_BACKGROUND);
     CHECK(launcher_save_kind("Background Save") == LAUNCHER_SAVE_BACKGROUND);
     CHECK(launcher_save_kind("quick save") == LAUNCHER_SAVE_QUICK);
     CHECK(launcher_save_kind("Vault Dweller") == LAUNCHER_SAVE_MANUAL);

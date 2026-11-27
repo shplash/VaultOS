@@ -1640,7 +1640,7 @@ int32_t launcher_save_kind(const char* name)
     if (value == "auto save") {
         return LAUNCHER_SAVE_AUTO;
     }
-    if (value == "background save") {
+    if (value == "background save" || value == "guard save") {
         return LAUNCHER_SAVE_BACKGROUND;
     }
     return LAUNCHER_SAVE_MANUAL;
