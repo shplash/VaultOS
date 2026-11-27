@@ -309,11 +309,7 @@ static void glowNearbyItems()
         // corpse is often flagged never to be highlighted, so a new outline is
         // refused while either holds. Set it directly instead, so the body turns
         // white as it falls rather than when the fight ends.
-        Rect oldRect;
-        oldRect.ulx = 0;
-        oldRect.uly = 0;
-        oldRect.lrx = 0;
-        oldRect.lry = 0;
+        Rect oldRect = { 0, 0, 0, 0 };
         bool hadOutline = (object->outline & OUTLINE_TYPE_MASK) != 0;
         if (hadOutline) {
             objectClearOutline(object, &oldRect);
