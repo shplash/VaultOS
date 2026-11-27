@@ -14,11 +14,7 @@
   </a>
 
   <a href="https://github.com/shplash/vaultos/releases">
-    <img src="https://img.shields.io/github/v/release/shplash/vaultos?style=for-the-badge&label=download&color=0A84FF">
-  </a>
-
-  <a href="https://raw.githubusercontent.com/shplash/shplash-repo/main/apps.json">
-    <img src="https://img.shields.io/badge/AltSource-Get-729864?style=for-the-badge">
+    <img src="https://img.shields.io/badge/Download-IPA-0A84FF?style=for-the-badge">
   </a>
 </p>
 
@@ -36,8 +32,6 @@
 2. Sideload the IPA with AltStore, SideStore, Feather, LiveContainer or
    TrollStore. LiveContainer needs its **Fix File Picker** option turned on, or
    the file picker will not open.
-
-The AltSource is `https://raw.githubusercontent.com/shplash/shplash-repo/main/apps.json`.
 
 ## Requirements
 
