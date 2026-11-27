@@ -613,7 +613,7 @@ void auto_save()
         return;
     }
 
-    const int saved = fallout::ios_quick_save_auto();
+    const int saved = fallout::ios_auto_save();
     lastSave = now;
 
     if (saved == 1) {
@@ -658,6 +658,18 @@ void request_load_slot(int slot)
     fallout::loadsave_request_slot(slot);
 }
 
+// The recovery save the launcher asks for when the app leaves the foreground,
+// and the note that the app is back, so a later one is written again.
+int background_save()
+{
+    return fallout::loadsave_save_background();
+}
+
+void background_return()
+{
+    fallout::loadsave_background_return();
+}
+
 const FalloutEngineAPI g_api = {
     FALLOUT_ENGINE_ABI_VERSION,
     "fallout1",
@@ -685,6 +697,8 @@ const FalloutEngineAPI g_api = {
     action_button_rect,
     cursor_mode_requests,
     request_load_slot,
+    background_save,
+    background_return,
 };
 
 } // namespace

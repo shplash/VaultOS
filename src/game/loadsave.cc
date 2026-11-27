@@ -184,6 +184,23 @@ static int slot_cursor = 0;
 // 0x505960
 static bool quick_done = false;
 
+// Whether the save being written is one of the three automatic ones: the save
+// window never writes them, and their own saves do.
+static bool saving_automatic = false;
+
+// Set once the recovery save has been written for this background session, so the
+// notifications iOS sends in a row write one save rather than several.
+static bool background_saved = false;
+
+// The automatic save a new game still has to write: 0-2 in turn, -1 when the
+// three are on disk.
+static int initial_saves_next = -1;
+
+// One automatic save, written with no screen. The slot is the one the save lives
+// in and the name is the one it carries; a failure is only shown when the player
+// asked for the save.
+static int save_automatic(int slot, bool quiet);
+
 // 0x505964
 static bool bk_enable = false;
 
@@ -332,6 +349,11 @@ void InitLoadSave()
     quick_done = false;
     slot_cursor = 0;
 
+    // A game the launcher opens is not a new one: its automatic saves are the
+    // ones already on disk, and the first background save is yet to come.
+    initial_saves_next = -1;
+    background_saved = false;
+
     if (!config_get_string(&game_config, GAME_CONFIG_SYSTEM_KEY, GAME_CONFIG_MASTER_PATCHES_KEY, &patches)) {
         debug_printf("\nLOADSAVE: Error reading patches config variable! Using default.\n");
         patches = emgpath;
@@ -366,6 +388,17 @@ void loadsave_play_time_tick(void)
     }
     last = now;
     started = true;
+
+    // A new game's three automatic saves are written once the world is up: two
+    // seconds in, the map is loaded and the fade is over, so the write is not
+    // taken while the game is still starting.
+    if (initial_saves_next >= 0 && play_time_ms >= 2000) {
+        save_automatic(initial_saves_next, true);
+        initial_saves_next++;
+        if (initial_saves_next > LOADSAVE_SLOT_BACKGROUND) {
+            initial_saves_next = -1;
+        }
+    }
 }
 
 void loadsave_request_slot(int slot)
@@ -719,6 +752,90 @@ void loadsave_preview_all(void)
     }
 }
 
+// One of the three automatic saves, written with no screen: the slot is the one
+// the save lives in and the name is the one it carries, and the game is saved as
+// it stands. `quiet` keeps a failure to itself, for a save the player did not
+// ask for.
+static int save_automatic(int slot, bool quiet)
+{
+    IosScreenScope screenScope(IOS_SCREEN_SAVES);
+
+    if (slot < 0 || slot >= LOADSAVE_SLOT_COUNT) {
+        return -1;
+    }
+
+    if (!config_get_string(&game_config, GAME_CONFIG_SYSTEM_KEY, GAME_CONFIG_MASTER_PATCHES_KEY, &patches)) {
+        debug_printf("\nLOADSAVE: Error reading patches config variable! Using default.\n");
+        patches = emgpath;
+    }
+
+    // The save's own messages, which are what "Game saved." and a failure are
+    // said with. The save window loads them in its own start; these saves have
+    // no window, so they load them here.
+    if (!message_init(&lsgame_msgfl)) {
+        return -1;
+    }
+
+    char path[COMPAT_MAX_PATH];
+    snprintf(path, sizeof(path), "%s%s", msg_path, LSGAME_MSG_NAME);
+    if (!message_load(&lsgame_msgfl, path)) {
+        message_exit(&lsgame_msgfl);
+        return -1;
+    }
+
+    // The save window never writes these slots, and this is the one path that
+    // does.
+    saving_automatic = true;
+    slot_cursor = slot;
+
+    memset(LSData[slot].description, 0, sizeof(LSData[slot].description));
+    const char* name = loadsave_slot_name(slot);
+    if (name != NULL) {
+        strncpy(LSData[slot].description, name, sizeof(LSData[slot].description) - 1);
+    }
+
+    thumbnail_image[1] = NULL;
+    const int snapped = QuickSnapShot();
+    if (snapped != 1) {
+        saving_automatic = false;
+        message_exit(&lsgame_msgfl);
+        return -1;
+    }
+
+    const int saved = SaveSlot();
+
+    if (thumbnail_image[1] != NULL) {
+        mem_free(snapshot);
+    }
+
+    gmouse_set_cursor(MOUSE_CURSOR_ARROW);
+    saving_automatic = false;
+
+    if (saved == -1) {
+        if (!quiet) {
+            gsound_play_sfx_file("iisxxxx1");
+
+            MessageListItem messageListItem;
+            // Error saving game!
+            strcpy(str0, getmsg(&lsgame_msgfl, &messageListItem, 132));
+            // Unable to save game.
+            strcpy(str1, getmsg(&lsgame_msgfl, &messageListItem, 133));
+
+            const char* body[] = {
+                str1,
+            };
+            dialog_out(str0, body, 1, 169, 116, colorTable[32328], NULL, colorTable[32328], DIALOG_BOX_LARGE);
+        }
+
+        message_exit(&lsgame_msgfl);
+        return -1;
+    }
+
+    quick_done = true;
+    message_exit(&lsgame_msgfl);
+    return 1;
+}
+
 int SaveGame(int mode)
 {
     IosScreenScope screenScope(IOS_SCREEN_SAVES);
@@ -732,71 +849,22 @@ int SaveGame(int mode)
         patches = emgpath;
     }
 
-    if (mode == LOAD_SAVE_MODE_QUICK && quick_done) {
-        snprintf(gmpath, sizeof(gmpath), "%s\\%s%.2d\\", "SAVEGAME", "SLOT", slot_cursor + 1);
-        strcat(gmpath, "SAVE.DAT");
-
-        flptr = db_fopen(gmpath, "rb");
-        if (flptr != NULL) {
-            LoadHeader(slot_cursor);
-            db_fclose(flptr);
-        }
-
-        thumbnail_image[1] = NULL;
-        int v6 = QuickSnapShot();
-        if (v6 == 1) {
-            int v7 = SaveSlot();
-            if (v7 != -1) {
-                v6 = v7;
-            }
-        }
-
-        if (thumbnail_image[1] != NULL) {
-            mem_free(snapshot);
-        }
-
-        gmouse_set_cursor(MOUSE_CURSOR_ARROW);
-
-        if (v6 != -1) {
-            return 1;
-        }
-
-        if (!message_init(&lsgame_msgfl)) {
-            return -1;
-        }
-
-        char path[COMPAT_MAX_PATH];
-        snprintf(path, sizeof(path), "%s%s", msg_path, "LSGAME.MSG");
-        if (!message_load(&lsgame_msgfl, path)) {
-            return -1;
-        }
-
-        gsound_play_sfx_file("iisxxxx1");
-
-        // Error saving game!
-        strcpy(str0, getmsg(&lsgame_msgfl, &messageListItem, 132));
-        // Unable to save game.
-        strcpy(str1, getmsg(&lsgame_msgfl, &messageListItem, 133));
-
-        const char* body[] = {
-            str1,
-        };
-        dialog_out(str0, body, 1, 169, 116, colorTable[32328], NULL, colorTable[32328], DIALOG_BOX_LARGE);
-
-        message_exit(&lsgame_msgfl);
-
-        return -1;
+    // QUICK SAVE writes the first slot and nothing else: it never asks which
+    // slot to use and never moves on to another one.
+    if (mode == LOAD_SAVE_MODE_QUICK) {
+        return save_automatic(LOADSAVE_SLOT_QUICK, false);
     }
 
     quick_done = false;
 
-    int windowType = mode == LOAD_SAVE_MODE_QUICK
-        ? LOAD_SAVE_WINDOW_TYPE_PICK_QUICK_SAVE_SLOT
-        : LOAD_SAVE_WINDOW_TYPE_SAVE_GAME;
-    if (LSGameStart(windowType) == -1) {
+    if (LSGameStart(LOAD_SAVE_WINDOW_TYPE_SAVE_GAME) == -1) {
         debug_printf("\nLOADSAVE: ** Error loading save game screen data! **\n");
         return -1;
     }
+
+    // A manual save starts on the first slot of the player's own, and never on
+    // one of the three automatic ones.
+    slot_cursor = loadsave_manual_slot(slot_cursor);
 
     if (GetSlotList() == -1) {
         win_draw(lsgwin);
@@ -871,8 +939,8 @@ int SaveGame(int mode)
             switch (keyCode) {
             case KEY_ARROW_UP:
                 slot_cursor -= 1;
-                if (slot_cursor < 0) {
-                    slot_cursor = 0;
+                if (slot_cursor < LOADSAVE_SLOT_MANUAL_FIRST) {
+                    slot_cursor = LOADSAVE_SLOT_MANUAL_FIRST;
                 }
                 selectionChanged = true;
                 doubleClickSlot = -1;
@@ -886,7 +954,7 @@ int SaveGame(int mode)
                 doubleClickSlot = -1;
                 break;
             case KEY_HOME:
-                slot_cursor = 0;
+                slot_cursor = LOADSAVE_SLOT_MANUAL_FIRST;
                 selectionChanged = true;
                 doubleClickSlot = -1;
                 break;
@@ -907,13 +975,7 @@ int SaveGame(int mode)
                     int mouseY;
                     mouseGetPositionInWindow(lsgwin, &mouseX, &mouseY);
 
-                    slot_cursor = (mouseY - 79) / (3 * text_height() + 4);
-                    if (slot_cursor < 0) {
-                        slot_cursor = 0;
-                    }
-                    if (slot_cursor > 9) {
-                        slot_cursor = 9;
-                    }
+                    slot_cursor = loadsave_manual_slot((mouseY - 79) / (3 * text_height() + 4));
 
                     selectionChanged = true;
 
@@ -987,8 +1049,8 @@ int SaveGame(int mode)
 
                     if (scrollDirection == LOAD_SAVE_SCROLL_DIRECTION_UP) {
                         slot_cursor -= 1;
-                        if (slot_cursor < 0) {
-                            slot_cursor = 0;
+                        if (slot_cursor < LOADSAVE_SLOT_MANUAL_FIRST) {
+                            slot_cursor = LOADSAVE_SLOT_MANUAL_FIRST;
                         }
                     } else {
                         slot_cursor += 1;
@@ -1188,50 +1250,53 @@ int SaveGame(int mode)
     return rc;
 }
 
+// QUICK SAVE: the quick slot, written with no screen. The slot is the same on
+// every press, so a second save replaces the first rather than landing beside it.
 int ios_quick_save_auto()
 {
-    if (!quick_done) {
-        int slot = -1;
+    return save_automatic(LOADSAVE_SLOT_QUICK, false);
+}
 
-        for (int index = 0; index < 10 && slot == -1; index++) {
-            snprintf(str, sizeof(str), "%s\\%s%.2d\\%s", "SAVEGAME", "SLOT", index + 1, "SAVE.DAT");
-            flptr = db_fopen(str, "rb");
-            if (flptr == NULL) {
-                continue;
-            }
+// AUTO SAVE: the auto slot, written by the launcher's timer. A failure is the
+// launcher's to report, so no dialog interrupts the game.
+int ios_auto_save()
+{
+    return save_automatic(LOADSAVE_SLOT_AUTO, true);
+}
 
-            if (LoadHeader(index) == 0
-                && strncmp(LSData[index].description, "Quick Save", 10) == 0) {
-                slot = index;
-            }
-
-            db_fclose(flptr);
-        }
-
-        if (slot == -1) {
-            for (int index = 0; index < 10 && slot == -1; index++) {
-                snprintf(str, sizeof(str), "%s\\%s%.2d\\%s", "SAVEGAME", "SLOT", index + 1, "SAVE.DAT");
-                flptr = db_fopen(str, "rb");
-                if (flptr == NULL) {
-                    slot = index;
-                } else {
-                    db_fclose(flptr);
-                }
-            }
-        }
-
-        if (slot == -1) {
-            return 0;
-        }
-
-        memset(LSData[slot].description, 0, sizeof(LSData[slot].description));
-        strncpy(LSData[slot].description, "Quick Save", sizeof(LSData[slot].description) - 1);
-
-        slot_cursor = slot;
-        quick_done = true;
+// The recovery save: the background slot, written when the app leaves the
+// foreground. One save is written per background session, so the notifications
+// iOS sends one after another do not write the same game again and again.
+int loadsave_save_background(void)
+{
+    if (background_saved) {
+        return 0;
     }
 
-    return SaveGame(LOAD_SAVE_MODE_QUICK);
+    // Nothing to save before the world exists, and a save taken during a load
+    // would write the game that is not there yet.
+    if (loadingGame || obj_dude == NULL) {
+        return 0;
+    }
+
+    const int saved = save_automatic(LOADSAVE_SLOT_BACKGROUND, true);
+    if (saved == 1) {
+        background_saved = true;
+    }
+
+    return saved;
+}
+
+void loadsave_background_return(void)
+{
+    background_saved = false;
+}
+
+void loadsave_new_game_started(void)
+{
+    // Only a new game: a game opened from a save keeps the saves it has, so the
+    // three automatic saves are not written over it.
+    initial_saves_next = LOADSAVE_SLOT_QUICK;
 }
 
 // 0x46E6C8
@@ -1421,7 +1486,7 @@ int LoadGame(int mode)
             renderPresent();
         }
 
-        if (LoadSlot(slot_cursor) != -1) {
+        if (LoadSlot(LOADSAVE_SLOT_QUICK) != -1) {
             if (window != -1) {
                 win_delete(window);
             }
@@ -2049,6 +2114,13 @@ static int LSGameEnd(int windowType)
 // 0x46F978
 static int SaveSlot()
 {
+    // The three automatic slots are written by their own saves, never by the save
+    // window: the window's cursor cannot reach them, and this is the second lock
+    // on the same door.
+    if (!saving_automatic && !loadsave_slot_is_manual(slot_cursor)) {
+        return -1;
+    }
+
     ls_error_code = 0;
     map_backup_count = -1;
     gmouse_set_cursor(MOUSE_CURSOR_WAIT_PLANET);

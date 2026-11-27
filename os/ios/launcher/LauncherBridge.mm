@@ -425,6 +425,23 @@ extern "C" int fallout_ios_quick_save(void)
         : -2;
 }
 
+// The recovery save when the app leaves the foreground, and the note that it is
+// back. The engine writes one save per background session, so the notifications
+// iOS sends in a row do not write the same game several times.
+extern "C" int fallout_ios_background_save(void)
+{
+    return g_engine != NULL && g_engine->background_save != NULL
+        ? g_engine->background_save()
+        : 0;
+}
+
+extern "C" void fallout_ios_background_return(void)
+{
+    if (g_engine != NULL && g_engine->background_return != NULL) {
+        g_engine->background_return();
+    }
+}
+
 extern "C" int fallout_ios_menu_rect(int* x, int* y, int* width, int* height)
 {
     if (x != NULL) *x = 0;

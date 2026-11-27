@@ -939,6 +939,9 @@ final class LauncherModel: ObservableObject {
         let level: Int
         let preview: URL?
         let modified: Date
+        /// One of LAUNCHER_SAVE_*: the launcher's own three saves have their
+        /// names and their slots, and every other save is the player's.
+        let kind: Int
     }
 
     @Published var saves: [LauncherSave] = []
@@ -1059,10 +1062,13 @@ final class LauncherModel: ObservableObject {
         return result
     }
 
-    /// How a save's own date is shown when it has no play time to show.
+    /// How a save's own date is shown when it has no play time to show. The
+    /// date and the time follow the device's region and its 12 or 24-hour
+    /// setting, rather than one order written into the app.
     private static let saveDate: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "dd.MM.yyyy  HH:mm"
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
         return formatter
     }()
 
@@ -1126,7 +1132,9 @@ final class LauncherModel: ObservableObject {
                                        played: sidecar.played,
                                        level: sidecar.level,
                                        preview: preview,
-                                       modified: modified))
+                                       modified: modified,
+                                       kind: max(Int(launcher_save_slot_kind(Int32(slot))),
+                                                 Int(launcher_save_kind(saveName)))))
         }
 
         return result.sorted { $0.modified > $1.modified }

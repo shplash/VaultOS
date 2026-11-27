@@ -1352,11 +1352,104 @@ int install_from_zip_image(const char* zip_path, const std::vector<ZipEntry>& en
         destination, options);
 }
 
+// Whether the name is the game's own master.dat, by its last path part.
+bool is_master_dat_name(const std::string& name)
+{
+    const size_t slash = name.find_last_of('/');
+    const std::string base = lower_ascii(slash == std::string::npos
+            ? name
+            : name.substr(slash + 1));
+    return base == "master.dat";
+}
+
+bool has_master_dat_file(const std::vector<SourceFile>& files)
+{
+    for (const SourceFile& file : files) {
+        if (is_master_dat_name(file.name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// A container the importer can open inside another one.
+bool is_container_name(const std::string& name)
+{
+    const std::string lower = lower_ascii(name);
+    for (const char* extension : { ".zip", ".7z", ".rar" }) {
+        const size_t length = std::strlen(extension);
+        if (lower.size() > length && lower.compare(lower.size() - length, length, extension) == 0) {
+            return true;
+        }
+    }
+    return is_image_name(name);
+}
+
+// Whether a container inside an archive holds the game: only such a container is
+// opened, so an archive that carries a disc image and a ZIP of something else
+// installs the right one. A container that cannot be read is not one.
+bool nested_holds_game(const fs::path& path)
+{
+    const Container container = detect_container(path.string().c_str());
+
+    if (container == Container::Image) {
+        LauncherDiscImage image;
+        std::vector<LauncherDiscFile> files;
+        std::string error;
+        if (!launcher_disc_open(path.string().c_str(), &image, &files, &error)) {
+            return false;
+        }
+        for (const LauncherDiscFile& file : files) {
+            if (is_master_dat_name(file.name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (container == Container::Archive) {
+        std::vector<LauncherArchiveEntry> entries;
+        std::string error;
+        if (!launcher_archive_open(path.string().c_str(), &entries, &error)) {
+            return false;
+        }
+        for (const LauncherArchiveEntry& entry : entries) {
+            if (is_master_dat_name(entry.name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::ifstream archive;
+    std::vector<ZipEntry> entries;
+    if (!load_archive(path.string().c_str(), archive, entries)) {
+        return false;
+    }
+
+    bool holds = false;
+    for (const ZipEntry& entry : entries) {
+        if (is_master_dat_name(entry.name)) {
+            holds = true;
+            break;
+        }
+    }
+
+    archive.close();
+    return holds;
+}
+
+// One container, opened by what it holds rather than by its name: a disc image, a
+// 7z or RAR archive, or a ZIP of the game or of a disc. `depth` is how many
+// containers deep the import already is.
+int install_container(const char* path, const fs::path& destination,
+    const LauncherOptions& options, int depth);
+
 // A 7z or RAR archive is unpacked into a folder of the app's own, and the game
 // is installed from there by the path every other container uses, so the same
 // Fallout 1 and Fallout 2 checks see the same files.
 int install_from_archive(const char* path, const fs::path& destination,
-    const LauncherOptions& options)
+    const LauncherOptions& options, int depth)
 {
     set_status("Reading the archive...");
 
@@ -1414,7 +1507,65 @@ int install_from_archive(const char* path, const fs::path& destination,
         return LAUNCHER_ERROR;
     }
 
+    // An archive of a game CD or of a ZIP: the container inside it is opened the
+    // way the container itself would be. Only a container that holds the game is
+    // taken, so an archive with two of them installs the right one, and the
+    // nesting stops at one level so a crafted archive cannot nest forever.
+    if (depth < 1 && !has_master_dat_file(source.files)) {
+        for (const SourceFile& file : source.files) {
+            if (!is_container_name(file.name)) {
+                continue;
+            }
+
+            const fs::path nested = temporary.path / fs::path(file.name);
+            if (!nested_holds_game(nested)) {
+                continue;
+            }
+
+            set_status("Opening " + nested.filename().string() + "...");
+            return install_container(nested.string().c_str(), destination, options, depth + 1);
+        }
+    }
+
     return install_source(source, destination, options, "archive");
+}
+
+// One container, opened by what it holds rather than by its name: a disc image, a
+// 7z or RAR archive, or a ZIP of the game or of a disc.
+int install_container(const char* path, const fs::path& destination,
+    const LauncherOptions& options, int depth)
+{
+    switch (detect_container(path)) {
+    case Container::Image:
+        return install_from_image(fs::path(path), destination, options);
+    case Container::Archive:
+        return install_from_archive(path, destination, options, depth);
+    case Container::Zip:
+        break;
+    }
+
+    std::ifstream archive;
+    std::vector<ZipEntry> entries;
+    if (!load_archive(path, archive, entries)) {
+        return LAUNCHER_ERROR;
+    }
+
+    // A ZIP of a CD holds the disc image rather than the game's own files.
+    if (!zip_has_master_dat(entries)) {
+        const ZipEntry* image = find_game_image(entries);
+        if (image != nullptr) {
+            archive.close();
+            return install_from_zip_image(path, entries, *image, destination, options);
+        }
+    }
+
+    Source source;
+    source.archive = std::move(archive);
+    for (const ZipEntry& entry : entries) {
+        source.files.push_back({ entry.name, entry.uncompressed_size, &entry, 0 });
+    }
+
+    return install_source(source, destination, options, "ZIP");
 }
 
 } // namespace
@@ -1460,6 +1611,41 @@ void launcher_scan(const char* install_dir, int32_t game, LauncherInstallInfo* i
     get_install_info(fs::path(install_dir), game, *info, layout);
 }
 
+int32_t launcher_save_slot_kind(int32_t slot)
+{
+    switch (slot) {
+    case 1:
+        return LAUNCHER_SAVE_QUICK;
+    case 2:
+        return LAUNCHER_SAVE_AUTO;
+    case 3:
+        return LAUNCHER_SAVE_BACKGROUND;
+    default:
+        return LAUNCHER_SAVE_MANUAL;
+    }
+}
+
+int32_t launcher_save_kind(const char* name)
+{
+    if (name == NULL || name[0] == '\0') {
+        return LAUNCHER_SAVE_MANUAL;
+    }
+
+    // An older build's quick save could land in any slot, so the name it carries
+    // says what it is even when the slot does not.
+    const std::string value = lower_ascii(name);
+    if (value == "quick save") {
+        return LAUNCHER_SAVE_QUICK;
+    }
+    if (value == "auto save") {
+        return LAUNCHER_SAVE_AUTO;
+    }
+    if (value == "background save") {
+        return LAUNCHER_SAVE_BACKGROUND;
+    }
+    return LAUNCHER_SAVE_MANUAL;
+}
+
 int launcher_install_zip(const char* zip_path, const char* install_dir, const LauncherOptions* options)
 {
     LauncherOptions defaults;
@@ -1494,37 +1680,7 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
         return LAUNCHER_ERROR;
     }
 
-    switch (detect_container(zip_path)) {
-    case Container::Image:
-        return install_from_image(fs::path(zip_path), destination, *options);
-    case Container::Archive:
-        return install_from_archive(zip_path, destination, *options);
-    case Container::Zip:
-        break;
-    }
-
-    std::ifstream archive;
-    std::vector<ZipEntry> entries;
-    if (!load_archive(zip_path, archive, entries)) {
-        return LAUNCHER_ERROR;
-    }
-
-    // A ZIP of a CD holds the disc image rather than the game's own files.
-    if (!zip_has_master_dat(entries)) {
-        const ZipEntry* image = find_game_image(entries);
-        if (image != nullptr) {
-            archive.close();
-            return install_from_zip_image(zip_path, entries, *image, destination, *options);
-        }
-    }
-
-    Source source;
-    source.archive = std::move(archive);
-    for (const ZipEntry& entry : entries) {
-        source.files.push_back({ entry.name, entry.uncompressed_size, &entry, 0 });
-    }
-
-    return install_source(source, destination, *options, "ZIP");
+    return install_container(zip_path, destination, *options, 0);
 }
 
 // ---------------------------------------------------------------------------

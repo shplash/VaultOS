@@ -43,8 +43,9 @@ final class LauncherHost {
 
     private func appWillResignActive() {
         if finished {
-            // The game is running: silence its SDL stream. The launcher track
-            // was stopped on handover.
+            // The game is running: write its recovery save, then silence its SDL
+            // stream. The launcher track was stopped on handover.
+            fallout_ios_background_save()
             fallout_ios_pause_game_audio()
         } else {
             // Silence the launcher's music in the background.
@@ -55,6 +56,7 @@ final class LauncherHost {
     private func appDidBecomeActive() {
         if finished {
             fallout_ios_resume_game_audio()
+            fallout_ios_background_return()
         } else if window != nil {
             // The launch rotation to landscape lands after the launcher's window
             // exists.

@@ -2,6 +2,7 @@
 #define FALLOUT_GAME_LOADSAVE_H_
 
 #include "game/art.h"
+#include "game/loadsave_slots.h"
 #include "game/message.h"
 #include "plib/db/db.h"
 #include "plib/gnw/rect.h"
@@ -22,7 +23,24 @@ typedef enum LoadSaveMode {
 void InitLoadSave();
 void ResetLoadSave();
 int SaveGame(int mode);
-int ios_quick_save_auto();
+
+// QUICK SAVE: the quick slot, written with no screen, so pressing it twice in a
+// row writes one save rather than the second landing beside the first.
+int ios_quick_save_auto(void);
+
+// The launcher's AUTO SAVE: the auto slot, written with no screen.
+int ios_auto_save(void);
+
+// The recovery save written when the app leaves the foreground, once per
+// background session. `loadsave_background_return` starts the next session.
+int loadsave_save_background(void);
+void loadsave_background_return(void);
+
+// A new game has reached the playable world: its three automatic saves are
+// written once, a moment later, and never again for that game. A game opened
+// from a save keeps the saves it has.
+void loadsave_new_game_started(void);
+
 int LoadGame(int mode);
 
 // Real time played, counted once per game loop pass and written beside each

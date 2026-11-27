@@ -359,6 +359,12 @@ static int main_load_new(char* mapFileName)
     gmouse_set_cursor(MOUSE_CURSOR_NONE);
     mouse_show();
     map_load(mapFileName);
+
+    // A new game has reached the world: its three automatic saves are written
+    // once the map settles. A game opened from a save does not come through
+    // here, so its saves are never written over.
+    loadsave_new_game_started();
+
     PlayCityMapMusic();
     palette_fade_to(white_palette);
     win_delete(win);

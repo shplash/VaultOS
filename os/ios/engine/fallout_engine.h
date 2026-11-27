@@ -21,7 +21,7 @@
 extern "C" {
 #endif
 
-#define FALLOUT_ENGINE_ABI_VERSION 11
+#define FALLOUT_ENGINE_ABI_VERSION 12
 
 // Callbacks the engine may use to talk back to the launcher application.
 // They are implemented by the application and passed to the engine before run()
@@ -117,6 +117,14 @@ typedef struct FalloutEngineAPI {
 
     // The slot the launcher wants loaded as the game starts; 0 for none.
     void (*request_load_slot)(int slot);
+
+    // The recovery save, written when the app leaves the foreground: 1 saved, 0
+    // nothing to save or already saved for this background session, -1 failed.
+    int (*background_save)(void);
+
+    // The app is back: the next background save belongs to a new session, so a
+    // later one is written again.
+    void (*background_return)(void);
 } FalloutEngineAPI;
 
 // Exported by the in-process Fallout 1 adapter and by Fallout2Engine.framework.

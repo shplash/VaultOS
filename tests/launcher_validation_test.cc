@@ -22,6 +22,8 @@
 #include "launcher/launcher.h"
 #include "launcher/launcher_archive.h"
 
+#include "game/loadsave_slots.h"
+
 namespace fs = std::filesystem;
 
 static int g_failures = 0;
@@ -819,9 +821,72 @@ static void write_uu_fixture(const fs::path& source, const fs::path& path)
     write_file(path, uu_decode(text));
 }
 
+static std::string read_bytes(const fs::path& path)
+{
+    std::ifstream stream(path.string(), std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(stream)),
+        std::istreambuf_iterator<char>());
+}
+
+// The save slots the launcher owns, as both engines use them: the first three are
+// the automatic saves, a manual save never writes them, and the three names are
+// the ones the launcher shows.
+static void check_save_slots()
+{
+    CHECK(LOADSAVE_SLOT_QUICK == 0);
+    CHECK(LOADSAVE_SLOT_AUTO == 1);
+    CHECK(LOADSAVE_SLOT_BACKGROUND == 2);
+    CHECK(LOADSAVE_SLOT_MANUAL_FIRST == 3);
+    CHECK(LOADSAVE_SLOT_COUNT == 10);
+
+    CHECK(!loadsave_slot_is_manual(LOADSAVE_SLOT_QUICK));
+    CHECK(!loadsave_slot_is_manual(LOADSAVE_SLOT_AUTO));
+    CHECK(!loadsave_slot_is_manual(LOADSAVE_SLOT_BACKGROUND));
+    for (int slot = LOADSAVE_SLOT_MANUAL_FIRST; slot < LOADSAVE_SLOT_COUNT; slot++) {
+        CHECK(loadsave_slot_is_manual(slot));
+    }
+
+    CHECK(std::string(loadsave_slot_name(LOADSAVE_SLOT_QUICK)) == "Quick Save");
+    CHECK(std::string(loadsave_slot_name(LOADSAVE_SLOT_AUTO)) == "Auto Save");
+    CHECK(std::string(loadsave_slot_name(LOADSAVE_SLOT_BACKGROUND)) == "Background Save");
+    CHECK(loadsave_slot_name(LOADSAVE_SLOT_MANUAL_FIRST) == nullptr);
+
+    // A manual save is kept on the player's own slots, whichever slot it asks
+    // for.
+    CHECK(loadsave_manual_slot(-1) == LOADSAVE_SLOT_MANUAL_FIRST);
+    CHECK(loadsave_manual_slot(LOADSAVE_SLOT_QUICK) == LOADSAVE_SLOT_MANUAL_FIRST);
+    CHECK(loadsave_manual_slot(LOADSAVE_SLOT_AUTO) == LOADSAVE_SLOT_MANUAL_FIRST);
+    CHECK(loadsave_manual_slot(LOADSAVE_SLOT_BACKGROUND) == LOADSAVE_SLOT_MANUAL_FIRST);
+    CHECK(loadsave_manual_slot(4) == 4);
+    CHECK(loadsave_manual_slot(9) == 9);
+    CHECK(loadsave_manual_slot(LOADSAVE_SLOT_COUNT) == LOADSAVE_SLOT_COUNT - 1);
+}
+
+// What the launcher calls each save: its own three by their slot, and a save an
+// older build left behind by the name it carries.
+static void check_launcher_saves()
+{
+    CHECK(launcher_save_slot_kind(1) == LAUNCHER_SAVE_QUICK);
+    CHECK(launcher_save_slot_kind(2) == LAUNCHER_SAVE_AUTO);
+    CHECK(launcher_save_slot_kind(3) == LAUNCHER_SAVE_BACKGROUND);
+    CHECK(launcher_save_slot_kind(4) == LAUNCHER_SAVE_MANUAL);
+    CHECK(launcher_save_slot_kind(10) == LAUNCHER_SAVE_MANUAL);
+    CHECK(launcher_save_slot_kind(0) == LAUNCHER_SAVE_MANUAL);
+
+    CHECK(launcher_save_kind("Quick Save") == LAUNCHER_SAVE_QUICK);
+    CHECK(launcher_save_kind("Auto Save") == LAUNCHER_SAVE_AUTO);
+    CHECK(launcher_save_kind("Background Save") == LAUNCHER_SAVE_BACKGROUND);
+    CHECK(launcher_save_kind("quick save") == LAUNCHER_SAVE_QUICK);
+    CHECK(launcher_save_kind("Vault Dweller") == LAUNCHER_SAVE_MANUAL);
+    CHECK(launcher_save_kind("") == LAUNCHER_SAVE_MANUAL);
+    CHECK(launcher_save_kind(nullptr) == LAUNCHER_SAVE_MANUAL);
+}
+
 int main()
 {
     check_translation_tables();
+    check_save_slots();
+    check_launcher_saves();
 
     const fs::path root = fs::temp_directory_path() / "fallout-ce-launcher-tests";
     std::error_code ec;
@@ -1515,6 +1580,82 @@ int main()
         CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
                   &options) == LAUNCHER_ERROR);
         CHECK(std::string(launcher_last_error()).find("too many files") != std::string::npos);
+        CHECK(!fs::exists(install / "master.dat"));
+        CHECK(import_folders() == before);
+    }
+
+    // An archive of an archive: a 7z that holds a ZIP of the game is unpacked,
+    // and the ZIP inside it is installed by the path a ZIP takes.
+    {
+        const fs::path game = root / "Fallout inside a ZIP.zip";
+        write_zip(game, {
+            { "master.dat", "nested-master" },
+            { "critter.dat", "nested-critter" },
+            { "data/art/tiles.trx", "nested-tiles" },
+        });
+
+        const fs::path archive = root / "Fallout with a ZIP.7z";
+        write_7z(archive, { { "Fallout.zip", read_bytes(game) } }, "copy");
+
+        const fs::path install = root / "Fallout from a 7z of a ZIP";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(install / "master.dat", "nested-master"));
+        CHECK(file_contains(install / "critter.dat", "nested-critter"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "nested-tiles"));
+        CHECK(import_folders() == before);
+    }
+
+    // A 7z of a game CD, with a ZIP of something else beside it: only the
+    // container that holds the game is opened.
+    {
+        const fs::path junk = root / "readme.zip";
+        write_zip(junk, { { "readme.txt", "nothing here" } });
+
+        const fs::path archive = root / "Fallout with a disc.7z";
+        write_7z(archive, {
+            { "readme.zip", read_bytes(junk) },
+            { "game.iso", build_iso({
+                { "master.dat", "disc-master" },
+                { "critter.dat", "disc-critter" },
+                { "data/art/tiles.trx", "disc-tiles" },
+            }, {}) },
+        }, "copy");
+
+        const fs::path install = root / "Fallout from a 7z of a disc";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(install / "master.dat", "disc-master"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "disc-tiles"));
+        CHECK(import_folders() == before);
+    }
+
+    // One container deep only: an archive inside an archive inside an archive is
+    // refused with the game's own message rather than opened forever.
+    {
+        const fs::path game = root / "Fallout deep.zip";
+        write_zip(game, {
+            { "master.dat", "deep-master" },
+            { "critter.dat", "deep-critter" },
+            { "data/art/tiles.trx", "deep-tiles" },
+        });
+
+        const fs::path inner = root / "Fallout inner.7z";
+        write_7z(inner, { { "Fallout.zip", read_bytes(game) } }, "copy");
+
+        const fs::path outer = root / "Fallout outer.7z";
+        write_7z(outer, { { "Fallout.7z", read_bytes(inner) } }, "copy");
+
+        const fs::path install = root / "Fallout from a 7z of a 7z";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(outer.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("master.dat") != std::string::npos);
         CHECK(!fs::exists(install / "master.dat"));
         CHECK(import_folders() == before);
     }

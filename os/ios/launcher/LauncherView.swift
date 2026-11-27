@@ -120,6 +120,9 @@ struct LauncherView: View {
         .onAppear {
             model.refreshInstall()
             model.refreshSaves()
+            // The carousel opens on the save CONTINUE would open: the most
+            // recently saved one.
+            selectedSlot = nil
             scheduleSwipeHint()
             if !musicMuted {
                 LauncherMusic.shared.playIfAvailable()
@@ -136,6 +139,9 @@ struct LauncherView: View {
             model.savesNotice = nil
             model.importSummary = nil
             if page == .home {
+                // Coming back to the game page starts the carousel on the most
+                // recently saved save again.
+                selectedSlot = nil
                 scheduleSwipeHint()
             } else {
                 swipeHintTask?.cancel()
@@ -470,6 +476,19 @@ struct LauncherView: View {
                             .padding(inset),
                         alignment: .topLeading
                     )
+                    .overlay(
+                        // When it was saved, in the device's own date order and
+                        // clock: a quiet grey line under the shot.
+                        Text("\(L.t("Saved")) \(save.saved)")
+                            .font(Vault.label(7.5, weight: .regular))
+                            .kerning(0.4)
+                            .foregroundColor(.white.opacity(0.55))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .padding(.horizontal, inset)
+                            .padding(.bottom, inset * 0.5),
+                        alignment: .bottomLeading
+                    )
             } else {
                 // An empty slot: a save mark and EMPTY SLOT in the notes'
                 // grey.
@@ -548,17 +567,19 @@ struct LauncherView: View {
         let plateWidth = min(max(40, detailWidth + 15 * scale), max(40, width))
 
         return VStack(alignment: .leading, spacing: 1) {
-            Text(save.name)
+            Text(saveTitle(save))
                 .font(Vault.label(10 * scale, weight: .semibold))
                 .foregroundColor(Theme.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            Text(detail)
-                .font(Vault.label(9 * scale, weight: .regular))
-                .kerning(0.6)
-                .foregroundColor(Theme.faint)
-                .lineLimit(1)
+            if !detail.isEmpty {
+                Text(detail)
+                    .font(Vault.label(9 * scale, weight: .regular))
+                    .kerning(0.6)
+                    .foregroundColor(Theme.faint)
+                    .lineLimit(1)
+            }
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
@@ -588,8 +609,25 @@ struct LauncherView: View {
             parts.append("\(L.t("LVL")) \(save.level)")
         }
 
-        // Close, but not tight enough to read as one word.
-        return parts.isEmpty ? save.saved : parts.joined(separator: "·")
+        // Close, but not tight enough to read as one word. The time it was
+        // saved is its own line under the shot, so it is not repeated here.
+        return parts.joined(separator: "·")
+    }
+
+    /// What the carousel calls a save: the launcher's own three are named by the
+    /// launcher, in the player's language, and every other save by the name it
+    /// carries.
+    private func saveTitle(_ save: LauncherModel.LauncherSave) -> String {
+        switch save.kind {
+        case LAUNCHER_SAVE_QUICK:
+            return L.t("QUICK SAVE")
+        case LAUNCHER_SAVE_AUTO:
+            return L.t("AUTO SAVE")
+        case LAUNCHER_SAVE_BACKGROUND:
+            return L.t("BACKGROUND SAVE")
+        default:
+            return save.name
+        }
     }
 
     /// Destructive roles need iOS 15; on iOS 14 the item is a plain button.
@@ -624,6 +662,10 @@ struct LauncherView: View {
                let save = selectedSave ?? model.saves.first {
                 LauncherMusic.shared.stop()
                 model.play(onPlay: onPlay, loadSlot: save.slot)
+            } else if model.saves.isEmpty {
+                // There is no save to lose: a new game starts without asking.
+                LauncherMusic.shared.stop()
+                model.play(onPlay: onPlay, loadSlot: nil)
             } else {
                 // A new game shares this game's slots rather than making its
                 // own, so it asks first, with the music still playing.
@@ -711,7 +753,7 @@ struct LauncherView: View {
         }
 
         if let save = selectedSave ?? model.saves.first {
-            return save.name.uppercased()
+            return saveTitle(save).uppercased()
         }
 
         return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
@@ -1816,7 +1858,7 @@ struct LauncherView: View {
                       detail: "Vibrate when you press an on-screen button",
                       isOn: $model.buttonHaptics)
 
-            row("Auto quick save", detail: "The game quick-saves by itself at this interval. OFF stops it.") {
+            row("Auto save", detail: "The game writes an AUTO SAVE of its own at this interval. OFF stops it.") {
                 HStack(spacing: 8) {
                     Button {
                         model.autoSaveMinutes = max(0, model.autoSaveMinutes - 1)
@@ -2021,8 +2063,8 @@ struct LauncherView: View {
         }
     }
 
-    /// A new game keeps the same slots, so it asks before it starts: its first
-    /// save would otherwise take a slot that holds a game already.
+    /// A new game writes over its three automatic saves, so it asks before it
+    /// starts: the game played so far is only in the player's own slots.
     private var newGameWarning: some View {
         ZStack {
             Color.black.opacity(0.62)
@@ -2034,7 +2076,7 @@ struct LauncherView: View {
                     .kerning(0.8)
                     .foregroundColor(Theme.text)
 
-                Text(L.t("A new game is not a separate save: it shares this game's slots, so a quick save can replace one that is already there."))
+                Text(L.t("A new game starts from the beginning: its three automatic saves are written over, and the saves in your own slots are kept."))
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(Theme.dim)
                     .fixedSize(horizontal: false, vertical: true)

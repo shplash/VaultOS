@@ -333,6 +333,12 @@ static int _main_load_new(char* mapFileName)
     gameMouseSetCursor(MOUSE_CURSOR_NONE);
     mouseShowCursor();
     mapLoadByName(mapFileName);
+
+    // A new game has reached the world: its three automatic saves are written
+    // once the map settles. A game opened from a save does not come through
+    // here, so its saves are never written over.
+    loadsave_new_game_started();
+
     wmMapMusicStart();
     paletteFadeTo(gPaletteWhite);
     windowDestroy(win);

@@ -27,6 +27,21 @@ void loadsave_preview_all(void);
 // save as its own playtime, so the launcher can show it.
 void loadsave_play_time_tick(void);
 
+// QUICK SAVE: the quick slot, written with no screen.
+int iosQuickSaveAuto(void);
+
+// The launcher's AUTO SAVE: the auto slot, written with no screen.
+int iosAutoSave(void);
+
+// The recovery save written when the app leaves the foreground, once per
+// background session. `loadsave_background_return` starts the next session.
+int loadsave_save_background(void);
+void loadsave_background_return(void);
+
+// A new game has reached the playable world: its three automatic saves are
+// written once, a moment later, and never again for that game.
+void loadsave_new_game_started(void);
+
 } // namespace fallout
 
 #endif /* FALLOUT_ENGINE_IOS_SAVES_H_ */

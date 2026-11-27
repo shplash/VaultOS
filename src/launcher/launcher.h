@@ -97,6 +97,20 @@ void launcher_default_options(LauncherOptions* options);
 // `game` is one of LAUNCHER_GAME_*.
 void launcher_scan(const char* install_dir, int32_t game, LauncherInstallInfo* info);
 
+// The launcher's own saves, which have the first three slots: a manual save
+// never writes them, and none of the three is written by another.
+enum {
+    LAUNCHER_SAVE_MANUAL = 0,
+    LAUNCHER_SAVE_QUICK = 1,
+    LAUNCHER_SAVE_AUTO = 2,
+    LAUNCHER_SAVE_BACKGROUND = 3,
+};
+
+// Which of those saves a save is: by the slot it is in, and by the name it
+// carries, since an older build's quick save can sit in another slot.
+int32_t launcher_save_slot_kind(int32_t slot);
+int32_t launcher_save_kind(const char* name);
+
 // Extracts the game data from `zip_path` into `install_dir` and writes the
 // configuration files. The container is read from the file rather than asked
 // for: a ZIP, a 7z or RAR archive, or a game CD as an ISO, IMG, BIN or CUE,
@@ -192,6 +206,13 @@ void fallout_ios_hide_keyboard(void);
 void fallout_ios_present_shift(double points);
 void fallout_ios_pause_game_audio(void);
 void fallout_ios_resume_game_audio(void);
+
+// iOS only: writes the game's recovery save when the app leaves the foreground,
+// once per background session: 1 saved, 0 nothing to save, -1 failed.
+// `fallout_ios_background_return` is called when the app comes back, so the next
+// background save is a new session's.
+int fallout_ios_background_save(void);
+void fallout_ios_background_return(void);
 
 // Installation progress, 0..1. Only meaningful while an install is running.
 double launcher_progress(void);
