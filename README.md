@@ -78,5 +78,4 @@ The code is under the [Sustainable Use License](LICENSE.md), Also see
   </a>
 </p>
 
-If VaultOS has been useful to you, you can support its development as well as
-future projects.
+Support this projects development as well as future projects :)
