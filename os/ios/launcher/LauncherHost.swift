@@ -45,10 +45,9 @@ final class LauncherHost {
 
     private func appWillResignActive() {
         if finished {
-            // The game is running; pause both its SDL stream and the launcher
-            // track if the main menu is using it.
+            // The game is running: silence its SDL stream. The launcher track was
+            // stopped when the launcher handed over, so there is none to pause.
             fallout_ios_pause_game_audio()
-            LauncherMusic.shared.pause()
         } else {
             // Leaving the launcher in the background should silence its music.
             LauncherMusic.shared.stop()
@@ -58,7 +57,6 @@ final class LauncherHost {
     private func appDidBecomeActive() {
         if finished {
             fallout_ios_resume_game_audio()
-            LauncherMusic.shared.resume()
         } else if window != nil {
             // Launching the app rotates the interface to landscape, which lands
             // after the launcher's window exists.
@@ -185,6 +183,10 @@ final class LauncherHost {
             return
         }
         finished = true
+
+        // The track belongs to the launcher: nothing else stops it, and it was
+        // left playing over whatever the game started next.
+        LauncherMusic.shared.stop()
 
         for observer in sizeObservers {
             NotificationCenter.default.removeObserver(observer)
@@ -2902,20 +2904,21 @@ public func falloutIOSInstallGameControls() {
 
 // MARK: - Launcher music
 
-/// Background music for the launcher, reused by the game's main menu. Loading a
-/// small MP3 directly avoids the delay of decoding an ACM track from the game
-/// data first.
+/// Background music for the launcher, from the MP3s bundled with the app. It is
+/// stopped when the launcher hands over, so the game plays its own music.
 final class LauncherMusic {
     static let shared = LauncherMusic()
 
     private static let volume: Float = 0.32
     /// The track bundled with the app, used by any game that has no theme of
-    /// its own. It stops being used once both games have theirs.
+    /// its own.
     private static let sharedTrack = "intro music"
-    /// Per-game themes, in the order they are looked for in the bundle.
+    /// Per-game themes, in the order they are looked for in the bundle. A name is
+    /// only a file name: one the bundle does not carry is skipped, so a game
+    /// plays the shared track until a theme of its own is added.
     private static let themeNames: [FalloutGame: [String]] = [
-        .fallout1: ["maybe", "fallout1 music"],
-        .fallout2: ["blue moon", "fallout2 music"],
+        .fallout1: ["fallout1 music"],
+        .fallout2: ["fallout2 music"],
     ]
 
     private var player: AVAudioPlayer?
@@ -2938,7 +2941,7 @@ final class LauncherMusic {
 
     /// The track a game plays, or nil when the app carries no music at all.
     /// A game's own theme wins; otherwise the shared track covers it, which is
-    /// how one generic file keeps both games scored until the real songs land.
+    /// how one generic file keeps both games scored.
     static func themeName(for game: FalloutGame) -> String? {
         let names = (themeNames[game] ?? []) + [sharedTrack]
         for name in names where !name.isEmpty {
@@ -2991,14 +2994,6 @@ final class LauncherMusic {
         play(track: track)
     }
 
-    func pause() {
-        player?.pause()
-    }
-
-    func resume() {
-        player?.play()
-    }
-
     func stop() {
         player?.stop()
         player = nil
@@ -3008,8 +3003,10 @@ final class LauncherMusic {
     }
 }
 
-// The game's own main menu asks for 07desert.acm. On iOS the launcher MP3 is
-// used there too, so the bundled track replaces the game-data ACM cleanly.
+// Offered to the engines through the host callbacks, for a main menu that would
+// rather play the bundled track than decode the music in its own game data.
+// Neither engine asks for it yet - both play their menu music themselves - so
+// nothing calls these two today.
 @_cdecl("fallout_ios_menu_music_start")
 public func fallout_ios_menu_music_start() {
     LauncherMusic.shared.playIfAvailable()

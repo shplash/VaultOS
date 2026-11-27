@@ -335,9 +335,10 @@ endif()
 if(APPLE)
     if(IOS)
         # Any MP3 in assets/audio is bundled as a theme track, so a song can be
-        # dropped in without editing this list. The launcher looks for "maybe"
-        # for Fallout, "blue moon" for Fallout 2, and "intro music" as the shared
-        # fallback used by any game without a theme of its own.
+        # dropped in without editing this list. The launcher looks for
+        # "fallout1 music" for Fallout, "fallout2 music" for Fallout 2, and
+        # "intro music" as the shared fallback used by any game without a theme of
+        # its own.
         file(GLOB MUSIC_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/assets/audio/*.mp3")
         file(GLOB FONT_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/assets/fonts/*")
 
