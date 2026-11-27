@@ -387,15 +387,23 @@ struct LauncherView: View {
         // The heading's line and the two gaps around the buttons come out of
         // the height.
         let spacing: CGFloat = 4
-        let buttonHeight = max(22, (height - 14 - spacing * 2) / 2)
+        let buttonHeight = min(34, max(22, (height - 14 - spacing * 2) / 2))
 
         VStack(alignment: .leading, spacing: spacing) {
+            // The badge says whether the files are in: the game's own colour
+            // for DONE, amber for what is still needed.
             headerLine(L.t("Game data"),
-                       badge: info.installed == 1 ? "DONE" : "NEEDED")
+                       badge: info.installed == 1 ? "DONE" : "NEEDED",
+                       badgeColour: info.installed == 1 ? Theme.dim : Vault.amber,
+                       dot: info.installed == 1 ? game.accent : Vault.amber)
 
             if model.isInstalling || model.importSummary != nil {
                 gameDataStatus(game: game)
             } else {
+                // The heading stays on the row's top line and the buttons end
+                // on its bottom one, so they line up with the shot beside them.
+                Spacer(minLength: 0)
+
                 Button {
                     pendingImport = .language
                     model.showImporter = true
@@ -417,7 +425,7 @@ struct LauncherView: View {
                 .disabled(model.isInstalling)
             }
         }
-        .frame(width: width, alignment: .leading)
+        .frame(width: width, height: height, alignment: .leading)
     }
 
     @ViewBuilder
@@ -454,6 +462,13 @@ struct LauncherView: View {
         for slot in 1...10 where !slots.contains(slot) {
             slots.append(slot)
         }
+        // The fade at either end, and how far it reaches: a row that can still
+        // move that way fades, and one that has reached its end does not.
+        let offset = min(0, max(limit, savesScroll))
+        let fade: CGFloat = 24
+        let leftAlpha = 1 - 0.65 * min(1, max(0, -offset / fade))
+        let rightAlpha = 1 - 0.65 * min(1, max(0, (offset - limit) / fade))
+        let edge = min(0.5, fade / max(width, 1))
 
         return HStack(spacing: spacing) {
             ForEach(slots, id: \.self) { slot in
@@ -473,6 +488,17 @@ struct LauncherView: View {
         .frame(width: width, alignment: .leading)
         .frame(height: cardHeight, alignment: .leading)
         .clipped()
+        // The sliver at the edge is a card cut by the row, so it fades rather
+        // than being sliced. The fade never reaches nothing, so the drag on the
+        // row is left as it was.
+        .mask(
+            LinearGradient(stops: [
+                .init(color: Color.black.opacity(leftAlpha), location: 0),
+                .init(color: .black, location: edge),
+                .init(color: .black, location: 1 - edge),
+                .init(color: Color.black.opacity(rightAlpha), location: 1)
+            ], startPoint: .leading, endPoint: .trailing)
+        )
     }
 
     private func saveCard(slot: Int,
@@ -485,60 +511,63 @@ struct LauncherView: View {
         // Inset equally from every corner so the plate reads as laid on the
         // shot.
         let inset = max(4, min(width, height) * 0.03)
-        // The line under the shot keeps its own height, so every card is the
-        // same height whether it holds a save or not.
-        let stampHeight = max(9, min(12, height * 0.14))
-        let pictureHeight = max(20, height - stampHeight - 2)
+        // The shot fills the card, so the row's height is the picture's.
+        let pictureHeight = max(20, height)
+        // When it was written, at the corner across from the plate. A card too
+        // small for the badge leaves it off.
+        let age = save.flatMap { saveAge($0) }
+        let showsAge = age != nil && pictureHeight >= 52 && width >= 110
 
-        return VStack(spacing: 2) {
-            Group {
-                if let save = save {
-                    savePicture(save: save, width: width, height: pictureHeight)
-                        .overlay(
-                            // The shot carries its name, time and level.
-                            savePlate(save: save, width: width - inset * 2)
-                                .padding(inset),
-                            alignment: .topLeading
-                        )
-                } else {
-                    // An empty slot: a save mark and EMPTY SLOT in the notes'
-                    // grey.
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Color.white.opacity(0.05))
-                        .frame(width: width, height: pictureHeight)
-                        .overlay(
-                            VStack(spacing: 5) {
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 18, weight: .regular))
-                                    .foregroundColor(Theme.faint)
-
-                                Text(L.t("EMPTY SLOT"))
-                                    .font(Vault.label(8, weight: .regular))
-                                    .kerning(1.0)
-                                    .foregroundColor(Theme.faint)
+        return Group {
+            if let save = save {
+                savePicture(save: save, width: width, height: pictureHeight)
+                    .overlay(
+                        // The shot carries its name, time and level.
+                        savePlate(save: save, width: width - inset * 2)
+                            .padding(inset),
+                        alignment: .topLeading
+                    )
+                    .overlay(
+                        // The plate holds the top left, so the age takes the
+                        // corner across from it.
+                        Group {
+                            if showsAge, let age = age {
+                                saveAgeBadge(age)
+                                    .padding(inset)
                             }
-                        )
-                }
-            }
-            .frame(width: width, height: pictureHeight)
-            // Borders are drawn inside the picture's edge: grey on every slot,
-            // the game's colour on the save CONTINUE opens, white on a picked
-            // empty slot. Drawn inside, they cover the scaled shot's edge.
-            .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30), lineWidth: 1))
-            .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1))
-            .overlay(shape.strokeBorder(chosen ? Color.white.opacity(0.9) : Color.clear, lineWidth: 1))
+                        },
+                        alignment: .bottomTrailing
+                    )
+            } else {
+                // An empty slot: a save mark and EMPTY SLOT in the notes'
+                // grey.
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+                    .frame(width: width, height: pictureHeight)
+                    .overlay(
+                        VStack(spacing: 5) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 18, weight: .regular))
+                                .foregroundColor(Theme.faint)
 
-            // When it was saved, under the shot and in the same grey as the
-            // level and time on it. An empty slot keeps the line blank, so the
-            // cards still line up.
-            Text(save?.saved ?? " ")
-                .font(Vault.label(max(7, stampHeight * 0.8), weight: .regular))
-                .kerning(0.3)
-                .foregroundColor(Theme.faint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.55)
-                .opacity(save == nil ? 0 : 1)
+                            Text(L.t("EMPTY SLOT"))
+                                .font(Vault.label(8, weight: .regular))
+                                .kerning(1.0)
+                                .foregroundColor(Theme.faint)
+                        }
+                    )
+            }
         }
+        .frame(width: width, height: pictureHeight)
+        // Borders are drawn inside the picture's edge: grey on every slot, the
+        // game's colour on the save CONTINUE opens, white on a picked empty
+        // slot. Drawn inside, they cover the scaled shot's edge. An empty slot
+        // is dashed, so it reads as one rather than as a shot gone blank.
+        .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30),
+                                    style: StrokeStyle(lineWidth: 1,
+                                                       dash: save == nil ? [4, 3] : [])))
+        .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1.5))
+        .overlay(shape.strokeBorder(chosen ? Color.white.opacity(0.9) : Color.clear, lineWidth: 1))
         .frame(width: width, height: height, alignment: .top)
         .contentShape(Rectangle())
         .onTapGesture {
@@ -554,6 +583,14 @@ struct LauncherView: View {
                 deleteCandidate = save
             }
         })
+        // No line under the shot any more, so VoiceOver reads the save's own
+        // absolute time in place of it.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cardLabel(save))
+        .accessibilityAddTraits(active || chosen ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction {
+            selectedSlot = selectedSlot == slot ? nil : slot
+        }
     }
 
     /// The save's picture, filling the card and clipped to its corners, so the
@@ -570,6 +607,10 @@ struct LauncherView: View {
                 .aspectRatio(contentMode: .fill)
                 .frame(width: width, height: height)
                 .clipped()
+                // The engine writes the shot from the raw palette, without the
+                // gamma the game draws with, so it lands darker here than it
+                // looks on screen.
+                .brightness(0.06)
                 .clipShape(shape)
         } else {
             shape
@@ -605,7 +646,7 @@ struct LauncherView: View {
                 Text(detail)
                     .font(Vault.label(9 * scale, weight: .regular))
                     .kerning(0.6)
-                    .foregroundColor(Theme.faint)
+                    .foregroundColor(Theme.dim)
                     .lineLimit(1)
             }
         }
@@ -614,7 +655,7 @@ struct LauncherView: View {
         .padding(.horizontal, 7 * scale)
         .padding(.vertical, 5 * scale)
         .frame(width: plateWidth)
-        .background(shape.fill(Color.black.opacity(0.34)))
+        .background(shape.fill(Color.black.opacity(0.40)))
         .overlay(shape.stroke(Color.white.opacity(0.12), lineWidth: 1))
         .overlay(
             Rectangle()
@@ -637,10 +678,86 @@ struct LauncherView: View {
             parts.append("\(L.t("LVL")) \(save.level)")
         }
 
-        // Close, but not tight enough to read as one word. The time it was
-        // saved is its own line under the shot, so it is not repeated here.
+        // Close, but not tight enough to read as one word. When it was saved is
+        // the badge on the shot, so it is not repeated here.
         return parts.joined(separator: "·")
     }
+
+    /// How long ago a save was written, as the badge on its shot says it: an
+    /// age where one reads well, the date itself where it does not.
+    private func saveAge(_ save: LauncherModel.LauncherSave,
+                         now: Date = Date()) -> String? {
+        let modified = save.modified
+        // A save whose folder could not be read carries no time at all.
+        if modified < LauncherView.epoch {
+            return nil
+        }
+
+        let elapsed = now.timeIntervalSince(modified)
+        // A clock set back reads as a date, not as a time before the save was
+        // written.
+        if elapsed < -300 {
+            return LauncherView.saveAgeDate(modified, now: now)
+        }
+
+        if elapsed < 60 {
+            return L.t("JUST NOW")
+        }
+        if elapsed < 3600 {
+            return LauncherView.saveAgeCount("{n} MIN AGO", count: Int(elapsed / 60))
+        }
+        if elapsed < 86400 {
+            return LauncherView.saveAgeCount("{n} HR AGO", count: Int(elapsed / 3600))
+        }
+
+        // Days, not hours: the day it was written is counted, so a save 25
+        // hours old across two midnights reads as two days.
+        let calendar = Calendar.current
+        let days = max(1, calendar.dateComponents([.day],
+                                                  from: calendar.startOfDay(for: modified),
+                                                  to: calendar.startOfDay(for: now)).day ?? 1)
+        switch days {
+        case 1:
+            return L.t("YESTERDAY")
+        case 2...6:
+            return LauncherView.saveAgeCount("{n} D AGO", count: days)
+        case 7...29:
+            return LauncherView.saveAgeCount("{n} WK AGO", count: days / 7)
+        default:
+            return LauncherView.saveAgeDate(modified, now: now)
+        }
+    }
+
+    /// The badge's date, in the device's own order and in the caps the rest of
+    /// the shot is written in.
+    private static func saveAgeDate(_ date: Date, now: Date) -> String {
+        let calendar = Calendar.current
+        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
+        let formatter = sameYear ? LauncherView.ageDay : LauncherView.ageDayYear
+        return formatter.string(from: date).uppercased()
+    }
+
+    private static func saveAgeCount(_ key: String, count: Int) -> String {
+        return L.t(key).replacingOccurrences(of: "{n}", with: String(count))
+    }
+
+    /// Built once: a formatter made per card would be built again on every
+    /// frame of a drag.
+    private static let ageDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("dMMM")
+        return formatter
+    }()
+
+    private static let ageDayYear: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("dMMMy")
+        return formatter
+    }()
+
+    /// Before this no save exists: the model's own fallback for a folder it
+    /// could not read.
+    private static let epoch = Date(timeIntervalSince1970: 31_536_000)
 
     /// What the carousel calls a save: the launcher's own three are named by the
     /// launcher, in the player's language, and every other save by the name it
@@ -656,6 +773,40 @@ struct LauncherView: View {
         default:
             return save.name
         }
+    }
+
+    /// The age on a save's shot, in its bottom right corner. It is a note laid
+    /// on the shot rather than a second plate, so it has no edge of its own.
+    private func saveAgeBadge(_ text: String) -> some View {
+        Text(text)
+            .font(Vault.label(8, weight: .regular))
+            .kerning(0.6)
+            .foregroundColor(Theme.dim)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color.black.opacity(0.45))
+            )
+            .allowsHitTesting(false)
+    }
+
+    /// What VoiceOver reads for a card: the shot carries the age as a badge, so
+    /// the save's own absolute time is read out in its place.
+    private func cardLabel(_ save: LauncherModel.LauncherSave?) -> String {
+        guard let save = save else {
+            return L.t("EMPTY SLOT")
+        }
+
+        var parts = [saveTitle(save)]
+        let detail = saveDetail(save)
+        if !detail.isEmpty {
+            parts.append(detail)
+        }
+        parts.append(save.saved)
+        return parts.joined(separator: ", ")
     }
 
     /// A hold asks before the save goes: the launcher deletes the slot, and the
@@ -725,7 +876,7 @@ struct LauncherView: View {
         } label: {
             VStack(spacing: 3) {
                 Text(buttonTitle)
-                    .font(Vault.display(24))
+                    .font(Vault.display(22))
                     .kerning(titleKerning)
                     .padding(.trailing, -titleKerning)
                     .frame(maxWidth: .infinity)
@@ -734,7 +885,7 @@ struct LauncherView: View {
                 Text(statusText)
                     .font(Vault.label(10, weight: .bold))
                     .kerning(nameKerning)
-                    .foregroundColor(Vault.ink.opacity(0.62))
+                    .foregroundColor(Vault.ink.opacity(0.68))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.trailing, -nameKerning)
@@ -746,7 +897,7 @@ struct LauncherView: View {
                     Text(detail)
                         .font(Vault.label(9, weight: .regular))
                         .kerning(detailKerning)
-                        .foregroundColor(Vault.ink.opacity(0.46))
+                        .foregroundColor(Vault.ink.opacity(0.55))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .padding(.trailing, -detailKerning)
@@ -756,9 +907,9 @@ struct LauncherView: View {
             }
             // The height is set inside the style so the fill is that height
             // too, and PLAY stays as tall as CONTINUE without a detail line.
-            .frame(maxWidth: .infinity, minHeight: LauncherView.continueHeight - 20)
+            .frame(maxWidth: .infinity, minHeight: LauncherView.continueHeight - 16)
         }
-        .buttonStyle(PrimaryButtonStyle(accent: accent))
+        .buttonStyle(PrimaryButtonStyle(accent: accent, verticalPadding: 8))
         .disabled(model.install.installed == 0 || model.isInstalling)
         .opacity(model.install.installed == 1 ? 1 : 0.35)
     }
@@ -1073,6 +1224,9 @@ struct LauncherView: View {
         // without clipping at the card's edge.
         let filesWidth = max(126, widest + 30)
         let savesWidth = max(columns - filesWidth - 19, 90)
+        // The row takes what the page has left over, so the shot beside
+        // CONTINUE gets the room the hero cannot spare.
+        let rowHeight = LauncherView.savesRowHeight(forPageHeight: height)
         return VStack(alignment: .leading, spacing: 0) {
             hero(game: game)
 
@@ -1087,7 +1241,7 @@ struct LauncherView: View {
             HStack(alignment: .top, spacing: 0) {
                 savesColumn(game: game,
                             width: savesWidth,
-                            rowHeight: LauncherView.continueHeight,
+                            rowHeight: rowHeight,
                             selected: selected)
 
                 Rectangle()
@@ -1097,10 +1251,10 @@ struct LauncherView: View {
                 gameDataColumn(game: game,
                                info: info,
                                width: filesWidth,
-                               height: LauncherView.continueHeight)
+                               height: rowHeight)
                     .padding(.leading, 18)
             }
-            .frame(height: LauncherView.continueHeight)
+            .frame(height: rowHeight)
             .padding(.horizontal, Metrics.sheetInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -1123,14 +1277,24 @@ struct LauncherView: View {
     /// Tap height of a link, taller than the disc and the word it draws.
     private static let linkTapHeight: CGFloat = 44
 
-    /// The height CONTINUE is drawn at; the saves row beside it matches, so the
-    /// two read as one band across the launcher.
+    /// The height CONTINUE is drawn at, and the least the saves row beside it
+    /// takes.
     private static var continueHeight: CGFloat {
-        let title = VaultUI.display(24).lineHeight
+        let title = VaultUI.display(22).lineHeight
         let name = VaultUI.label(10, weight: .bold).lineHeight
         let detail = VaultUI.label(9, weight: .regular).lineHeight
         // Two gaps between the three lines, plus the button's own padding.
-        return title + name + detail + 6 + 20
+        return title + name + detail + 6 + 16
+    }
+
+    /// The saves row's height: CONTINUE's own plus what the page has left
+    /// over, so the shots grow without the hero giving up more than a little.
+    /// Four points stay unused, so a page with nothing to spare draws as it
+    /// did.
+    private static func savesRowHeight(forPageHeight pageHeight: CGFloat) -> CGFloat {
+        let base = LauncherView.continueHeight
+        let slack = pageHeight - (LauncherView.heroHeight + 1 + Metrics.gap + base)
+        return base + min(max(slack - 4, 0), 24)
     }
 
     /// Width of the word FALLOUT, which the game switch above it matches so it
@@ -2034,14 +2198,24 @@ struct LauncherView: View {
 
     private func headerLine(_ title: String,
                             badge: String? = nil,
-                            badgeColour: Color? = nil) -> some View {
+                            badgeColour: Color? = nil,
+                            dot: Color? = nil) -> some View {
         return HStack(spacing: 6) {
             Text(title)
                 .font(Vault.body(12, weight: .medium))
                 .foregroundColor(Theme.text)
                 .lineLimit(1)
 
-            // A note beside the header, in the game's own colour.
+            // A small mark ahead of the badge: the game's colour once its
+            // files are in, amber until they are.
+            if let dot = dot {
+                Circle()
+                    .fill(dot)
+                    .frame(width: 5, height: 5)
+            }
+
+            // A note beside the header, in the game's own colour unless it says
+            // otherwise.
             if let badge = badge {
                 Text(L.t(badge))
                     .font(Vault.label(9, weight: .bold))
@@ -2566,13 +2740,16 @@ private struct PillToggle: View {
 
 private struct PrimaryButtonStyle: ButtonStyle {
     let accent: Color
+    /// The room above and below the label. playButton sets it so PLAY and
+    /// CONTINUE with its three lines come out the same height.
+    var verticalPadding: CGFloat = 10
 
     func makeBody(configuration: Configuration) -> some View {
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
 
         return configuration.label
             .foregroundColor(Vault.ink)
-            .padding(.vertical, 10)
+            .padding(.vertical, verticalPadding)
             .frame(maxWidth: .infinity)
             .background(shape.fill(accent))
             .overlay(shape.stroke(Vault.edgeLight, lineWidth: 1))
