@@ -25,7 +25,7 @@
 - A ZIP of your own game files is all it needs; the app ships no game data
 - Touch controls you can move, resize, fade and colour
 - Language packs and savegame backups handled in the launcher
-- New and tweaked mechanics to accommodate both a small screen and touch controls
+- New and improved mechanics to accommodate both a small screen and touch controls
 
 ## Install
 
