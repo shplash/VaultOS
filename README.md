@@ -29,9 +29,9 @@
 ## Install
 
 1. Get the latest [release](https://github.com/shplash/vaultos/releases).
-2. Sideload the IPA with AltStore, SideStore, Feather, LiveContainer or
-   TrollStore. LiveContainer needs its **Fix File Picker** option turned on, or
-   the file picker will not open.
+2. Sideload the IPA with AltStore, SideStore, Feather, LiveContainer or TrollStore.
+
+If LiveContainer doesn’t let you select the zip, try turning its **Fix File Picker** option on.
 
 ## Requirements
 
@@ -65,14 +65,9 @@ Bethesda or Interplay.
 
 VaultOS is a modified version of Alexander Batalov's Fallout Community Edition
 engines ([Fallout CE](https://github.com/alexbatalov/fallout1-ce),
-[Fallout 2 CE](https://github.com/alexbatalov/fallout2-ce)): the launcher, the
-iOS port and the touch controls are this project's, and the Fallout 1 sources
-here are the engine with those changes in them.
+[Fallout 2 CE](https://github.com/alexbatalov/fallout2-ce)).
 
-The code is under the [Sustainable Use License](LICENSE.md), which is not the
-whole of what the app carries: the Anton font is under the SIL Open Font
-License, SDL is under the zlib licence, the two link icons are MIT and CC BY 4.0,
-and the bundled artwork and music are not part of the licensed source. See
+The code is under the [Sustainable Use License](LICENSE.md), Also see
 [third_party](third_party/README.md).
 
 ## Support
