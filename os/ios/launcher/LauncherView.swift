@@ -1170,15 +1170,12 @@ struct LauncherView: View {
                         Spacer(minLength: 10)
 
                         plainLink(L.t("SUPPORT ME"), address: "https://ko-fi.com/shplash") {
-                            // The mug's art reaches into its box's corners,
-                            // which a circle cuts: a little smaller than the
-                            // octocat, its corners stay inside the disc.
-                            Image("coffee-mark")
+                            Image("donate-mark")
                                 .renderingMode(.template)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: LauncherView.linkDisc * 0.76,
-                                       height: LauncherView.linkDisc * 0.76)
+                                .frame(width: LauncherView.linkDisc * 0.84,
+                                       height: LauncherView.linkDisc * 0.84)
                         }
                     }
                     .frame(width: LauncherView.heroEditionWidth, alignment: .leading)

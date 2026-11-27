@@ -1,15 +1,15 @@
 # Third-party artwork
 
-The launcher's two link marks are vector assets in `os/ios/AppIcon.xcassets`. They come from these
-sources, and their licences are kept here rather than in the launcher.
+The launcher's two link marks are vector assets in `os/ios/AppIcon.xcassets`. Their notices are kept
+here, each in its own folder, rather than in the launcher.
 
 ## github-mark
 
 The GitHub mark, from [Primer Octicons](https://github.com/primer/octicons): `mark-github-24.svg`.
 Copyright GitHub, Inc., under the MIT licence.
 
-## coffee-mark
+## donate-mark
 
-The `mug-hot` icon, from [Font Awesome Free](https://fontawesome.com) 6.7.2.
-Copyright Fonticons, Inc., under the CC BY 4.0 licence. This notice is the attribution that licence
-asks for.
+The `donate-heart` icon, from [Boxicons](https://github.com/atisawd/boxicons) by way of
+[SVG Repo](https://www.svgrepo.com/svg/334622/donate-heart/), under CC BY 4.0. The attribution that
+licence asks for is in [boxicons/LICENSE](boxicons/LICENSE).
