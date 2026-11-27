@@ -4,6 +4,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <strings.h>
+#include <sys/stat.h>
 
 namespace {
 
@@ -29,6 +31,31 @@ void fallout_engine_set_install_dir(const char* path)
 const char* fallout_engine_install_dir()
 {
     return g_install_dir;
+}
+
+const char* fallout_engine_support_file(const char* name)
+{
+    static char path[4096];
+    char directory[4096];
+
+    // The folder sits beside the installations: one level above a game's own
+    // folder, and inside the app's Documents for Fallout 1 itself.
+    std::snprintf(directory, sizeof(directory), "%s", g_install_dir);
+    size_t length = std::strlen(directory);
+    while (length > 1 && directory[length - 1] == '/') {
+        directory[--length] = '\0';
+    }
+
+    char* separator = std::strrchr(directory, '/');
+    if (separator != nullptr && strcasecmp(separator + 1, "Documents") != 0) {
+        *separator = '\0';
+    }
+
+    std::snprintf(path, sizeof(path), "%s/VaultOS", directory);
+    mkdir(path, 0755);
+    std::snprintf(directory, sizeof(directory), "%s", path);
+    std::snprintf(path, sizeof(path), "%s/%s", directory, name);
+    return path;
 }
 
 void fallout_engine_set_host(const FalloutEngineHost* host)

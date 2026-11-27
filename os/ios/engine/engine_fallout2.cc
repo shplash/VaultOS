@@ -71,9 +71,9 @@ int run(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    // Fallout 2's own log, beside its game files, so a crash or a failed start
-    // leaves a trail the player can read - the same file Fallout 1 writes.
-    fallout::_debug_register_log("vaultos-log.txt", "wt");
+    // Fallout 2's own log, in the launcher's folder beside the installations,
+    // so a crash or a failed start leaves a trail the player can read.
+    fallout::_debug_register_log(fallout_engine_support_file("fallout2-log.txt"), "wt");
 
     atexit(SDL_Quit);
 

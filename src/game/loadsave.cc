@@ -11,6 +11,8 @@
 
 #include <algorithm>
 
+#include "engine_glue.h"
+
 #include "game/automap.h"
 #include "game/bmpdlog.h"
 #include "game/combat.h"
@@ -433,17 +435,15 @@ static void put_long(unsigned char* dest, unsigned int value)
     dest[3] = (unsigned char)((value >> 24) & 0xFF);
 }
 
-// Everything that goes wrong here lands in a note beside the game, which the
-// Files app shows: a save that will not open, a picture that is not written, a
-// time that is not counted. Without it a failure is silent, which is how a
-// picture and a playtime could be missing with nothing to say why.
+// Everything that goes wrong here lands in a note in the launcher's own folder,
+// which the Files app shows: a save that will not open, a picture that is not
+// written, a time that is not counted. Without it a failure is silent.
 static void saves_log(const char* format, ...)
 {
     char path[COMPAT_MAX_PATH];
-    snprintf(path, sizeof(path), "%svaultos-saves.log", iOSGetDocumentsPath());
+    snprintf(path, sizeof(path), "%s", fallout_engine_support_file("fallout1-saves.log"));
 
-    // Bounded before anything is added: this note is written on every failure,
-    // and it sits in the folder the player browses their saves in.
+    // Bounded before anything is added: this note is written on every failure.
     launcher_trim_log(path, LAUNCHER_LOG_LIMIT_BYTES, LAUNCHER_LOG_KEEP_BYTES);
 
     FILE* fp = fopen(path, "at");

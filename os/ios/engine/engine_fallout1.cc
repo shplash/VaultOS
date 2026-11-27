@@ -60,10 +60,10 @@ int run(int argc, char** argv)
         chdir(installDir);
     }
 
-    // The engine's start-up log beside the game data: every step printed as it
-    // completes or fails, so a game that stops before its first frame leaves
-    // behind the step it stopped at.
-    fallout::debug_register_log("vaultos-log.txt", "wt");
+    // The engine's start-up log, in the launcher's own folder: every step
+    // printed as it completes or fails, so a game that stops before its first
+    // frame leaves behind the step it stopped at.
+    fallout::debug_register_log(fallout_engine_support_file("fallout1-log.txt"), "wt");
 
     // Which binary this log came from: the About page version alone cannot tell
     // a fresh install from a stale one, and a restored build tree compiles
@@ -89,8 +89,8 @@ int run(int argc, char** argv)
             "The game stopped while starting up. The files it needs are missing "
             "or damaged, or the game data left over from an earlier import is "
             "in the way. Import the game ZIP again from the launcher's HOME "
-            "page. A log naming the step that failed is in vaultos-log.txt, "
-            "beside your game files.");
+            "page. A log naming the step that failed is in the VaultOS folder, "
+            "as fallout1-log.txt.");
     }
 
     return result;

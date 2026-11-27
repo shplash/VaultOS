@@ -305,9 +305,28 @@ static void glowNearbyItems()
             continue;
         }
 
+        // A body that fell in a fight still wears the combat outline, and a
+        // corpse is often flagged never to be highlighted, so a new outline is
+        // refused while either holds. Set it directly instead, so the body turns
+        // white as it falls rather than when the fight ends.
+        Rect oldRect;
+        oldRect.ulx = 0;
+        oldRect.uly = 0;
+        oldRect.lrx = 0;
+        oldRect.lry = 0;
+        bool hadOutline = (object->outline & OUTLINE_TYPE_MASK) != 0;
+        if (hadOutline) {
+            objectClearOutline(object, &oldRect);
+        }
+
+        object->outline = OUTLINE_TYPE_ITEM;
+        objectEnableOutline(object, nullptr);
+
         Rect rect;
-        if (objectSetOutline(object, OUTLINE_TYPE_ITEM, &rect) == 0) {
-            tileWindowRefreshRect(&rect, object->elevation);
+        objectGetRect(object, &rect);
+        tileWindowRefreshRect(&rect, object->elevation);
+        if (hadOutline) {
+            tileWindowRefreshRect(&oldRect, object->elevation);
         }
     }
 }

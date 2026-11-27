@@ -13,6 +13,10 @@ void fallout_engine_set_install_dir(const char* path);
 // The install directory, always with a trailing slash, or an empty string.
 const char* fallout_engine_install_dir();
 
+// A file in the launcher's own folder beside the installations, created on first
+// use. Every log the app leaves for the player lives there.
+const char* fallout_engine_support_file(const char* name);
+
 void fallout_engine_set_host(const FalloutEngineHost* host);
 const FalloutEngineHost* fallout_engine_host();
 

@@ -27,6 +27,7 @@
 #include "delay.h"
 #include "display_monitor.h"
 #include "draw.h"
+#include "engine_glue.h"
 #include "file_utils.h"
 #include "game.h"
 #include "game_mouse.h"
@@ -928,17 +929,15 @@ void loadsave_play_time_tick(void)
     started = true;
 }
 
-// Everything that goes wrong here lands in a note beside the game, which the
-// Files app shows: a save that will not open, a picture that is not written, a
-// time that is not counted. Without it a failure is silent, which is how a
-// picture and a playtime could be missing with nothing to say why.
+// Everything that goes wrong here lands in a note in the launcher's own folder,
+// which the Files app shows: a save that will not open, a picture that is not
+// written, a time that is not counted. Without it a failure is silent.
 static void saves_log(const char* format, ...)
 {
     char path[COMPAT_MAX_PATH];
-    snprintf(path, sizeof(path), "%svaultos-saves.log", iOSGetDocumentsPath());
+    snprintf(path, sizeof(path), "%s", fallout_engine_support_file("fallout2-saves.log"));
 
-    // Bounded before anything is added: this note is written on every failure,
-    // and it sits in the folder the player browses their saves in.
+    // Bounded before anything is added: this note is written on every failure.
     launcher_trim_log(path, LAUNCHER_LOG_LIMIT_BYTES, LAUNCHER_LOG_KEEP_BYTES);
 
     FILE* fp = fopen(path, "at");
