@@ -974,12 +974,14 @@ final class GameControlsOverlay: UIView {
     private let amountPlusButton = LabeledControlButton(
         title: "",
         symbol: "plus",
-        iconPointSize: 16
+        iconPointSize: 16,
+        layout: .horizontal
     )
     private let amountMinusButton = LabeledControlButton(
         title: "",
         symbol: "minus",
-        iconPointSize: 16
+        iconPointSize: 16,
+        layout: .horizontal
     )
     private var menuRectCache: CGRect?
     private var menuRectScreen: ScreenMode = .game

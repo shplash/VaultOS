@@ -1542,7 +1542,7 @@ struct LauncherView: View {
                     ("Aim", "An aimed shot costs one more action point and can cripple a limb, which often ends a fight faster than damage."),
                     ("VATS", "The attack mode's aimed steps are the game's VATS: they show the chance to hit and cost one more action point."),
                     ("Skills", "While a skill is armed the mode button reads USE SKILL, and pressing it goes back to move or target. Arm one from the skilldex or from an object's menu."),
-                    ("Red isn't always hostile", "A red outline can belong to a neutral who will fight back. Nothing in either game marks friend and foe apart, so watch who is shooting at you."),
+                    ("Red isn't always hostile", "A red outline can belong to a neutral who will fight back. Fallout 1's Friendly Foe perk turns your own side green; Fallout 2 does that by default."),
                 ]
             case .launcher:
                 return [
@@ -3248,10 +3248,10 @@ private struct TouchControlEditor: View {
 // MARK: - Launcher log
 
 /// What the launcher itself did: each picker, what it handed back and what each
-/// import was given. Kept in `VaultOS/vaultos-launcher.log`, separate from the
-/// engine's `vaultos-log.txt`, which it truncates on every start. Nothing here
-/// is for the player: it exists so a picker that does nothing can be read
-/// instead of guessed at.
+/// import was given. Kept in `VaultOS/vaultos-launcher.log`, beside the engines'
+/// own logs, which each truncate their file on every start. Nothing here is for
+/// the player: it exists so a picker that does nothing can be read instead of
+/// guessed at.
 enum LauncherLog {
     static func write(_ message: String) {
         NSLog("VaultOS: %@", message)
