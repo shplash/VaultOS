@@ -5197,6 +5197,10 @@ void draw_amount(int value, int inventoryWindowType)
     win_draw_rect(mt_wid, &rect);
 }
 
+// Set by the on-screen ALL and DONE buttons: the window's loop reads it as the
+// press of its own button.
+int ios_move_timer_request = 0;
+
 // 0x469458
 static int do_move_timer(int inventoryWindowType, Object* item, int max)
 {
@@ -5224,6 +5228,10 @@ static int do_move_timer(int inventoryWindowType, Object* item, int max)
         sharedFpsLimiter.mark();
 
         int keyCode = get_input();
+        if (ios_move_timer_request != 0) {
+            keyCode = ios_move_timer_request == 1 ? 5000 : KEY_RETURN;
+            ios_move_timer_request = 0;
+        }
         if (keyCode == KEY_ESCAPE) {
             exit_move_timer_win(inventoryWindowType);
             return -1;

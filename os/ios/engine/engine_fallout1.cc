@@ -20,6 +20,7 @@
 #include "game/gmouse.h"
 #include "game/gmovie.h"
 #include "game/intface.h"
+#include "game/inventry.h"
 #include "game/ios_screen.h"
 #include "game/item.h"
 #include "game/loadsave.h"
@@ -204,6 +205,11 @@ int action_available(int action)
         return has_firearm_in_hand() ? 1 : 0;
     case 21:
         return screen() == fallout::IOS_SCREEN_DIALOGUE ? 0 : 1;
+    case 28:
+    case 29:
+        // ALL and DONE on the "MOVE ITEMS" window, which the game drives
+        // itself: they exist only while that window is on screen.
+        return screen() == fallout::IOS_SCREEN_PICK_AMOUNT ? 1 : 0;
     default:
         break;
     }
@@ -326,6 +332,13 @@ void press_action(int action)
         break;
     case 27:
         ios_send_scan_code(SDL_SCANCODE_A);
+        break;
+    case 28:
+        // ALL on the "MOVE ITEMS" window, read by that window's own loop.
+        fallout::ios_move_timer_request = 1;
+        break;
+    case 29:
+        fallout::ios_move_timer_request = 2;
         break;
     default:
         break;
@@ -522,7 +535,8 @@ int movie_state()
         return 0;
     }
 
-    return movie == fallout::MOVIE_IPLOGO || movie == fallout::MOVIE_INTRO ? 1 : 2;
+    // The logo is a tap; the intro is a full video and is held, like Fallout 2's.
+    return movie == fallout::MOVIE_IPLOGO ? 1 : 2;
 }
 
 int screen()

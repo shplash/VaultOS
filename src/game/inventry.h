@@ -54,6 +54,11 @@ typedef struct IosListRect {
 int ios_list_rects(IosListRect* rects, int capacity);
 int ios_list_slot_height();
 
+// Set by the on-screen ALL and DONE buttons while the "MOVE ITEMS" window is
+// open: 1 is ALL, 2 is DONE, and the window's own loop reads it as the press
+// of its own button.
+extern int ios_move_timer_request;
+
 extern CacheEntry* ikey[OFF_59E7BC_COUNT];
 
 void inven_set_dude(Object* obj, int pid);
