@@ -389,13 +389,18 @@ struct LauncherView: View {
         let spacing: CGFloat = 4
         let buttonHeight = min(34, max(22, (height - 14 - spacing * 2) / 2))
 
+        // The launcher's own scan of the install folder says whether the files
+        // are there, so a game copied in by hand counts as installed.
+        let installed = info.installed == 1
+
         VStack(alignment: .leading, spacing: spacing) {
-            // The badge says whether the files are in: the game's own colour
-            // for DONE, amber for what is still needed.
+            // A tick once the files are in, a dash until they are. The note
+            // beside it is the game's own colour until they are.
             headerLine(L.t("Game data"),
-                       badge: info.installed == 1 ? "DONE" : "NEEDED",
-                       badgeColour: info.installed == 1 ? Theme.dim : Vault.amber,
-                       dot: info.installed == 1 ? game.accent : Vault.amber)
+                       badge: installed ? "DONE" : "NEEDED",
+                       badgeColour: installed ? Theme.dim : game.accent,
+                       mark: installed ? "checkmark" : "minus",
+                       markColour: installed ? game.accent : Theme.faint)
 
             if model.isInstalling || model.importSummary != nil {
                 gameDataStatus(game: game)
@@ -412,13 +417,13 @@ struct LauncherView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: buttonHeight))
-                .disabled(model.isInstalling || info.installed == 0)
+                .disabled(model.isInstalling || !installed)
 
                 Button {
                     pendingImport = .game
                     model.showImporter = true
                 } label: {
-                    Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME"))
+                    Text(L.t(installed ? "REPLACE FILES" : "IMPORT GAME"))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: buttonHeight))
@@ -507,7 +512,7 @@ struct LauncherView: View {
                           chosen: Bool,
                           width: CGFloat,
                           height: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         // Inset equally from every corner so the plate reads as laid on the
         // shot.
         let inset = max(4, min(width, height) * 0.03)
@@ -541,7 +546,7 @@ struct LauncherView: View {
             } else {
                 // An empty slot: a save mark and EMPTY SLOT in the notes'
                 // grey.
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.white.opacity(0.05))
                     .frame(width: width, height: pictureHeight)
                     .overlay(
@@ -599,7 +604,7 @@ struct LauncherView: View {
     private func savePicture(save: LauncherModel.LauncherSave,
                              width: CGFloat,
                              height: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
 
         if let url = save.preview, let image = UIImage(contentsOfFile: url.path) {
             Image(uiImage: image)
@@ -625,7 +630,7 @@ struct LauncherView: View {
         // Eighteen percent under the card's own type, so the plate stays a
         // note on the shot.
         let scale: CGFloat = 0.82
-        let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
         let detail = saveDetail(save)
         let detailWidth = ceil((detail as NSString).size(withAttributes: [
             .font: VaultUI.label(9 * scale),
@@ -854,7 +859,6 @@ struct LauncherView: View {
         // line off centre by half of it; take it back with trailing padding.
         let titleKerning: CGFloat = 1.6
         let nameKerning: CGFloat = 1.3
-        let detailKerning: CGFloat = 1.4
 
         return Button {
             // An empty slot starts the game rather than loading a save that is
@@ -891,22 +895,9 @@ struct LauncherView: View {
                     .padding(.trailing, -nameKerning)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
-
-                // Time played and level under the name, in a thinner face.
-                if let detail = continueDetail {
-                    Text(detail)
-                        .font(Vault.label(9, weight: .regular))
-                        .kerning(detailKerning)
-                        .foregroundColor(Vault.ink.opacity(0.55))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.trailing, -detailKerning)
-                        .frame(maxWidth: .infinity)
-                        .multilineTextAlignment(.center)
-                }
             }
             // The height is set inside the style so the fill is that height
-            // too, and PLAY stays as tall as CONTINUE without a detail line.
+            // too, and PLAY stays as tall as CONTINUE.
             .frame(maxWidth: .infinity, minHeight: LauncherView.continueHeight - 16)
         }
         .buttonStyle(PrimaryButtonStyle(accent: accent, verticalPadding: 8))
@@ -958,31 +949,6 @@ struct LauncherView: View {
         }
 
         return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
-    }
-
-    /// The save's play time and level under its name; a new game has neither.
-    private var continueDetail: String? {
-        guard !model.isInstalling, !picksEmptySlot else {
-            return nil
-        }
-
-        guard let save = selectedSave ?? model.saves.first else {
-            return nil
-        }
-
-        // Saves from before play time was kept would read as `0:00 · LEVEL 0`,
-        // so only what they carry is listed.
-        var parts: [String] = []
-        if let played = save.played {
-            parts.append(played)
-        }
-
-        if save.level > 0 {
-            parts.append("\(L.t("LVL")) \(save.level)")
-        }
-
-        // Close, but not tight enough to read as one word.
-        return parts.isEmpty ? nil : parts.joined(separator: "·")
     }
 
     // MARK: - Pages
@@ -1040,10 +1006,12 @@ struct LauncherView: View {
             .clipped()
             .contentShape(Rectangle())
             // One gesture for the whole card: a drag that begins in the saves box
-            // slides its slots, any other turns the page. Two competing gestures
-            // left the box scrolling the page instead of itself.
+            // slides its slots, any other turns the page. It outranks the
+            // controls under it, so a drag that starts on a button, a link or
+            // the game switch turns the page instead of tapping what it began
+            // on; a touch that never moves still reaches them.
             .coordinateSpace(name: LauncherView.cardSpace)
-            .simultaneousGesture(homePagingGesture(width: pageWidth))
+            .highPriorityGesture(homePagingGesture(width: pageWidth))
             .onPreferenceChange(SavesBoxKey.self) { box in
                 savesBox = box
             }
@@ -1282,9 +1250,9 @@ struct LauncherView: View {
     private static var continueHeight: CGFloat {
         let title = VaultUI.display(22).lineHeight
         let name = VaultUI.label(10, weight: .bold).lineHeight
-        let detail = VaultUI.label(9, weight: .regular).lineHeight
-        // Two gaps between the three lines, plus the button's own padding.
-        return title + name + detail + 6 + 16
+        // One gap between the two lines, plus the button's own padding. The
+        // save's time and level are on its card, not repeated here.
+        return title + name + 3 + 16
     }
 
     /// The saves row's height: CONTINUE's own plus what the page has left
@@ -2199,19 +2167,20 @@ struct LauncherView: View {
     private func headerLine(_ title: String,
                             badge: String? = nil,
                             badgeColour: Color? = nil,
-                            dot: Color? = nil) -> some View {
+                            mark: String? = nil,
+                            markColour: Color? = nil) -> some View {
         return HStack(spacing: 6) {
             Text(title)
                 .font(Vault.body(12, weight: .medium))
                 .foregroundColor(Theme.text)
                 .lineLimit(1)
 
-            // A small mark ahead of the badge: the game's colour once its
-            // files are in, amber until they are.
-            if let dot = dot {
-                Circle()
-                    .fill(dot)
-                    .frame(width: 5, height: 5)
+            // A tick or a dash ahead of the note, small enough to read as part
+            // of the line rather than as an icon.
+            if let mark = mark {
+                Image(systemName: mark)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(markColour ?? Theme.faint)
             }
 
             // A note beside the header, in the game's own colour unless it says
