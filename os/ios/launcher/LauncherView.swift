@@ -393,7 +393,7 @@ struct LauncherView: View {
                     pendingImport = .game
                     model.showImporter = true
                 } label: {
-                    Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP"))
+                    Text(L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME"))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SmallButtonStyle(accent: game.accent, minHeight: buttonHeight))
@@ -973,7 +973,7 @@ struct LauncherView: View {
         let columns = width - Metrics.sheetInset * 2
         // The game data is as wide as its buttons and sits at the far right.
         let labels = [L.t("LANGUAGE FILES"),
-                      L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT ZIP")]
+                      L.t(info.installed == 1 ? "REPLACE FILES" : "IMPORT GAME")]
         let widest = labels.reduce(CGFloat(0)) { widest, name in
             max(widest, ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width))
         }
@@ -3356,7 +3356,19 @@ final class LauncherDocumentPicker: NSObject, UIDocumentPickerDelegate {
 
     private var completion: ((URL?) -> Void)?
 
-    func present(contentTypes: [UTType] = [UTType.zip], completion: @escaping (URL?) -> Void) {
+    /// Every container the importer reads: a ZIP, a game CD or its image. A 7z
+    /// or RAR file can be picked too, so its message can say what to do instead.
+    static let importTypes: [UTType] = {
+        var types: [UTType] = [UTType.zip]
+        for name in ["iso", "bin", "cue", "img", "7z", "rar"] {
+            if let type = UTType(filenameExtension: name) {
+                types.append(type)
+            }
+        }
+        return types
+    }()
+
+    func present(contentTypes: [UTType] = LauncherDocumentPicker.importTypes, completion: @escaping (URL?) -> Void) {
         guard let controller = LauncherDocumentPicker.topViewController() else {
             LauncherLog.write("picker: no view controller to present from")
             completion(nil)

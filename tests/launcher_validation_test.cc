@@ -258,6 +258,339 @@ static void write_zip(const fs::path& path, const std::vector<ZipItem>& items)
     stream.write(archive.data(), static_cast<std::streamsize>(archive.size()));
 }
 
+// A game CD, built here so no copyrighted game data has to be shipped: a primary
+// volume descriptor with its root, an optional Joliet tree with long names, and
+// the file data behind them.
+struct IsoItem {
+    std::string name;
+    std::string contents;
+};
+
+struct IsoNode {
+    std::string name;
+    std::string contents;
+    bool directory = false;
+    size_t parent = 0;
+    uint32_t lba = 0;
+    uint32_t size = 0;
+    std::vector<size_t> children;
+};
+
+static void put_be16(std::string& out, uint16_t value)
+{
+    out.push_back(static_cast<char>((value >> 8) & 0xff));
+    out.push_back(static_cast<char>(value & 0xff));
+}
+
+static void put_be32(std::string& out, uint32_t value)
+{
+    out.push_back(static_cast<char>((value >> 24) & 0xff));
+    out.push_back(static_cast<char>((value >> 16) & 0xff));
+    out.push_back(static_cast<char>((value >> 8) & 0xff));
+    out.push_back(static_cast<char>(value & 0xff));
+}
+
+// Joliet stores every character in two bytes, most significant first.
+static std::string ucs2be(const std::string& value)
+{
+    std::string out;
+    for (char character : value) {
+        out.push_back('\0');
+        out.push_back(character);
+    }
+    return out;
+}
+
+static size_t iso_find_child(const std::vector<IsoNode>& nodes, size_t parent,
+    const std::string& name)
+{
+    for (size_t child : nodes[parent].children) {
+        if (nodes[child].name == name) {
+            return child;
+        }
+    }
+    return static_cast<size_t>(-1);
+}
+
+static void iso_add_item(std::vector<IsoNode>& nodes, const IsoItem& item)
+{
+    size_t parent = 0;
+    size_t start = 0;
+
+    while (start < item.name.size()) {
+        const size_t slash = item.name.find('/', start);
+        const bool last = slash == std::string::npos;
+        const std::string name = item.name.substr(start,
+            last ? std::string::npos : slash - start);
+
+        size_t node = iso_find_child(nodes, parent, name);
+        if (node == static_cast<size_t>(-1)) {
+            IsoNode created;
+            created.name = name;
+            created.directory = !last;
+            created.contents = last ? item.contents : std::string();
+            created.parent = parent;
+            node = nodes.size();
+            nodes.push_back(created);
+            nodes[parent].children.push_back(node);
+        }
+
+        if (last) {
+            return;
+        }
+        parent = node;
+        start = slash + 1;
+    }
+}
+
+static std::vector<IsoNode> iso_tree(const std::vector<IsoItem>& items)
+{
+    std::vector<IsoNode> nodes(1);
+    nodes[0].directory = true;
+
+    for (const IsoItem& item : items) {
+        iso_add_item(nodes, item);
+    }
+
+    return nodes;
+}
+
+// A file carries its ISO 9660 version, and a Joliet tree stores the name in two
+// bytes per character.
+static std::string iso_stored_name(const IsoNode& node, bool joliet)
+{
+    const std::string name = node.directory ? node.name : node.name + ";1";
+    return joliet ? ucs2be(name) : name;
+}
+
+static uint32_t iso_record_size(size_t name_length)
+{
+    return static_cast<uint32_t>(33 + name_length + (name_length % 2 == 0 ? 1 : 0));
+}
+
+// One directory record, with the location and the size in both byte orders as
+// ISO 9660 asks for.
+static std::string iso_record(const std::string& name, uint32_t lba, uint32_t size,
+    bool directory)
+{
+    std::string record;
+    record.push_back(static_cast<char>(iso_record_size(name.size())));
+    record.push_back('\0'); // extended attribute length
+    put_u32(record, lba);
+    put_be32(record, lba);
+    put_u32(record, size);
+    put_be32(record, size);
+    for (int index = 0; index < 7; index++) {
+        record.push_back('\0'); // recording date
+    }
+    record.push_back(static_cast<char>(directory ? 0x02 : 0x00)); // file flags
+    record.push_back('\0'); // file unit size
+    record.push_back('\0'); // interleave gap
+    put_u16(record, 1);     // volume sequence number
+    put_be16(record, 1);
+    record.push_back(static_cast<char>(name.size()));
+    record += name;
+    if (name.size() % 2 == 0) {
+        record.push_back('\0'); // a record ends on a whole word
+    }
+    return record;
+}
+
+static uint32_t iso_listing_size(const std::vector<IsoNode>& nodes, size_t directory,
+    bool joliet)
+{
+    uint32_t size = iso_record_size(1) + iso_record_size(1); // "." and ".."
+
+    for (size_t child : nodes[directory].children) {
+        size += iso_record_size(iso_stored_name(nodes[child], joliet).size());
+    }
+
+    return ((size + 2047) / 2048) * 2048;
+}
+
+static std::string iso_listing(const std::vector<IsoNode>& nodes, size_t directory,
+    bool joliet)
+{
+    const IsoNode& folder = nodes[directory];
+
+    std::string listing;
+    listing += iso_record(std::string(1, '\0'), folder.lba, folder.size, true);
+    listing += iso_record(std::string(1, '\1'), nodes[folder.parent].lba,
+        nodes[folder.parent].size, true);
+
+    for (size_t child : folder.children) {
+        const IsoNode& entry = nodes[child];
+        listing += iso_record(iso_stored_name(entry, joliet), entry.lba, entry.size,
+            entry.directory);
+    }
+
+    return listing;
+}
+
+// Places the folder listings first and the file data behind them, so every
+// record can name where its entry really starts.
+static uint32_t iso_place(std::vector<IsoNode>& nodes, uint32_t sector, bool joliet)
+{
+    for (size_t index = 0; index < nodes.size(); index++) {
+        if (!nodes[index].directory) {
+            continue;
+        }
+        nodes[index].size = iso_listing_size(nodes, index, joliet);
+        nodes[index].lba = sector;
+        sector += nodes[index].size / 2048;
+    }
+
+    for (IsoNode& node : nodes) {
+        if (node.directory) {
+            continue;
+        }
+        node.lba = sector;
+        node.size = static_cast<uint32_t>(node.contents.size());
+        sector += static_cast<uint32_t>((node.size + 2047) / 2048);
+    }
+
+    return sector;
+}
+
+static void iso_descriptor(std::string& image, uint32_t sector, unsigned char type,
+    const IsoNode& root, uint32_t total_sectors, const char* escape)
+{
+    const size_t base = static_cast<size_t>(sector) * 2048;
+
+    image[base] = static_cast<char>(type);
+    std::memcpy(&image[base + 1], "CD001", 5);
+    image[base + 6] = 1; // version
+
+    std::string field;
+    put_u32(field, total_sectors);
+    put_be32(field, total_sectors);
+    std::memcpy(&image[base + 80], field.data(), field.size()); // volume space size
+
+    field.clear();
+    put_u16(field, 2048);
+    put_be16(field, 2048);
+    std::memcpy(&image[base + 128], field.data(), field.size()); // logical block size
+
+    field.clear();
+    put_u16(field, 1);
+    put_be16(field, 1);
+    std::memcpy(&image[base + 120], field.data(), field.size()); // volume set size
+    std::memcpy(&image[base + 124], field.data(), field.size()); // volume sequence number
+
+    if (escape != nullptr) {
+        std::memcpy(&image[base + 88], escape, 3);
+    }
+
+    const std::string record = iso_record(std::string(1, '\0'), root.lba, root.size, true);
+    std::memcpy(&image[base + 156], record.data(), record.size()); // the root record
+}
+
+static std::string build_iso(const std::vector<IsoItem>& primary,
+    const std::vector<IsoItem>& joliet)
+{
+    std::vector<IsoNode> primary_nodes = iso_tree(primary);
+    std::vector<IsoNode> joliet_nodes = iso_tree(joliet);
+
+    // Sectors 0-15 are the system area, then the descriptors, then one sector
+    // that ends them.
+    const uint32_t last_descriptor = joliet.empty() ? 17 : 18;
+    uint32_t sector = last_descriptor + 1;
+
+    sector = iso_place(primary_nodes, sector, false);
+    if (!joliet.empty()) {
+        sector = iso_place(joliet_nodes, sector, true);
+    }
+
+    std::string image(static_cast<size_t>(sector) * 2048, '\0');
+
+    iso_descriptor(image, 16, 1, primary_nodes[0], sector, nullptr);
+    if (!joliet.empty()) {
+        iso_descriptor(image, 17, 2, joliet_nodes[0], sector, "%/E");
+    }
+
+    const size_t end = static_cast<size_t>(last_descriptor) * 2048;
+    image[end] = static_cast<char>(0xff);
+    std::memcpy(&image[end + 1], "CD001", 5);
+    image[end + 6] = 1;
+
+    for (size_t index = 0; index < primary_nodes.size(); index++) {
+        if (!primary_nodes[index].directory) {
+            continue;
+        }
+        const std::string listing = iso_listing(primary_nodes, index, false);
+        std::memcpy(&image[static_cast<size_t>(primary_nodes[index].lba) * 2048],
+            listing.data(), listing.size());
+    }
+
+    if (!joliet.empty()) {
+        for (size_t index = 0; index < joliet_nodes.size(); index++) {
+            if (!joliet_nodes[index].directory) {
+                continue;
+            }
+            const std::string listing = iso_listing(joliet_nodes, index, true);
+            std::memcpy(&image[static_cast<size_t>(joliet_nodes[index].lba) * 2048],
+                listing.data(), listing.size());
+        }
+    }
+
+    for (const IsoNode& node : primary_nodes) {
+        if (node.directory) {
+            continue;
+        }
+        std::memcpy(&image[static_cast<size_t>(node.lba) * 2048], node.contents.data(),
+            node.contents.size());
+    }
+
+    if (!joliet.empty()) {
+        for (const IsoNode& node : joliet_nodes) {
+            if (node.directory) {
+                continue;
+            }
+            std::memcpy(&image[static_cast<size_t>(node.lba) * 2048], node.contents.data(),
+                node.contents.size());
+        }
+    }
+
+    return image;
+}
+
+// A raw MODE1/2352 track: the sync pattern and the header in front of every one
+// of the image's 2048-byte sectors.
+static std::string raw_track(const std::string& image)
+{
+    std::string track;
+
+    for (size_t sector = 0; sector * 2048 < image.size(); sector++) {
+        std::string raw(2352, '\0');
+        std::fill(raw.begin() + 1, raw.begin() + 11, static_cast<char>(0xff));
+        raw[12] = 0; // minutes
+        raw[13] = 0; // seconds
+        raw[14] = 0; // frames
+        raw[15] = 1; // mode 1
+        std::memcpy(&raw[16], image.data() + sector * 2048, 2048);
+        track += raw;
+    }
+
+    return track;
+}
+
+// The folders the importer unpacks a disc image into: there must be none left
+// over after an import, whether it worked or not.
+static int import_folders()
+{
+    std::error_code ec;
+    int count = 0;
+
+    for (const fs::directory_entry& entry :
+        fs::directory_iterator(fs::temp_directory_path(ec), ec)) {
+        if (entry.path().filename().string().rfind("vaultos-import-", 0) == 0) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
 int main()
 {
     check_translation_tables();
@@ -527,6 +860,234 @@ int main()
         CHECK(file_contains(fallout1 / "data" / "art" / "tiles.trx", "installed-tiles"));
         CHECK(file_contains(fallout1 / "data" / "SAVEGAME" / "SLOT01" / "save.dat", "save-data"));
         CHECK(!fs::exists(fallout1 / "SAVEGAME" / "SLOT01" / "save.dat"));
+    }
+
+    // A game CD offered as an ISO is installed from the image itself, and the
+    // files it holds are validated exactly as a ZIP's are.
+    const fs::path iso_install = root / "Fallout from ISO";
+    {
+        const fs::path iso = root / "Fallout CD.iso";
+        write_file(iso, build_iso({
+            { "master.dat", "iso-master" },
+            { "critter.dat", "iso-critter" },
+            { "data/art/tiles.trx", "iso-tiles" },
+        }, {}));
+
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(iso.string().c_str(), iso_install.string().c_str(), &options)
+            == LAUNCHER_OK);
+        CHECK(file_contains(iso_install / "master.dat", "iso-master"));
+        CHECK(file_contains(iso_install / "critter.dat", "iso-critter"));
+        CHECK(file_contains(iso_install / "data" / "art" / "tiles.trx", "iso-tiles"));
+
+        scan(iso_install, LAUNCHER_GAME_FALLOUT1, &info);
+        CHECK(info.installed == 1);
+    }
+
+    // A Fallout 2 disc installs as Fallout 2, and is refused as Fallout 1 before
+    // its patch archive can land in a Fallout 1 folder.
+    {
+        const fs::path iso = root / "Fallout 2 CD.iso";
+        write_file(iso, build_iso({
+            { "master.dat", "iso2-master" },
+            { "critter.dat", "iso2-critter" },
+            { "patch000.dat", "iso2-patch" },
+            { "data/art/tiles.trx", "iso2-tiles" },
+        }, {}));
+
+        LauncherOptions fallout1Options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(iso.string().c_str(), iso_install.string().c_str(),
+                  &fallout1Options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("patch000.dat") != std::string::npos);
+        CHECK(!fs::exists(iso_install / "patch000.dat"));
+        CHECK(file_contains(iso_install / "master.dat", "iso-master"));
+
+        const fs::path fallout2_install = root / "Fallout 2 from ISO";
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT2);
+        CHECK(launcher_install_zip(iso.string().c_str(), fallout2_install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(fallout2_install / "patch000.dat", "iso2-patch"));
+        CHECK(file_contains(fallout2_install / "data" / "art" / "tiles.trx", "iso2-tiles"));
+    }
+
+    // A disc that carries Joliet names is read with them: its plain names have no
+    // data folder, so only the Joliet tree can install.
+    {
+        const fs::path iso = root / "Fallout Joliet.iso";
+        write_file(iso, build_iso({
+            { "master.dat", "joliet-master" },
+            { "critter.dat", "joliet-critter" },
+        }, {
+            { "master.dat", "joliet-master" },
+            { "critter.dat", "joliet-critter" },
+            { "data/art/tiles.trx", "joliet-tiles" },
+        }));
+
+        const fs::path install = root / "Fallout from Joliet";
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(iso.string().c_str(), install.string().c_str(), &options)
+            == LAUNCHER_OK);
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "joliet-tiles"));
+    }
+
+    // A raw BIN with its CUE: the reader keeps the 2048 bytes behind each
+    // sector's sync pattern and header, and the sheet says where they start.
+    {
+        const fs::path bin = root / "Fallout CD.bin";
+        write_file(bin, raw_track(build_iso({
+            { "master.dat", "bin-master" },
+            { "critter.dat", "bin-critter" },
+            { "data/art/tiles.trx", "bin-tiles" },
+        }, {})));
+        write_file(root / "Fallout CD.cue",
+            "FILE \"Fallout CD.bin\" BINARY\n"
+            "  TRACK 01 MODE1/2352\n"
+            "    INDEX 01 00:00:00\n");
+
+        const fs::path install = root / "Fallout from BIN";
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip((root / "Fallout CD.cue").string().c_str(),
+                  install.string().c_str(), &options) == LAUNCHER_OK);
+        CHECK(file_contains(install / "master.dat", "bin-master"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "bin-tiles"));
+
+        // A bare BIN has no sheet to name its track, so the layout is read from
+        // the sector pattern itself.
+        const fs::path bare = root / "Fallout from a bare BIN";
+        CHECK(launcher_install_zip(bin.string().c_str(), bare.string().c_str(), &options)
+            == LAUNCHER_OK);
+        CHECK(file_contains(bare / "master.dat", "bin-master"));
+    }
+
+    // A mixed-mode sheet names an audio track first: it is stepped over rather
+    // than read as the disc's data.
+    {
+        const fs::path bin = root / "mixed.bin";
+        write_file(bin, raw_track(build_iso({
+            { "master.dat", "mixed-master" },
+            { "critter.dat", "mixed-critter" },
+            { "data/art/tiles.trx", "mixed-tiles" },
+        }, {})));
+        write_file(root / "mixed.cue",
+            "FILE \"mixed.bin\" BINARY\n"
+            "  TRACK 01 AUDIO\n"
+            "    INDEX 01 00:00:00\n"
+            "  TRACK 02 MODE1/2352\n"
+            "    INDEX 01 00:00:00\n");
+
+        const fs::path install = root / "Fallout from a mixed-mode disc";
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip((root / "mixed.cue").string().c_str(),
+                  install.string().c_str(), &options) == LAUNCHER_OK);
+        CHECK(file_contains(install / "master.dat", "mixed-master"));
+    }
+
+    // A ZIP of a CD holds the image rather than the game: both are unpacked into
+    // a folder of the app's own, which is gone when the import ends.
+    {
+        const fs::path archive = root / "Fallout CD.zip";
+        write_zip(archive, {
+            { "cd.bin", raw_track(build_iso({
+                { "master.dat", "zipcd-master" },
+                { "critter.dat", "zipcd-critter" },
+                { "data/art/tiles.trx", "zipcd-tiles" },
+            }, {})) },
+            { "cd.cue", "FILE \"cd.bin\" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00\n" },
+        });
+
+        const int before = import_folders();
+        const fs::path install = root / "Fallout from a ZIP of a CD";
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(), &options)
+            == LAUNCHER_OK);
+        CHECK(file_contains(install / "master.dat", "zipcd-master"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "zipcd-tiles"));
+        CHECK(import_folders() == before);
+
+        // A CD that holds no game files is refused, and that folder is gone too.
+        const fs::path wrong = root / "Wrong CD.zip";
+        write_zip(wrong, { { "cd.iso", build_iso({ { "readme.txt", "hello" } }, {}) } });
+
+        CHECK(launcher_install_zip(wrong.string().c_str(),
+                  (root / "Fallout from a wrong CD").string().c_str(), &options)
+            == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("master.dat") != std::string::npos);
+        CHECK(import_folders() == before);
+    }
+
+    // A disc that is one of a set says so, rather than reporting the game as
+    // damaged.
+    {
+        const fs::path iso = root / "Fallout disc 1.iso";
+        write_file(iso, build_iso({ { "master.dat", "disc-master" } }, {}));
+
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(iso.string().c_str(),
+                  (root / "Fallout from disc 1").string().c_str(), &options)
+            == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("critter.dat") != std::string::npos);
+        CHECK(std::string(launcher_last_error()).find("one disc of a set")
+            != std::string::npos);
+    }
+
+    // An image with no filesystem, and a sheet pointing outside its own folder,
+    // are both refused with a reason and nothing is installed.
+    {
+        const fs::path broken = root / "broken.iso";
+        write_file(broken, std::string(64 * 2048, '\0'));
+
+        const fs::path install = root / "Fallout from a broken CD";
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(broken.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("ISO 9660") != std::string::npos);
+        CHECK(!fs::exists(install / "master.dat"));
+
+        write_file(root / "escaping.cue",
+            "FILE \"../outside.bin\" BINARY\n"
+            "  TRACK 01 MODE1/2352\n"
+            "    INDEX 01 00:00:00\n");
+        CHECK(launcher_install_zip((root / "escaping.cue").string().c_str(),
+                  install.string().c_str(), &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("outside its folder")
+            != std::string::npos);
+        CHECK(!fs::exists(install / "master.dat"));
+    }
+
+    // Formats there is no reader for are named, with what to do instead, rather
+    // than failing on a file that cannot be opened.
+    {
+        const char sevenZipMagic[] = { '7', 'z', '\xBC', '\xAF', '\x27', '\x1C' };
+        const char rarMagic[] = { 'R', 'a', 'r', '!', '\x1A', '\x07', '\x00' };
+        const char installerMagic[] = { 'M', 'Z' };
+
+        const fs::path sevenZip = root / "Fallout.7z";
+        write_file(sevenZip, std::string(sevenZipMagic, sizeof(sevenZipMagic))
+            + "not really an archive");
+
+        const fs::path rar = root / "Fallout.rar";
+        write_file(rar, std::string(rarMagic, sizeof(rarMagic)) + "not really an archive");
+
+        const fs::path installer = root / "setup_fallout.exe";
+        write_file(installer, std::string(installerMagic, sizeof(installerMagic))
+            + "not really an installer");
+
+        const fs::path nowhere = root / "Fallout from an archive";
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+
+        CHECK(launcher_install_zip(sevenZip.string().c_str(), nowhere.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("7z") != std::string::npos);
+
+        CHECK(launcher_install_zip(rar.string().c_str(), nowhere.string().c_str(), &options)
+            == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("RAR") != std::string::npos);
+
+        CHECK(launcher_install_zip(installer.string().c_str(), nowhere.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("installer") != std::string::npos);
+
+        CHECK(!fs::exists(nowhere / "master.dat"));
     }
 
     // Uppercase installations (CD-era copies) are detected as well.

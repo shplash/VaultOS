@@ -1,4 +1,5 @@
 #include "launcher/launcher.h"
+#include "launcher/launcher_disc.h"
 
 #include <algorithm>
 #include <atomic>
@@ -91,6 +92,14 @@ struct ZipEntry {
     uint64_t compressed_size = 0;
     uint64_t uncompressed_size = 0;
     uint64_t local_header_offset = 0;
+};
+
+// One file a source can hand over, whichever container it came from.
+struct SourceFile {
+    std::string name;
+    uint64_t size = 0;
+    const ZipEntry* zip = nullptr; // set for a ZIP, which reads it in place
+    size_t disc = 0;               // index into a disc image's file list
 };
 
 uint16_t read_u16(const unsigned char* data)
@@ -323,11 +332,11 @@ bool load_archive(const char* path, std::ifstream& archive, std::vector<ZipEntry
     return true;
 }
 
-bool has_data_folder(const std::vector<ZipEntry>& entries, const std::string& prefix)
+bool has_data_folder(const std::vector<SourceFile>& entries, const std::string& prefix)
 {
     std::string wanted = lower_ascii(prefix + "data/");
 
-    for (const ZipEntry& entry : entries) {
+    for (const SourceFile& entry : entries) {
         if (lower_ascii(entry.name).rfind(wanted, 0) == 0) {
             return true;
         }
@@ -339,7 +348,7 @@ bool has_data_folder(const std::vector<ZipEntry>& entries, const std::string& pr
 // Locates the folder containing the game: archives either store it at the root or
 // inside a single wrapper folder, and preferring one that also holds `data` keeps
 // an unrelated stray master.dat from winning.
-std::string find_game_prefix(const std::vector<ZipEntry>& entries)
+std::string find_game_prefix(const std::vector<SourceFile>& entries)
 {
     struct Candidate {
         std::string prefix;
@@ -349,7 +358,7 @@ std::string find_game_prefix(const std::vector<ZipEntry>& entries)
 
     std::vector<Candidate> candidates;
 
-    for (const ZipEntry& entry : entries) {
+    for (const SourceFile& entry : entries) {
         size_t slash = entry.name.find_last_of('/');
         std::string base = lower_ascii(slash == std::string::npos ? entry.name : entry.name.substr(slash + 1));
 
@@ -888,6 +897,388 @@ bool get_install_info(const fs::path& install_dir, int32_t game, LauncherInstall
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Importing a game
+// ---------------------------------------------------------------------------
+
+void add_progress(void* context, uint64_t bytes)
+{
+    (void)context;
+    g_progress_done.fetch_add(bytes);
+}
+
+// One source of game files: a ZIP read in place, or a disc image read by sector.
+struct Source {
+    bool disc = false;
+    std::ifstream archive;
+    LauncherDiscImage image;
+    std::vector<LauncherDiscFile> disc_files;
+    std::vector<SourceFile> files;
+};
+
+// A folder of the app's own, removed when the import ends whatever its outcome,
+// so nothing an image was unpacked from is left behind.
+std::atomic<int> g_temp_counter { 0 };
+
+struct TempFolder {
+    fs::path path;
+
+    bool create()
+    {
+        std::error_code ec;
+        const fs::path root = fs::temp_directory_path(ec);
+        if (ec) {
+            return fail("Cannot reach the temporary folder.");
+        }
+
+        for (int attempt = 0; attempt < 100; attempt++) {
+            const int index = g_temp_counter.fetch_add(1);
+            const std::string name = "vaultos-import-"
+                + std::to_string(static_cast<long long>(std::time(nullptr))) + "-"
+                + std::to_string(index);
+            path = root / name;
+            ec.clear();
+            if (fs::create_directory(path, ec)) {
+                return true;
+            }
+        }
+
+        return fail("Cannot create a temporary folder for the disc image.");
+    }
+
+    ~TempFolder()
+    {
+        if (path.empty()) {
+            return;
+        }
+        std::error_code ec;
+        fs::remove_all(path, ec);
+    }
+};
+
+bool is_image_name(const std::string& name)
+{
+    const std::string lower = lower_ascii(name);
+    for (const char* extension : { ".cue", ".iso", ".bin", ".img" }) {
+        const size_t length = std::strlen(extension);
+        if (lower.size() > length && lower.compare(lower.size() - length, length, extension) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool zip_has_master_dat(const std::vector<ZipEntry>& entries)
+{
+    for (const ZipEntry& entry : entries) {
+        const std::string lower = lower_ascii(entry.name);
+        const size_t slash = lower.find_last_of('/');
+        if ((slash == std::string::npos ? lower : lower.substr(slash + 1)) == "master.dat") {
+            return true;
+        }
+    }
+    return false;
+}
+
+// A disc image inside a ZIP: the CUE first, since it names its own track, then a
+// whole image, and a bare BIN last.
+const ZipEntry* find_game_image(const std::vector<ZipEntry>& entries)
+{
+    const ZipEntry* cue = nullptr;
+    const ZipEntry* iso = nullptr;
+    const ZipEntry* img = nullptr;
+    const ZipEntry* bin = nullptr;
+
+    for (const ZipEntry& entry : entries) {
+        if (is_junk_entry(entry.name)) {
+            continue;
+        }
+
+        const std::string lower = lower_ascii(entry.name);
+        const size_t length = lower.size();
+        if (length > 4 && lower.compare(length - 4, 4, ".cue") == 0) {
+            if (cue == nullptr) {
+                cue = &entry;
+            }
+        } else if (length > 4 && lower.compare(length - 4, 4, ".iso") == 0) {
+            if (iso == nullptr) {
+                iso = &entry;
+            }
+        } else if (length > 4 && lower.compare(length - 4, 4, ".img") == 0) {
+            if (img == nullptr) {
+                img = &entry;
+            }
+        } else if (length > 4 && lower.compare(length - 4, 4, ".bin") == 0) {
+            if (bin == nullptr) {
+                bin = &entry;
+            }
+        }
+    }
+
+    if (cue != nullptr) {
+        return cue;
+    }
+    if (iso != nullptr) {
+        return iso;
+    }
+    if (img != nullptr) {
+        return img;
+    }
+    return bin;
+}
+
+// Formats with no reader here are named rather than guessed at, so the message
+// can say what to do instead of failing on a file it cannot open.
+bool reject_unsupported_format(const char* path)
+{
+    std::ifstream stream(path, std::ios::binary);
+    if (!stream) {
+        return true; // the ZIP reader reports a file that cannot be opened
+    }
+
+    unsigned char magic[8] = { 0 };
+    stream.read(reinterpret_cast<char*>(magic), sizeof(magic));
+    if (stream.gcount() < 4) {
+        return true;
+    }
+
+    if (magic[0] == '7' && magic[1] == 'z' && magic[2] == 0xBC && magic[3] == 0xAF) {
+        return fail("7z archives are not supported yet. Unpack the game on a computer and import the folder as a ZIP, or import the game CD as an ISO, BIN/CUE or IMG.");
+    }
+
+    if (std::memcmp(magic, "Rar!", 4) == 0) {
+        return fail("RAR archives are not supported yet. Unpack the game on a computer and import the folder as a ZIP.");
+    }
+
+    if (magic[0] == 'M' && magic[1] == 'Z') {
+        return fail("Windows installers cannot be run here. GOG's offline installers are one: unpack them on a computer with innoextract, or import the game CD as an ISO, BIN/CUE or IMG.");
+    }
+
+    return true;
+}
+
+bool read_source_file(Source& source, const SourceFile& file, const fs::path& destination)
+{
+    if (!source.disc) {
+        return extract_entry(source.archive, *file.zip, destination);
+    }
+
+    std::string error;
+    if (!launcher_disc_extract(source.image, source.disc_files[file.disc],
+            destination.string().c_str(), add_progress, nullptr, &error)) {
+        return fail(error.empty() ? "Cannot read " + quote(file.name) + " from the disc image." : error);
+    }
+
+    return true;
+}
+
+// The one installation path for every container: the same game validation,
+// extraction and configuration, told what the files came from for its messages.
+int install_source(Source& source, const fs::path& destination, const LauncherOptions& options,
+    const char* kind)
+{
+    const std::string prefix = find_game_prefix(source.files);
+
+    bool has_master = false;
+    bool has_critter = false;
+    bool has_patch = false;
+    for (const SourceFile& file : source.files) {
+        const std::string name = lower_ascii(file.name);
+        if (name.size() < prefix.size() || name.compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
+            continue;
+        }
+        const std::string relative = name.substr(prefix.size());
+        if (relative == "master.dat") {
+            has_master = true;
+        } else if (relative == "critter.dat") {
+            has_critter = true;
+        } else if (relative == "patch000.dat") {
+            has_patch = true;
+        }
+    }
+
+    const bool requires_patch = is_fallout2(options);
+    const std::string from = std::string("This ") + kind + " doesn't look like a ";
+    if (requires_patch && !has_patch) {
+        fail(from + "Fallout 2 installation: patch000.dat not found. If this is the first game, choose Fallout in the launcher.");
+        return LAUNCHER_ERROR;
+    }
+    if (!requires_patch && has_patch) {
+        // patch000.dat only exists in Fallout 2. Extracting it over Fallout 1
+        // mixes the two data sets and the engine crashes on the first map.
+        fail(from + "Fallout installation: it contains patch000.dat. Choose Fallout 2 in the launcher first.");
+        return LAUNCHER_ERROR;
+    }
+    if (!has_master || !has_critter) {
+        std::string missing;
+        if (!has_master) {
+            missing = "master.dat";
+        }
+        if (!has_critter) {
+            if (!missing.empty()) {
+                missing += " and ";
+            }
+            missing += "critter.dat";
+        }
+        std::string message = from + game_name(options) + " installation: " + missing + " not found.";
+        if (source.disc) {
+            message += " If this is one disc of a set, import the disc that holds the game files.";
+        }
+        fail(message);
+        return LAUNCHER_ERROR;
+    }
+
+    if (!has_data_folder(source.files, prefix)) {
+        fail(from + game_name(options) + " installation: the data folder is missing.");
+        return LAUNCHER_ERROR;
+    }
+
+    uint64_t total_bytes = 0;
+    for (const SourceFile& file : source.files) {
+        const std::string name = lower_ascii(file.name);
+        if (name.size() < prefix.size() || name.compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
+            continue;
+        }
+        total_bytes += file.size;
+    }
+    g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
+
+    uint32_t extracted = 0;
+    for (const SourceFile& file : source.files) {
+        const std::string name = lower_ascii(file.name);
+        if (name.size() < prefix.size() || name.compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
+            continue;
+        }
+
+        const std::string relative = file.name.substr(prefix.size());
+        if (relative.empty()) {
+            continue;
+        }
+
+        // Savegames are the player's data, never installation data: ignore any
+        // entry that would replace them, in either folder a game keeps them in.
+        const std::string lower_relative = lower_ascii(relative);
+        if (lower_relative.rfind("savegame/", 0) == 0
+            || lower_relative.rfind("data/savegame/", 0) == 0) {
+            continue;
+        }
+
+        set_status("Installing " + relative + "...");
+
+        if (!read_source_file(source, file, destination / fs::path(relative))) {
+            return LAUNCHER_ERROR;
+        }
+
+        extracted++;
+    }
+
+    source.archive.close();
+
+    if (extracted == 0) {
+        fail(std::string("The ") + kind + " didn't contain any game files to install.");
+        return LAUNCHER_ERROR;
+    }
+
+    set_status("Checking game data...");
+    InstallLayout layout = detect_layout(destination);
+    if (!layout_is_complete(layout, options.game)) {
+        fail("Some game files are missing after extraction: " + describe_missing(layout, options.game) + ".");
+        return LAUNCHER_ERROR;
+    }
+
+    ensure_save_directories(destination);
+
+    set_status("Writing configuration...");
+    if (!write_configs(destination, layout, options)) {
+        return LAUNCHER_ERROR;
+    }
+
+    // A Fallout 1 folder must not keep Fallout 2's patch archive from an
+    // earlier import: the engine reads it as game data and crashes.
+    if (!is_fallout2(options)) {
+        std::error_code remove_ec;
+        fs::remove(destination / "patch000.dat", remove_ec);
+    }
+
+    g_progress_done.store(g_progress_total.load());
+    set_status("Game data installed.");
+    return LAUNCHER_OK;
+}
+
+int install_from_image(const fs::path& image_path, const fs::path& destination,
+    const LauncherOptions& options)
+{
+    set_status("Reading the disc image...");
+
+    Source source;
+    source.disc = true;
+
+    std::string error;
+    if (!launcher_disc_open(image_path.string().c_str(), &source.image, &source.disc_files, &error)) {
+        fail(error.empty() ? "This disc image has no readable ISO 9660 filesystem." : error);
+        return LAUNCHER_ERROR;
+    }
+
+    for (size_t index = 0; index < source.disc_files.size(); index++) {
+        source.files.push_back({ source.disc_files[index].name, source.disc_files[index].size,
+            nullptr, index });
+    }
+
+    return install_source(source, destination, options, "disc image");
+}
+
+// A ZIP of a CD holds the disc rather than the game's own files: the image and
+// the CUE beside it are unpacked into a folder of the app's own, and the same
+// disc reader installs from there.
+int install_from_zip_image(const char* zip_path, const std::vector<ZipEntry>& entries,
+    const ZipEntry& image, const fs::path& destination, const LauncherOptions& options)
+{
+    TempFolder temporary;
+    if (!temporary.create()) {
+        return LAUNCHER_ERROR;
+    }
+
+    std::ifstream archive(zip_path, std::ios::binary);
+    if (!archive) {
+        fail("Cannot open the game ZIP.");
+        return LAUNCHER_ERROR;
+    }
+
+    const size_t slash = image.name.find_last_of('/');
+    const std::string directory = slash == std::string::npos ? std::string() : image.name.substr(0, slash + 1);
+
+    uint64_t total = 0;
+    for (const ZipEntry& entry : entries) {
+        const std::string relative = entry.name.compare(0, directory.size(), directory) == 0
+            ? entry.name.substr(directory.size())
+            : std::string();
+        if (!relative.empty() && relative.find('/') == std::string::npos && is_image_name(relative)) {
+            total += entry.uncompressed_size;
+        }
+    }
+    g_progress_total.store(std::max<uint64_t>(total, 1));
+
+    for (const ZipEntry& entry : entries) {
+        if (entry.name.compare(0, directory.size(), directory) != 0) {
+            continue;
+        }
+        const std::string relative = entry.name.substr(directory.size());
+        if (relative.empty() || relative.find('/') != std::string::npos || !is_image_name(relative)) {
+            continue;
+        }
+
+        set_status("Unpacking " + relative + "...");
+        if (!extract_entry(archive, entry, temporary.path / fs::path(relative))) {
+            return LAUNCHER_ERROR;
+        }
+    }
+
+    archive.close();
+
+    return install_from_image(temporary.path / fs::path(image.name.substr(directory.size())),
+        destination, options);
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -961,139 +1352,40 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
         return LAUNCHER_ERROR;
     }
 
+    // The format is read from the file rather than asked for: a game CD and an
+    // installer are named here, and only a ZIP reaches the ZIP reader.
+    if (!reject_unsupported_format(zip_path)) {
+        return LAUNCHER_ERROR;
+    }
+
+    const std::string extension = lower_ascii(fs::path(zip_path).extension().string());
+    if (extension == ".iso" || extension == ".img" || extension == ".cue"
+        || extension == ".bin") {
+        return install_from_image(fs::path(zip_path), destination, *options);
+    }
+
     std::ifstream archive;
     std::vector<ZipEntry> entries;
     if (!load_archive(zip_path, archive, entries)) {
         return LAUNCHER_ERROR;
     }
 
-    std::string prefix = find_game_prefix(entries);
-    bool has_master = false;
-    bool has_critter = false;
-    bool has_patch = false;
+    // A ZIP of a CD holds the disc image rather than the game's own files.
+    if (!zip_has_master_dat(entries)) {
+        const ZipEntry* image = find_game_image(entries);
+        if (image != nullptr) {
+            archive.close();
+            return install_from_zip_image(zip_path, entries, *image, destination, *options);
+        }
+    }
+
+    Source source;
+    source.archive = std::move(archive);
     for (const ZipEntry& entry : entries) {
-        std::string name = lower_ascii(entry.name);
-        if (name.size() < prefix.size() || name.compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
-            continue;
-        }
-        std::string relative = name.substr(prefix.size());
-        if (relative == "master.dat") {
-            has_master = true;
-        } else if (relative == "critter.dat") {
-            has_critter = true;
-        } else if (relative == "patch000.dat") {
-            has_patch = true;
-        }
+        source.files.push_back({ entry.name, entry.uncompressed_size, &entry, 0 });
     }
 
-    const bool requires_patch = is_fallout2(*options);
-    if (requires_patch && !has_patch) {
-        fail("This ZIP doesn't look like a Fallout 2 installation: patch000.dat not found. If this is the first game, choose Fallout in the launcher.");
-        return LAUNCHER_ERROR;
-    }
-    if (!requires_patch && has_patch) {
-        // patch000.dat only exists in Fallout 2. Extracting it over Fallout 1
-        // mixes the two data sets and the engine crashes on the first map.
-        fail("This ZIP is a Fallout 2 installation: it contains patch000.dat. Choose Fallout 2 in the launcher first.");
-        return LAUNCHER_ERROR;
-    }
-    if (!has_master || !has_critter) {
-        std::string missing;
-        if (!has_master) {
-            missing = "master.dat";
-        }
-        if (!has_critter) {
-            if (!missing.empty()) {
-                missing += " and ";
-            }
-            missing += "critter.dat";
-        }
-        if (requires_patch && !has_patch) {
-            if (!missing.empty()) {
-                missing += " and ";
-            }
-            missing += "patch000.dat";
-        }
-        fail("This ZIP doesn't look like a " + std::string(game_name(*options)) + " installation: " + missing + " not found.");
-        return LAUNCHER_ERROR;
-    }
-
-    if (!has_data_folder(entries, prefix)) {
-        fail("This ZIP doesn't look like a " + std::string(game_name(*options)) + " installation: the data folder is missing.");
-        return LAUNCHER_ERROR;
-    }
-
-    uint64_t total_bytes = 0;
-    for (const ZipEntry& entry : entries) {
-        std::string name = lower_ascii(entry.name);
-        if (name.size() < prefix.size() || name.compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
-            continue;
-        }
-        total_bytes += entry.uncompressed_size;
-    }
-    g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
-
-    uint32_t extracted = 0;
-    for (const ZipEntry& entry : entries) {
-        std::string name = lower_ascii(entry.name);
-        if (name.size() < prefix.size() || name.compare(0, prefix.size(), lower_ascii(prefix)) != 0) {
-            continue;
-        }
-
-        std::string relative = entry.name.substr(prefix.size());
-        if (relative.empty()) {
-            continue;
-        }
-
-        // Savegames are the player's data, never installation data: ignore any
-        // entry that would replace them, in either folder a game keeps them in.
-        const std::string lower_relative = lower_ascii(relative);
-        if (lower_relative.rfind("savegame/", 0) == 0
-            || lower_relative.rfind("data/savegame/", 0) == 0) {
-            continue;
-        }
-
-        set_status("Installing " + relative + "...");
-
-        fs::path output = destination / fs::path(relative);
-        if (!extract_entry(archive, entry, output)) {
-            return LAUNCHER_ERROR;
-        }
-
-        extracted++;
-    }
-
-    archive.close();
-
-    if (extracted == 0) {
-        fail("The ZIP didn't contain any game files to install.");
-        return LAUNCHER_ERROR;
-    }
-
-    set_status("Checking game data...");
-    InstallLayout layout = detect_layout(destination);
-    if (!layout_is_complete(layout, options->game)) {
-        fail("Some game files are missing after extraction: " + describe_missing(layout, options->game) + ".");
-        return LAUNCHER_ERROR;
-    }
-
-    ensure_save_directories(destination);
-
-    set_status("Writing configuration...");
-    if (!write_configs(destination, layout, *options)) {
-        return LAUNCHER_ERROR;
-    }
-
-    // A Fallout 1 folder must not keep Fallout 2's patch archive from an
-    // earlier import: the engine reads it as game data and crashes.
-    if (!is_fallout2(*options)) {
-        std::error_code remove_ec;
-        fs::remove(destination / "patch000.dat", remove_ec);
-    }
-
-    g_progress_done.store(g_progress_total.load());
-    set_status("Game data installed.");
-    return LAUNCHER_OK;
+    return install_source(source, destination, *options, "ZIP");
 }
 
 // ---------------------------------------------------------------------------
@@ -1227,7 +1519,7 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
         const std::string name = lower_ascii(entry.name);
         const std::string base = name.substr(name.find_last_of('/') + 1);
         if (base == "master.dat" || base == "critter.dat" || base == "patch000.dat") {
-            fail("That is a game ZIP, not a language pack. Use IMPORT GAME ZIP on HOME for it.");
+            fail("That is a game ZIP, not a language pack. Use IMPORT GAME on HOME for it.");
             return LAUNCHER_ERROR;
         }
     }

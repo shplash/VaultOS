@@ -17,6 +17,7 @@ mkdir -p "$work"
 c++ -std=c++17 -Wall -Wextra -I src \
     tests/launcher_validation_test.cc \
     src/launcher/launcher_core.cc \
+    src/launcher/launcher_disc.cc \
     -lz \
     -o "$work/launcher-tests"
 "./$work/launcher-tests"

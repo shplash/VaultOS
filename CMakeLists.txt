@@ -305,6 +305,8 @@ if(IOS)
         "src/platform/ios/paths.h"
         "src/launcher/launcher.h"
         "src/launcher/launcher_core.cc"
+        "src/launcher/launcher_disc.cc"
+        "src/launcher/launcher_disc.h"
         "os/ios/host/HostMain.mm"
         "os/ios/host/host.h"
         "os/ios/engine/engine_glue.cc"
