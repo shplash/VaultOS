@@ -29,9 +29,6 @@ Bundled as source: [sdl2](sdl2) under the zlib licence, [fpattern](fpattern)
 under the licence in [fpattern/LICENSE](fpattern/LICENSE), and zlib from the iOS
 SDK under its own.
 
-## Artwork and music
+## Music
 
-`assets/artwork/` holds the Fallout and Fallout 2 art the home screen shows, and
-`assets/audio/` holds the music the launcher plays. Both are bundled so the
-launcher needs no network, and neither is covered by the licence above: whoever
-distributes the app has to hold the rights to them.
+`assets/audio/` holds the music the launcher plays and needs no attribution.
