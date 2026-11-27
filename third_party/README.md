@@ -29,6 +29,15 @@ Bundled as source: [sdl2](sdl2) under the zlib licence, [fpattern](fpattern)
 under the licence in [fpattern/LICENSE](fpattern/LICENSE), and zlib from the iOS
 SDK under its own.
 
+## libarchive and liblzma
+
+The importer unpacks 7z and RAR archives with [libarchive](https://github.com/libarchive/libarchive)
+3.8.11, under the BSD 2-Clause licence in [libarchive/LICENSE](libarchive/LICENSE),
+and decodes their LZMA streams with xz's [liblzma](https://github.com/tukaani-project/xz)
+5.8.4, under 0BSD. Both are built from source by
+[libarchive/CMakeLists.txt](libarchive/CMakeLists.txt), pinned by version and
+checksum, and the notices are in the app's `Notices` folder.
+
 ## Music
 
 `assets/audio/` holds the music the launcher plays and needs no attribution.

@@ -1344,7 +1344,7 @@ struct LauncherView: View {
                     // The licence asks a modified copy to say so: this is that
                     // notice.
                     tip("Engines", "A modified version of Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License. The launcher, the iOS port and the touch controls are added here.")
-                    tip("Libraries", "SDL 2.0 (zlib licence), zlib and fpattern. Their notices apply to this distribution.")
+                    tip("Libraries", "SDL 2.0 (zlib licence), zlib, fpattern, libarchive and liblzma. Their notices apply to this distribution.")
                     tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
                     footnote("The app contains no game data; bring your own installation.")
                 }

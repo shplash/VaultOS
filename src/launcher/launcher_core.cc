@@ -1,4 +1,5 @@
 #include "launcher/launcher.h"
+#include "launcher/launcher_archive.h"
 #include "launcher/launcher_disc.h"
 
 #include <algorithm>
@@ -907,9 +908,11 @@ void add_progress(void* context, uint64_t bytes)
     g_progress_done.fetch_add(bytes);
 }
 
-// One source of game files: a ZIP read in place, or a disc image read by sector.
+// One source of game files: a ZIP read in place, a disc image read by sector,
+// or a folder a 7z or RAR archive was unpacked into.
 struct Source {
     bool disc = false;
+    fs::path folder;
     std::ifstream archive;
     LauncherDiscImage image;
     std::vector<LauncherDiscFile> disc_files;
@@ -1027,31 +1030,95 @@ const ZipEntry* find_game_image(const std::vector<ZipEntry>& entries)
     return bin;
 }
 
-// Formats with no reader here are named rather than guessed at, so the message
-// can say what to do instead of failing on a file it cannot open.
-bool reject_unsupported_format(const char* path)
+// The container is read from the file rather than asked for, so the picker has
+// no format of its own and a wrongly named file still lands in the right reader.
+enum class Container { Zip, Image, Archive };
+
+bool has_archive_magic(const unsigned char* magic, std::streamsize read)
+{
+    if (read >= 6 && magic[0] == '7' && magic[1] == 'z' && magic[2] == 0xBC && magic[3] == 0xAF) {
+        return true; // 7z
+    }
+    return read >= 4 && std::memcmp(magic, "Rar!", 4) == 0;
+}
+
+Container detect_container(const char* path)
+{
+    const std::string extension = lower_ascii(fs::path(path).extension().string());
+    if (extension == ".iso" || extension == ".img" || extension == ".cue" || extension == ".bin") {
+        return Container::Image;
+    }
+    if (extension == ".7z" || extension == ".rar") {
+        return Container::Archive;
+    }
+
+    std::ifstream stream(path, std::ios::binary);
+    if (stream) {
+        unsigned char magic[6] = { 0 };
+        stream.read(reinterpret_cast<char*>(magic), sizeof(magic));
+        if (has_archive_magic(magic, stream.gcount())) {
+            return Container::Archive;
+        }
+    }
+
+    return Container::Zip;
+}
+
+// Windows installers cannot be run here: GOG's offline installers are one, and
+// they say so rather than failing as an archive that cannot be opened.
+bool reject_installer(const char* path)
 {
     std::ifstream stream(path, std::ios::binary);
     if (!stream) {
-        return true; // the ZIP reader reports a file that cannot be opened
+        return true; // the archive reader reports a file that cannot be opened
     }
 
-    unsigned char magic[8] = { 0 };
+    unsigned char magic[2] = { 0, 0 };
     stream.read(reinterpret_cast<char*>(magic), sizeof(magic));
-    if (stream.gcount() < 4) {
-        return true;
-    }
-
-    if (magic[0] == '7' && magic[1] == 'z' && magic[2] == 0xBC && magic[3] == 0xAF) {
-        return fail("7z archives are not supported yet. Unpack the game on a computer and import the folder as a ZIP, or import the game CD as an ISO, BIN/CUE or IMG.");
-    }
-
-    if (std::memcmp(magic, "Rar!", 4) == 0) {
-        return fail("RAR archives are not supported yet. Unpack the game on a computer and import the folder as a ZIP.");
-    }
-
-    if (magic[0] == 'M' && magic[1] == 'Z') {
+    if (stream.gcount() == 2 && magic[0] == 'M' && magic[1] == 'Z') {
         return fail("Windows installers cannot be run here. GOG's offline installers are one: unpack them on a computer with innoextract, or import the game CD as an ISO, BIN/CUE or IMG.");
+    }
+
+    return true;
+}
+
+// A file unpacked from an archive is moved into the installation a block at a
+// time, so a large game file never sits in memory whole.
+bool copy_source_file(const fs::path& source, const fs::path& destination)
+{
+    std::ifstream input(source.string(), std::ios::binary);
+    if (!input) {
+        return fail("Cannot read " + source.filename().string() + ".");
+    }
+
+    std::error_code ec;
+    fs::create_directories(destination.parent_path(), ec);
+
+    // Never follow a link an earlier import may have left behind.
+    if (fs::is_symlink(fs::symlink_status(destination, ec))) {
+        fs::remove(destination, ec);
+    }
+
+    std::ofstream output(destination.string(), std::ios::binary | std::ios::trunc);
+    if (!output) {
+        return fail("Cannot write " + destination.string() + ". The device may be out of storage.");
+    }
+
+    std::vector<char> block(64 * 1024);
+    while (input) {
+        input.read(block.data(), static_cast<std::streamsize>(block.size()));
+        const std::streamsize read = input.gcount();
+        if (read <= 0) {
+            break;
+        }
+
+        output.write(block.data(), read);
+        if (!output) {
+            return fail("Cannot write " + destination.string()
+                + ". The device may be out of storage.");
+        }
+
+        g_progress_done.fetch_add(static_cast<uint64_t>(read));
     }
 
     return true;
@@ -1060,6 +1127,9 @@ bool reject_unsupported_format(const char* path)
 bool read_source_file(Source& source, const SourceFile& file, const fs::path& destination)
 {
     if (!source.disc) {
+        if (!source.folder.empty()) {
+            return copy_source_file(source.folder / fs::path(file.name), destination);
+        }
         return extract_entry(source.archive, *file.zip, destination);
     }
 
@@ -1141,6 +1211,9 @@ int install_source(Source& source, const fs::path& destination, const LauncherOp
         }
         total_bytes += file.size;
     }
+
+    // Unpacking an archive has a progress of its own, so this phase starts over.
+    g_progress_done.store(0);
     g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
 
     uint32_t extracted = 0;
@@ -1279,6 +1352,71 @@ int install_from_zip_image(const char* zip_path, const std::vector<ZipEntry>& en
         destination, options);
 }
 
+// A 7z or RAR archive is unpacked into a folder of the app's own, and the game
+// is installed from there by the path every other container uses, so the same
+// Fallout 1 and Fallout 2 checks see the same files.
+int install_from_archive(const char* path, const fs::path& destination,
+    const LauncherOptions& options)
+{
+    set_status("Reading the archive...");
+
+    std::vector<LauncherArchiveEntry> entries;
+    std::string error;
+    if (!launcher_archive_open(path, &entries, &error)) {
+        fail(error.empty() ? "This archive cannot be read." : error);
+        return LAUNCHER_ERROR;
+    }
+
+    uint64_t total = 0;
+    for (const LauncherArchiveEntry& entry : entries) {
+        total += entry.size;
+    }
+    g_progress_done.store(0);
+    g_progress_total.store(std::max<uint64_t>(total, 1));
+
+    TempFolder temporary;
+    if (!temporary.create()) {
+        return LAUNCHER_ERROR;
+    }
+
+    set_status("Unpacking the archive...");
+    if (!launcher_archive_extract(path, temporary.path.string().c_str(), add_progress, nullptr,
+            &error)) {
+        fail(error.empty() ? "This archive cannot be read." : error);
+        return LAUNCHER_ERROR;
+    }
+
+    Source source;
+    source.folder = temporary.path;
+
+    std::error_code ec;
+    fs::recursive_directory_iterator entry(temporary.path, ec);
+    const fs::recursive_directory_iterator last;
+    while (!ec && entry != last) {
+        if (entry->is_regular_file(ec)) {
+            const fs::path relative = entry->path().lexically_relative(temporary.path);
+            const std::uintmax_t size = fs::file_size(entry->path(), ec);
+            if (!ec && !relative.empty()) {
+                source.files.push_back({ relative.generic_string(),
+                    static_cast<uint64_t>(size), nullptr, 0 });
+            }
+        }
+        entry.increment(ec);
+    }
+
+    if (ec) {
+        fail("Cannot read the files unpacked from the archive.");
+        return LAUNCHER_ERROR;
+    }
+
+    if (source.files.empty()) {
+        fail("This archive holds no files the launcher can read.");
+        return LAUNCHER_ERROR;
+    }
+
+    return install_source(source, destination, options, "archive");
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -1352,16 +1490,17 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
         return LAUNCHER_ERROR;
     }
 
-    // The format is read from the file rather than asked for: a game CD and an
-    // installer are named here, and only a ZIP reaches the ZIP reader.
-    if (!reject_unsupported_format(zip_path)) {
+    if (!reject_installer(zip_path)) {
         return LAUNCHER_ERROR;
     }
 
-    const std::string extension = lower_ascii(fs::path(zip_path).extension().string());
-    if (extension == ".iso" || extension == ".img" || extension == ".cue"
-        || extension == ".bin") {
+    switch (detect_container(zip_path)) {
+    case Container::Image:
         return install_from_image(fs::path(zip_path), destination, *options);
+    case Container::Archive:
+        return install_from_archive(zip_path, destination, *options);
+    case Container::Zip:
+        break;
     }
 
     std::ifstream archive;

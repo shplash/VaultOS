@@ -304,6 +304,8 @@ if(IOS)
     target_sources(${EXECUTABLE_NAME} PUBLIC
         "src/platform/ios/paths.h"
         "src/launcher/launcher.h"
+        "src/launcher/launcher_archive.cc"
+        "src/launcher/launcher_archive.h"
         "src/launcher/launcher_core.cc"
         "src/launcher/launcher_disc.cc"
         "src/launcher/launcher_disc.h"
@@ -417,6 +419,10 @@ target_link_libraries(${EXECUTABLE_NAME} adecode::adecode)
 
 add_subdirectory("third_party/fpattern")
 target_link_libraries(${EXECUTABLE_NAME} fpattern::fpattern)
+
+# The importer unpacks 7z and RAR archives with libarchive.
+add_subdirectory("third_party/libarchive")
+target_link_libraries(${EXECUTABLE_NAME} archive::archive)
 
 target_link_libraries(${EXECUTABLE_NAME} ${SDL2_LIBRARIES})
 target_include_directories(${EXECUTABLE_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})

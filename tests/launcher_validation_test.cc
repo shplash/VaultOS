@@ -16,7 +16,11 @@
 #include <string>
 #include <vector>
 
+#include <archive.h>
+#include <archive_entry.h>
+
 #include "launcher/launcher.h"
+#include "launcher/launcher_archive.h"
 
 namespace fs = std::filesystem;
 
@@ -591,6 +595,230 @@ static int import_folders()
     return count;
 }
 
+// ---------------------------------------------------------------------------
+// 7z and RAR archives
+// ---------------------------------------------------------------------------
+//
+// The 7z fixtures are written by libarchive itself, and the RAR ones are built
+// here, so no game data has to be shipped and the reader meets real archives.
+
+struct ArcItem {
+    std::string name;
+    std::string contents;
+    std::string link; // a symbolic link's target, when this is a link
+    bool encrypted = false; // the password flag of a RAR4 file header
+};
+
+static uint16_t rar_header_crc(const std::string& block)
+{
+    return static_cast<uint16_t>(crc32_of(block) & 0xffff);
+}
+
+static std::string rar4_file_block(const ArcItem& item)
+{
+    std::string block;
+    block.push_back(static_cast<char>(0x74)); // HEAD_TYPE: a file
+    put_u16(block, static_cast<uint16_t>(0x8000 | (item.encrypted ? 0x0004 : 0)));
+    put_u16(block, static_cast<uint16_t>(32 + item.name.size()));     // HEAD_SIZE
+    put_u32(block, static_cast<uint32_t>(item.contents.size()));       // PACK_SIZE
+    put_u32(block, static_cast<uint32_t>(item.contents.size()));       // UNP_SIZE
+    block.push_back(static_cast<char>(3));                              // HOST_OS: Unix
+    put_u32(block, crc32_of(item.contents));                           // FILE_CRC
+    put_u32(block, 0x58216000);                                         // FTIME
+    block.push_back(static_cast<char>(20));                             // UNP_VER
+    block.push_back(static_cast<char>(0x30));                           // METHOD: stored
+    put_u16(block, static_cast<uint16_t>(item.name.size()));
+    put_u32(block, 0x81a4);                                             // ATTR: -rw-r--r--
+    block += item.name;
+
+    std::string archive;
+    put_u16(archive, rar_header_crc(block));
+    archive += block;
+    archive += item.contents;
+    return archive;
+}
+
+// A RAR4 archive, stored: the format RAR 4 wrote, and the one older archives
+// of a game are in.
+static void write_rar4(const fs::path& path, const std::vector<ArcItem>& items)
+{
+    std::string archive;
+    archive.append("Rar!\x1A\x07\x00", 7); // the RAR4 marker
+
+    std::string main;
+    main.push_back(static_cast<char>(0x73)); // HEAD_TYPE: the archive
+    put_u16(main, 0);                          // HEAD_FLAGS
+    put_u16(main, 13);                         // HEAD_SIZE
+    put_u16(main, 0);                          // reserved
+    put_u32(main, 0);
+    put_u16(archive, rar_header_crc(main));
+    archive += main;
+
+    for (const ArcItem& item : items) {
+        archive += rar4_file_block(item);
+    }
+
+    std::string end;
+    end.push_back(static_cast<char>(0x7B)); // HEAD_TYPE: the end of the archive
+    put_u16(end, 0x4000);
+    put_u16(end, 7);
+    put_u16(archive, rar_header_crc(end));
+    archive += end;
+
+    write_file(path, archive);
+}
+
+// A RAR5 variable-length integer: seven bits a byte, low first.
+static void put_vint(std::string& out, uint64_t value)
+{
+    while (value >= 0x80) {
+        out.push_back(static_cast<char>((value & 0x7f) | 0x80));
+        value >>= 7;
+    }
+    out.push_back(static_cast<char>(value));
+}
+
+static void put_rar5_block(std::string& archive, uint64_t type, uint64_t flags,
+    const std::string& fields, const std::string& data)
+{
+    std::string body;
+    put_vint(body, type);
+    put_vint(body, flags);
+    if ((flags & 0x0002) != 0) {
+        put_vint(body, data.size()); // DATA_SIZE
+    }
+    body += fields;
+
+    std::string size;
+    put_vint(size, body.size());
+
+    put_u32(archive, crc32_of(size + body)); // HEAD_CRC
+    archive += size;
+    archive += body;
+    archive += data;
+}
+
+// A RAR5 archive, stored: what RAR 5 and 7-Zip write today.
+static void write_rar5(const fs::path& path, const std::vector<ArcItem>& items)
+{
+    std::string archive;
+    archive.append("Rar!\x1A\x07\x01\x00", 8); // the RAR5 marker
+
+    std::string main;
+    put_vint(main, 0); // ARCHIVE_FLAGS
+    put_rar5_block(archive, 1, 0, main, std::string());
+
+    for (const ArcItem& item : items) {
+        std::string fields;
+        put_vint(fields, 0x0004);                  // FILE_FLAGS: a data CRC
+        put_vint(fields, item.contents.size());    // UNP_SIZE
+        put_vint(fields, 0x81a4);                  // ATTRIBUTES: -rw-r--r--
+        put_u32(fields, crc32_of(item.contents));  // DATA_CRC32
+        put_vint(fields, 0);                       // COMPRESSION_INFO: stored
+        put_vint(fields, 1);                       // HOST_OS: Unix
+        put_vint(fields, item.name.size());
+        fields += item.name;
+
+        put_rar5_block(archive, 2, 0x0002, fields, item.contents);
+    }
+
+    std::string end;
+    put_vint(end, 1); // ENDARC_FLAGS: the end of the archive
+    put_rar5_block(archive, 5, 0, end, std::string());
+
+    write_file(path, archive);
+}
+
+// A real 7z archive, written by libarchive's own 7z encoder.
+static void write_7z(const fs::path& path, const std::vector<ArcItem>& items,
+    const char* method)
+{
+    struct archive* writer = archive_write_new();
+    CHECK(writer != nullptr);
+
+    CHECK(archive_write_set_format_7zip(writer) == ARCHIVE_OK);
+    const std::string option = std::string("7zip:compression=") + method;
+    CHECK(archive_write_set_options(writer, option.c_str()) == ARCHIVE_OK);
+    CHECK(archive_write_open_filename(writer, path.string().c_str()) == ARCHIVE_OK);
+
+    for (const ArcItem& item : items) {
+        struct archive_entry* entry = archive_entry_new();
+        archive_entry_set_pathname(entry, item.name.c_str());
+        archive_entry_set_perm(entry, 0644);
+
+        if (!item.link.empty()) {
+            archive_entry_set_filetype(entry, AE_IFLNK);
+            archive_entry_set_symlink(entry, item.link.c_str());
+            archive_entry_set_size(entry, 0);
+        } else {
+            archive_entry_set_filetype(entry, AE_IFREG);
+            archive_entry_set_size(entry, static_cast<la_int64_t>(item.contents.size()));
+        }
+
+        CHECK(archive_write_header(writer, entry) == ARCHIVE_OK);
+        if (!item.contents.empty()) {
+            CHECK(archive_write_data(writer, item.contents.data(), item.contents.size())
+                == static_cast<la_ssize_t>(item.contents.size()));
+        }
+        archive_entry_free(entry);
+    }
+
+    CHECK(archive_write_close(writer) == ARCHIVE_OK);
+    CHECK(archive_write_free(writer) == ARCHIVE_OK);
+}
+
+// libarchive ships its own test archives uuencoded, and the RAR fixture is one
+// of them, so a real archive is read rather than only ones built here.
+static std::string uu_decode(const std::string& text)
+{
+    std::string binary;
+    size_t position = 0;
+
+    while (position < text.size()) {
+        const size_t newline = text.find('\n', position);
+        const std::string line = text.substr(position,
+            newline == std::string::npos ? std::string::npos : newline - position);
+        position = newline == std::string::npos ? text.size() : newline + 1;
+
+        if (line.compare(0, 3, "end") == 0) {
+            break;
+        }
+        if (line.size() < 2 || line.compare(0, 6, "begin ") == 0) {
+            continue;
+        }
+
+        int remaining = (static_cast<unsigned char>(line[0]) - 0x20) & 0x3f;
+        for (size_t index = 1; index + 3 < line.size() && remaining > 0; index += 4) {
+            const int first = (static_cast<unsigned char>(line[index]) - 0x20) & 0x3f;
+            const int second = (static_cast<unsigned char>(line[index + 1]) - 0x20) & 0x3f;
+            const int third = (static_cast<unsigned char>(line[index + 2]) - 0x20) & 0x3f;
+            const int fourth = (static_cast<unsigned char>(line[index + 3]) - 0x20) & 0x3f;
+
+            const unsigned char bytes[3] = {
+                static_cast<unsigned char>((first << 2) | (second >> 4)),
+                static_cast<unsigned char>((second << 4) | (third >> 2)),
+                static_cast<unsigned char>((third << 6) | fourth),
+            };
+            for (int byte = 0; byte < 3 && remaining > 0; byte++) {
+                binary += static_cast<char>(bytes[byte]);
+                remaining--;
+            }
+        }
+    }
+
+    return binary;
+}
+
+static void write_uu_fixture(const fs::path& source, const fs::path& path)
+{
+    std::ifstream stream(source.string(), std::ios::binary);
+    CHECK(stream.good());
+
+    const std::string text((std::istreambuf_iterator<char>(stream)),
+        std::istreambuf_iterator<char>());
+    write_file(path, uu_decode(text));
+}
+
 int main()
 {
     check_translation_tables();
@@ -1054,40 +1282,253 @@ int main()
         CHECK(!fs::exists(install / "master.dat"));
     }
 
-    // Formats there is no reader for are named, with what to do instead, rather
-    // than failing on a file that cannot be opened.
+    // The container is read from the file rather than its name: a 7z archive
+    // named as something else still reaches the 7z reader.
     {
-        const char sevenZipMagic[] = { '7', 'z', '\xBC', '\xAF', '\x27', '\x1C' };
-        const char rarMagic[] = { 'R', 'a', 'r', '!', '\x1A', '\x07', '\x00' };
-        const char installerMagic[] = { 'M', 'Z' };
+        const fs::path renamed = root / "Fallout copy.data";
+        write_7z(renamed, {
+            { "master.dat", "renamed-master" },
+            { "critter.dat", "renamed-critter" },
+            { "data/art/tiles.trx", "renamed-tiles" },
+        }, "copy");
 
-        const fs::path sevenZip = root / "Fallout.7z";
-        write_file(sevenZip, std::string(sevenZipMagic, sizeof(sevenZipMagic))
-            + "not really an archive");
-
-        const fs::path rar = root / "Fallout.rar";
-        write_file(rar, std::string(rarMagic, sizeof(rarMagic)) + "not really an archive");
-
-        const fs::path installer = root / "setup_fallout.exe";
-        write_file(installer, std::string(installerMagic, sizeof(installerMagic))
-            + "not really an installer");
-
-        const fs::path nowhere = root / "Fallout from an archive";
+        const fs::path install = root / "Fallout from a renamed 7z";
         LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(renamed.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(install / "master.dat", "renamed-master"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "renamed-tiles"));
+    }
 
-        CHECK(launcher_install_zip(sevenZip.string().c_str(), nowhere.string().c_str(),
+    // A 7z archive is unpacked and the game installed from it by the path a
+    // ZIP takes, so Fallout's checks see the same files.
+    const fs::path seven_install = root / "Fallout from a 7z";
+    const fs::path seven2_install = root / "Fallout 2 from a 7z";
+    {
+        const fs::path archive = root / "Fallout copy.7z";
+        write_7z(archive, {
+            { "master.dat", "seven-master" },
+            { "critter.dat", "seven-critter" },
+            { "data/art/tiles.trx", "seven-tiles" },
+        }, "copy");
+
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), seven_install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(seven_install / "master.dat", "seven-master"));
+        CHECK(file_contains(seven_install / "critter.dat", "seven-critter"));
+        CHECK(file_contains(seven_install / "data" / "art" / "tiles.trx", "seven-tiles"));
+        CHECK(import_folders() == before);
+
+        scan(seven_install, LAUNCHER_GAME_FALLOUT1, &info);
+        CHECK(info.installed == 1);
+    }
+
+    // The LZMA2 compression most 7z repacks use is decoded: a Fallout 2 archive
+    // installs as Fallout 2, and the same archive is refused as Fallout 1.
+    {
+        const fs::path archive = root / "Fallout 2.7z";
+        write_7z(archive, {
+            { "master.dat", "seven2-master" },
+            { "critter.dat", "seven2-critter" },
+            { "patch000.dat", "seven2-patch" },
+            { "data/art/tiles.trx", "seven2-tiles" },
+        }, "lzma2");
+
+        LauncherOptions fallout1Options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), seven_install.string().c_str(),
+                  &fallout1Options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("patch000.dat") != std::string::npos);
+        CHECK(file_contains(seven_install / "master.dat", "seven-master"));
+
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT2);
+        CHECK(launcher_install_zip(archive.string().c_str(), seven2_install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(seven2_install / "patch000.dat", "seven2-patch"));
+        CHECK(file_contains(seven2_install / "data" / "art" / "tiles.trx", "seven2-tiles"));
+    }
+
+    // A folder tree inside the archive is kept, a repeated name keeps its last
+    // version, and a name or a link that would leave the installation is never
+    // written.
+    {
+        const fs::path archive = root / "Fallout odd names.7z";
+        write_7z(archive, {
+            { "Fallout/master.dat", "names-first" },
+            { "Fallout/master.dat", "names-last" },
+            { "Fallout/critter.dat", "names-critter" },
+            { "Fallout/data/art/tiles.trx", "names-tiles" },
+            { "Fallout/data/SAVEGAME/SLOT01/save.dat", "names-save" },
+            { "../escape.txt", "escaped" },
+            { "/absolute.txt", "absolute" },
+            { "Fallout/data/link", "", "../../etc/hosts" },
+        }, "copy");
+
+        const fs::path install = root / "Fallout from odd names";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+
+        CHECK(file_contains(install / "master.dat", "names-last"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "names-tiles"));
+        CHECK(!fs::exists(install / "data" / "link"));
+        CHECK(!fs::exists(install / "data" / "SAVEGAME" / "SLOT01" / "save.dat"));
+        CHECK(!fs::exists(root / "escape.txt"));
+        CHECK(!fs::exists(root / "absolute.txt"));
+        CHECK(import_folders() == before);
+    }
+
+    // A damaged archive fails with a reason, leaves the installation alone and
+    // cleans up what it unpacked.
+    {
+        const fs::path whole = root / "Fallout whole.7z";
+        write_7z(whole, {
+            { "master.dat", "damaged-master" },
+            { "critter.dat", "damaged-critter" },
+            { "data/art/tiles.trx", "damaged-tiles" },
+        }, "lzma2");
+
+        std::ifstream stream(whole.string(), std::ios::binary);
+        const std::string contents((std::istreambuf_iterator<char>(stream)),
+            std::istreambuf_iterator<char>());
+        stream.close();
+
+        const fs::path truncated = root / "Fallout truncated.7z";
+        write_file(truncated, contents.substr(0, contents.size() / 2));
+
+        const fs::path install = root / "Fallout from a truncated 7z";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(truncated.string().c_str(), install.string().c_str(),
                   &options) == LAUNCHER_ERROR);
-        CHECK(std::string(launcher_last_error()).find("7z") != std::string::npos);
+        CHECK(!std::string(launcher_last_error()).empty());
+        CHECK(!fs::exists(install / "master.dat"));
+        CHECK(import_folders() == before);
+    }
 
-        CHECK(launcher_install_zip(rar.string().c_str(), nowhere.string().c_str(), &options)
+    // A RAR4 archive is read as well: stored, so the fixture is one this
+    // project can build without a RAR tool.
+    {
+        const fs::path archive = root / "Fallout rar4.rar";
+        write_rar4(archive, {
+            { "Fallout/master.dat", "rar4-master" },
+            { "Fallout/critter.dat", "rar4-critter" },
+            { "Fallout/data/art/tiles.trx", "rar4-tiles" },
+        });
+
+        std::vector<LauncherArchiveEntry> entries;
+        std::string error;
+        CHECK(launcher_archive_open(archive.string().c_str(), &entries, &error));
+        CHECK(entries.size() == 3);
+
+        const fs::path install = root / "Fallout from a RAR4";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(install / "master.dat", "rar4-master"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "rar4-tiles"));
+        CHECK(import_folders() == before);
+    }
+
+    // A RAR5 archive, the one RAR and 7-Zip write today, is installed the same.
+    {
+        const fs::path archive = root / "Fallout rar5.rar";
+        write_rar5(archive, {
+            { "Fallout2/master.dat", "rar5-master" },
+            { "Fallout2/critter.dat", "rar5-critter" },
+            { "Fallout2/patch000.dat", "rar5-patch" },
+            { "Fallout2/data/art/tiles.trx", "rar5-tiles" },
+        });
+
+        const fs::path install = root / "Fallout 2 from a RAR5";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT2);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_OK);
+        CHECK(file_contains(install / "patch000.dat", "rar5-patch"));
+        CHECK(file_contains(install / "data" / "art" / "tiles.trx", "rar5-tiles"));
+        CHECK(import_folders() == before);
+    }
+
+    // libarchive's own RAR4 test archive is read, and its files go through the
+    // game checks: it holds no game files, so the import names what is missing.
+    {
+        const fs::path archive = root / "libarchive rar4.rar";
+        write_uu_fixture("tests/fixtures/libarchive-rar4.rar.uu", archive);
+
+        std::vector<LauncherArchiveEntry> entries;
+        std::string error;
+        CHECK(launcher_archive_open(archive.string().c_str(), &entries, &error));
+        CHECK(entries.size() >= 2);
+
+        const fs::path install = root / "Fallout from a real RAR";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("master.dat") != std::string::npos);
+        CHECK(!fs::exists(install / "master.dat"));
+        CHECK(import_folders() == before);
+    }
+
+    // An archive that says it is encrypted is refused rather than read as if it
+    // were empty.
+    {
+        const fs::path archive = root / "Fallout encrypted.rar";
+        ArcItem item;
+        item.name = "master.dat";
+        item.contents = "secret";
+        item.encrypted = true;
+        write_rar4(archive, { item });
+
+        const fs::path install = root / "Fallout from an encrypted RAR";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(!std::string(launcher_last_error()).empty());
+        CHECK(!fs::exists(install / "master.dat"));
+        CHECK(import_folders() == before);
+    }
+
+    // An archive that holds more files than the launcher will unpack is refused
+    // while it is listed, so nothing of it reaches the disk.
+    {
+        std::vector<ArcItem> items;
+        items.reserve(50001);
+        for (int index = 0; index < 50001; index++) {
+            ArcItem item;
+            item.name = "pack/data/file" + std::to_string(index) + ".dat";
+            item.contents = "x";
+            items.push_back(item);
+        }
+
+        const fs::path archive = root / "Fallout packed.7z";
+        write_7z(archive, items, "copy");
+
+        const fs::path install = root / "Fallout from a packed 7z";
+        const int before = import_folders();
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT1);
+        CHECK(launcher_install_zip(archive.string().c_str(), install.string().c_str(),
+                  &options) == LAUNCHER_ERROR);
+        CHECK(std::string(launcher_last_error()).find("too many files") != std::string::npos);
+        CHECK(!fs::exists(install / "master.dat"));
+        CHECK(import_folders() == before);
+    }
+
+    // A Windows installer is still named, now that 7z and RAR are read.
+    {
+        const fs::path installer = root / "setup_fallout2.exe";
+        write_file(installer, std::string("MZ", 2) + "not really an installer");
+
+        LauncherOptions options = options_for(LAUNCHER_GAME_FALLOUT2);
+        CHECK(launcher_install_zip(installer.string().c_str(),
+                  (root / "Fallout 2 from an installer").string().c_str(), &options)
             == LAUNCHER_ERROR);
-        CHECK(std::string(launcher_last_error()).find("RAR") != std::string::npos);
-
-        CHECK(launcher_install_zip(installer.string().c_str(), nowhere.string().c_str(),
-                  &options) == LAUNCHER_ERROR);
         CHECK(std::string(launcher_last_error()).find("installer") != std::string::npos);
-
-        CHECK(!fs::exists(nowhere / "master.dat"));
     }
 
     // Uppercase installations (CD-era copies) are detected as well.

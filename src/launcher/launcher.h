@@ -99,9 +99,10 @@ void launcher_scan(const char* install_dir, int32_t game, LauncherInstallInfo* i
 
 // Extracts the game data from `zip_path` into `install_dir` and writes the
 // configuration files. The container is read from the file rather than asked
-// for: a ZIP, or a game CD as an ISO, IMG, BIN or CUE, and a ZIP that holds one
-// of those. Existing files are overwritten; savegames are left alone. Returns
-// LAUNCHER_OK on success, LAUNCHER_ERROR otherwise.
+// for: a ZIP, a 7z or RAR archive, or a game CD as an ISO, IMG, BIN or CUE,
+// and a ZIP that holds one of those. Existing files are overwritten;
+// savegames are left alone. Returns LAUNCHER_OK on success, LAUNCHER_ERROR
+// otherwise.
 int launcher_install_zip(const char* zip_path, const char* install_dir, const LauncherOptions* options);
 
 // Rewrites `fallout.cfg` and `f1_res.ini` for an existing installation.
