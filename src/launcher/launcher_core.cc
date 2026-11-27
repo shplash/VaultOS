@@ -199,13 +199,13 @@ bool load_archive(const char* path, std::ifstream& archive, std::vector<ZipEntry
 {
     archive.open(path, std::ios::binary);
     if (!archive) {
-        return fail("Cannot open the game ZIP. Make sure the file is still available.");
+        return fail("Cannot open the game archive. Make sure the file is still available.");
     }
 
     archive.seekg(0, std::ios::end);
     std::streamoff end = archive.tellg();
     if (end < 22) {
-        return fail("This file is not a valid ZIP archive.");
+        return fail("This file is not a valid archive.");
     }
     uint64_t file_size = static_cast<uint64_t>(end);
 
@@ -213,7 +213,7 @@ bool load_archive(const char* path, std::ifstream& archive, std::vector<ZipEntry
     uint64_t tail_size = std::min<uint64_t>(file_size, 65557);
     std::vector<unsigned char> tail(static_cast<size_t>(tail_size));
     if (!read_at(archive, file_size - tail_size, tail.data(), tail.size())) {
-        return fail("Cannot read the ZIP archive.");
+        return fail("Cannot read the archive.");
     }
 
     bool found = false;
@@ -232,7 +232,7 @@ bool load_archive(const char* path, std::ifstream& archive, std::vector<ZipEntry
     }
 
     if (!found) {
-        return fail("This file is not a valid ZIP archive.");
+        return fail("This file is not a valid archive.");
     }
 
     uint16_t entry_count = read_u16(&tail[eocd + 10]);
@@ -327,7 +327,7 @@ bool load_archive(const char* path, std::ifstream& archive, std::vector<ZipEntry
     }
 
     if (entries.empty()) {
-        return fail("The ZIP archive contains no usable files.");
+        return fail("The archive contains no usable files.");
     }
 
     return true;
@@ -409,7 +409,7 @@ bool extract_entry(std::ifstream& archive, const ZipEntry& entry, const fs::path
 {
     unsigned char header[30];
     if (!read_at(archive, entry.local_header_offset, header, sizeof(header))) {
-        return fail("Cannot read " + quote(entry.name) + " from the ZIP.");
+        return fail("Cannot read " + quote(entry.name) + " from the archive.");
     }
     if (read_u32(header) != 0x04034b50) {
         return fail("The ZIP entry " + quote(entry.name) + " is damaged.");
@@ -422,7 +422,7 @@ bool extract_entry(std::ifstream& archive, const ZipEntry& entry, const fs::path
     archive.clear();
     archive.seekg(static_cast<std::streamoff>(data_offset), std::ios::beg);
     if (!archive) {
-        return fail("Cannot read " + quote(entry.name) + " from the ZIP.");
+        return fail("Cannot read " + quote(entry.name) + " from the archive.");
     }
 
     std::error_code ec;
@@ -1313,7 +1313,7 @@ int install_from_zip_image(const char* zip_path, const std::vector<ZipEntry>& en
 
     std::ifstream archive(zip_path, std::ios::binary);
     if (!archive) {
-        fail("Cannot open the game ZIP.");
+        fail("Cannot open the game archive.");
         return LAUNCHER_ERROR;
     }
 
@@ -1565,7 +1565,7 @@ int install_container(const char* path, const fs::path& destination,
         source.files.push_back({ entry.name, entry.uncompressed_size, &entry, 0 });
     }
 
-    return install_source(source, destination, options, "ZIP");
+    return install_source(source, destination, options, "archive");
 }
 
 } // namespace
@@ -1660,7 +1660,7 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
     set_status("Opening game archive...");
 
     if (zip_path == NULL || zip_path[0] == '\0') {
-        fail("No game ZIP was selected.");
+        fail("No game archive was selected.");
         return LAUNCHER_ERROR;
     }
     if (install_dir == NULL || install_dir[0] == '\0') {
@@ -1814,7 +1814,7 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
         const std::string name = lower_ascii(entry.name);
         const std::string base = name.substr(name.find_last_of('/') + 1);
         if (base == "master.dat" || base == "critter.dat" || base == "patch000.dat") {
-            fail("That is a game ZIP, not a language pack. Use IMPORT GAME on HOME for it.");
+            fail("That is a game archive, not a language pack. Use IMPORT GAME on HOME for it.");
             return LAUNCHER_ERROR;
         }
     }
@@ -1822,7 +1822,7 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
     bool found = false;
     const std::string prefix = find_tree_prefix(entries, "text/", found);
     if (!found) {
-        fail("This ZIP has no text folder. A language pack is the game's own data/text folder, zipped.");
+        fail("This archive has no text folder. A language pack is the game's own data/text folder, archived.");
         return LAUNCHER_ERROR;
     }
 
@@ -1850,7 +1850,7 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
     }
 
     if (files.empty()) {
-        fail("This ZIP has no text folder. A language pack is the game's own data/text folder, zipped.");
+        fail("This archive has no text folder. A language pack is the game's own data/text folder, archived.");
         return LAUNCHER_ERROR;
     }
 
@@ -2194,7 +2194,7 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     bool found = false;
     const std::string prefix = find_tree_prefix(entries, "savegame/", found);
     if (!found) {
-        fail("This ZIP has no SAVEGAME folder.");
+        fail("This archive has no SAVEGAME folder.");
         return LAUNCHER_ERROR;
     }
 
@@ -2221,7 +2221,7 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     }
 
     if (files.empty()) {
-        fail("This ZIP has no SAVEGAME folder.");
+        fail("This archive has no SAVEGAME folder.");
         return LAUNCHER_ERROR;
     }
 

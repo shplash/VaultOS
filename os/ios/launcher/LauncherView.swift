@@ -15,7 +15,7 @@ struct LauncherView: View {
     @State private var showControlEditor = false
     @State private var tipGroup: TipGroup = .touch
     @State private var musicMuted = LauncherMusic.isMuted
-    /// What the ZIP picker is being opened for.
+    /// What the archive picker is being opened for.
     @State private var pendingImport: LauncherImport = .game
     @State private var savesScroll: CGFloat = 0
     @State private var savesDragStart: CGFloat?
@@ -1386,7 +1386,7 @@ struct LauncherView: View {
                     // The licence asks a modified copy to say so: this is that
                     // notice.
                     tip("Engines", "A modified version of Fallout Community Edition and Fallout 2 Community Edition by Alexander Batalov (alexbatalov), under the Sustainable Use License. The launcher, the iOS port and the touch controls are added here.")
-                    tip("Libraries", "SDL 2.0 (zlib licence), zlib, fpattern, libarchive and liblzma. Their notices apply to this distribution.")
+                    tip("Libraries", "SDL 2.0, zlib, fpattern, libarchive, liblzma and adecode, with Octicons, Boxicons and Anton. Every notice is in the app's Notices folder.")
                     tip("Notices", "Fallout is a trademark of Bethesda Softworks. Unofficial fan project, not affiliated with Bethesda or Interplay. You must own the games to play.")
                     footnote("The app contains no game data; bring your own installation.")
                 }
@@ -1597,7 +1597,7 @@ struct LauncherView: View {
                 ]
             case .launcher:
                 return [
-                    ("Import once", "Import a ZIP per game. Importing again replaces the game data and keeps your savegames."),
+                    ("Import once", "Import an archive per game: a ZIP, 7z or RAR, or the game CD as an image. Importing again replaces the game data and keeps your savegames."),
                     ("HALF or FULL", "HALF keeps the interface readable on a phone; FULL is sharpest on a tablet."),
                     ("Per game", "Resolution, audio, language and controls are stored separately for each game."),
                     ("Own folders", "Fallout keeps its files in Documents, Fallout 2 in Documents/Fallout2, so the two never mix."),
@@ -3398,8 +3398,8 @@ final class LauncherDocumentPicker: NSObject, UIDocumentPickerDelegate {
 
     private var completion: ((URL?) -> Void)?
 
-    /// Every container the importer reads: a ZIP, a game CD or its image. A 7z
-    /// or RAR file can be picked too, so its message can say what to do instead.
+    /// Every container the importer reads: a ZIP, a 7z or RAR archive, or a game
+    /// CD as an image.
     static let importTypes: [UTType] = {
         var types: [UTType] = [UTType.zip]
         for name in ["iso", "bin", "cue", "img", "7z", "rar"] {

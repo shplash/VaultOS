@@ -29,7 +29,7 @@ std::string message_of(struct archive* reader)
 std::string describe(struct archive* reader, const char* path)
 {
     if (archive_read_has_encrypted_entries(reader) == 1) {
-        return "This archive is encrypted. Unpack it on a computer first, or import the game folder as a ZIP.";
+        return "This archive is encrypted. Unpack it on a computer first, or import the game folder itself.";
     }
 
     const std::string file = fs::path(path).filename().string();

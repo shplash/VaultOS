@@ -22,7 +22,7 @@
 
 - Fallout and Fallout 2 in one app, each with its own install and saves
 - Runs natively: no JIT, no entitlements
-- A ZIP of your own game files is all it needs; the app ships no game data
+- Your own game files, from an archive or the game CD; it ships no game data
 - Touch controls you can move, resize, fade and colour
 - Language packs and savegame backups handled in the launcher
 - New and tweaked mechanics to accommodate both a small screen and touch controls
@@ -41,10 +41,11 @@ If LiveContainer doesn’t let you select the zip, try turning its **Fix File Pi
 
 ## Game files
 
-Zip the game once, then import that ZIP in the launcher. Either the game folder
-itself, or one folder around it (`Fallout/`, `Fallout2/`).
+Import the game once: a ZIP, 7z or RAR of the game folder, or the game CD as an
+ISO, IMG, BIN or CUE. Either the folder itself, or one folder around it
+(`Fallout/`, `Fallout2/`).
 
-| Game | The ZIP needs |
+| Game | The game files |
 | --- | --- |
 | **Fallout** | `master.dat` `critter.dat` `data/` |
 | **Fallout 2** | `master.dat` `critter.dat` `patch000.dat` `data/` |
@@ -58,6 +59,7 @@ the next number, so an older one is never replaced.
 
 ## In the launcher
 
+- **IMPORT GAME** takes the game from an archive or from its disc
 - **LANGUAGE FILES** adds a translation pack you supply
 - **BACK UP** writes a numbered backup into `Backups/` in the game's folder.
   **IMPORT** restores one
@@ -71,8 +73,9 @@ VaultOS is a modified version of Alexander Batalov's Fallout Community Edition
 engines ([Fallout CE](https://github.com/alexbatalov/fallout1-ce),
 [Fallout 2 CE](https://github.com/alexbatalov/fallout2-ce)).
 
-The code is under the [Sustainable Use License](LICENSE.md), Also see
-[third_party](third_party/README.md).
+The code is under the [Sustainable Use License](LICENSE.md). Every third-party
+part, and its notice, is in [third_party](third_party/README.md) and in the app's
+`Notices` folder.
 
 ## Support
 

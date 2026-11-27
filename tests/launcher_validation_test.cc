@@ -1132,7 +1132,7 @@ int main()
         int32_t languages = 0;
         CHECK(launcher_install_language_pack(game.string().c_str(), fallout1.string().c_str(),
                   &languages) == LAUNCHER_ERROR);
-        CHECK(std::string(launcher_last_error()).find("game ZIP") != std::string::npos);
+        CHECK(std::string(launcher_last_error()).find("game archive") != std::string::npos);
         CHECK(languages == 0);
         CHECK(!fs::exists(fallout1 / "data" / "text" / "english"));
     }

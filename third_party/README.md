@@ -1,8 +1,10 @@
 # Third-party notices
 
-What this repository carries that it did not write, and the terms each part comes
-under. The [Sustainable Use License](../LICENSE.md) covers the code this project
-wrote; it does not relicense anything listed here.
+What this repository carries or fetches that it did not write, and the terms each
+part comes under. The [Sustainable Use License](../LICENSE.md) covers the code
+this project wrote; it does not relicense anything listed here. Every notice is
+also in the app's own `Notices` folder, listed by
+[Notices/README.txt](../os/ios/Notices/README.txt).
 
 ## github-mark
 
@@ -36,7 +38,18 @@ The importer unpacks 7z and RAR archives with [libarchive](https://github.com/li
 and decodes their LZMA streams with xz's [liblzma](https://github.com/tukaani-project/xz)
 5.8.4, under 0BSD. Both are built from source by
 [libarchive/CMakeLists.txt](libarchive/CMakeLists.txt), pinned by version and
-checksum, and the notices are in the app's `Notices` folder.
+checksum.
+
+## adecode
+
+[adecode](https://github.com/alexbatalov/adecode) 1.0.0 decodes the games' ACM
+audio. It is fetched at build time by [adecode/CMakeLists.txt](adecode/CMakeLists.txt),
+pinned by commit, under the MIT licence in the app's `Notices/adecode-LICENSE.txt`.
+
+## Artwork
+
+`assets/artwork/` holds one still from each game, used only to name the two games.
+The stills belong to Bethesda Softworks, under the note at the end of the README.
 
 ## Music
 

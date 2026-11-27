@@ -3,7 +3,7 @@
 
 // Launcher support.
 //
-// The launcher accepts a ZIP with a Fallout installation (master.dat,
+// The launcher accepts an archive with a Fallout installation (master.dat,
 // critter.dat and the data folder, optionally nested in a top level folder),
 // extracts it into an install directory and generates the configuration files
 // the engine needs - `fallout.cfg` and `f1_res.ini`.
@@ -114,7 +114,7 @@ int32_t launcher_save_kind(const char* name);
 // Extracts the game data from `zip_path` into `install_dir` and writes the
 // configuration files. The container is read from the file rather than asked
 // for: a ZIP, a 7z or RAR archive, or a game CD as an ISO, IMG, BIN or CUE,
-// and a ZIP that holds one of those. Existing files are overwritten;
+// and an archive that holds one of those. Existing files are overwritten;
 // savegames are left alone. Returns LAUNCHER_OK on success, LAUNCHER_ERROR
 // otherwise.
 int launcher_install_zip(const char* zip_path, const char* install_dir, const LauncherOptions* options);

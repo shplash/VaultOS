@@ -175,7 +175,7 @@ final class LauncherModel: ObservableObject {
     @Published var progress: Double = 0
     @Published var statusText = ""
     @Published var errorMessage: String?
-    /// Whether the ZIP picker is open. Its kind lives in the view, so a dismissal
+    /// Whether the archive picker is open. Its kind lives in the view, so a dismissal
     /// cannot clear it before the chosen file arrives.
     @Published var showImporter = false
 
@@ -252,7 +252,7 @@ final class LauncherModel: ObservableObject {
             }
 
             let text = "VaultOS - \(games[index])\n\n"
-                + "Copy \(files[index]) into this folder, or import a game ZIP from the launcher's HOME page.\n"
+                + "Copy \(files[index]) into this folder, or import an archive of them in the launcher.\n"
             try? text.write(to: note, atomically: true, encoding: .utf8)
         }
     }
