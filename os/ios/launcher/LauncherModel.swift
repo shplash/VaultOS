@@ -817,6 +817,9 @@ final class LauncherModel: ObservableObject {
                 self.isInstalling = false
                 self.statusText = ""
                 self.refreshInstall()
+                // The slots just changed on disk: read them again so the new
+                // saves show without restarting the app.
+                self.refreshSaves()
 
                 if result == 0 {
                     self.notice("Saves restored.")
@@ -1172,13 +1175,18 @@ final class LauncherModel: ObservableObject {
         let seconds = number(in: text, key: "playSeconds")
         let level = number(in: text, key: "level")
 
-        // Minutes, and hours once there are any, so `1:05` cannot be read as
-        // one minute five seconds or as an hour and five minutes.
+        // Minutes alone until the first hour, then whole hours: `59` must not
+        // turn into `1h 04m`.
         let hours = seconds / 3600
         let minutes = seconds / 60 % 60
-        let played = hours > 0
-            ? "\(hours)h \(String(format: "%02d", minutes))m"
-            : "\(minutes) " + L.t("MIN")
+        let played: String
+        if hours == 0 {
+            played = "\(minutes) " + L.t("MIN")
+        } else if hours == 1 {
+            played = "1 " + L.t("HR")
+        } else {
+            played = "\(hours) " + L.t("HRS")
+        }
 
         return (played, level)
     }

@@ -1604,6 +1604,7 @@ struct LauncherView: View {
                     ("Dialogue", "In Fallout 2, BARTER on the right trades with whoever you are talking to."),
                     ("Combat", "The START COMBAT button changes to SKIP TURN when combat starts."),
                     ("Auto target", "On by default: the game switches to attack mode as a fight starts, so the first tap is an attack."),
+                    ("Look around", "Either the joystick or a two-finger drag moves the view."),
                 ]
             case .survival:
                 return [
@@ -1612,6 +1613,7 @@ struct LauncherView: View {
                     ("Aim", "An aimed shot costs one more action point and can cripple a limb, which often ends a fight faster than damage."),
                     ("VATS", "The attack mode's aimed steps are the game's VATS: they show the chance to hit and cost one more action point."),
                     ("Skills", "While a skill is armed the mode button reads USE SKILL, and pressing it goes back to move or target. Arm one from the skilldex or from an object's menu."),
+                    ("Red isn't always hostile", "A red outline can belong to a neutral who will fight back. Nothing in either game marks friend and foe apart, so watch who is shooting at you."),
                 ]
             case .launcher:
                 return [

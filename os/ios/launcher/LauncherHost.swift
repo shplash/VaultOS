@@ -977,6 +977,16 @@ final class GameControlsOverlay: UIView {
         symbol: "bubble.right",
         iconPointSize: 16
     )
+    private let amountAllButton = LabeledControlButton(
+        title: "ALL",
+        symbol: "hand.point.up.left",
+        iconPointSize: 16
+    )
+    private let amountDoneButton = LabeledControlButton(
+        title: "DONE",
+        symbol: "checkmark",
+        iconPointSize: 16
+    )
     private var menuRectCache: CGRect?
     private var menuRectScreen: ScreenMode = .game
     private let quickSaveNotice = UIView()
@@ -1307,6 +1317,22 @@ final class GameControlsOverlay: UIView {
         talkButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(talkButton)
 
+        // ALL and DONE beside the engine's own "MOVE ITEMS" window, so a
+        // quantity can be given or taken without reaching into the panel.
+        amountAllButton.isHidden = true
+        amountAllButton.tag = 28
+        amountAllButton.accessibilityLabel = "Give all"
+        amountAllButton.backgroundOpacity = 0.9
+        amountAllButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(amountAllButton)
+
+        amountDoneButton.isHidden = true
+        amountDoneButton.tag = 29
+        amountDoneButton.accessibilityLabel = "Done"
+        amountDoneButton.backgroundOpacity = 0.9
+        amountDoneButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
+        addSubview(amountDoneButton)
+
         keyboardIsUp = false
 
         NotificationCenter.default.addObserver(self,
@@ -1458,14 +1484,27 @@ final class GameControlsOverlay: UIView {
         let clampTop = max(10, safeAreaInsets.top + 6)
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
 
-        if currentScreen == .options {
-            // The preferences window is 640x480, the whole game screen, so its
-            // rectangle is the game view itself and there is no panel edge to
-            // hang BACK beside: the column rule below would leave it over the
-            // middle of the window. It sits on the screen's left edge, half way
-            // down, like every other menu.
+        if currentScreen == .options && box.width >= surface.width - 2 {
+            // The preferences window is the whole 640x480 screen, so there is no
+            // panel edge to hang BACK beside: it goes on the left edge, half way
+            // down, like every other menu. The ESC menu is a panel of its own,
+            // so BACK sits beside it like the rest.
             let top = min(max(clampTop, (bounds.height - side) / 2), max(clampTop, clampBottom - side))
             backButton.frame = CGRect(x: clampLeft, y: top, width: side, height: side)
+            return
+        }
+
+        if currentScreen == .pickAmount {
+            // BACK keeps its place left of the window; ALL and DONE stack the
+            // same distance out on its right, each the size of BACK.
+            let stackHeight = side * 2 + gap
+            let top = min(max(clampTop, box.midY - stackHeight / 2), max(clampTop, clampBottom - stackHeight))
+            let backY = min(max(clampTop, box.midY - side / 2), max(clampTop, clampBottom - side))
+            let rightX = min(max(box.maxX + gap, clampLeft), clampRight)
+            let leftX = min(max(box.minX - gap - side, clampLeft), clampRight)
+            backButton.frame = CGRect(x: leftX, y: backY, width: side, height: side)
+            amountAllButton.frame = CGRect(x: rightX, y: top, width: side, height: side)
+            amountDoneButton.frame = CGRect(x: rightX, y: top + side + gap, width: side, height: side)
             return
         }
 
@@ -2035,6 +2074,8 @@ final class GameControlsOverlay: UIView {
         tellAboutButton.controlOpacity = value
         offerButton.controlOpacity = value
         talkButton.controlOpacity = value
+        amountAllButton.controlOpacity = value
+        amountDoneButton.controlOpacity = value
         for button in sideButtons {
             button.controlOpacity = value
         }
@@ -2046,7 +2087,7 @@ final class GameControlsOverlay: UIView {
         // to end in a crash. Attaching is the engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
-        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider]
+        var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider, amountAllButton, amountDoneButton]
         controls.append(contentsOf: sideButtons as [UIView])
 
         if keyboardIsUp {
@@ -2137,6 +2178,8 @@ final class GameControlsOverlay: UIView {
         let itemScreen = screen.listsItems
         lookButton.isHidden = !itemScreen
         helpButton.isHidden = !itemScreen
+        amountAllButton.isHidden = true
+        amountDoneButton.isHidden = true
         if !itemScreen {
             helpCard.isHidden = true
             helpBackdrop.isHidden = true
@@ -2182,6 +2225,12 @@ final class GameControlsOverlay: UIView {
             }
             lookButton.isHidden = !itemScreen
             helpButton.isHidden = !itemScreen
+
+            // The "MOVE ITEMS" window is the only menu whose quantity is set
+            // from outside: its own loop takes the two presses.
+            let pickAmount = screen == .pickAmount
+            amountAllButton.isHidden = !(pickAmount && fallout_ios_action_available(28) != 0)
+            amountDoneButton.isHidden = !(pickAmount && fallout_ios_action_available(29) != 0)
 
             if fallout_ios_action_available(21) == 0 {
                 backButton.isHidden = true
