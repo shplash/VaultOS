@@ -1458,6 +1458,17 @@ final class GameControlsOverlay: UIView {
         let clampTop = max(10, safeAreaInsets.top + 6)
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
 
+        if currentScreen == .options {
+            // The preferences window is 640x480, the whole game screen, so its
+            // rectangle is the game view itself and there is no panel edge to
+            // hang BACK beside: the column rule below would leave it over the
+            // middle of the window. It sits on the screen's left edge, half way
+            // down, like every other menu.
+            let top = min(max(clampTop, (bounds.height - side) / 2), max(clampTop, clampBottom - side))
+            backButton.frame = CGRect(x: clampLeft, y: top, width: side, height: side)
+            return
+        }
+
         if currentScreen == .dialogue {
             placeDialogueButtons(in: box)
             return
