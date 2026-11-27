@@ -201,8 +201,10 @@ int action_available(int action)
         return screen() == fallout::IOS_SCREEN_DIALOGUE ? 0 : 1;
     case 28:
     case 29:
-        // ALL and DONE on the "MOVE ITEMS" window, which the game drives
-        // itself: they exist only while that window is on screen.
+    case 30:
+    case 31:
+        // ALL, DONE and the two quantity steps on the "MOVE ITEMS" window,
+        // which the game drives itself: they exist only while it is on screen.
         return screen() == fallout::IOS_SCREEN_PICK_AMOUNT ? 1 : 0;
     default:
         break;
@@ -333,6 +335,12 @@ void press_action(int action)
         break;
     case 29:
         fallout::ios_move_timer_request = 2;
+        break;
+    case 30:
+        fallout::ios_move_timer_request = 3;
+        break;
+    case 31:
+        fallout::ios_move_timer_request = 4;
         break;
     default:
         break;

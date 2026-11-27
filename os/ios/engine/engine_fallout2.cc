@@ -225,7 +225,8 @@ int movie_state()
     }
 
     if (movie == fallout::MOVIE_CREDITS) {
-        return 3;
+        // The credits hold like the rest: one press length everywhere.
+        return 2;
     }
 
     return 2;

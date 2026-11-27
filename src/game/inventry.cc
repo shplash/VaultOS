@@ -5229,7 +5229,20 @@ static int do_move_timer(int inventoryWindowType, Object* item, int max)
 
         int keyCode = get_input();
         if (ios_move_timer_request != 0) {
-            keyCode = ios_move_timer_request == 1 ? 5000 : KEY_RETURN;
+            switch (ios_move_timer_request) {
+            case 1:
+                keyCode = 5000; // ALL
+                break;
+            case 2:
+                keyCode = KEY_RETURN; // DONE
+                break;
+            case 3:
+                keyCode = 6000; // one more
+                break;
+            default:
+                keyCode = 7000; // one less
+                break;
+            }
             ios_move_timer_request = 0;
         }
         if (keyCode == KEY_ESCAPE) {
