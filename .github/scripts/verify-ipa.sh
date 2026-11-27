@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 #
-# Verifies the packaged iOS IPA. This checks what a successful build alone does
-# not prove: that the application actually contains both engines, that they are
-# in separate images with the expected entry points, that the ARM64/iOS
-# architecture is right, and that the Fallout 2 framework can resolve its SDL
-# symbols from the application.
-#
-# Compilation, linking, packaging and runtime are different things: this script
-# covers everything up to (and including) packaging. It cannot prove that either
-# game boots on a device.
+# Verifies the packaged iOS IPA: that it holds both engines in separate images
+# with their entry points, the right ARM64/iOS architecture, and a Fallout 2
+# framework that resolves its SDL symbols from the application. It covers the
+# build up to packaging, not whether either game boots on a device.
 
 set -euo pipefail
 

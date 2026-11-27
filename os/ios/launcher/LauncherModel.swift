@@ -45,8 +45,8 @@ enum LauncherImport {
     case saves
 }
 
-/// The colours the on-screen controls can be drawn in. White is the default for
-/// both games, so the controls look the same as the interface they sit on.
+/// The colours the on-screen controls can be drawn in; white is the default for
+/// both games.
 enum ControlColour: Int, CaseIterable, Identifiable {
     case white
     case orange
@@ -90,11 +90,8 @@ struct DisplayPreset: Identifiable, Hashable {
 
 /// Owns the launcher state and talks to the C++ install core.
 ///
-/// Both games keep their own installation and configuration, so every option
-/// is stored per game as well. The published properties always describe the
-/// selected game: switching games saves the outgoing values and loads the
-/// incoming ones, which lets Fallout 1 and Fallout 2 run at different
-/// resolutions with their own audio, gameplay and touch settings.
+/// Both games keep their own installation and options, stored per game:
+/// switching saves the outgoing values and loads the incoming ones.
 final class LauncherModel: ObservableObject {
     @Published var width = 1280 { didSet { store(width, "width") } }
     @Published var height = 720 { didSet { store(height, "height") } }
@@ -115,16 +112,15 @@ final class LauncherModel: ObservableObject {
     @Published var buttonScale: Double = 1 { didSet { store(buttonScale, "buttonScale") } }
     /// Opacity of the in-game touch controls, 0.10 (barely there) to 1.
     @Published var controlsOpacity: Double = 1 { didSet { store(controlsOpacity, "controlsOpacity") } }
-    /// Whether the touch controls are drawn over the game at all. Off leaves the
-    /// whole screen to the game, for a session with a controller in hand.
+    /// Whether the touch controls are drawn over the game at all; off leaves the
+    /// whole screen to the game.
     @Published var touchControls = true { didSet { store(touchControls, "touchControls") } }
     @Published var autoTarget = true { didSet { store(autoTarget, "autoTarget") } }
     @Published var autoSaveMinutes = 5 { didSet { store(autoSaveMinutes, "autoSaveMinutes") } }
     @Published var saveHaptics = true { didSet { store(saveHaptics, "saveHaptics") } }
     @Published var buttonHaptics = false { didSet { store(buttonHaptics, "buttonHaptics") } }
-    /// How the game's finished frame is scaled to the display: 0 sharp, 1 smooth,
-    /// 2 enhanced. The in-game presenter reads it every frame, so it applies at
-    /// once.
+    /// How a finished frame is scaled: 0 sharp, 1 smooth, 2 enhanced. The
+    /// presenter reads it every frame.
     @Published var imageScaling = 2 { didSet { store(imageScaling, "imageScaling") } }
     /// The frame rate the game is capped to in play: 60 or 30.
     @Published var frameRate = 60 { didSet { store(frameRate, "frameRate") } }
@@ -164,9 +160,8 @@ final class LauncherModel: ObservableObject {
                 refreshInstall()
             }
 
-            // The other game's saves are its own: its folder holds them, and
-            // the list of the one just left was all the launcher had. Reading
-            // it again is what keeps Fallout 1's saves out of Fallout 2.
+            // Read the new game's saves: its folder holds them, not the list of
+            // the one just left.
             refreshSaves()
 
             loadSettings(for: selectedGame)
@@ -180,9 +175,8 @@ final class LauncherModel: ObservableObject {
     @Published var progress: Double = 0
     @Published var statusText = ""
     @Published var errorMessage: String?
-    /// Whether the ZIP picker is open. What it was opened for lives in the
-    /// launcher view, so the picker's own dismissal cannot clear the intent
-    /// before the chosen file arrives.
+    /// Whether the ZIP picker is open. Its kind lives in the view, so a dismissal
+    /// cannot clear it before the chosen file arrives.
     @Published var showImporter = false
 
     private let documentsDirectory: URL
@@ -201,12 +195,11 @@ final class LauncherModel: ObservableObject {
         return documentsDirectory.appendingPathComponent(game.installFolder, isDirectory: true)
     }
 
-    /// Shown in each language's own words, so the list can be read whatever the
-    /// launcher is currently set to.
+    /// Shown in each language's own words, whatever the launcher is set to.
     private static let languageNames = ["ENGLISH", "FRANÇAIS", "DEUTSCH", "ITALIANO", "ESPAÑOL"]
 
-    /// A fresh installation starts in the device's language when the launcher
-    /// speaks it; the GAME page's own choice overrides it from then on.
+    /// A fresh installation starts in the device's language; the GAME page's own
+    /// choice overrides it from then on.
     private static let deviceLanguage: Int = {
         for tag in Locale.preferredLanguages {
             switch String(tag.prefix(2)).lowercased() {
@@ -234,11 +227,10 @@ final class LauncherModel: ObservableObject {
         refreshInstall()
     }
 
-    /// Creates both installation folders and leaves a note in each. iOS only
-    /// lists an app in the Files app once its Documents folder holds something,
-    /// and a fresh installation holds nothing at all until a game has run - so
-    /// the folder that should have been used for copying game files in by hand
-    /// was not there to use. The notes say what belongs in each.
+    /// Creates both installation folders with a note in each. iOS only lists an
+    /// app in the Files app once its Documents folder holds something, and a
+    /// fresh installation holds nothing until a game has run. The notes say what
+    /// belongs in each.
     private static func prepareInstallFolders(documents: URL) {
         let manager = FileManager.default
         let folders = [
@@ -267,8 +259,8 @@ final class LauncherModel: ObservableObject {
 
     // MARK: - Screen size
 
-    /// The screen's real pixel size in landscape. It is the basis for the
-    /// FULL/HALF logical sizes, not a game resolution by itself.
+    /// The screen's real pixel size in landscape, the basis for the FULL/HALF
+    /// logical sizes rather than a game resolution by itself.
     static func nativeResolution() -> (Int, Int) {
         let nativeBounds = UIScreen.main.nativeBounds
         let scale = max(UIScreen.main.nativeScale, 1)
@@ -280,9 +272,9 @@ final class LauncherModel: ObservableObject {
         return (max(640, longSide), max(480, shortSide))
     }
 
-    /// Logical game sizes, matched to the screen's aspect ratio. Rendering at
-    /// every physical pixel made the world tiny; two pixels per game pixel
-    /// keeps the HUD readable and is still sharp on a Retina panel.
+    /// Logical game sizes matched to the screen's aspect. Rendering at every
+    /// physical pixel made the world tiny; two pixels per game pixel keeps the
+    /// HUD readable and is still sharp on Retina.
     static func displayResolution(divisor: Int, native: (Int, Int)? = nil) -> (Int, Int) {
         let screen = native ?? LauncherModel.nativeResolution()
         let aspect = Double(screen.0) / Double(max(screen.1, 1))
@@ -295,12 +287,10 @@ final class LauncherModel: ObservableObject {
         return (width, height)
     }
 
-    /// The preset the launcher starts on: the one nearer the screen's own
-    /// points, its pixels divided by its native scale. The game draws its
-    /// 640-wide interface at the game's resolution, so matching points is what
-    /// keeps that interface at about iOS's text sizes. On a 3x phone FULL is
-    /// already smaller than iOS draws and HALF is nearer, while a 2x tablet
-    /// draws FULL at exactly its points and HALF a third larger.
+    /// The preset to start on: the one nearer the screen's own points, its
+    /// pixels divided by its native scale. Matching points keeps the game's
+    /// 640-wide interface near iOS text sizes: on a 3x phone FULL is smaller
+    /// than iOS draws and HALF is nearer, on a 2x tablet FULL is exact.
     static func defaultPresetId() -> String {
         let native = LauncherModel.nativeResolution()
         let scale = max(Double(UIScreen.main.nativeScale), 1)
@@ -329,9 +319,9 @@ final class LauncherModel: ObservableObject {
         ]
     }
 
-    /// The size stored for a game. The launcher only plays at FULL or HALF, and
-    /// anything else - a custom size from an earlier build, or one saved on
-    /// another screen - becomes the preset this screen starts on.
+    /// The size stored for a game. Anything but FULL or HALF (a custom size from
+    /// an earlier build, or one saved on another screen) becomes the preset this
+    /// screen starts on.
     private func storedResolution(for game: FalloutGame) -> (Int, Int) {
         let fallback = LauncherModel.defaultResolution()
         let storedWidth = storedInt("width", for: game, fallback: fallback.0)
@@ -352,16 +342,16 @@ final class LauncherModel: ObservableObject {
     }
 
     func selected(preset: DisplayPreset) -> Bool {
-        // A pixel or two of slack: a size saved on another screen is still
-        // meant to be that preset, so the tile has to read as in use.
+        // A pixel or two of slack: a size saved on another screen still means
+        // that preset.
         return abs(width - preset.width) <= 2 && abs(height - preset.height) <= 2
     }
 
     func apply(preset: DisplayPreset) {
         width = preset.width
         height = preset.height
-        // Persist immediately so the control overlay can choose the matching
-        // FULL/HALF layout even if the editor is closed without tapping Play.
+        // Persist at once so the overlay can pick the matching FULL/HALF layout
+        // even if the editor is closed without pressing Play.
         defaults.set(width, forKey: LauncherModel.optionKey("width", for: selectedGame))
         defaults.set(height, forKey: LauncherModel.optionKey("height", for: selectedGame))
     }
@@ -413,11 +403,9 @@ final class LauncherModel: ObservableObject {
     private static let displayVersionKey = "launcher.displayVersion"
     private static let displayVersion = 3
 
-    /// Both games start at the preset that matches this screen's points, so a
-    /// phone starts at HALF and a tablet at FULL. Earlier builds started every
-    /// device at HALF, or at FULL before that, and could have any resolution
-    /// stored, so it is reset once here; a preset the player picks afterwards
-    /// is kept.
+    /// Both games start at the preset matching this screen's points. Earlier
+    /// builds stored HALF or FULL for every device, so the resolution is reset
+    /// once here; a preset picked afterwards is kept.
     private static func applyDefaultResolution() {
         let defaults = UserDefaults.standard
         guard defaults.integer(forKey: displayVersionKey) < displayVersion else {
@@ -432,10 +420,9 @@ final class LauncherModel: ObservableObject {
         defaults.set(displayVersion, forKey: displayVersionKey)
     }
 
-    /// Subtitles ship on. Builds before this stored them off, so they are
-    /// switched on once here for both games; the version is raised when an
-    /// earlier build left the switch off, which puts an existing install back
-    /// on subtitles as well.
+    /// Subtitles ship on. Earlier builds stored them off, so they are switched on
+    /// once here for both games, and the version is raised so an install left
+    /// with them off goes back on.
     private static let subtitlesVersionKey = "launcher.subtitlesVersion"
     private static let subtitlesVersion = 2
 
@@ -451,8 +438,8 @@ final class LauncherModel: ObservableObject {
         defaults.set(subtitlesVersion, forKey: subtitlesVersionKey)
     }
 
-    /// Auto target ships on. Builds before this stored it off by default, so it
-    /// is switched on once here for both games.
+    /// Auto target ships on. Earlier builds stored it off, so it is switched on
+    /// once here for both games.
     private static let autoTargetVersionKey = "launcher.autoTargetVersion"
     private static let autoTargetVersion = 1
 
@@ -468,8 +455,8 @@ final class LauncherModel: ObservableObject {
         defaults.set(autoTargetVersion, forKey: autoTargetVersionKey)
     }
 
-    /// Earlier builds stored a single set of options for the only game the app
-    /// had. Those values belong to Fallout 1; Fallout 2 starts from defaults.
+    /// Earlier builds stored one set of options for the only game the app had.
+    /// Those values belong to Fallout 1; Fallout 2 starts from defaults.
     private static func migrateSettings() {
         let defaults = UserDefaults.standard
         guard defaults.integer(forKey: settingsVersionKey) < settingsVersion else {
@@ -653,8 +640,8 @@ final class LauncherModel: ObservableObject {
         }
     }
 
-    /// Adds a translation pack to the selected game's installation: the game's
-    /// own text tree, which the engine reads from `data` before the archive.
+    /// Adds a translation pack to the game's installation, in the game's own text
+    /// tree, which the engine reads from `data` before the archive.
     func importLanguagePack(from url: URL) {
         guard !isInstalling else {
             return
@@ -704,10 +691,9 @@ final class LauncherModel: ObservableObject {
         }
     }
 
-    /// Picks the language the pack carried: the one already selected when it is
-    /// in the pack, otherwise the only language the pack has, otherwise the
-    /// device's own when the pack has that too. A pack holding several leaves
-    /// the choice alone.
+    /// Picks the language the pack carried: the one already selected, else the
+    /// only one in the pack, else the device's. A pack with several leaves the
+    /// choice alone.
     private func selectInstalledLanguage(mask: Int32) {
         guard mask != 0 else {
             return
@@ -944,8 +930,8 @@ final class LauncherModel: ObservableObject {
         let name: String
         let detail: String
         let saved: String
-        /// The time played, when the save has a time: a save written before
-        /// the game kept one has none, and `nil` says so rather than `0:00`.
+        /// Play time when the save has one: absent rather than `0:00` for saves
+        /// written before the game kept a time.
         let played: String?
         let level: Int
         let preview: URL?
@@ -978,10 +964,9 @@ final class LauncherModel: ObservableObject {
 
         let found = LauncherModel.readSaves(folder: folder)
 
-        // A folder that cannot be listed for a moment - the device locked
-        // while the app was in the background - is not a folder with no saves
-        // in it: the same game's list stands until the folder can be read
-        // again. The list of another game is never left in its place.
+        // A folder that cannot be listed for a moment is not an empty one: the
+        // same game's list stands until it can be read again, and another
+        // game's list is never left in its place.
         if folder != nil && found.isEmpty && !saves.isEmpty && savesGame == selectedGame {
             return
         }
@@ -1008,10 +993,8 @@ final class LauncherModel: ObservableObject {
     }
 
     /// The folder the game writes its saves into. The game can leave an empty
-    /// SAVEGAME folder behind - it creates one where its data folder points
-    /// and can write the slots into another - so the folder actually holding
-    /// slots is the one to read, and a folder the short list does not spell is
-    /// found by its name instead.
+    /// SAVEGAME behind and write its slots into another, so the folder holding
+    /// slots is the one read.
     private static func saveFolder(installDirectory: URL,
                                    game: FalloutGame,
                                    known: URL?) -> URL? {
@@ -1100,31 +1083,27 @@ final class LauncherModel: ObservableObject {
                 $0.lastPathComponent.uppercased() == "SAVE.DAT"
             }
 
-            // The file is what makes a slot a save. What is inside it can be
-            // out of reach for a moment - the device locked while the app was
-            // in the background - and the save is still there then, so it is
-            // read again next time rather than dropped from the list.
+            // The file is what makes a slot a save. A header that cannot be
+            // read for a moment is read again next time rather than dropped.
             guard let saveFile = file else {
                 continue
             }
 
             let data = (try? Data(contentsOf: saveFile)) ?? Data()
 
-            // The character's name is written beside the save's own, and the
-            // save's name is the one the player typed for it - the one worth
-            // showing, with the character's own when it has none.
+            // The character's name is written beside the save's; the player's own
+            // name for the save wins, with the character's when it has none.
             let character = readString(data, at: 29, length: 32)
             let saveName = readString(data, at: 61, length: 30)
             let sidecar = readSidecar(entry)
             let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date.distantPast
 
-            // The date the save was written, from the file itself: the dates
-            // inside the save's own header are the game's, and reading them
-            // wrong gave a line of numbers that meant nothing.
+            // The file's own date, not the game's header dates, which read as
+            // meaningless numbers.
             let saved = LauncherModel.saveDate.string(from: modified)
 
-            // The game writes the picture as a PNG; the BMP an older build
-            // wrote is still read, so a save made with it keeps its picture.
+            // The game writes a PNG; the BMP an earlier build wrote is still
+            // read.
             let previewPNG = entry.appendingPathComponent("preview.png")
             let previewBMP = entry.appendingPathComponent("preview.bmp")
             let preview: URL?
@@ -1159,9 +1138,8 @@ final class LauncherModel: ObservableObject {
         return String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// The time and level the game wrote beside a save. A save written before
-    /// it kept them has neither, which is said by the time being absent rather
-    /// than by `0:00`, so the card can show the date instead.
+    /// Time and level as the game wrote them. A save from before it kept them
+    /// has neither, said by the time being absent rather than `0:00`.
     private static func readSidecar(_ folder: URL) -> (played: String?, level: Int) {
         let file = folder.appendingPathComponent("VaultOS.json")
         guard let data = try? Data(contentsOf: file),
@@ -1172,8 +1150,8 @@ final class LauncherModel: ObservableObject {
         let seconds = number(in: text, key: "playSeconds")
         let level = number(in: text, key: "level")
 
-        // Minutes, and hours once there are any, so `1:05` cannot be read as
-        // one minute five seconds or as an hour and five minutes.
+        // Minutes, and hours once there are any, so `1:05` is never read as one
+        // minute five seconds.
         let hours = seconds / 3600
         let minutes = seconds / 60 % 60
         let played = hours > 0

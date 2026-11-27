@@ -336,9 +336,9 @@ bool has_data_folder(const std::vector<ZipEntry>& entries, const std::string& pr
     return false;
 }
 
-// Locates the folder containing the game. Most archives either store the game
-// files at the root or inside a single wrapper folder; preferring a folder that
-// also contains `data` keeps an unrelated stray master.dat from winning.
+// Locates the folder containing the game: archives either store it at the root or
+// inside a single wrapper folder, and preferring one that also holds `data` keeps
+// an unrelated stray master.dat from winning.
 std::string find_game_prefix(const std::vector<ZipEntry>& entries)
 {
     struct Candidate {
@@ -649,9 +649,9 @@ bool folder_has_saves(const fs::path& root)
     return false;
 }
 
-// Both engines write saves to SAVEGAME/SLOTnn under the patches directory, which
-// is the game's own data folder; the original installation ships these folders,
-// but minimal archives often don't, so make sure they exist.
+// Both engines write saves to SAVEGAME/SLOTnn under the patches directory, the
+// game's own data folder. The original installation ships it, minimal archives
+// often do not, so make sure it exists.
 void ensure_save_directories(const fs::path& install_dir)
 {
     std::error_code ec;
@@ -669,9 +669,9 @@ bool has_save_files(const fs::path& install_dir)
     return folder_has_saves(savegame_root(install_dir));
 }
 
-// Fallout 1 needs master.dat, critter.dat and the data folder.
-// Fallout 2 additionally needs patch000.dat: upstream's installation notes list
-// it as part of the required data, and the engine loads it as its patch archive.
+// Fallout 1 needs master.dat, critter.dat and the data folder. Fallout 2 also
+// needs patch000.dat: upstream's installation notes list it as required data, and
+// the engine loads it as its patch archive.
 bool layout_is_complete(const InstallLayout& layout, int32_t game)
 {
     return !layout.master_dat.empty()
@@ -1045,9 +1045,8 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
             continue;
         }
 
-        // Savegames are the player's data, never installation data. Ignore any
-        // archive entry that tries to replace them, in either folder a game keeps
-        // them in.
+        // Savegames are the player's data, never installation data: ignore any
+        // entry that would replace them, in either folder a game keeps them in.
         const std::string lower_relative = lower_ascii(relative);
         if (lower_relative.rfind("savegame/", 0) == 0
             || lower_relative.rfind("data/savegame/", 0) == 0) {
@@ -1102,7 +1101,7 @@ int launcher_install_zip(const char* zip_path, const char* install_dir, const La
 // ---------------------------------------------------------------------------
 
 // Finds the shallowest `<folder>` tree in the archive - `text/` for a language
-// pack, `savegame/` for a backup - so a pack wrapped in one folder, or holding a
+// pack, `savegame/` for a backup - so a pack wrapped in a folder, or holding a
 // whole data folder, is still found.
 static std::string find_tree_prefix(const std::vector<ZipEntry>& entries, const char* folder, bool& found)
 {
@@ -1130,9 +1129,9 @@ static std::string find_tree_prefix(const std::vector<ZipEntry>& entries, const 
     return best;
 }
 
-// A pack's language folder, under whichever name its edition used. The engine
-// asks for `text/<language>` with the English name, so a pack that shipped as
-// text/FRANCAIS or text/DEUTSCH has to be stored under the name it looks for.
+// A pack's language folder under whichever name its edition used. The engine asks
+// for `text/<language>` with the English name, so a pack shipped as text/FRANCAIS
+// or text/DEUTSCH is stored under the name it looks for.
 struct LanguageFolder {
     const char* folder;
     const char* canonical;
@@ -1222,8 +1221,8 @@ int launcher_install_language_pack(const char* zip_path, const char* install_dir
         return LAUNCHER_ERROR;
     }
 
-    // A game ZIP is not a translation, and picking one here used to write its
-    // text tree over the other game's data. Refuse it before extracting.
+    // A game ZIP is not a translation: picking one here used to write its text
+    // tree over the other game's data, so refuse it before extracting.
     for (const ZipEntry& entry : entries) {
         const std::string name = lower_ascii(entry.name);
         const std::string base = name.substr(name.find_last_of('/') + 1);
@@ -1594,7 +1593,7 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     const fs::path saves = savegame_root(destination);
 
     // The import replaces rather than merges: a slot left behind by newer saves
-    // would otherwise look like part of the backup. The launcher warns first.
+    // would look like part of the backup. The launcher warns first.
     std::error_code ec;
     fs::remove_all(saves, ec);
     ec.clear();
@@ -1627,8 +1626,8 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     return LAUNCHER_OK;
 }
 
-// A repeated failure writes a line every time it is tried, so a note left beside
-// the game for the player to read has to be bounded somewhere. It is bounded
+// A failure that repeats writes a line every time it is tried, and the note sits
+// in Documents beside the game files, so it has to be bounded. It is bounded
 // here rather than in each writer, so both engines keep the same limit.
 void launcher_trim_log(const char* path, int32_t limit, int32_t keep)
 {
@@ -1658,9 +1657,9 @@ void launcher_trim_log(const char* path, int32_t limit, int32_t keep)
         tail.erase(0, newline + 1);
     }
 
-    // Written beside the log and renamed over it. The engine trims a note because
-    // something has just gone wrong, which is the worst moment to empty the file
-    // it is about to write to.
+    // Written beside the log and renamed over it: the log is trimmed because
+    // something just failed, the worst moment to empty the file it is about to
+    // write to.
     const fs::path temporary = target.string() + ".trim";
     {
         std::ofstream output(temporary, std::ios::binary | std::ios::trunc);

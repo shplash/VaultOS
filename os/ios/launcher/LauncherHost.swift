@@ -4,9 +4,8 @@ import QuartzCore
 import SwiftUI
 import UIKit
 
-/// Entry point called from the engine's `main` on iOS. Presents the launcher in
-/// its own window and blocks until the user taps Play; the engine boots right
-/// after this returns.
+/// Called from the engine's `main`: presents the launcher and blocks until Play,
+/// after which the engine boots.
 @_cdecl("fallout_ios_present_launcher")
 public func fallout_ios_present_launcher() {
     LauncherHost.shared.present()
@@ -36,20 +35,19 @@ final class LauncherHost {
         }
     }
 
-    /// What the display keeps for the sensor housing and the home indicator.
-    /// The launcher covers the whole screen and keeps its own content inside
-    /// these, so it fills a phone or a tablet instead of sitting in a box.
+    /// What the display keeps for the sensor housing and home indicator; the
+    /// launcher keeps its content inside these.
     static var safeInsets: UIEdgeInsets {
         return shared.window?.safeAreaInsets ?? .zero
     }
 
     private func appWillResignActive() {
         if finished {
-            // The game is running: silence its SDL stream. The launcher track was
-            // stopped when the launcher handed over, so there is none to pause.
+            // The game is running: silence its SDL stream. The launcher track
+            // was stopped on handover.
             fallout_ios_pause_game_audio()
         } else {
-            // Leaving the launcher in the background should silence its music.
+            // Silence the launcher's music in the background.
             LauncherMusic.shared.stop()
         }
     }
@@ -58,8 +56,8 @@ final class LauncherHost {
         if finished {
             fallout_ios_resume_game_audio()
         } else if window != nil {
-            // Launching the app rotates the interface to landscape, which lands
-            // after the launcher's window exists.
+            // The launch rotation to landscape lands after the launcher's window
+            // exists.
             fitToAvailableSpace()
             LauncherMusic.shared.playIfAvailable()
         }
@@ -88,12 +86,10 @@ final class LauncherHost {
         controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
 
         // The window takes the space the app is actually given, never a shape
-        // guessed from the screen. main() runs this during launch, before the
-        // landscape-only rotation has landed, so the screen can still report the
-        // portrait metrics; and on an iPad the app can be given a window smaller
-        // than the screen. A window built from the wrong bounds leaves the
-        // launcher laid out for a shape it is never shown in, which reads as a
-        // squeezed rail with the rest of the page off screen.
+        // guessed from the screen: main() runs before the landscape rotation
+        // lands, so the screen can still report portrait metrics, and an iPad can
+        // be given a window smaller than its screen. The wrong bounds leave the
+        // launcher laid out for a shape it is never shown in.
         let window = launcherWindow()
         // Above SDL's launch screen window (UIWindowLevelNormal + 1).
         window.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.normal.rawValue + 2)
@@ -104,13 +100,13 @@ final class LauncherHost {
         fitToAvailableSpace()
         followAvailableSpace()
 
-        // main() has to keep control until the game is ready to boot, so run a
-        // nested run loop. finish(launchGame:) stops it.
+        // main() keeps control until the game can boot, so run a nested loop;
+        // finish(launchGame:) stops it.
         fallout_ios_run_launcher_loop()
     }
 
-    /// A window owned by the app's scene when it has one, so UIKit keeps it the
-    /// size of the space the app was given; a landscape window otherwise.
+    /// A scene-owned window when there is one, so UIKit keeps it the size of the
+    /// space the app was given; a landscape window otherwise.
     private func launcherWindow() -> UIWindow {
         if let windowScene = scene() {
             return UIWindow(windowScene: windowScene)
@@ -124,11 +120,8 @@ final class LauncherHost {
         return scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
     }
 
-    /// The space the launcher may use: its own scene when UIKit gave it one,
-    /// the screen otherwise, always in the shape the app is shown in. During
-    /// launch the scene still reports the portrait metrics until the interface
-    /// rotation to landscape lands, and a launcher laid out for those only puts
-    /// itself right once the device is turned.
+    /// The space the launcher may use, in the shape the app is shown in. During
+    /// launch the scene still reports portrait metrics until the rotation lands.
     private func availableBounds() -> CGRect {
         let bounds: CGRect
         if let windowScene = window?.windowScene {
@@ -164,10 +157,8 @@ final class LauncherHost {
         }
     }
 
-    /// The interface rotation that follows launch is not a device rotation, and
-    /// a resized window on an iPad can change at any time, so the launcher's
-    /// window is fitted again on every change and once more once UIKit has
-    /// settled the launch-time rotation.
+    /// The launch rotation is not a device rotation, and an iPad window can
+    /// resize at any time, so the window is fitted again on every change.
     private func followAvailableSpace() {
         sizeObservers.append(NotificationCenter.default.addObserver(
             forName: UIDevice.orientationDidChangeNotification,
@@ -184,8 +175,7 @@ final class LauncherHost {
         }
         finished = true
 
-        // The track belongs to the launcher: nothing else stops it, and it was
-        // left playing over whatever the game started next.
+        // The track belongs to the launcher: nothing else stops it.
         LauncherMusic.shared.stop()
 
         for observer in sizeObservers {
@@ -212,15 +202,14 @@ final class LauncherHost {
 
 // MARK: - In-game controls
 
-// Native controls shown over SDL's view in the black margins beside the HUD.
-// Keeping them as real UIKit views means SDL never sees these touches, while
-// the rest of the screen keeps working exactly as before.
+// Native controls over SDL's view in the black margins beside the HUD. Real
+// UIKit views, so SDL never sees their touches and the rest of the screen keeps
+// working as before.
 
 private enum ControlTheme {
-    /// The colour the player picked for the controls. It tints the glyphs, the
-    /// labels and the wash of a held or selected button; the plates, their
-    /// outlines and their shadows stay neutral, so nothing here tints the game
-    /// underneath them.
+    /// The colour the player picked for the controls: it tints the glyphs, labels
+    /// and wash; plates, outlines and shadows stay neutral so the game is not
+    /// tinted underneath them.
     static var control: UIColor {
         let key = LauncherModel.optionKey("buttonColour", for: ControlLayout.activeGame())
         let index = UserDefaults.standard.integer(forKey: key)
@@ -327,9 +316,8 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Both games keep independent control sets and layouts. The reload and
-    /// attack-mode buttons show themselves only when the running engine reports
-    /// the action as available.
+    /// Both games keep independent control sets and layouts. Reload and attack
+    /// mode only show when the running engine reports them available.
     static func controls(for game: FalloutGame) -> [TouchControl] {
         return allCases
     }
@@ -436,19 +424,17 @@ enum TouchControl: String, CaseIterable, Identifiable, Hashable {
     /// The phone the control layout was designed on, in points.
     static let designScreen = CGSize(width: 852, height: 393)
 
-    /// How much bigger this screen is than that phone, for every size below.
-    /// One factor for both sides keeps each control's shape: a width taken from
-    /// the screen's width and a height from its height changes shape with the
-    /// aspect, so SKIP, ACTION, MAP, CHA and INV came out as tall blocks on a
-    /// 4:3 tablet and flat bars on a 2:1 phone.
+    /// How much bigger this screen is than the design phone, as one factor for
+    /// both sides so each control keeps its shape: widths from the screen's width
+    /// and heights from its height turn SKIP, ACTION, MAP, CHA and INV into tall
+    /// blocks on a 4:3 tablet and flat bars on a 2:1 phone.
     static func sizeUnit(in bounds: CGSize) -> CGFloat {
         return max(0.75, min(bounds.width / designScreen.width,
                              bounds.height / designScreen.height))
     }
 
-    /// Base size in points before the global and per-control scale settings.
-    /// The HUD-row buttons are intentionally rectangles so they fill the side
-    /// strip in the same way as the proposed layout.
+    /// Base size in points before the global and per-control scale. The HUD-row
+    /// buttons are rectangles so they fill the side strip.
     func defaultSize(in bounds: CGSize, profile: LayoutProfile = .full) -> CGSize {
         let size = designSize()
         let unit = TouchControl.sizeUnit(in: bounds)
@@ -521,9 +507,8 @@ enum ControlLayout {
         return "launcher.control.\(control.rawValue)\(suffix)"
     }
 
-    /// Which layout the current resolution setting uses. The launcher saves
-    /// width/height before handing control to the engine, so the overlay can
-    /// pick the matching layout without a separate switch.
+    /// Which layout the resolution setting uses: the launcher saves width/height
+    /// before handing over, so the overlay can match it without a switch.
     static func profileForCurrentResolution() -> LayoutProfile {
         let defaults = UserDefaults.standard
         let game = activeGame()
@@ -541,8 +526,8 @@ enum ControlLayout {
         return CGFloat(min(max(value, 0.10), 1))
     }
 
-    /// Whether the in-game touch controls are drawn at all. On unless the player
-    /// has switched them off for this game.
+    /// Whether the in-game controls are drawn; on unless switched off for this
+    /// game.
     static func touchControls() -> Bool {
         let value = UserDefaults.standard.object(
             forKey: LauncherModel.optionKey("touchControls", for: activeGame())) as? Bool
@@ -555,10 +540,9 @@ enum ControlLayout {
         return value ?? true
     }
 
-    /// The first build with the reference layout used saved drag positions
-    /// from the older oversized layout. This migration copies the existing
-    /// single layout into the FULL profile, then starts a separate HALF
-    /// profile from its own defaults.
+    /// The first build with the reference layout reused drag positions from the
+    /// older oversized layout: copy the existing layout into FULL, then start
+    /// HALF from its own defaults.
     static func migrateIfNeeded() {
         let defaults = UserDefaults.standard
         guard defaults.integer(forKey: layoutVersionKey) < layoutVersion else {
@@ -577,8 +561,8 @@ enum ControlLayout {
                 defaults.removeObject(forKey: legacy)
             }
 
-            // Version 10 stored one layout per display profile for Fallout 1.
-            // Move it to the game-qualified key so Fallout 2 can own its own.
+            // Version 10 stored one layout for Fallout 1; move it to the
+            // game-qualified key so Fallout 2 can own its own.
             for (suffix, target) in [
                 (xSuffix, key(control, xSuffix, profile: .full, game: .fallout1)),
                 (ySuffix, key(control, ySuffix, profile: .full, game: .fallout1)),
@@ -601,10 +585,8 @@ enum ControlLayout {
 
         let previous = defaults.integer(forKey: layoutVersionKey)
 
-        // Version 17 put every control back on the original layout with the
-        // neutral faces, so the stored positions are cleared and each one comes
-        // back where the layout puts it. The player's own sizes are kept, since
-        // those still mean what they meant.
+        // Version 17 put every control back on the original layout, so stored
+        // positions are cleared; the player's sizes keep their meaning.
         if previous < 17 {
             for game in FalloutGame.allCases {
                 for profile in [LayoutProfile.full, .half] {
@@ -617,9 +599,8 @@ enum ControlLayout {
         }
 
         // Version 18 joins QUICK SAVE and its chevron into one assembly, which
-        // only reads as one control when the two sit flush. Their stored
-        // positions are cleared so they come back joined; the other controls,
-        // and every size, keep what the player set.
+        // only reads right when the two sit flush: their positions are cleared so
+        // they come back joined; other controls and sizes are kept.
         if previous < 18 {
             for game in FalloutGame.allCases {
                 for profile in [LayoutProfile.full, .half] {
@@ -828,14 +809,13 @@ enum ScreenMode: Int {
     case options = 10
     case saves = 11
 
-    /// The panel that picks the item to use something on: drawn like the
-    /// inventory, but the touch layer keeps the trackpad there.
+    /// Drawn like the inventory, but the touch layer keeps the trackpad here.
     case useOn = 12
 
     case pickAmount = 13
 
-    /// The called shot panel drawn over the game view; it is a menu for the
-    /// overlay's purposes, so the HUD steps aside and only BACK stays.
+    /// A menu for the overlay's purposes: the HUD steps aside and only BACK
+    /// stays.
     case calledShot = 14
 
     case death = 15
@@ -857,12 +837,10 @@ enum ScreenMode: Int {
 }
 
 final class GameControlsOverlay: UIView {
-    /// The overlay is a subview of the engine's own window, exactly like the
-    /// original single-engine build. A separate window above SDL looks the same
-    /// but stops the engine from receiving touches in the empty area, which
-    /// kills the trackpad cursor: Fallout 1 turns SDL finger events into mouse
-    /// movement in touch.cc/mouse.cc. Being a sibling above SDL's view keeps
-    /// the buttons working while touches outside them fall through to the game.
+    /// A subview of the engine's own window, like the original single-engine
+    /// build. A separate window above SDL looks the same but stops the engine
+    /// receiving touches in the empty area, which kills the trackpad cursor
+    /// (touch.cc and mouse.cc turn finger events into mouse movement).
     private static let overlayTag = 0xF0110
     private static var windowObserver: NSObjectProtocol?
     private static var windowRetryTimer: Timer?
@@ -1005,10 +983,8 @@ final class GameControlsOverlay: UIView {
     private var quickSaveSerial: Int32 = -1
     private var trayOpen = false
 
-    /// Refreshes the overlay that is on screen, if there is one. The engine
-    /// calls this from its own input loop, on the main thread between frames,
-    /// which is why nothing here may change the view hierarchy: it only asks
-    /// the game what the controls can do and updates them.
+    /// Refreshes the overlay on screen. Called from the engine's input loop
+    /// between frames, so nothing here may change the view hierarchy.
     static func refreshInstalled() {
         installedOverlay?.refreshControls()
     }
@@ -1020,14 +996,13 @@ final class GameControlsOverlay: UIView {
     static func install() {
         ControlLayout.migrateIfNeeded()
 
-        // The engine calls this once its SDL window exists (Fallout 1's
-        // svga_init does), in which case the overlay can attach immediately.
+        // The engine calls this once its SDL window exists (Fallout 1 does from
+        // svga_init), so the overlay can attach at once.
         if let window = sdlWindow() {
             attach(to: window)
         } else {
-            // Fallout 2's engine does not call back after creating its window,
-            // so wait for that window to appear instead of covering it with a
-            // window of our own.
+            // Fallout 2 does not call back after creating its window, so wait
+            // for that window rather than covering it with one of our own.
             observeEngineWindow()
             watchForEngineWindow()
         }
@@ -1035,9 +1010,8 @@ final class GameControlsOverlay: UIView {
         startOverlayClock()
     }
 
-    /// Second way of noticing SDL's window, for the case where the visibility
-    /// notification is not posted or arrives before the window is usable. The
-    /// run loop the engine keeps spinning is the only clock available here.
+    /// Notices SDL's window if the visibility notification is not posted or
+    /// arrives too early; the engine's run loop is the only clock here.
     private static func watchForEngineWindow() {
         guard windowRetryTimer == nil else {
             return
@@ -1062,9 +1036,9 @@ final class GameControlsOverlay: UIView {
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    /// SDL's window is the only visible window at the normal level once the
-    /// engine starts: the launcher sits above it and is hidden, and SDL's
-    /// launch-screen window is one level above normal.
+    /// SDL's window is the only visible one at the normal level once the engine
+    /// starts: the launcher is above it and hidden, and SDL's launch screen is
+    /// one level up.
     private static func sdlWindow() -> UIWindow? {
         return UIApplication.shared.windows.first {
             !$0.isHidden && $0.windowLevel == .normal
@@ -1076,10 +1050,9 @@ final class GameControlsOverlay: UIView {
             return
         }
 
-        // queue: nil delivers synchronously on the thread that posts the
-        // notification, which is the main thread during SDL window creation.
-        // A main-queue observer would only run when the run loop next spins,
-        // and the engine blocks that loop for the whole session.
+        // queue: nil delivers synchronously on the posting thread, the main
+        // thread during SDL window creation; a main-queue observer would only
+        // run when a run loop the engine blocks for the whole session spins.
         windowObserver = NotificationCenter.default.addObserver(
             forName: UIWindow.didBecomeVisibleNotification,
             object: nil,
@@ -1222,9 +1195,8 @@ final class GameControlsOverlay: UIView {
         loadButton.addTarget(self, action: #selector(sideActionPressed(_:)), for: .touchUpInside)
         addSubview(loadButton)
 
-        // The engine's own quick save, with a tick for confirmation when it has
-        // been asked for. QUICK SAVE and the chevron share one plate, drawn
-        // under both, so the pair reads as one control with a divider.
+        // The engine's own quick save. QUICK SAVE and the chevron share one
+        // plate, so the pair reads as one control with a divider.
         saveAssembly.isHidden = true
         saveAssembly.fill = ControlTheme.panel
         saveAssembly.edge = ControlTheme.border
@@ -1246,8 +1218,7 @@ final class GameControlsOverlay: UIView {
         quickSaveButton.drawsOwnPlate = false
         addSubview(quickSaveButton)
 
-        // The chevron beside QUICK SAVE opens the tray that holds LOAD and
-        // SAVE, which stay out of the way until they are asked for.
+        // The chevron beside QUICK SAVE opens the tray that holds LOAD and SAVE.
         trayButton.accessibilityLabel = "Save options"
         trayButton.addTarget(self, action: #selector(trayPressed), for: .touchUpInside)
         trayButton.drawsOwnPlate = false
@@ -1318,8 +1289,8 @@ final class GameControlsOverlay: UIView {
                                                name: UIResponder.keyboardWillHideNotification,
                                                object: nil)
 
-        // The help button is the same square as INSPECT, in the same panel, so
-        // the two read as one column against the menu's edge.
+        // The help button is the same square as INSPECT, so the two read as one
+        // column against the menu's edge.
         helpButton.isHidden = true
         helpButton.accessibilityLabel = "Inventory help"
         helpButton.addTarget(self, action: #selector(helpPressed), for: .touchUpInside)
@@ -1338,10 +1309,9 @@ final class GameControlsOverlay: UIView {
 
         skipMovieButton.isHidden = true
         skipMovieButton.onTrigger = { [weak self] in
-            // Asked again here and not trusted: the overlay is not refreshed
-            // while the engine is busy, so this button can still be on screen
-            // after the movie ended - and ESC in the main menu is the key that
-            // closes the game.
+            // Asked again here because the overlay is not refreshed while the
+            // engine is busy: this button can outlive the movie, and ESC in the
+            // main menu is the key that closes the game.
             if fallout_ios_movie_state() != 0 {
                 fallout_ios_back()
             }
@@ -1350,12 +1320,10 @@ final class GameControlsOverlay: UIView {
         addSubview(skipMovieButton)
 
         refreshControls()
-        // No timer. The overlay used to poll the engine every half second to
-        // learn what it could do (cursor mode, attack mode, reload, skip), from
-        // an NSTimer running inside the engine's own loop - and a crash report
-        // shows exactly that: __NSFireTimer on the main thread, a few frames of
-        // ours, then a read through a null pointer. The engine is asked only
-        // when the player actually presses something now.
+        // No timer: polling from an NSTimer inside the engine's own loop crashed
+        // (__NSFireTimer on the main thread, then a read through a null
+        // pointer), so the engine is asked only when the player presses
+        // something.
     }
 
     required init?(coder: NSCoder) {
@@ -1441,10 +1409,9 @@ final class GameControlsOverlay: UIView {
         let side = min(max(48, surface.height * 0.17), 84)
 
         if currentScreen == .skilldex, let panel = panel {
-            // The skill panel's own CANCEL button sits at 48,338 in the panel's
-            // own pixels. BACK is centred on the panel's bottom strip, dark
-            // enough to hide it, so the panel does not offer the same way out
-            // twice.
+            // The skill panel's own CANCEL sits at 48,338 in panel pixels.
+            // BACK covers it, dark enough to hide it, so the panel does not
+            // offer two ways out.
             let width = min(152, panel.width - 30)
             backButton.solidBackground = true
             backButton.frame = gameRect(CGRect(x: panel.midX - width / 2 + 2, y: panel.minY + 332,
@@ -1459,11 +1426,9 @@ final class GameControlsOverlay: UIView {
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
 
         if currentScreen == .options {
-            // The preferences window is 640x480, the whole game screen, so its
-            // rectangle is the game view itself and there is no panel edge to
-            // hang BACK beside: the column rule below would leave it over the
-            // middle of the window. It sits on the screen's left edge, half way
-            // down, like every other menu.
+            // The preferences window is the whole 640x480 screen, so there is no
+            // panel edge to hang BACK beside: it goes on the screen's left edge,
+            // half way down, like every other menu.
             let top = min(max(clampTop, (bounds.height - side) / 2), max(clampTop, clampBottom - side))
             backButton.frame = CGRect(x: clampLeft, y: top, width: side, height: side)
             return
@@ -1737,9 +1702,8 @@ final class GameControlsOverlay: UIView {
         let point = ControlLayout.centerPoint(for: control, profile: profile, game: game, in: bounds.size)
         let halfWidth = size.width / 2
         let halfHeight = size.height / 2
-        // The whole screen, sensor housing included: the controls belong on its
-        // edges, and pulling them inside the safe-area insets squeezed the side
-        // columns into each other on a notched phone.
+        // The whole screen, safe area included: pulling the controls inside the
+        // insets squeezed the side columns into each other on a notched phone.
         let x: CGFloat
         let y: CGFloat
         if control == .tray {
@@ -1763,9 +1727,8 @@ final class GameControlsOverlay: UIView {
     }
 
     @objc private func primaryAction() {
-        // USE SKILL is a mode of its own that the game's own cycle does not
-        // leave, so the button puts the game back into movement, or into combat
-        // targeting while a fight is on.
+        // USE SKILL is a mode the game's own cycle does not leave, so this puts
+        // it back into movement, or into combat targeting during a fight.
         if currentScreen == .game && fallout_ios_cursor_mode() == 3 {
             fallout_ios_press_action(fallout_ios_action_available(5) != 0 ? 12 : 13)
         } else {
@@ -1793,9 +1756,8 @@ final class GameControlsOverlay: UIView {
         selectionFeedback()
     }
 
-    /// The chevron beside QUICK SAVE. Tapping it slides LOAD and SAVE out of the
-    /// tray, and tapping it again puts them away; the button keeps QUICK SAVE
-    /// as its neighbour and never moves.
+    /// The chevron beside QUICK SAVE slides LOAD and SAVE out of the tray and
+    /// back; QUICK SAVE stays put as its neighbour.
     @objc private func trayPressed() {
         setTray(open: !trayOpen)
         selectionFeedback()
@@ -1846,14 +1808,13 @@ final class GameControlsOverlay: UIView {
             return
         }
 
-        // The count has moved because of this press, so the refresh must not
-        // show the same save twice.
+        // The count moved with this press, so the refresh must not show it twice.
         quickSaveSerial = fallout_ios_quick_save_serial()
         showQuickSaveResult(saved: result == 1)
     }
 
-    // The tick means the game was really written, the cross means it was not.
-    // Nothing in between, whether a finger or the launcher's own clock asked.
+    // A tick means the game was written and a cross that it was not, whichever
+    // asked: a finger or the launcher's own clock.
     private func showQuickSaveResult(saved: Bool) {
         quickSaveNotice.isHidden = true
         quickSaveButton.set(symbol: saved ? "checkmark" : "xmark",
@@ -1920,10 +1881,9 @@ final class GameControlsOverlay: UIView {
 
     @objc private func lookPressed() {
         fallout_ios_press_action(16)
-        // The game keeps this mode to itself, so the button carries it, and a
-        // wash shows when the inventory is in look mode. The engine is told as
-        // well: in look mode a touch clicks an item instead of dragging it, and
-        // that click is what shows the item's description.
+        // The game keeps this mode to itself, so the button carries it; the
+        // engine is told as well, since in look mode a touch clicks an item
+        // instead of dragging it, and that click shows its description.
         inspectOn.toggle()
         fallout_ios_press_action(inspectOn ? 17 : 18)
         lookButton.showsSelection = inspectOn
@@ -2005,16 +1965,15 @@ final class GameControlsOverlay: UIView {
         }
     }
 
-    /// Laying a finger on the screen is the other moment the controls are
-    /// refreshed: the player is about to act, so what is on offer is looked up
-    /// then, and never from a clock running inside the engine's loop.
+    /// Also refreshed when a finger lands: the player is about to act, so what
+    /// is on offer is looked up then rather than from a clock.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         refreshControls()
         super.touchesBegan(touches, with: event)
     }
 
-    /// Pushes the player's opacity setting into every control. Buttons combine
-    /// it with their enabled state themselves.
+    /// Pushes the player's opacity into every control; buttons combine it with
+    /// their enabled state themselves.
     private func applyControlOpacity(_ value: CGFloat) {
         joystick.controlOpacity = value
         actionButton.controlOpacity = value
@@ -2041,9 +2000,9 @@ final class GameControlsOverlay: UIView {
     }
 
     private func refreshControls() {
-        // No view hierarchy work here, deliberately. This runs from the engine's
-        // own loop; attaching, resizing or reordering views there is what used
-        // to end in a crash. Attaching is the engine window watcher's job.
+        // No view hierarchy work here: this runs on the engine's own loop, where
+        // attaching, resizing or reordering views crashed. Attaching is the
+        // engine window watcher's job.
         applyControlOpacity(ControlLayout.controlsOpacity())
 
         var controls: [UIView] = [joystick, actionButton, backButton, pipButton, skipButton, skillButton, swapButton, endButton, reloadButton, fireModeButton, savesButton, loadButton, quickSaveButton, trayButton, saveAssembly, saveDivider]
@@ -2081,19 +2040,17 @@ final class GameControlsOverlay: UIView {
             if isHidden {
                 isHidden = false
             }
-            // The engine usually blocks on the loading screen that follows a
-            // movie, and UIKit would only commit these hides once it gets the
-            // run loop back - long after that screen is drawn. Flushing sends
-            // them to the screen now.
+            // The engine usually blocks on the loading screen after a movie, and
+            // UIKit would only commit these hides once it gets the run loop
+            // back, long after that screen is drawn; flushing sends them now.
             CATransaction.flush()
             return
         }
 
         if movieWasPlaying {
             movieWasPlaying = false
-            // What follows a movie is usually a loading screen the engine draws
-            // without handing the run loop back for a while, so the controls
-            // that just went away are sent to the screen now.
+            // The loading screen after a movie does not hand the run loop back
+            // for a while, so flush the hides that just went through.
             CATransaction.flush()
         }
 
@@ -2174,9 +2131,8 @@ final class GameControlsOverlay: UIView {
                 return
             }
 
-            // A menu already carries the game's own buttons, so the only
-            // control worth keeping is the way out of it. The item screens
-            // also keep INSPECT and its help beside them.
+            // A menu carries the game's own buttons, so only the way out is
+            // kept; item screens also keep INSPECT and its help.
             for control in controls where control !== backButton {
                 control.isHidden = true
             }
@@ -2193,9 +2149,8 @@ final class GameControlsOverlay: UIView {
             return
         }
 
-        // With the touch controls switched off the overlay leaves the screen
-        // entirely, so the game gets every touch, not only the ones that miss a
-        // control.
+        // With the touch controls off the overlay leaves the screen, so the game
+        // gets every touch.
         let shown = ControlLayout.touchControls() && fallout_ios_in_game() != 0
         if isHidden == shown {
             isHidden = !shown
@@ -2293,9 +2248,8 @@ final class GameControlsOverlay: UIView {
                            accessibilityLabel: startsCombat ? "Start combat" : "Skip turn")
         }
 
-        // Reload stays on screen for anything that takes ammunition and dims
-        // when it would do nothing; a melee weapon or empty hands keep it away.
-        // The attack mode is always there and dims without a usable weapon.
+        // Reload shows for anything that takes ammunition and dims when it would
+        // do nothing; attack mode is always there and dims without a weapon.
         let carriesFirearm = fallout_ios_action_available(26) != 0
         let canReload = fallout_ios_action_available(8) != 0
         let canChangeMode = fallout_ios_action_available(9) != 0
@@ -2320,16 +2274,12 @@ final class GameControlsOverlay: UIView {
         CATransaction.flush()
     }
 
-    /// The game exposes its selected attack mode through the interface item
-    /// action: primary, primary aiming, secondary (burst) and secondary aiming.
-    /// The pictogram carries the mode - one dot for the primary attack, two for
-    /// the secondary, plus a crosshair when that mode is aimed - and the label
-    /// underneath says what the button is, since it applies to melee attacks
-    /// as well.
+    /// The attack mode the game reports: primary, primary aiming, secondary
+    /// (burst) and secondary aiming. The pictogram carries the mode and the
+    /// label says what the button is, since it applies to melee too.
     private func updateFireModeButton(_ mode: Int32) {
-        // Aimed steps of the attack mode are the game's VATS: they show the
-        // chance to hit and cost an extra action point, so the label says so
-        // while one of them is selected.
+        // Aimed steps of the attack mode are the game's VATS - an extra action
+        // point and a shown chance to hit - so the label says so.
         let aimed = mode == 2 || mode == 4
         let title = aimed ? "VATS\nMODE" : "ATTACK\nMODE"
         switch mode {
@@ -2352,9 +2302,9 @@ final class GameControlsOverlay: UIView {
         }
     }
 
-    /// One 42x20 pictogram: one dot for the primary attack, two for the
-    /// secondary (burst), and a crosshair when the mode is aimed. The whole
-    /// group is centred in the canvas so all four modes line up in the button.
+    /// A 42x20 pictogram: one dot for the primary attack, two for the
+    /// secondary (burst), a crosshair when the mode is aimed. Centred, so all
+    /// four modes line up in the button.
     static func fireModeImage(_ mode: Int32) -> UIImage {
         let size = CGSize(width: 42, height: 20)
         let color = ControlTheme.control
@@ -2429,16 +2379,15 @@ private final class LabeledControlButton: UIControl {
     private let label = UILabel()
 
     /// A control that has to hide what is under it, such as the skill panel's
-    /// own CANCEL button, paints its panel solid instead of translucent.
+    /// CANCEL, paints its panel solid instead of translucent.
     var solidBackground = false {
         didSet {
             plate.fill = normalBackground
         }
     }
 
-    /// Set for an action that must not happen on a stray tap: the button fills
-    /// while it is held and fires only once the hold is long enough. It stays
-    /// the same button as its neighbours otherwise.
+    /// Set for an action that must not happen on a stray tap: fills while held
+    /// and fires only once the hold is long enough.
     var onHold: (() -> Void)?
     var holdSeconds: TimeInterval = 2
 
@@ -2449,9 +2398,8 @@ private final class LabeledControlButton: UIControl {
         return solidBackground ? ControlTheme.solidPanel : ControlTheme.panel.withAlphaComponent(backgroundOpacity)
     }
 
-    /// A control that is one half of a joined assembly draws no plate of its
-    /// own: the assembly behind it supplies the outline and the fill, while the
-    /// glyph, label, press state and touch area stay its own.
+    /// One half of a joined assembly draws no plate of its own: the assembly
+    /// behind it supplies the outline and the fill.
     var drawsOwnPlate = true {
         didSet {
             plate.isHidden = !drawsOwnPlate
@@ -2486,9 +2434,8 @@ private final class LabeledControlButton: UIControl {
         insertSubview(plate, at: 0)
         tintColor = ControlTheme.control
 
-        // A translucent wash over the panel, for a control that is switched on
-        // rather than pressed. The player's colour shows here and in the labels;
-        // the plate and its outline stay neutral.
+        // A wash for a control that is switched on rather than pressed; the
+        // plate and its outline stay neutral.
         selectionView.backgroundColor = ControlTheme.wash
         selectionView.isUserInteractionEnabled = false
         selectionView.isHidden = true
@@ -2569,9 +2516,8 @@ private final class LabeledControlButton: UIControl {
         )
     }
 
-    /// A control that cannot be used right now is dimmed, but never below the
-    /// player's own opacity setting: the two only move together once the
-    /// slider goes under the dimming, so the unusable ones do not fade first.
+    /// Dimmed, but never below the player's opacity: once the slider goes under
+    /// the dimming the two move together.
     private static let disabledOpacity: CGFloat = 0.35
     private var baseOpacity: CGFloat = 1
 
@@ -2613,9 +2559,8 @@ private final class LabeledControlButton: UIControl {
         }
     }
 
-    // A held control fills while the finger is down, as an interpolation rather
-    // than a timer redrawing it: the engine keeps the main run loop to itself
-    // and a timer only gets a slot now and then.
+    // The held fill is a Core Animation interpolation, not a timer redrawing
+    // it: the engine keeps the main run loop to itself.
     private var holdFraction: CGFloat {
         guard let holdStarted = holdStarted else {
             return 0
@@ -2702,8 +2647,8 @@ private final class LabeledControlButton: UIControl {
 
         switch layout {
         case .stacked:
-            // A two-line label has to share the button with the pictogram, so
-            // it gets a smaller font and two line heights instead of one.
+            // A two-line label gets a smaller font and two line heights so it
+            // shares the button with the pictogram.
             let fontSize = labelLines > 1
                 ? max(9, min(15, min(bounds.width * 0.30, bounds.height * 0.235)))
                 : max(10, min(16, min(bounds.width * 0.26, bounds.height * 0.24)))
@@ -2915,18 +2860,16 @@ public func falloutIOSInstallGameControls() {
 
 // MARK: - Launcher music
 
-/// Background music for the launcher, from the MP3s bundled with the app. It is
-/// stopped when the launcher hands over, so the game plays its own music.
+/// Music for the launcher, from the MP3s bundled with the app. Stopped when the
+/// launcher hands over, so the game plays its own.
 final class LauncherMusic {
     static let shared = LauncherMusic()
 
     private static let volume: Float = 0.32
-    /// The track bundled with the app, used by any game that has no theme of
-    /// its own.
+    /// The track any game without a theme of its own falls back to.
     private static let sharedTrack = "intro music"
-    /// Per-game themes, in the order they are looked for in the bundle. A name is
-    /// only a file name: one the bundle does not carry is skipped, so a game
-    /// plays the shared track until a theme of its own is added.
+    /// Per-game themes, in the order they are looked for in the bundle. A name
+    /// is only a file name: one the bundle does not carry is skipped.
     private static let themeNames: [FalloutGame: [String]] = [
         .fallout1: ["fallout1 music"],
         .fallout2: ["fallout2 music"],
@@ -2950,9 +2893,8 @@ final class LauncherMusic {
         }
     }
 
-    /// The track a game plays, or nil when the app carries no music at all.
-    /// A game's own theme wins; otherwise the shared track covers it, which is
-    /// how one generic file keeps both games scored.
+    /// The track a game plays, or nil when the app carries no music: its own
+    /// theme wins, the shared track covers both games otherwise.
     static func themeName(for game: FalloutGame) -> String? {
         let names = (themeNames[game] ?? []) + [sharedTrack]
         for name in names where !name.isEmpty {
@@ -2976,9 +2918,8 @@ final class LauncherMusic {
             let next = try AVAudioPlayer(contentsOf: url)
             next.numberOfLoops = -1
             next.volume = LauncherMusic.isMuted ? 0 : LauncherMusic.volume
-            // Loading the buffers now is what keeps the first second of the
-            // track from being late; the game's ACMs take seconds to decode,
-            // an MP3 prepared this way starts at once.
+            // Preparing the buffers now keeps the first second from being late;
+            // an MP3 starts at once, unlike the game's ACMs.
             next.prepareToPlay()
             next.play()
 
@@ -3015,9 +2956,8 @@ final class LauncherMusic {
 }
 
 // Offered to the engines through the host callbacks, for a main menu that would
-// rather play the bundled track than decode the music in its own game data.
-// Neither engine asks for it yet - both play their menu music themselves - so
-// nothing calls these two today.
+// rather play the bundled track than decode its own music. Neither engine asks
+// for it yet - both play their menu music themselves - so nothing calls these.
 @_cdecl("fallout_ios_menu_music_start")
 public func fallout_ios_menu_music_start() {
     LauncherMusic.shared.playIfAvailable()
@@ -3028,9 +2968,8 @@ public func fallout_ios_menu_music_stop() {
     LauncherMusic.shared.stop()
 }
 
-// The engine asks for this from its own input loop, a few times a second, on
-// the main thread and between frames. It is how the on-screen controls know
-// what the game can do right now without a timer of ours interrupting it.
+// The engine calls this from its input loop a few times a second, between
+// frames: how the controls know what the game can do without a timer of ours.
 @_cdecl("fallout_ios_refresh_game_controls")
 public func fallout_ios_refresh_game_controls() {
     GameControlsOverlay.refreshInstalled()
@@ -3120,11 +3059,9 @@ final class MovieSkipButton: UIControl {
     private func startProgress() {
         progressTimer?.invalidate()
 
-        // The fill is a Core Animation interpolation, not a timer redrawing it
-        // thirty times a second. The engine keeps the main run loop blocked
-        // while it runs, so a timer only gets a slot now and then and the bar
-        // crawls; an animation is drawn by the render server and stays smooth.
-        // Flushing hands it over now instead of waiting for a run loop turn.
+        // The fill is an interpolation, not a timer redrawing it thirty times a
+        // second: the engine blocks the run loop, so a timer crawls and an
+        // animation stays smooth. Flushing hands it over now.
         fill.layer.removeAllAnimations()
         fill.frame = CGRect(x: 0, y: 0, width: 0, height: bounds.height)
         UIView.animate(withDuration: holdSeconds,
@@ -3134,7 +3071,7 @@ final class MovieSkipButton: UIControl {
         }
         CATransaction.flush()
 
-        // Only the moment the hold is long enough is timed.
+        // Only the moment the hold completes is timed.
         let timer = Timer(timeInterval: holdSeconds, repeats: false) { [weak self] _ in
             self?.trigger()
         }
@@ -3143,7 +3080,7 @@ final class MovieSkipButton: UIControl {
     }
 
     /// A hold counts as done the moment the finger comes up, whatever the timer
-    /// managed to do while the run loop was busy.
+    /// managed while the run loop was busy.
     private func holdReached() {
         if fraction >= 1 {
             trigger()

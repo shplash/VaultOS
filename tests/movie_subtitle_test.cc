@@ -1,8 +1,7 @@
 // The subtitle row is drawn into the window the movie fills, so it has to stay
-// inside it. A row that reached past the window wrote over whatever follows
-// the surface, which is what stopped the intro at a large resolution; the rows
-// below are the sizes the launcher can hand the games, the largest device at
-// FULL included.
+// inside it: a row reaching past the window wrote over what follows the surface,
+// which is what stopped the intro at a large resolution. The sizes below are the
+// ones the launcher can hand the games, the largest iPad at FULL included.
 
 #include <cstdio>
 

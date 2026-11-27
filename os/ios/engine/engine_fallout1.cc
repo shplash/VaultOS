@@ -1,9 +1,8 @@
 // Fallout 1 CE engine adapter.
 //
-// This file is compiled into the launcher application together with the
-// Fallout 1 engine. It replaces the executable entry point from winmain.cc
-// (which is not compiled on iOS) and exposes the engine's in-game touch
-// controls through the shared C ABI.
+// Compiled into the launcher application with the Fallout 1 engine. It replaces
+// the winmain.cc entry point (not built on iOS) and exposes the engine's in-game
+// touch controls through the shared C ABI.
 
 #include <SDL.h>
 
@@ -60,17 +59,14 @@ int run(int argc, char** argv)
         chdir(installDir);
     }
 
-    // The engine's own log, written beside the game data. Start-up prints every
-    // step it completes and every step that fails, so a game that stops before
-    // its first frame leaves behind the step it stopped at - and the player can
-    // open the file in the Files app instead of guessing.
+    // The engine's start-up log beside the game data: every step printed as it
+    // completes or fails, so a game that stops before its first frame leaves
+    // behind the step it stopped at.
     fallout::debug_register_log("vaultos-log.txt", "wt");
 
-    // Which binary this log came from. Without it there is no way to tell a
-    // fresh install from a stale one, and every build writes the same version
-    // number to the About page. The commit is the reliable half: a restored
-    // build tree compiles incrementally, so __DATE__ and __TIME__ can be older
-    // than the source the IPA was made from.
+    // Which binary this log came from: the About page version alone cannot tell
+    // a fresh install from a stale one, and a restored build tree compiles
+    // incrementally, so __DATE__ can predate the source the IPA was built from.
     if (VAULTOS_BUILD_SHA[0] != '\0') {
         fallout::debug_printf("[vaultos] Fallout 1 engine built %s %s, commit %s\n",
             __DATE__,
@@ -86,8 +82,8 @@ int run(int argc, char** argv)
 
     int result = fallout::gnw_main(argc, argv);
     if (result != 0) {
-        // The engine gives up with a plain return, which would leave the app
-        // closing itself with no explanation at all.
+        // The engine gives up with a plain return, which would close the app
+        // with no explanation.
         fallout_ios_report_engine_failure(
             "The game stopped while starting up. The files it needs are missing "
             "or damaged, or the game data left over from an earlier import is "
@@ -129,11 +125,10 @@ int has_item_in_hand()
     return is_real_item(item) ? 1 : 0;
 }
 
-// Reloading in Fallout 1 lives in the interface, not on its own key: the
-// interface loops item_w_try_reload on the active weapon when its slot is used.
-// The same two calls are made here, so the on-screen button does exactly what
-// the weapon slot does.
-// A weapon that takes ammunition and is not already full.
+// Reloading lives in the interface, which loops item_w_try_reload on the active
+// weapon when its slot is used: the same two calls are made here, so the button
+// does exactly what the weapon slot does - on a weapon that takes ammunition and
+// is not already full.
 int has_reloadable_weapon()
 {
     fallout::Object* item = nullptr;
@@ -167,9 +162,8 @@ void reload_active_weapon()
     bool aimingBefore = false;
     bool hadAttackBefore = fallout::intface_get_attack(&hitModeBefore, &aimingBefore) == 0;
 
-    // The interface's own reload, sound included, so the on-screen button does
-    // exactly what the game does when the weapon slot reloads - not a silent
-    // copy of half of it.
+    // The interface's own reload, sound included, so the button does what the
+    // weapon slot does rather than a silent copy of half of it.
     fallout::intface_item_reload();
 
     if (!hadAttackBefore) {
@@ -607,9 +601,8 @@ void auto_save()
     }
 }
 
-// The window of the menu the player is looking at, in game pixels. Every menu
-// opens its own window, so the topmost one other than the game's display window
-// is the panel the overlay should hang its buttons on.
+// The topmost menu window other than the game's display window, in game pixels:
+// it is the panel the overlay hangs its buttons on.
 int menu_rect(int* x, int* y, int* width, int* height)
 {
     if (fallout::ios_screen == fallout::IOS_SCREEN_GAME) {
