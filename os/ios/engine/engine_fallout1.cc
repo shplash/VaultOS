@@ -360,12 +360,6 @@ void camera_pan(double x, double y)
         return;
     }
 
-    // The engine scrolls only when the cursor touches a screen edge, so turn
-    // the joystick into a directional edge target instead of a free cursor.
-    const double deadzone = 0.30;
-    const int dx = x < -deadzone ? -1 : (x > deadzone ? 1 : 0);
-    const int dy = y < -deadzone ? -1 : (y > deadzone ? 1 : 0);
-
     int targetX = 0;
     int targetY = 0;
     fallout::mouse_get_position(&targetX, &targetY);
@@ -376,16 +370,40 @@ void camera_pan(double x, double y)
         cameraY = targetY;
     }
 
-    if (dx < 0) {
-        targetX = 0;
-    } else if (dx > 0) {
-        targetX = width - 1;
-    }
-    if (dy < 0) {
-        targetY = 0;
-    } else if (dy > 0) {
-        targetY = height - 1;
-    }
+    // The stick is a position, not one of eight directions: the cursor is put
+    // where the stick points, so every angle between the axes works. The travel
+    // ends at the screen edge, which is where the engine starts scrolling, so
+    // the view pans once the stick is pushed past 0.6 of its way.
+    const double deadzone = 0.12;
+    const double travel = 0.6 - deadzone;
+
+    auto place = [deadzone, travel](double value, int extent, int& target) {
+        const int last = extent - 1;
+        const double middle = last * 0.5;
+
+        if (std::fabs(value) <= deadzone) {
+            target = static_cast<int>(middle);
+            return;
+        }
+
+        double reach = (std::fabs(value) - deadzone) / travel;
+        if (reach > 1.0) {
+            reach = 1.0;
+        }
+
+        const double offset = reach * middle;
+        const double placed = value < 0 ? middle - offset : middle + offset;
+
+        target = static_cast<int>(std::lround(placed));
+        if (target < 0) {
+            target = 0;
+        } else if (target > last) {
+            target = last;
+        }
+    };
+
+    place(x, width, targetX);
+    place(y, height, targetY);
 
     fallout::mouse_set_position(targetX, targetY);
 }
