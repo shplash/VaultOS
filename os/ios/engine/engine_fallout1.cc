@@ -371,11 +371,11 @@ void camera_pan(double x, double y)
     }
 
     // The stick is a position, not one of eight directions: the cursor is put
-    // where the stick points, so every angle between the axes works. The travel
-    // ends at the screen edge, which is where the engine starts scrolling, so
-    // the view pans once the stick is pushed past 0.6 of its way.
-    const double deadzone = 0.12;
-    const double travel = 0.6 - deadzone;
+    // where the stick points, so every angle between the axes works. The aim is
+    // the screen edge, which is where the engine starts scrolling, so the edge
+    // is reached at 0.16 of the deflection and any real push pans.
+    const double deadzone = 0.08;
+    const double travel = 0.08;
 
     auto place = [deadzone, travel](double value, int extent, int& target) {
         const int last = extent - 1;
