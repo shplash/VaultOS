@@ -2338,7 +2338,7 @@ final class GameControlsOverlay: UIView {
             accessibilityTitle = "Target"
         case 3:
             symbol = "hand.point.up.left.fill"
-            title = TouchControl.skill.label + " USE"
+            title = "USE SKILL"
             accessibilityTitle = "Use skill"
         default:
             symbol = "hand.tap"

@@ -524,7 +524,7 @@ struct LauncherView: View {
         let installed = info.installed == 1
 
         VStack(alignment: .leading, spacing: spacing) {
-            headerLine("Game data",
+            headerLine(L.t("Game data"),
                        badge: installed ? "INSTALLED" : "NOT INSTALLED",
                        badgeColour: Theme.dim,
                        mark: installed ? "checkmark" : "xmark",
@@ -2143,11 +2143,14 @@ struct LauncherView: View {
                 Slider(value: value, in: 0...100)
                     .accentColor(accent)
                     .frame(maxWidth: 320)
+                    .accessibilityHidden(true)
 
                 Text(verbatim: "\(Int(value.wrappedValue.rounded()))%")
                     .font(Vault.label(10))
                     .foregroundColor(Theme.dim)
                     .frame(width: 38, alignment: .trailing)
+                    .accessibilityLabel(L.t(title) + " %")
+                    .accessibilityValue("\(Int(value.wrappedValue.rounded()))%")
             }
         }
     }
@@ -2314,11 +2317,14 @@ struct LauncherView: View {
                     Slider(value: $model.controlsOpacity, in: 0.10...1)
                         .accentColor(accent)
                         .frame(maxWidth: 320)
+                        .accessibilityHidden(true)
 
                     Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
                         .font(Vault.label(10))
                         .foregroundColor(Theme.dim)
                         .frame(width: 38, alignment: .trailing)
+                        .accessibilityLabel(L.t("Opacity"))
+                        .accessibilityValue("\(Int((model.controlsOpacity * 100).rounded()))%")
                 }
             }
             // Greyed while the controls are off, like the rows above.
