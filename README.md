@@ -20,7 +20,7 @@
 
 ## Features
 
-- Fallout and Fallout 2 in one app, each with its own install and saves
+- Both games in one app, each with its own install and saves
 - Runs natively: no JIT, no entitlements
 - Your own game files, from an archive or the game CD; it ships no game data
 - Touch controls you can move, resize, fade and colour
