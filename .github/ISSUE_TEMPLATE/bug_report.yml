@@ -64,6 +64,15 @@ body:
       label: Expected behavior
       placeholder: What should have happened?
 
+  - type: markdown
+    attributes:
+      value: |
+        **Logs** live in the app's own folder: in the Files app, *On My iPhone
+        → VaultOS → VaultOS*. `vaultos-launcher.log` covers the launcher,
+        `fallout1-log.txt` and `fallout2-log.txt` the two engines' start-up,
+        and `fallout1-saves.log` and `fallout2-saves.log` anything a save or a
+        save picture went wrong on.
+
   - type: textarea
     id: logs
     attributes:
