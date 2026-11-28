@@ -852,61 +852,61 @@ final class GameControlsOverlay: UIView {
 
     private let joystick = CameraJoystickControl()
     private let actionButton = LabeledControlButton(
-        title: "ACTION",
+        title: TouchControl.action.label,
         symbol: "hand.tap",
         iconPointSize: 18
     )
     private let backButton = LabeledControlButton(
-        title: "BACK",
+        title: TouchControl.back.label,
         symbol: "chevron.backward",
         iconPointSize: 18
     )
     private let skipButton = LabeledControlButton(
-        title: "END\nTURN",
+        title: TouchControl.skip.label,
         symbol: "forward.end",
         iconPointSize: 18,
         accent: true,
         labelLines: 2
     )
     private let skillButton = LabeledControlButton(
-        title: "SKILL",
+        title: TouchControl.skill.label,
         symbol: "star",
         iconPointSize: 18
     )
     private let swapButton = LabeledControlButton(
-        title: "SWAP",
+        title: TouchControl.swap.label,
         symbol: "arrow.left.arrow.right",
         iconPointSize: 18
     )
     private let endButton = LabeledControlButton(
-        title: "END\nCOMBAT",
+        title: TouchControl.end.label,
         symbol: "xmark",
         iconPointSize: 18,
         labelLines: 2
     )
     private let reloadButton = LabeledControlButton(
-        title: "RELOAD",
+        title: TouchControl.reload.label,
         symbol: "arrow.clockwise",
         iconPointSize: 16
     )
     private let fireModeButton = LabeledControlButton(
-        title: "ATTACK\nMODE",
+        title: TouchControl.fireMode.label,
         symbol: "scope",
         iconPointSize: 16,
         labelLines: 2
     )
     private let savesButton = LabeledControlButton(
-        title: "SAVE",
+        title: TouchControl.saves.label,
         symbol: "tray.full",
         iconPointSize: 16
     )
     private let loadButton = LabeledControlButton(
-        title: "LOAD",
+        title: TouchControl.load.label,
         symbol: "tray.and.arrow.down",
         iconPointSize: 16
     )
     private let quickSaveButton = LabeledControlButton(
-        title: "QUICK\nSAVE",
+        title: TouchControl.quickSave.label,
         symbol: "bolt.fill",
         iconPointSize: 17,
         labelLines: 2,
@@ -920,7 +920,7 @@ final class GameControlsOverlay: UIView {
     private let saveAssembly = VaultPanelView()
     private let saveDivider = UIView()
     private let pipButton = LabeledControlButton(
-        title: "PIP",
+        title: TouchControl.pip.label,
         symbol: "book.closed",
         iconPointSize: 14
     )
@@ -1164,14 +1164,14 @@ final class GameControlsOverlay: UIView {
         backButton.addTarget(self, action: #selector(goBack), for: .touchUpInside)
         addSubview(backButton)
 
-        let sideActions = [
-            ("MAP", "map", 1),
-            ("CHA", "person", 2),
-            ("INV", "bag", 0),
+        let sideActions: [(TouchControl, String, Int)] = [
+            (.map, "map", 1),
+            (.cha, "person", 2),
+            (.inv, "bag", 0),
         ]
         for item in sideActions {
             let button = LabeledControlButton(
-                title: item.0,
+                title: item.0.label,
                 symbol: item.1,
                 iconPointSize: 14
             )
@@ -1911,17 +1911,39 @@ final class GameControlsOverlay: UIView {
     // A tick means the game was written and a cross that it was not, whichever
     // asked: a finger or the launcher's own clock.
     private func showQuickSaveResult(saved: Bool) {
-        quickSaveNotice.isHidden = true
         quickSaveButton.set(symbol: saved ? "checkmark" : "xmark",
-                            title: "QUICK\nSAVE",
-                            accessibilityLabel: saved ? "Saved" : "Save failed")
+                            title: TouchControl.quickSave.label,
+                            accessibilityLabel: L.t(saved ? "Saved" : "Save failed"))
+        if saved {
+            hideSaveNotice()
+        } else {
+            showSaveNotice(L.t("Save failed") + "\n" + L.t("Clear one in SAVES."))
+        }
         if saveHaptics {
             UINotificationFeedbackGenerator().notificationOccurred(saved ? .success : .error)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
-            self?.quickSaveButton.set(symbol: "bolt.fill", title: "QUICK\nSAVE",
-                                      accessibilityLabel: "Quick save")
+            self?.quickSaveButton.set(symbol: "bolt.fill", title: TouchControl.quickSave.label,
+                                      accessibilityLabel: L.t("Quick save"))
         }
+    }
+
+    private func showSaveNotice(_ text: String) {
+        quickSaveNoticeLabel.text = text
+        quickSaveNotice.isHidden = false
+        setNeedsLayout()
+        quickSaveNoticeTimer?.invalidate()
+        let timer = Timer(timeInterval: 6, repeats: false) { [weak self] _ in
+            self?.quickSaveNotice.isHidden = true
+        }
+        quickSaveNoticeTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func hideSaveNotice() {
+        quickSaveNotice.isHidden = true
+        quickSaveNoticeTimer?.invalidate()
+        quickSaveNoticeTimer = nil
     }
 
     private var saveHaptics: Bool {
@@ -1961,17 +1983,7 @@ final class GameControlsOverlay: UIView {
     }
 
     private func showAutoSaveNotice() {
-        quickSaveNoticeLabel.text = L.t("Auto save found no free slot.")
-            + "\n"
-            + L.t("Clear one in SAVES.")
-        quickSaveNotice.isHidden = false
-        setNeedsLayout()
-        quickSaveNoticeTimer?.invalidate()
-        let timer = Timer(timeInterval: 6, repeats: false) { [weak self] _ in
-            self?.quickSaveNotice.isHidden = true
-        }
-        quickSaveNoticeTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
+        showSaveNotice(L.t("Auto save found no free slot.") + "\n" + L.t("Clear one in SAVES."))
     }
 
     @objc private func lookPressed() {
@@ -2326,7 +2338,7 @@ final class GameControlsOverlay: UIView {
             accessibilityTitle = "Target"
         case 3:
             symbol = "hand.point.up.left.fill"
-            title = "USE SKILL"
+            title = TouchControl.skill.label + " USE"
             accessibilityTitle = "Use skill"
         default:
             symbol = "hand.tap"
@@ -2337,7 +2349,7 @@ final class GameControlsOverlay: UIView {
         if cursorModeIcon != symbol || cursorModeTitle != title {
             cursorModeIcon = symbol
             cursorModeTitle = title
-            actionButton.set(symbol: symbol, title: title)
+            actionButton.set(symbol: symbol, title: L.t(title))
         }
         actionButton.accessibilityLabel = accessibilityTitle
 
@@ -2400,7 +2412,7 @@ final class GameControlsOverlay: UIView {
         // Aimed steps of the attack mode are the game's VATS - an extra action
         // point and a shown chance to hit - so the label says so.
         let aimed = mode == 2 || mode == 4
-        let title = aimed ? "VATS\nMODE" : "ATTACK\nMODE"
+        let title = aimed ? "VATS\nMODE" : TouchControl.fireMode.label
         switch mode {
         case 1:
             fireModeButton.set(image: Self.fireModeImage(mode), title: title,
@@ -2579,7 +2591,7 @@ private final class LabeledControlButton: UIControl {
         label.textAlignment = layout == .horizontal ? .left : .center
         label.numberOfLines = self.labelLines
         label.adjustsFontSizeToFitWidth = true
-        label.minimumScaleFactor = 0.6
+        label.minimumScaleFactor = 0.7
         label.textColor = ControlTheme.control
         label.isUserInteractionEnabled = false
         addSubview(label)
@@ -3224,7 +3236,7 @@ final class MovieSkipButton: UIControl {
 
 
 final class InventoryHelpCard: UIView {
-    static let green = UIColor(red: 0.30, green: 1.0, blue: 0.40, alpha: 1)
+    static let green = ControlTheme.control
 
     private let plate = VaultPanelView()
     private let label = UILabel()

@@ -36,6 +36,7 @@ struct LauncherView: View {
     /// How many dots follow INSTALLING while an import is going.
     @State private var installingDots = 0
     @State private var showResetAllWarning = false
+    @State private var pendingPageReset: (() -> Void)?
     /// Set while the update check runs; the answer is shown once over About.
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
@@ -112,6 +113,20 @@ struct LauncherView: View {
                 }
                 if let prompt = updatePrompt {
                     updateWarning(prompt)
+                }
+                if let reset = pendingPageReset {
+                    WarningPlate(title: "Reset this page?",
+                                 message: "Every setting on this page goes back to its default for this game. Your saved games are kept.",
+                                 actions: {
+                                     Button(L.t("CANCEL")) { pendingPageReset = nil }
+                                         .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
+
+                                     Button(L.t("RESET")) {
+                                         reset()
+                                         pendingPageReset = nil
+                                     }
+                                     .buttonStyle(ChipStyle(accent: accent, look: .destructive, minHeight: 36))
+                                 })
                 }
             }
         )
@@ -360,8 +375,8 @@ struct LauncherView: View {
         // card's place, and the row begins beside it. Only the automatic save
         // picked in the stack has a card, so the row holds eight.
         let spacing: CGFloat = 8
-        let visible: CGFloat = 2.2
-        let stackWidth = LauncherView.autoStackWidth
+        let visible: CGFloat = width >= 900 ? 3.4 : 2.2
+        let stackWidth = width >= 900 ? 40 : LauncherView.autoStackWidth
         let rowWidth = max(60, width - stackWidth - LauncherView.autoStackGap)
         let cardWidth = max(48, (rowWidth - spacing) / visible)
         // A card is the row's height: the shot fills all of it.
@@ -433,6 +448,7 @@ struct LauncherView: View {
             return
         }
 
+        UISelectionFeedbackGenerator().selectionChanged()
         autoSlot = slot
         selectedSlot = slot
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
@@ -634,8 +650,24 @@ struct LauncherView: View {
             if let save = save {
                 savePicture(save: save, width: width, height: pictureHeight)
                     .overlay(
-                        // The name is the button's to say, so the shot is left
-                        // to the age alone.
+                        Group {
+                            if width >= 110 && pictureHeight >= 52 {
+                                Text(saveTitle(save).uppercased())
+                                    .font(Vault.label(9, weight: .bold))
+                                    .kerning(0.5)
+                                    .foregroundColor(Theme.text)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Color.black.opacity(0.55)))
+                                    .padding(inset)
+                                    .allowsHitTesting(false)
+                            }
+                        },
+                        alignment: .topLeading
+                    )
+                    .overlay(
                         Group {
                             if showsAge, let age = age {
                                 saveAgeBadge(age)
@@ -645,14 +677,14 @@ struct LauncherView: View {
                         alignment: .bottomLeading
                     )
             } else {
-                // An empty slot: a save mark and EMPTY SLOT in the notes'
+                // An empty slot: a neutral mark and EMPTY SLOT in the notes'
                 // grey.
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.white.opacity(0.05))
                     .frame(width: width, height: pictureHeight)
                     .overlay(
                         VStack(spacing: 5) {
-                            Image(systemName: "square.and.arrow.down")
+                            Image(systemName: "minus")
                                 .font(.system(size: 18, weight: .regular))
                                 .foregroundColor(Theme.faint)
 
@@ -680,6 +712,7 @@ struct LauncherView: View {
             // Any slot can be picked, empty or not; picking it again lets it
             // go.
             selectedSlot = selectedSlot == slot ? nil : slot
+            UISelectionFeedbackGenerator().selectionChanged()
         }
         // A hold asks in the launcher's own plate: the system's menu put a
         // border round the card, faded it in and out, and drew over the game
@@ -1146,14 +1179,19 @@ struct LauncherView: View {
                     target = nextIndex == 0 ? FalloutGame.fallout1 : .fallout2
                 }
 
-                withAnimation(reduceMotion ? .easeOut(duration: 0.18) : .spring(response: 0.34, dampingFraction: 0.86)) {
+                let changed = target != model.selectedGame
+                let duration = reduceMotion ? 0.18 : 0.34
+                withAnimation(reduceMotion ? .easeOut(duration: duration) : .spring(response: 0.34, dampingFraction: 0.86)) {
                     homeDrag = 0
-                    if target != model.selectedGame {
+                    if changed {
                         model.selectedGame = target
                     }
                 }
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                if changed {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+                        isPaging = false
+                    }
+                } else {
                     isPaging = false
                 }
             }
@@ -1364,7 +1402,7 @@ struct LauncherView: View {
 
     private func hero(game: FalloutGame) -> some View {
         GeometryReader { geometry in
-            let artWidth = min(min(geometry.size.width * 0.54, 340), geometry.size.height * 4 / 3)
+            let artWidth = min(geometry.size.width * (geometry.size.width >= 900 ? 0.62 : 0.54), geometry.size.height * 4 / 3)
             let artHeight = artWidth * 3 / 4
 
             ZStack(alignment: .leading) {
@@ -1467,7 +1505,7 @@ struct LauncherView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open \(title)")
+        .accessibilityLabel(L.t("Open %@").replacingOccurrences(of: "%@", with: title))
     }
 
     private func heroArt(game: FalloutGame, width: CGFloat, height: CGFloat) -> some View {
@@ -1601,7 +1639,7 @@ struct LauncherView: View {
             .fixedSize()
         }
         .buttonStyle(ChipStyle(accent: accent, look: primary ? .selected : .unselected))
-        .accessibilityLabel("Open \(title)")
+        .accessibilityLabel(L.t("Open %@").replacingOccurrences(of: "%@", with: title))
     }
 
     /// Where to report things, and who to credit for the rest.
@@ -1938,7 +1976,7 @@ struct LauncherView: View {
     }
 
     private var displaySheet: some View {
-        sheet(title: "VIDEO", detail: "Resolution, pixel quality and frame rate", onReset: resetDisplay) {
+        sheet(title: "VIDEO", detail: "Resolution, pixel quality and frame rate", onReset: { pendingPageReset = { self.resetDisplay() } }) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
                     ForEach(model.presets) { preset in
@@ -2071,7 +2109,7 @@ struct LauncherView: View {
     }
 
     private var audioSheet: some View {
-        sheet(title: "AUDIO", detail: "Volumes, kept per game", onReset: resetAudio) {
+        sheet(title: "AUDIO", detail: "Volumes, kept per game", onReset: { pendingPageReset = { self.resetAudio() } }) {
             volumeRow("Master", value: $model.masterVolume)
             volumeRow("Music", value: $model.musicVolume)
             volumeRow("Effects", value: $model.sfxVolume)
@@ -2104,7 +2142,7 @@ struct LauncherView: View {
             HStack(spacing: 12) {
                 Slider(value: value, in: 0...100)
                     .accentColor(accent)
-                    .frame(width: 220)
+                    .frame(maxWidth: 320)
 
                 Text(verbatim: "\(Int(value.wrappedValue.rounded()))%")
                     .font(Vault.label(10))
@@ -2115,7 +2153,7 @@ struct LauncherView: View {
     }
 
     private var gameSheet: some View {
-        sheet(title: "SYSTEM", detail: "Language, movement, haptics and saving", onReset: resetGame) {
+        sheet(title: "SYSTEM", detail: "Language, movement, haptics and saving", onReset: { pendingPageReset = { self.resetGame() } }) {
             row("Language", detail: "Game text, voice, this launcher and the buttons") {
                 Menu {
                     ForEach(0..<model.languageNames.count, id: \.self) { index in
@@ -2216,7 +2254,7 @@ struct LauncherView: View {
     }
 
     private var controlsSheet: some View {
-        sheet(title: "CONTROLS", detail: "Layout, colour and opacity of the on-screen buttons", onReset: resetControls) {
+        sheet(title: "CONTROLS", detail: "Layout, colour and opacity of the on-screen buttons", onReset: { pendingPageReset = { self.resetControls() } }) {
             toggleRow("On-screen controls",
                       detail: "Show the touch buttons over the game. Off, you get the bare game screen.",
                       isOn: $model.touchControls)
@@ -2275,7 +2313,7 @@ struct LauncherView: View {
                 HStack(spacing: 12) {
                     Slider(value: $model.controlsOpacity, in: 0.10...1)
                         .accentColor(accent)
-                        .frame(width: 220)
+                        .frame(maxWidth: 320)
 
                     Text(verbatim: "\(Int((model.controlsOpacity * 100).rounded()))%")
                         .font(Vault.label(10))
@@ -2299,30 +2337,27 @@ struct LauncherView: View {
                             badgeColour: Color? = nil,
                             mark: String? = nil,
                             markColour: Color? = nil) -> some View {
-        return HStack(spacing: 5) {
+        return HStack(spacing: 6) {
             Text(title)
-                .font(Vault.body(12, weight: .medium))
+                .font(Vault.body(13, weight: .medium))
                 .foregroundColor(Theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
-            // A tick or a cross ahead of the note, small enough to read as part
-            // of the line rather than as an icon.
             if let mark = mark {
                 Image(systemName: mark)
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(markColour ?? Theme.faint)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(markColour ?? Theme.dim)
+                    .accessibilityHidden(true)
             }
 
-            // A note beside the header, in the game's own colour unless it says
-            // otherwise.
             if let badge = badge {
                 Text(L.t(badge))
-                    .font(Vault.label(9, weight: .bold))
-                    .kerning(0.8)
-                    .foregroundColor(badgeColour ?? Theme.faint)
+                    .font(Vault.label(10, weight: .bold))
+                    .kerning(0.6)
+                    .foregroundColor(badgeColour ?? Theme.dim)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .minimumScaleFactor(0.75)
             }
 
             Spacer(minLength: 0)
@@ -2332,203 +2367,106 @@ struct LauncherView: View {
     /// Importing replaces the saves, so it waits out a countdown with the
     /// warning on screen. Backing up is harmless.
     private var saveImportWarning: some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
+        WarningPlate(title: "Replace your saved games?",
+                     message: "Every save in this installation is deleted and the ones in the backup you choose take their place. This cannot be undone.",
+                     destructive: true,
+                     actions: {
+                         Button(L.t("CANCEL")) {
+                             showSaveImportWarning = false
+                             saveImportCountdown = 0
+                         }
+                         .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
 
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L.t("Replace your saved games?").uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.8)
-                    .foregroundColor(Theme.text)
-
-                Text(L.t("Every save in this installation is deleted and the ones in the backup you choose take their place. This cannot be undone."))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-
-                    Button(L.t("CANCEL")) {
-                        showSaveImportWarning = false
-                        saveImportCountdown = 0
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
-
-                    Button(saveImportCountdown > 0
-                        ? "\(L.t("IMPORT")) \(saveImportCountdown)"
-                        : L.t("IMPORT")) {
-                        showSaveImportWarning = false
-                        pendingImport = .saves
-                        model.showImporter = true
-                    }
-                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
-                    .disabled(saveImportCountdown > 0)
-                }
-            }
-            .padding(22)
-            .frame(maxWidth: 440)
-            .warningPlate()
-            .padding(24)
-        }
+                         Button(saveImportCountdown > 0 ? "\(L.t("IMPORT")) \(saveImportCountdown)" : L.t("IMPORT")) {
+                             showSaveImportWarning = false
+                             pendingImport = .saves
+                             model.showImporter = true
+                         }
+                         .buttonStyle(ChipStyle(accent: accent, look: .destructive, minHeight: 36))
+                         .disabled(saveImportCountdown > 0)
+                     })
     }
 
     /// A new game writes over its three automatic saves, so it asks before it
     /// starts: the game played so far is only in the player's own slots.
     private var newGameWarning: some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
+        WarningPlate(title: "Start a new game?",
+                     message: "A new game starts from the beginning: its three automatic saves are written over, and the saves in your own slots are kept.",
+                     note: "Back up first: SYSTEM > Saved games > BACK UP, and IMPORT restores your backup.",
+                     destructive: true,
+                     actions: {
+                         Button(L.t("CANCEL")) {
+                             showNewGameWarning = false
+                             newGameCountdown = 0
+                         }
+                         .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
 
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L.t("Start a new game?").uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.8)
-                    .foregroundColor(Theme.text)
-
-                Text(L.t("A new game starts from the beginning: its three automatic saves are written over, and the saves in your own slots are kept."))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(L.t("Back up first: SYSTEM > Saved games > BACK UP, and IMPORT restores your backup."))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.faint)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-
-                    Button(L.t("CANCEL")) {
-                        showNewGameWarning = false
-                        newGameCountdown = 0
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
-
-                    Button(newGameCountdown > 0
-                        ? "\(L.t("PLAY")) \(newGameCountdown)"
-                        : L.t("PLAY")) {
-                        showNewGameWarning = false
-                        newGameCountdown = 0
-                        LauncherMusic.shared.stop()
-                        model.play(onPlay: onPlay)
-                    }
-                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
-                    .disabled(newGameCountdown > 0)
-                }
-            }
-            .padding(22)
-            .frame(maxWidth: 440)
-            .warningPlate()
-            .padding(24)
-        }
+                         Button(newGameCountdown > 0 ? "\(L.t("PLAY")) \(newGameCountdown)" : L.t("PLAY")) {
+                             showNewGameWarning = false
+                             newGameCountdown = 0
+                             LauncherMusic.shared.stop()
+                             model.play(onPlay: onPlay)
+                         }
+                         .buttonStyle(ChipStyle(accent: accent, look: .destructive, minHeight: 36))
+                         .disabled(newGameCountdown > 0)
+                     })
     }
 
     private var resetAllWarning: some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
+        WarningPlate(title: "Reset every setting?",
+                     message: "Every setting in the launcher goes back to its default - resolution, audio, language, subtitles and the touch controls - for both games. Your game files and your saved games are kept.",
+                     destructive: true,
+                     actions: {
+                         Button(L.t("CANCEL")) {
+                             showResetAllWarning = false
+                         }
+                         .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
 
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L.t("Reset every setting?").uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.8)
-                    .foregroundColor(Theme.text)
-
-                Text(L.t("Every setting in the launcher goes back to its default - resolution, audio, language, subtitles and the touch controls - for both games. Your game files and your saved games are kept."))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-
-                    Button(L.t("CANCEL")) {
-                        showResetAllWarning = false
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
-
-                    Button(L.t("RESET ALL")) {
-                        showResetAllWarning = false
-                        model.resetEverything()
-                    }
-                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
-                }
-            }
-            .padding(22)
-            .frame(maxWidth: 440)
-            .warningPlate()
-            .padding(24)
-        }
+                         Button(L.t("RESET ALL")) {
+                             showResetAllWarning = false
+                             model.resetEverything()
+                         }
+                         .buttonStyle(ChipStyle(accent: accent, look: .destructive, minHeight: 36))
+                     })
     }
 
     private func updateWarning(_ prompt: UpdatePrompt) -> some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
+        WarningPlate(title: "Update available",
+                     message: prompt.version,
+                     notes: prompt.notes,
+                     messageColour: accent,
+                     actions: {
+                         Button {
+                             UserDefaults.standard.set(prompt.version, forKey: "launcher.updateSkipped")
+                             updatePrompt = nil
+                         } label: {
+                             Text(L.t("Don't show again"))
+                                 .font(Vault.label(10, weight: .regular))
+                                 .underline()
+                         }
+                         .buttonStyle(.plain)
+                         .foregroundColor(Theme.dim)
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text(L.t("Update available").uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.8)
-                    .foregroundColor(Theme.text)
+                         Spacer(minLength: 0)
 
-                Text(prompt.version)
-                    .font(Vault.label(10, weight: .bold))
-                    .kerning(0.8)
-                    .foregroundColor(accent)
+                         if let address = prompt.address, let url = URL(string: address) {
+                             Button {
+                                 UIApplication.shared.open(url)
+                             } label: {
+                                 HStack(spacing: 5) {
+                                     Text(L.t("GITHUB"))
+                                     Image(systemName: "arrow.up.right")
+                                         .font(.system(size: 9, weight: .bold))
+                                 }
+                             }
+                             .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
+                         }
 
-                if !prompt.notes.isEmpty {
-                    ScrollView(.vertical, showsIndicators: true) {
-                        Text(prompt.notes)
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundColor(Theme.dim)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxHeight: 200)
-                }
-
-                HStack(spacing: 10) {
-                    Button {
-                        UserDefaults.standard.set(prompt.version, forKey: "launcher.updateSkipped")
-                        updatePrompt = nil
-                    } label: {
-                        Text(L.t("Don't show again"))
-                            .font(Vault.label(9, weight: .regular))
-                            .underline()
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(Theme.faint)
-
-                    Spacer(minLength: 0)
-
-                    if let address = prompt.address, let url = URL(string: address) {
-                        Button {
-                            UIApplication.shared.open(url)
-                        } label: {
-                            HStack(spacing: 5) {
-                                Text(L.t("GITHUB"))
-
-                                Image(systemName: "arrow.up.right")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                        }
-                        .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
-                    }
-
-                    Button(L.t("OK")) {
-                        updatePrompt = nil
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
-                }
-            }
-            .padding(22)
-            .frame(maxWidth: 440)
-            .warningPlate()
-            .padding(24)
-        }
+                         Button(L.t("OK")) {
+                             updatePrompt = nil
+                         }
+                         .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
+                     })
     }
 
     private func toggleRow(_ title: String, detail: String? = nil, divider: Bool = true, isOn: Binding<Bool>) -> some View {
@@ -2539,8 +2477,8 @@ struct LauncherView: View {
                 PillToggle(isOn: isOn.wrappedValue, accent: accent)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(title)
-            .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+            .accessibilityLabel(L.t(title))
+            .accessibilityValue(L.t(isOn.wrappedValue ? "On" : "Off"))
         }
     }
 
