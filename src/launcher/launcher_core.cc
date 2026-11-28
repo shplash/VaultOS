@@ -2228,11 +2228,19 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
     const fs::path destination(install_dir);
     const fs::path saves = savegame_root(destination);
 
-    // The import replaces rather than merges: a slot left behind by newer saves
-    // would look like part of the backup. The launcher warns first.
+    // Unpacked beside the real saves and swapped in at the end, so an archive
+    // that turns out to be damaged half way leaves the saves it would have
+    // replaced exactly as they were.
+    const fs::path staging = saves.parent_path() / (saves.filename().string() + ".importing");
+
     std::error_code ec;
-    fs::remove_all(saves, ec);
+    fs::remove_all(staging, ec);
     ec.clear();
+    fs::create_directories(staging, ec);
+    if (ec) {
+        fail("Cannot write " + staging.string() + ". The device may be out of storage.");
+        return LAUNCHER_ERROR;
+    }
 
     g_progress_total.store(std::max<uint64_t>(total_bytes, 1));
     set_status("Restoring saves...");
@@ -2248,12 +2256,25 @@ int launcher_import_saves(const char* zip_path, const char* install_dir)
             continue;
         }
 
-        if (!extract_entry(archive, *file.entry, saves / fs::path(name))) {
+        if (!extract_entry(archive, *file.entry, staging / fs::path(name))) {
+            archive.close();
+            fs::remove_all(staging, ec);
             return LAUNCHER_ERROR;
         }
     }
 
     archive.close();
+
+    // The import replaces rather than merges: a slot left behind by newer saves
+    // would look like part of the backup. The launcher warns first.
+    fs::remove_all(saves, ec);
+    ec.clear();
+    fs::rename(staging, saves, ec);
+    if (ec) {
+        fs::remove_all(staging, ec);
+        fail("Cannot replace " + saves.string() + ".");
+        return LAUNCHER_ERROR;
+    }
 
     ensure_save_directories(destination);
 
