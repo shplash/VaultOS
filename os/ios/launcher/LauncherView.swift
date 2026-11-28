@@ -352,20 +352,28 @@ struct LauncherView: View {
                              rowHeight: CGFloat,
                              selected: Bool) -> some View {
         // Two whole slots and a fifth: the sliver at the right edge is what
-        // shows the row slides.
+        // shows the row slides. The stack of automatic saves takes the first
+        // card's place, and the row begins beside it.
         let spacing: CGFloat = 8
         let visible: CGFloat = 2.2
-        let cardWidth = max(48, (width - spacing) / visible)
-        // The picture carries its own name, so a card takes the full row height.
+        let stackWidth = LauncherView.autoStackWidth
+        let rowWidth = max(60, width - stackWidth - spacing)
+        let cardWidth = max(48, (rowWidth - spacing) / visible)
+        // A card is the row's height: the shot fills all of it.
         let cardHeight = max(40, rowHeight)
         let content = CGFloat(10) * cardWidth + CGFloat(9) * spacing
-        let limit = min(0, width - content)
+        let limit = min(0, rowWidth - content)
 
-        return savesRow(game: game,
-                        width: width,
-                        cardWidth: cardWidth,
-                        cardHeight: cardHeight,
-                        limit: limit)
+        return HStack(alignment: .top, spacing: spacing) {
+            autoStack(cardWidth: cardWidth, spacing: spacing, limit: limit)
+                .frame(width: stackWidth, height: cardHeight)
+
+            savesRow(game: game,
+                     width: rowWidth,
+                     cardWidth: cardWidth,
+                     cardHeight: cardHeight,
+                     limit: limit)
+        }
             .frame(width: width, height: rowHeight, alignment: .topLeading)
             .contentShape(Rectangle())
             // Only the box on screen reports its frame; the other card is laid
@@ -380,6 +388,96 @@ struct LauncherView: View {
                             : SavesBox())
                 }
             )
+    }
+
+    /// The three automatic saves as one stack, ahead of the row. A tap brings
+    /// that save forward: picked, and scrolled to the first place in the row.
+    private func autoStack(cardWidth: CGFloat,
+                           spacing: CGFloat,
+                           limit: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+
+        return VStack(spacing: 0) {
+            ForEach(LauncherView.autoSlots, id: \.self) { slot in
+                if slot != LauncherView.autoSlots[0] {
+                    Rectangle()
+                        .fill(Theme.hairline)
+                        .frame(height: 1)
+                }
+
+                Button {
+                    showAutomatic(slot, cardWidth: cardWidth, spacing: spacing, limit: limit)
+                } label: {
+                    Image(systemName: LauncherView.automaticMark(slot))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(slot == stackSlot ? Theme.text : Theme.faint)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(LauncherView.automaticTitle(slot))
+                .accessibilityAddTraits(slot == stackSlot ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .background(shape.fill(Color.white.opacity(0.05)))
+        .overlay(shape.stroke(Theme.hairline, lineWidth: 1))
+    }
+
+    private func showAutomatic(_ slot: Int,
+                               cardWidth: CGFloat,
+                               spacing: CGFloat,
+                               limit: CGFloat) {
+        guard let save = model.saves.first(where: { $0.slot == slot }),
+              let index = savesOrder().firstIndex(of: slot) else {
+            return
+        }
+
+        selectedSlot = save.slot
+        let target = max(limit, min(0, -CGFloat(index) * (cardWidth + spacing)))
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
+            savesScroll = target
+        }
+    }
+
+    /// The slots the row holds, in the order it draws them: the saves newest
+    /// first, then the empty slots in slot order.
+    private func savesOrder() -> [Int] {
+        var slots = model.saves.map { $0.slot }
+        for slot in 1...10 where !slots.contains(slot) {
+            slots.append(slot)
+        }
+        return slots
+    }
+
+    /// The automatic save the stack lights: the picked one where it is one of
+    /// the three, and otherwise the one written most recently.
+    private var stackSlot: Int? {
+        if let slot = selectedSlot, LauncherView.autoSlots.contains(slot) {
+            return slot
+        }
+        return model.saves.first { LauncherView.autoSlots.contains($0.slot) }?.slot
+    }
+
+    private static func automaticMark(_ slot: Int) -> String {
+        switch slot {
+        case 1:
+            return "bolt.fill"
+        case 2:
+            return "clock"
+        default:
+            return "shield"
+        }
+    }
+
+    private static func automaticTitle(_ slot: Int) -> String {
+        switch slot {
+        case 1:
+            return L.t("QUICK SAVE")
+        case 2:
+            return L.t("AUTO SAVE")
+        default:
+            return L.t("GUARD SAVE")
+        }
     }
 
     /// The game data, right of the saves and ending where they end. While an
@@ -400,11 +498,11 @@ struct LauncherView: View {
         let installed = info.installed == 1
 
         VStack(alignment: .leading, spacing: spacing) {
-            // A tick once the files are in, a cross until they are. The note
-            // beside it is the game's own colour until they are.
+            // A tick once the files are in, a cross until they are, both in the
+            // game's own colour.
             headerLine(L.t("Game data"),
                        badge: installed ? "DONE" : "NEEDED",
-                       badgeColour: installed ? Theme.dim : game.accent,
+                       badgeColour: Theme.dim,
                        mark: installed ? "checkmark" : "xmark",
                        markColour: game.accent)
 
@@ -469,10 +567,7 @@ struct LauncherView: View {
         // them the empty slots in slot order: the save CONTINUE opens is the
         // first card in the row, not one somewhere inside it.
         let saved = model.saves
-        var slots = saved.map { $0.slot }
-        for slot in 1...10 where !slots.contains(slot) {
-            slots.append(slot)
-        }
+        let slots = savesOrder()
         // The fade at either end, and how far it reaches: a row that can still
         // move that way fades, and one that has reached its end does not.
         let offset = min(0, max(limit, savesScroll))
@@ -519,12 +614,11 @@ struct LauncherView: View {
                           width: CGFloat,
                           height: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        // Inset equally from every corner so the plate reads as laid on the
-        // shot.
+        // Inset from every corner, so the badge reads as laid on the shot.
         let inset = max(4, min(width, height) * 0.03)
         // The shot fills the card, so the row's height is the picture's.
         let pictureHeight = max(20, height)
-        // When it was written, at the corner across from the plate. A card too
+        // When it was written, in the shot's bottom left corner. A card too
         // small for the badge leaves it off.
         let age = save.flatMap { saveAge($0) }
         let showsAge = age != nil && pictureHeight >= 52 && width >= 110
@@ -533,21 +627,15 @@ struct LauncherView: View {
             if let save = save {
                 savePicture(save: save, width: width, height: pictureHeight)
                     .overlay(
-                        // The shot carries its name, time and level.
-                        savePlate(save: save, width: width - inset * 2)
-                            .padding(inset),
-                        alignment: .topLeading
-                    )
-                    .overlay(
-                        // The plate holds the top left, so the age takes the
-                        // corner across from it.
+                        // The name is the button's to say, so the shot is left
+                        // to the age alone.
                         Group {
                             if showsAge, let age = age {
                                 saveAgeBadge(age)
                                     .padding(inset)
                             }
                         },
-                        alignment: .bottomTrailing
+                        alignment: .bottomLeading
                     )
             } else {
                 // An empty slot: a save mark and EMPTY SLOT in the notes'
@@ -577,7 +665,7 @@ struct LauncherView: View {
         .overlay(shape.strokeBorder(Color(white: 0.72).opacity(0.30),
                                     style: StrokeStyle(lineWidth: 1,
                                                        dash: save == nil ? [4, 3] : [])))
-        .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 1.5))
+        .overlay(shape.strokeBorder(active ? accent.opacity(0.8) : Color.clear, lineWidth: 2))
         .overlay(shape.strokeBorder(chosen ? Color.white.opacity(0.9) : Color.clear, lineWidth: 1))
         .frame(width: width, height: height, alignment: .top)
         .contentShape(Rectangle())
@@ -628,43 +716,6 @@ struct LauncherView: View {
                 .fill(Color.white.opacity(0.05))
                 .frame(width: width, height: height)
         }
-    }
-
-    /// The save's name on a small plate over its shot, as wide as the name
-    /// needs.
-    private func savePlate(save: LauncherModel.LauncherSave, width: CGFloat) -> some View {
-        // Eighteen percent under the card's own type, so the plate stays a
-        // note on the shot.
-        let scale: CGFloat = 0.82
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-        let title = saveTitle(save)
-        let titleWidth = ceil((title as NSString).size(withAttributes: [
-            .font: VaultUI.label(10 * scale, weight: .semibold),
-            .kern: 0.6
-        ]).width)
-        // The name's width plus the plate's padding, and no more: a long name
-        // is cut instead of widening it.
-        let plateWidth = min(max(40, titleWidth + 15 * scale), max(40, width))
-
-        return Text(title)
-            .font(Vault.label(10 * scale, weight: .semibold))
-            .foregroundColor(Theme.text)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 7 * scale)
-            .padding(.vertical, 5 * scale)
-            .frame(width: plateWidth)
-            .background(shape.fill(Color.black.opacity(0.40)))
-            .overlay(shape.stroke(Color.white.opacity(0.12), lineWidth: 1))
-            .overlay(
-                Rectangle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 1)
-                    .padding(.horizontal, 5),
-                alignment: .top
-            )
     }
 
     /// Play time and level, or the date for saves written before the game kept
@@ -759,9 +810,8 @@ struct LauncherView: View {
     /// could not read.
     private static let epoch = Date(timeIntervalSince1970: 31_536_000)
 
-    /// What the carousel calls a save: the launcher's own three are named by the
-    /// launcher, in the player's language, and every other save by the name it
-    /// carries.
+    /// What the launcher calls a save: its own three are named in the player's
+    /// language, and every other save by the name it carries.
     private func saveTitle(_ save: LauncherModel.LauncherSave) -> String {
         switch save.kind {
         case LAUNCHER_SAVE_QUICK:
@@ -775,7 +825,7 @@ struct LauncherView: View {
         }
     }
 
-    /// The age on a save's shot, in its bottom right corner. It is a note laid
+    /// The age on a save's shot, in its bottom left corner. It is a note laid
     /// on the shot rather than a second plate, so it has no edge of its own.
     private func saveAgeBadge(_ text: String) -> some View {
         Text(text)
@@ -887,8 +937,9 @@ struct LauncherView: View {
                     .kerning(nameKerning)
                     .foregroundColor(Vault.ink.opacity(0.68))
                     .lineLimit(1)
+                    .truncationMode(.tail)
                     .minimumScaleFactor(0.7)
-                    .padding(.trailing, -nameKerning)
+                    .padding(.horizontal, 8)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
 
@@ -1266,6 +1317,11 @@ struct LauncherView: View {
 
     /// The room the game switch takes above the title.
     private static let switchHeight: CGFloat = 30
+
+    /// The width of the stack of automatic saves beside the row, and the slots
+    /// those saves are written to.
+    private static let autoStackWidth: CGFloat = 38
+    private static let autoSlots = [1, 2, 3]
 
     /// Diameter of the two link discs; everything about a disc is a share of
     /// this one number.
