@@ -1490,13 +1490,15 @@ final class GameControlsOverlay: UIView {
         let clampTop = max(10, safeAreaInsets.top + 6)
         let clampBottom = bounds.height - max(10, safeAreaInsets.bottom + 6)
 
-        if currentScreen == .options && box.width >= surface.width - 2 {
-            // The preferences window is the whole 640x480 screen, so there is no
-            // panel edge to hang BACK beside: it goes on the left edge, half way
-            // down, like every other menu. The ESC menu is a panel of its own,
-            // so BACK sits beside it like the rest.
-            let top = min(max(clampTop, (bounds.height - side) / 2), max(clampTop, clampBottom - side))
-            backButton.frame = CGRect(x: clampLeft, y: top, width: side, height: side)
+        if currentScreen == .options {
+            // The preferences window is the whole game screen, and the engine
+            // reports it as the ESC menu's panel, which used to put BACK on top
+            // of the preferences' own controls. It goes in the bottom right
+            // corner instead, clear of every panel and of the DEFAULT, DONE and
+            // CANCEL row, on a plate of its own so it covers what it lands on.
+            backButton.solidBackground = true
+            backButton.frame = clampFrame(CGRect(x: clampRight, y: clampBottom - side,
+                                                width: side, height: side))
             return
         }
 
