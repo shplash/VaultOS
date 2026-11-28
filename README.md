@@ -58,8 +58,7 @@ Each game keeps its own files and saves: `Documents/` for Fallout,
 
 - **IMPORT GAME** takes the game from an archive or from its disc
 - **LANGUAGE FILES** adds a translation pack you supply
-- **BACK UP** writes a numbered backup into `Backups/` in the game's folder and opens the share sheet in case you want it elsewhere.
-**IMPORT** restores one
+- **BACK UP** writes a numbered backup into `Backups/` in the game's folder and opens the share sheet in case you want it elsewhere, **IMPORT** restores one
 
 ## Notes
 
