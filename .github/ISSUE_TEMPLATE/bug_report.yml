@@ -40,7 +40,7 @@ body:
     id: version
     attributes:
       label: VaultOS version
-      placeholder: 1.0 (109), shown on the About page
+      placeholder: 1.0 (109), shown on the INFO page
 
   - type: dropdown
     id: game

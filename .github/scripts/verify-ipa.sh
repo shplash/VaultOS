@@ -275,5 +275,23 @@ for artwork in fallout1.webp fallout2.jpeg; do
 done
 note "artwork: both game stills are bundled"
 
+# --- Bundled notices --------------------------------------------------------
+
+# The licences the app carries ask for their text to travel with it, so every
+# notice in the repository's Notices folder has to be inside the bundle. A
+# packaging change that stops copying them would otherwise ship silently.
+notices="$app/Notices"
+[ -d "$notices" ] || fail "the application bundle has no Notices folder"
+
+notice_count=0
+for source in os/ios/Notices/*; do
+    [ -f "$source" ] || continue
+    name="$(basename "$source")"
+    [ -f "$notices/$name" ] || fail "the application bundle is missing the notice $name"
+    notice_count=$((notice_count + 1))
+done
+[ "$notice_count" -gt 0 ] || fail "the repository holds no notices to check"
+note "notices: $notice_count licence files are bundled in Notices/"
+
 note "IPA structure: Payload/$(basename "$app") with Frameworks/Fallout2Engine.framework"
 note "all checks passed"

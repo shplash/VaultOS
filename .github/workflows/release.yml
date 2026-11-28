@@ -37,6 +37,7 @@ jobs:
     needs: tests
 
     runs-on: ${{ vars.VAULTOS_MACOS_RUNNER || 'macos-15-intel' }}
+    timeout-minutes: 150
 
     steps:
       - name: Clone
