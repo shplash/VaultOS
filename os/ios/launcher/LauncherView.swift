@@ -21,6 +21,8 @@ struct LauncherView: View {
     @State private var savesDragStart: CGFloat?
     /// The picked save. Picking loads nothing; CONTINUE does that.
     @State private var selectedSlot: Int?
+    /// The automatic save shown in the row, chosen in the stack beside it.
+    @State private var autoSlot: Int?
     /// The save a hold asked to delete, until that is answered.
     @State private var deleteCandidate: LauncherModel.LauncherSave?
     /// The saves box's frame and slide limit in card coordinates, so a drag on
@@ -353,19 +355,22 @@ struct LauncherView: View {
                              selected: Bool) -> some View {
         // Two whole slots and a fifth: the sliver at the right edge is what
         // shows the row slides. The stack of automatic saves takes the first
-        // card's place, and the row begins beside it.
+        // card's place, and the row begins beside it. Only the automatic save
+        // picked in the stack has a card, so the row holds eight.
         let spacing: CGFloat = 8
         let visible: CGFloat = 2.2
         let stackWidth = LauncherView.autoStackWidth
-        let rowWidth = max(60, width - stackWidth - spacing)
+        let rowWidth = max(60, width - stackWidth - LauncherView.autoStackGap)
         let cardWidth = max(48, (rowWidth - spacing) / visible)
         // A card is the row's height: the shot fills all of it.
         let cardHeight = max(40, rowHeight)
-        let content = CGFloat(10) * cardWidth + CGFloat(9) * spacing
+        let slots = savesOrder()
+        let content = CGFloat(slots.count) * cardWidth
+            + CGFloat(max(0, slots.count - 1)) * spacing
         let limit = min(0, rowWidth - content)
 
-        return HStack(alignment: .top, spacing: spacing) {
-            autoStack(cardWidth: cardWidth, spacing: spacing, limit: limit)
+        return HStack(alignment: .top, spacing: LauncherView.autoStackGap) {
+            autoStack()
                 .frame(width: stackWidth, height: cardHeight)
 
             savesRow(game: game,
@@ -390,11 +395,9 @@ struct LauncherView: View {
             )
     }
 
-    /// The three automatic saves as one stack, ahead of the row. A tap brings
-    /// that save forward: picked, and scrolled to the first place in the row.
-    private func autoStack(cardWidth: CGFloat,
-                           spacing: CGFloat,
-                           limit: CGFloat) -> some View {
+    /// The three automatic saves as one stack, ahead of the row. A tap shows
+    /// that save: it is the only one of the three with a card.
+    private func autoStack() -> some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
 
         return VStack(spacing: 0) {
@@ -406,10 +409,10 @@ struct LauncherView: View {
                 }
 
                 Button {
-                    showAutomatic(slot, cardWidth: cardWidth, spacing: spacing, limit: limit)
+                    showAutomatic(slot)
                 } label: {
                     Image(systemName: LauncherView.automaticMark(slot))
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(slot == stackSlot ? Theme.text : Theme.faint)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
@@ -419,40 +422,45 @@ struct LauncherView: View {
                 .accessibilityAddTraits(slot == stackSlot ? [.isButton, .isSelected] : .isButton)
             }
         }
-        .background(shape.fill(Color.white.opacity(0.05)))
+        .background(shape.fill(Color.white.opacity(0.03)))
         .overlay(shape.stroke(Theme.hairline, lineWidth: 1))
     }
 
-    private func showAutomatic(_ slot: Int,
-                               cardWidth: CGFloat,
-                               spacing: CGFloat,
-                               limit: CGFloat) {
-        guard let save = model.saves.first(where: { $0.slot == slot }),
-              let index = savesOrder().firstIndex(of: slot) else {
+    private func showAutomatic(_ slot: Int) {
+        guard model.saves.contains(where: { $0.slot == slot }) else {
             return
         }
 
-        selectedSlot = save.slot
-        let target = max(limit, min(0, -CGFloat(index) * (cardWidth + spacing)))
+        autoSlot = slot
+        selectedSlot = slot
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
-            savesScroll = target
+            savesScroll = 0
         }
     }
 
-    /// The slots the row holds, in the order it draws them: the saves newest
-    /// first, then the empty slots in slot order.
+    /// The slots the row holds, in the order it draws them: the automatic save
+    /// picked in the stack, then the player's own saves newest first, then the
+    /// empty ones in slot order.
     private func savesOrder() -> [Int] {
-        var slots = model.saves.map { $0.slot }
-        for slot in 1...10 where !slots.contains(slot) {
+        let manual = LauncherView.manualFirst...10
+        var slots: [Int] = []
+        if let auto = stackSlot {
+            slots.append(auto)
+        }
+        for save in model.saves where manual.contains(save.slot) && !slots.contains(save.slot) {
+            slots.append(save.slot)
+        }
+        for slot in manual where !slots.contains(slot) {
             slots.append(slot)
         }
         return slots
     }
 
-    /// The automatic save the stack lights: the picked one where it is one of
-    /// the three, and otherwise the one written most recently.
+    /// The automatic save the row shows and the stack lights: the one picked
+    /// there while it still has a save, and otherwise the one written most
+    /// recently.
     private var stackSlot: Int? {
-        if let slot = selectedSlot, LauncherView.autoSlots.contains(slot) {
+        if let slot = autoSlot, model.saves.contains(where: { $0.slot == slot }) {
             return slot
         }
         return model.saves.first { LauncherView.autoSlots.contains($0.slot) }?.slot
@@ -463,9 +471,9 @@ struct LauncherView: View {
         case 1:
             return "bolt.fill"
         case 2:
-            return "clock"
+            return "clock.fill"
         default:
-            return "shield"
+            return "shield.fill"
         }
     }
 
@@ -563,9 +571,8 @@ struct LauncherView: View {
                           limit: CGFloat) -> some View {
         let spacing: CGFloat = 8
 
-        // The saves in the order they were written, newest first, and after
-        // them the empty slots in slot order: the save CONTINUE opens is the
-        // first card in the row, not one somewhere inside it.
+        // The stack picks which automatic save has a card; the row leads with
+        // it, then the player's own saves.
         let saved = model.saves
         let slots = savesOrder()
         // The fade at either end, and how far it reaches: a row that can still
@@ -1318,10 +1325,14 @@ struct LauncherView: View {
     /// The room the game switch takes above the title.
     private static let switchHeight: CGFloat = 30
 
-    /// The width of the stack of automatic saves beside the row, and the slots
-    /// those saves are written to.
-    private static let autoStackWidth: CGFloat = 38
+    /// The width of the stack of automatic saves beside the row, the sliver of
+    /// space it keeps from it, and the slots those saves are written to.
+    private static let autoStackWidth: CGFloat = 30
+    private static let autoStackGap: CGFloat = 2
     private static let autoSlots = [1, 2, 3]
+    private static var manualFirst: Int {
+        return (autoSlots.last ?? 0) + 1
+    }
 
     /// Diameter of the two link discs; everything about a disc is a share of
     /// this one number.
