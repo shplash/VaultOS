@@ -20,7 +20,7 @@
 
 ## Features
 
-- Fallout and Fallout 2 in one app, each with its own install and saves
+- Both games in one app, each with its own install and saves
 - Runs natively: no JIT, no entitlements
 - Your own game files, from an archive or the game CD; it ships no game data
 - Touch controls you can move, resize, fade and colour
@@ -52,17 +52,13 @@ ISO, IMG, BIN or CUE. Either the folder itself, or one folder around it
 
 Each game keeps its own files and saves: `Documents/` for Fallout,
 `Documents/Fallout2/` for Fallout 2, both show up in the Files app. Saves live in
-`data/SAVEGAME` inside that folder, one `SLOT01`, `SLOT02`… per save. Backups go
-to `Backups/` in that same folder, one file each, named
-`d(day)-m(month)-(time)-fo(1/2)-bkup-(year)-#(number).zip`; a new backup takes
-the next number, so an older one is never replaced.
+`data/SAVEGAME` inside that folder, one `SLOT01`, `SLOT02`… per save.
 
 ## In the launcher
 
 - **IMPORT GAME** takes the game from an archive or from its disc
 - **LANGUAGE FILES** adds a translation pack you supply
-- **BACK UP** writes a numbered backup into `Backups/` in the game's folder.
-  **IMPORT** restores one
+- **BACK UP** writes a numbered backup into `Backups/` in the game's folder and opens the share sheet in case you want it elsewhere, **IMPORT** restores one
 
 ## Notes
 
