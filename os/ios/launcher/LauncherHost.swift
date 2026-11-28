@@ -1731,8 +1731,15 @@ final class GameControlsOverlay: UIView {
     }
 
     private func layoutTutorial() {
+        // Laid out inside the safe area, so no notch or home indicator sits on
+        // the panel and the card stays clear of both.
+        let safe = CGRect(x: 0,
+                          y: safeAreaInsets.top,
+                          width: bounds.width,
+                          height: max(0, bounds.height - safeAreaInsets.top - safeAreaInsets.bottom))
         let availableWidth = bounds.width - safeAreaInsets.left - safeAreaInsets.right - 32
-        let availableHeight = bounds.height - safeAreaInsets.top - safeAreaInsets.bottom - 24
+        let availableHeight = safe.height - 16
+
         var width = min(availableWidth, 460)
         var size = tutorialCard.preferredSize(maxWidth: width, maxHeight: availableHeight)
 
@@ -1744,7 +1751,7 @@ final class GameControlsOverlay: UIView {
             size = tutorialCard.preferredSize(maxWidth: width, maxHeight: availableHeight)
         }
 
-        let top = max(safeAreaInsets.top + 12, (bounds.height - size.height) / 2)
+        let top = max(safe.minY + 8, safe.midY - size.height / 2)
         tutorialCard.frame = CGRect(x: (bounds.width - size.width) / 2,
                                     y: top,
                                     width: size.width,
