@@ -1379,7 +1379,7 @@ final class GameControlsOverlay: UIView {
         addSubview(tutorialBackdrop)
 
         tutorialCard.isHidden = true
-        tutorialCard.onContinue = { [weak self] in
+        tutorialCard.onFinished = { [weak self] in
             self?.finishTutorial()
         }
         addSubview(tutorialCard)
@@ -1722,16 +1722,28 @@ final class GameControlsOverlay: UIView {
         setNeedsLayout()
     }
 
+    /// The third tick ends it: the card goes away by itself and the flag keeps it
+    /// away for the rest of that game.
     private func finishTutorial() {
         tutorialCard.isHidden = true
         tutorialBackdrop.isHidden = true
         UserDefaults.standard.set(true, forKey: GameControlsOverlay.tutorialKey)
-        selectionFeedback()
     }
 
     private func layoutTutorial() {
-        let width = min(bounds.width - 44, 460)
-        let size = tutorialCard.preferredSize(maxWidth: width)
+        let availableWidth = bounds.width - safeAreaInsets.left - safeAreaInsets.right - 32
+        let availableHeight = bounds.height - safeAreaInsets.top - safeAreaInsets.bottom - 24
+        var width = min(availableWidth, 460)
+        var size = tutorialCard.preferredSize(maxWidth: width, maxHeight: availableHeight)
+
+        // A screen too short for the tips trades some width for height before it
+        // scrolls, so the smallest phone scrolls as little as possible.
+        let widest = min(availableWidth, 520)
+        if size.height >= availableHeight, widest > width {
+            width = widest
+            size = tutorialCard.preferredSize(maxWidth: width, maxHeight: availableHeight)
+        }
+
         let top = max(safeAreaInsets.top + 12, (bounds.height - size.height) / 2)
         tutorialCard.frame = CGRect(x: (bounds.width - size.width) / 2,
                                     y: top,
@@ -1748,12 +1760,12 @@ final class GameControlsOverlay: UIView {
     /// The three things the game itself never says out loud.
     private static var tutorialTips: [(String, String)] {
         return [
-            (L.t("Panning the camera"),
-             L.t("The CAMERA pad moves the view. The further you push it, the further the pointer goes, and the map pans once it reaches the edge.")),
-            (L.t("The pointer"),
-             L.t("Drag anywhere else on the screen to move the pointer, and tap to click. A tap with two fingers is the right button, which changes what a tap does.")),
-            (L.t("Looking at things"),
-             L.t("Toggle INSPECT to examine an item's characteristics. Hold an item while INSPECT is on to open its menu.")),
+            (L.t("Camera"),
+             L.t("The joystick pad controls the direction you pan. You can also pan using a two-finger drag. Move either in any direction to look around the world.")),
+            (L.t("Pointer"),
+             L.t("Drag to move the pointer and tap to interact. Some menus let you hold an item to pick it up and drag to scroll through lists, such as Inventory and Barter.")),
+            (L.t("Actions"),
+             L.t("The on-screen buttons provide contextual actions such as Move, Actions and Use Skills. Target appears during combat, while Use Skills appears when a skill is selected. Available buttons change depending on what you're doing.")),
         ]
     }
 
@@ -3388,9 +3400,9 @@ final class InventoryHelpCard: UIView {
     }
 }
 
-/// The walkthrough shown the first time a world loads. Each tip is a line of its
-/// own, divided by a hairline, with a circle to tick on the right; CONTINUE stays
-/// shut until every circle is ticked.
+/// The walkthrough shown the first time a world loads: a heading with a line of
+/// help beside it, then a tip per line with a circle to tick. The card closes
+/// itself as soon as the last circle is ticked, so it carries no button.
 private final class TutorialCard: UIView {
     private final class Row {
         let header = UILabel()
@@ -3400,25 +3412,24 @@ private final class TutorialCard: UIView {
         var ticked = false
     }
 
-    /// Called by CONTINUE, once every tip is ticked.
-    var onContinue: (() -> Void)?
+    /// Called once every tip is ticked.
+    var onFinished: (() -> Void)?
 
     private let plate = VaultPanelView()
     private let heading = UILabel()
-    private let hint = UILabel()
-    private let continueButton = UIButton(type: .system)
+    private let subheading = UILabel()
+    private let scroll = UIScrollView()
+    private let content = UIView()
     private var rows: [Row] = []
 
     private let inset: CGFloat = 18
-    private let headingHeight: CGFloat = 16
-    private let headingGap: CGFloat = 12
-    private let tickSide: CGFloat = 34
-    private let tickGap: CGFloat = 10
-    private let headerGap: CGFloat = 4
-    private let dividerGap: CGFloat = 13
+    private let headingGap: CGFloat = 10
+    private let headingDetailGap: CGFloat = 8
+    private let tickSide: CGFloat = 40
+    private let tickGap: CGFloat = 8
+    private let titleGap: CGFloat = 4
+    private let dividerGap: CGFloat = 12
     private let dividerHeight: CGFloat = 1
-    private let continueHeight: CGFloat = 44
-    private let continueGap: CGFloat = 16
     private let circlePoint: CGFloat = 22
 
     override init(frame: CGRect) {
@@ -3435,27 +3446,27 @@ private final class TutorialCard: UIView {
 
         heading.font = VaultUI.label(11, weight: .bold)
         heading.textColor = ControlTheme.control
-        heading.text = L.t("FIRST STEPS")
         heading.isUserInteractionEnabled = false
         addSubview(heading)
 
-        hint.font = VaultUI.label(11, weight: .medium)
-        hint.textColor = VaultUI.faint
-        hint.numberOfLines = 0
-        hint.text = L.t("Three things worth knowing. Tick each one to carry on.")
-        hint.isUserInteractionEnabled = false
-        addSubview(hint)
+        // Beside the heading rather than under it, smaller and muted, so the
+        // heading keeps the weight of the row.
+        subheading.font = VaultUI.label(10, weight: .medium)
+        subheading.textColor = VaultUI.faint
+        subheading.numberOfLines = 1
+        subheading.adjustsFontSizeToFitWidth = true
+        subheading.minimumScaleFactor = 0.8
+        subheading.isUserInteractionEnabled = false
+        addSubview(subheading)
 
-        continueButton.titleLabel?.font = VaultUI.label(13, weight: .bold)
-        continueButton.titleLabel?.adjustsFontSizeToFitWidth = true
-        continueButton.titleLabel?.minimumScaleFactor = 0.7
-        continueButton.layer.cornerRadius = VaultShape.button
-        continueButton.layer.borderWidth = VaultShape.hairline
-        continueButton.clipsToBounds = true
-        continueButton.addTarget(self, action: #selector(continuePressed), for: .touchUpInside)
-        addSubview(continueButton)
-
-        updateContinue()
+        // The tips scroll only on a screen too short to hold them, so the card
+        // never grows past the safe area on a small phone in landscape.
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.showsVerticalScrollIndicator = true
+        scroll.alwaysBounceVertical = false
+        scroll.isScrollEnabled = false
+        scroll.addSubview(content)
+        addSubview(scroll)
     }
 
     required init?(coder: NSCoder) {
@@ -3479,34 +3490,32 @@ private final class TutorialCard: UIView {
             row.header.numberOfLines = 0
             row.header.text = tip.0
             row.header.isUserInteractionEnabled = false
-            addSubview(row.header)
+            content.addSubview(row.header)
 
             row.body.font = VaultUI.label(12, weight: .medium)
             row.body.textColor = VaultUI.dim
             row.body.numberOfLines = 0
             row.body.text = tip.1
             row.body.isUserInteractionEnabled = false
-            addSubview(row.body)
+            content.addSubview(row.body)
 
             row.divider.backgroundColor = ControlTheme.border.withAlphaComponent(0.45)
             row.divider.isUserInteractionEnabled = false
             row.divider.isHidden = index == tips.count - 1
-            addSubview(row.divider)
+            content.addSubview(row.divider)
 
             row.tick.tag = index
             row.tick.tintColor = ControlTheme.control
             row.tick.accessibilityLabel = tip.0
             row.tick.addTarget(self, action: #selector(tickPressed(_:)), for: .touchUpInside)
-            addSubview(row.tick)
+            content.addSubview(row.tick)
 
             rows.append(row)
             apply(ticked: false, to: row)
         }
 
-        heading.text = L.t("FIRST STEPS")
-        hint.text = L.t("Three things worth knowing. Tick each one to carry on.")
-        continueButton.setTitle(L.t("CONTINUE"), for: .normal)
-        updateContinue()
+        heading.text = L.t("STARTER TIPS")
+        subheading.text = L.t("Tap each circle when done")
         setNeedsLayout()
     }
 
@@ -3530,33 +3539,19 @@ private final class TutorialCard: UIView {
         let row = rows[sender.tag]
         apply(ticked: !row.ticked, to: row)
         UISelectionFeedbackGenerator().selectionChanged()
-        updateContinue()
-    }
 
-    @objc private func continuePressed() {
-        guard !rows.isEmpty, rows.allSatisfy({ $0.ticked }) else {
-            return
+        // The third tick ends it, so there is no button to press afterwards.
+        if !rows.isEmpty, rows.allSatisfy({ $0.ticked }) {
+            onFinished?()
         }
-        onContinue?()
     }
 
-    private func updateContinue() {
-        let ready = !rows.isEmpty && rows.allSatisfy { $0.ticked }
-
-        continueButton.isEnabled = ready
-        continueButton.backgroundColor = ready ? ControlTheme.control : UIColor(white: 1, alpha: 0.06)
-        continueButton.setTitleColor(ready ? VaultUI.ink : VaultUI.faint, for: .normal)
-        continueButton.setTitleColor(VaultUI.faint, for: .disabled)
-        continueButton.layer.borderColor = (ready ? ControlTheme.control : ControlTheme.border).cgColor
+    private func headerHeight() -> CGFloat {
+        return ceil(max(heading.font.lineHeight, subheading.font.lineHeight))
     }
 
     private func textWidth(for width: CGFloat) -> CGFloat {
         return max(0, width - inset * 2 - tickSide - tickGap)
-    }
-
-    private func hintHeight(for width: CGFloat) -> CGFloat {
-        return hint.sizeThatFits(CGSize(width: max(0, width - inset * 2),
-                                        height: .greatestFiniteMagnitude)).height
     }
 
     private func rowHeights(for width: CGFloat) -> [CGFloat] {
@@ -3566,20 +3561,22 @@ private final class TutorialCard: UIView {
                                                        height: .greatestFiniteMagnitude)).height
             let body = row.body.sizeThatFits(CGSize(width: text,
                                                    height: .greatestFiniteMagnitude)).height
-            return max(tickSide, header + headerGap + body)
+            return max(tickSide, ceil(header) + titleGap + ceil(body))
         }
     }
 
-    private var dividersHeight: CGFloat {
-        return CGFloat(max(0, rows.count - 1)) * (dividerGap * 2 + dividerHeight)
+    /// The tips alone, with the hairline between each pair.
+    private func tipsHeight(for width: CGFloat) -> CGFloat {
+        return rowHeights(for: width).reduce(0, +)
+            + CGFloat(max(0, rows.count - 1)) * (dividerGap * 2 + dividerHeight)
     }
 
-    func preferredSize(maxWidth: CGFloat) -> CGSize {
-        let height = inset
-            + headingHeight + 3 + hintHeight(for: maxWidth) + headingGap
-            + rowHeights(for: maxWidth).reduce(0, +)
-            + dividersHeight
-            + continueGap + continueHeight + inset
+    /// Tall enough for every tip, and never taller than the room it is given: a
+    /// screen too short to hold them scrolls the rest instead of clipping it.
+    func preferredSize(maxWidth: CGFloat, maxHeight: CGFloat) -> CGSize {
+        let room = max(0, maxHeight - inset * 2 - headerHeight() - headingGap)
+        let height = inset * 2 + headerHeight() + headingGap
+            + min(tipsHeight(for: maxWidth), room)
         return CGSize(width: maxWidth, height: height)
     }
 
@@ -3588,31 +3585,52 @@ private final class TutorialCard: UIView {
 
         plate.frame = bounds
 
-        let text = textWidth(for: bounds.width)
         let full = max(0, bounds.width - inset * 2)
+        let line = headerHeight()
 
-        heading.frame = CGRect(x: inset, y: inset, width: full, height: headingHeight)
+        let titleWidth = min(full, ceil(heading.sizeThatFits(CGSize(width: full,
+                                                                    height: .greatestFiniteMagnitude)).width))
+        let titleHeight = ceil(heading.sizeThatFits(CGSize(width: max(titleWidth, 1),
+                                                           height: .greatestFiniteMagnitude)).height)
+        heading.frame = CGRect(x: inset,
+                               y: inset + (line - titleHeight) / 2,
+                               width: titleWidth,
+                               height: titleHeight)
 
-        let hintHeight = hintHeight(for: bounds.width)
-        hint.frame = CGRect(x: inset,
-                            y: inset + headingHeight + 3,
-                            width: full,
-                            height: hintHeight)
+        let detailX = inset + titleWidth + headingDetailGap
+        let detailWidth = max(0, bounds.width - inset - detailX)
+        let detailHeight = ceil(subheading.sizeThatFits(CGSize(width: detailWidth,
+                                                               height: .greatestFiniteMagnitude)).height)
+        subheading.frame = CGRect(x: detailX,
+                                  y: inset + (line - detailHeight) / 2,
+                                  width: detailWidth,
+                                  height: detailHeight)
 
-        var y = inset + headingHeight + 3 + hintHeight + headingGap
+        let top = inset + line + headingGap
+        let tips = tipsHeight(for: bounds.width)
+        let room = max(0, bounds.height - top - inset)
+
+        scroll.frame = CGRect(x: 0, y: top, width: bounds.width, height: room)
+        content.frame = CGRect(x: 0, y: 0, width: bounds.width, height: max(tips, room))
+        scroll.contentSize = content.bounds.size
+        scroll.isScrollEnabled = tips > room + 0.5
+
+        let text = textWidth(for: bounds.width)
         let heights = rowHeights(for: bounds.width)
+        var y: CGFloat = 0
 
         for (index, row) in rows.enumerated() {
             let height = index < heights.count ? heights[index] : tickSide
-            let header = row.header.sizeThatFits(CGSize(width: text,
-                                                        height: .greatestFiniteMagnitude)).height
-            let body = row.body.sizeThatFits(CGSize(width: text,
-                                                    height: .greatestFiniteMagnitude)).height
+            let header = ceil(row.header.sizeThatFits(CGSize(width: text,
+                                                             height: .greatestFiniteMagnitude)).height)
+            let body = ceil(row.body.sizeThatFits(CGSize(width: text,
+                                                         height: .greatestFiniteMagnitude)).height)
 
             row.header.frame = CGRect(x: inset, y: y, width: text, height: header)
-            row.body.frame = CGRect(x: inset, y: y + header + headerGap, width: text, height: body)
+            row.body.frame = CGRect(x: inset, y: y + header + titleGap, width: text, height: body)
+            // The circle is centred against the whole tip, title and description.
             row.tick.frame = CGRect(x: bounds.width - inset - tickSide,
-                                    y: y + (header - tickSide) / 2,
+                                    y: y + (height - tickSide) / 2,
                                     width: tickSide,
                                     height: tickSide)
 
@@ -3625,10 +3643,6 @@ private final class TutorialCard: UIView {
 
             y += height + dividerGap * 2 + dividerHeight
         }
-
-        continueButton.frame = CGRect(x: inset,
-                                      y: bounds.height - inset - continueHeight,
-                                      width: full,
-                                      height: continueHeight)
     }
 }
+
