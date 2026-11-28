@@ -152,6 +152,7 @@ struct LauncherView: View {
             // The carousel opens on the save CONTINUE would open: the most
             // recently saved one.
             selectedSlot = nil
+            autoSlot = nil
             scheduleSwipeHint()
             checkForUpdatesOnLaunch()
             if !musicMuted {
@@ -172,6 +173,7 @@ struct LauncherView: View {
                 // Coming back to the game page starts the carousel on the most
                 // recently saved save again.
                 selectedSlot = nil
+                autoSlot = nil
                 scheduleSwipeHint()
             } else {
                 swipeHintTask?.cancel()
@@ -187,11 +189,16 @@ struct LauncherView: View {
             // A picked save belongs to the game and scroll position it was
             // picked in.
             selectedSlot = nil
+            autoSlot = nil
             savesScroll = 0
         }
         .onChange(of: model.saves.count) { _ in
             if selectedSave == nil {
                 selectedSlot = nil
+            }
+
+            if let slot = autoSlot, !model.saves.contains(where: { $0.slot == slot }) {
+                autoSlot = nil
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
@@ -416,6 +423,7 @@ struct LauncherView: View {
     /// that save: it is the only one of the three with a card.
     private func autoStack() -> some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let highlighted = activeSave?.slot
 
         return VStack(spacing: 0) {
             ForEach(LauncherView.autoSlots, id: \.self) { slot in
@@ -430,13 +438,13 @@ struct LauncherView: View {
                 } label: {
                     Image(systemName: LauncherView.automaticMark(slot))
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(slot == stackSlot ? Theme.text : Theme.faint)
+                        .foregroundColor(slot == highlighted ? Theme.text : Theme.faint)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(LauncherView.automaticTitle(slot))
-                .accessibilityAddTraits(slot == stackSlot ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAddTraits(slot == highlighted ? [.isButton, .isSelected] : .isButton)
             }
         }
         .background(shape.fill(Color.white.opacity(0.03)))
@@ -474,10 +482,13 @@ struct LauncherView: View {
         return slots
     }
 
-    /// The automatic save the row shows and the stack lights: the one picked
-    /// there while it still has a save, and otherwise the one written most
-    /// recently.
+    /// The automatic save the row shows: the picked save while it is one of the
+    /// three, and otherwise the one picked in the stack, and failing that the
+    /// one written most recently.
     private var stackSlot: Int? {
+        if let save = activeSave, LauncherView.autoSlots.contains(save.slot) {
+            return save.slot
+        }
         if let slot = autoSlot, model.saves.contains(where: { $0.slot == slot }) {
             return slot
         }
@@ -607,7 +618,7 @@ struct LauncherView: View {
                 // or the newest); an empty slot is white only while picked.
                 saveCard(slot: slot,
                          save: save,
-                         active: save != nil && slot == (selectedSlot ?? saved.first?.slot),
+                         active: save != nil && slot == activeSave?.slot,
                          chosen: save == nil && slot == selectedSlot,
                          width: cardWidth,
                          height: cardHeight)
@@ -918,8 +929,7 @@ struct LauncherView: View {
         return Button {
             // An empty slot starts the game rather than loading a save that is
             // not there.
-            if selectedSlot == nil || selectedSave != nil,
-               let save = selectedSave ?? model.saves.first {
+            if !picksEmptySlot, let save = activeSave {
                 LauncherMusic.shared.stop()
                 model.play(onPlay: onPlay, loadSlot: save.slot)
             } else if model.saves.isEmpty {
@@ -967,6 +977,13 @@ struct LauncherView: View {
         return model.saves.first { $0.slot == slot }
     }
 
+    /// The save the launcher treats as picked: the slot tapped, and otherwise
+    /// the one written most recently, so the stack, the row and CONTINUE all
+    /// name the same save.
+    private var activeSave: LauncherModel.LauncherSave? {
+        return selectedSave ?? model.saves.first
+    }
+
     /// Whether the picked slot is empty, which means the next game rather than a
     /// save to go back to.
     private var picksEmptySlot: Bool {
@@ -993,7 +1010,7 @@ struct LauncherView: View {
             return nil
         }
 
-        return selectedSave ?? model.saves.first
+        return activeSave
     }
 
     /// Time played and level, on a line each, in the place the save's name had.
@@ -1282,8 +1299,16 @@ struct LauncherView: View {
             max(widest, ceil((name as NSString).size(withAttributes: [.font: buttonFont]).width))
         }
         // A button carries its own padding, so the column fits the widest label
-        // without clipping at the card's edge.
-        let filesWidth = max(126, widest + 30)
+        // without clipping at the card's edge. The heading above them shares
+        // its line with a mark and a badge, and that line is the wider of the
+        // two for a game that is not installed yet.
+        let headingFont = UIFont.systemFont(ofSize: 13, weight: .medium)
+        let badgeFont = VaultUI.label(10, weight: .bold)
+        let heading = ceil((L.t("Game data") as NSString).size(withAttributes: [.font: headingFont]).width)
+        let badge = ceil((L.t(info.installed == 1 ? "DONE" : "NEEDED") as NSString)
+            .size(withAttributes: [.font: badgeFont, .kern: 0.6]).width)
+        // Two gaps of six and the ten point mark between them.
+        let filesWidth = max(126, widest + 30, heading + badge + 26)
         let savesWidth = max(columns - filesWidth - 19, 90)
         // The row takes what the page has left over, so the shot beside
         // CONTINUE gets the room the hero cannot spare.
@@ -1453,10 +1478,6 @@ struct LauncherView: View {
                         }
                     }
                     .frame(width: LauncherView.heroEditionWidth, alignment: .leading)
-                    .overlay(
-                        PageIndicator(current: game == .fallout1 ? 0 : 1, count: 2, accent: game.accent)
-                            .offset(x: LauncherView.heroEditionWidth + 10, y: 30)
-                    )
                     // The tap area reaches further up and down than the marks it
                     // draws; pulling the row up by that much leaves the marks
                     // where they were.
@@ -2886,23 +2907,6 @@ private struct WarningPlate<Actions: View>: View {
             .accessibilityElement(children: .contain)
             .accessibilityAddTraits(.isModal)
         }
-    }
-}
-
-private struct PageIndicator: View {
-    let current: Int
-    let count: Int
-    let accent: Color
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<count, id: \.self) { index in
-                Circle()
-                    .fill(index == current ? accent : Color.white.opacity(0.22))
-                    .frame(width: 4, height: 4)
-            }
-        }
-        .accessibilityHidden(true)
     }
 }
 
