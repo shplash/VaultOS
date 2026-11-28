@@ -147,6 +147,9 @@ struct LauncherView: View {
             }
         }
         .onAppear {
+            // Being shown is when a playing session ends: the game's total is
+            // brought up to date and its saves are read again.
+            model.endPlaySession()
             model.refreshInstall()
             model.refreshSaves()
             // The carousel opens on the save CONTINUE would open: the most
@@ -170,10 +173,8 @@ struct LauncherView: View {
             model.savesNotice = nil
             model.importSummary = nil
             if page == .home {
-                // Coming back to the game page starts the carousel on the most
-                // recently saved save again.
-                selectedSlot = nil
-                autoSlot = nil
+                // A save picked stays picked for as long as the launcher is
+                // open: only a launch starts on the newest one.
                 scheduleSwipeHint()
             } else {
                 swipeHintTask?.cancel()
@@ -204,6 +205,7 @@ struct LauncherView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             // The Documents folder is in the Files app, so files can be dropped
             // in while the launcher is in the background: look again on return.
+            model.endPlaySession()
             model.refreshInstall()
             model.refreshSaves()
 
@@ -662,8 +664,9 @@ struct LauncherView: View {
                 savePicture(save: save, width: width, height: pictureHeight)
                     .overlay(
                         Group {
-                            if width >= 110 && pictureHeight >= 52 {
+                            if width >= 84 && pictureHeight >= 44 {
                                 saveAgeBadge(saveTitle(save).uppercased())
+                                    .frame(maxWidth: max(40, width - inset * 2), alignment: .leading)
                                     .padding(inset)
                             }
                         },
@@ -760,20 +763,14 @@ struct LauncherView: View {
         }
     }
 
-    /// Play time and level, or the date for saves written before the game kept
-    /// a time.
+    /// The level the save was written at: the play time is one total for the
+    /// game, so it belongs to the button rather than to a save.
     private func saveDetail(_ save: LauncherModel.LauncherSave) -> String {
-        var parts: [String] = []
-        if let played = save.played {
-            parts.append(played)
+        guard save.level > 0 else {
+            return ""
         }
 
-        if save.level > 0 {
-            parts.append("\(L.t("LVL")) \(save.level)")
-        }
-
-        // Close, but not tight enough to read as one word.
-        return parts.joined(separator: "·")
+        return "\(L.t("LVL")) \(save.level)"
     }
 
     /// How long ago a save was written, as the badge on its shot says it: an
@@ -931,10 +928,12 @@ struct LauncherView: View {
             // not there.
             if !picksEmptySlot, let save = activeSave {
                 LauncherMusic.shared.stop()
+                model.beginPlaySession()
                 model.play(onPlay: onPlay, loadSlot: save.slot)
             } else if model.saves.isEmpty {
                 // There is no save to lose: a new game starts without asking.
                 LauncherMusic.shared.stop()
+                model.beginPlaySession()
                 model.play(onPlay: onPlay, loadSlot: nil)
             } else {
                 // A new game shares this game's slots rather than making its
@@ -1014,13 +1013,15 @@ struct LauncherView: View {
     }
 
     /// Time played and level, on a line each, in the place the save's name had.
+    /// The time is the game's own total, so only the level changes with the
+    /// save.
     private var continueLines: [String] {
         guard let save = continueSave else {
             return []
         }
 
         var lines: [String] = []
-        if let played = save.played {
+        if let played = model.playedText {
             lines.append(played)
         }
 
@@ -2256,8 +2257,16 @@ struct LauncherView: View {
                     .disabled(model.isInstalling || model.install.installed == 0 || model.install.has_saves == 0)
 
                     Button {
-                        saveImportCountdown = 5
-                        showSaveImportWarning = true
+                        // Nothing can be lost while there is no save, so a
+                        // backup is restored at once instead of after a
+                        // countdown.
+                        if model.install.has_saves == 0 {
+                            pendingImport = .saves
+                            model.showImporter = true
+                        } else {
+                            saveImportCountdown = 5
+                            showSaveImportWarning = true
+                        }
                     } label: {
                         Text(L.t("IMPORT"))
                     }
@@ -2423,6 +2432,7 @@ struct LauncherView: View {
                              showNewGameWarning = false
                              newGameCountdown = 0
                              LauncherMusic.shared.stop()
+                             model.beginPlaySession()
                              model.play(onPlay: onPlay)
                          }
                          .buttonStyle(ChipStyle(accent: accent, look: .destructive, minHeight: 36))

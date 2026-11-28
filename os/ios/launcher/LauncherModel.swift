@@ -505,6 +505,7 @@ final class LauncherModel: ObservableObject {
         frameRate = storedInt("frameRate", for: game, fallback: 60) == 30 ? 30 : 60
         shaderVibrant = storedBool("shaderVibrant", for: game, fallback: false)
         buttonColour = storedInt("buttonColour", for: game, fallback: ControlColour.white.rawValue)
+        playedSeconds = defaults.integer(forKey: LauncherModel.playedKey("playedSeconds", for: game))
     }
 
     private func saveSettings(for game: FalloutGame) {
@@ -1211,6 +1212,64 @@ final class LauncherModel: ObservableObject {
         }
 
         return Int(digits) ?? 0
+    }
+
+    /// Seconds played in the game's world, counted from the moment the game is
+    /// handed the screen until it hands it back. One total per game rather than
+    /// one per save, so a save says how far the game had got and not how long
+    /// it was played.
+    @Published private(set) var playedSeconds = 0
+
+    private static func playedKey(_ name: String, for game: FalloutGame) -> String {
+        return "launcher.\(game.rawValue).\(name)"
+    }
+
+    /// The total as the CONTINUE line shows it, and nothing before the game has
+    /// been played once.
+    var playedText: String? {
+        guard playedSeconds > 0 else {
+            return nil
+        }
+
+        let hours = playedSeconds / 3600
+        let minutes = playedSeconds / 60 % 60
+        if hours == 0 {
+            return "\(minutes) " + L.t("MIN")
+        }
+        if hours == 1 {
+            return "1 " + L.t("HR")
+        }
+        return "\(hours) " + L.t("HRS")
+    }
+
+    /// Starts the game's clock as the game is handed the screen, so the time
+    /// spent loading into the world is counted too.
+    func beginPlaySession() {
+        let key = LauncherModel.playedKey("playStartedAt", for: selectedGame)
+        guard defaults.object(forKey: key) == nil else {
+            return
+        }
+
+        defaults.set(Date().timeIntervalSince1970, forKey: key)
+    }
+
+    /// Closes a running session into the game's total. Called whenever the
+    /// launcher is shown again, which also closes one the app was killed in.
+    func endPlaySession() {
+        let key = LauncherModel.playedKey("playStartedAt", for: selectedGame)
+        guard let started = defaults.object(forKey: key) as? Double else {
+            return
+        }
+
+        defaults.removeObject(forKey: key)
+
+        let elapsed = Int(Date().timeIntervalSince1970 - started)
+        guard elapsed > 0 else {
+            return
+        }
+
+        playedSeconds += elapsed
+        defaults.set(playedSeconds, forKey: LauncherModel.playedKey("playedSeconds", for: selectedGame))
     }
 
     func play(onPlay: () -> Void) {
