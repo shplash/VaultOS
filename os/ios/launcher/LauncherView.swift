@@ -37,6 +37,8 @@ struct LauncherView: View {
     /// Set while the update check runs; the answer is shown once over About.
     @State private var isCheckingForUpdates = false
     @State private var updateOutcome: UpdateOutcome?
+    @State private var updatePrompt: UpdatePrompt?
+    @State private var hasCheckedForUpdates = false
     @State private var homeDrag: CGFloat = 0
     @State private var homeAtEdge = false
     @State private var hasSwipedHome = false
@@ -104,6 +106,9 @@ struct LauncherView: View {
                 if let save = deleteCandidate {
                     deleteWarning(save)
                 }
+                if let prompt = updatePrompt {
+                    updateWarning(prompt)
+                }
             }
         )
         .preferredColorScheme(.dark)
@@ -129,6 +134,7 @@ struct LauncherView: View {
             // recently saved one.
             selectedSlot = nil
             scheduleSwipeHint()
+            checkForUpdatesOnLaunch()
             if !musicMuted {
                 LauncherMusic.shared.playIfAvailable()
             }
@@ -394,13 +400,13 @@ struct LauncherView: View {
         let installed = info.installed == 1
 
         VStack(alignment: .leading, spacing: spacing) {
-            // A tick once the files are in, a dash until they are. The note
+            // A tick once the files are in, a cross until they are. The note
             // beside it is the game's own colour until they are.
             headerLine(L.t("Game data"),
                        badge: installed ? "DONE" : "NEEDED",
                        badgeColour: installed ? Theme.dim : game.accent,
-                       mark: installed ? "checkmark" : "minus",
-                       markColour: installed ? game.accent : Theme.faint)
+                       mark: installed ? "checkmark" : "xmark",
+                       markColour: game.accent)
 
             if model.isInstalling || model.importSummary != nil {
                 gameDataStatus(game: game)
@@ -624,51 +630,41 @@ struct LauncherView: View {
         }
     }
 
-    /// The save's name and detail on a small plate over its shot, as wide as
-    /// the detail needs.
+    /// The save's name on a small plate over its shot, as wide as the name
+    /// needs.
     private func savePlate(save: LauncherModel.LauncherSave, width: CGFloat) -> some View {
         // Eighteen percent under the card's own type, so the plate stays a
         // note on the shot.
         let scale: CGFloat = 0.82
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-        let detail = saveDetail(save)
-        let detailWidth = ceil((detail as NSString).size(withAttributes: [
-            .font: VaultUI.label(9 * scale),
+        let title = saveTitle(save)
+        let titleWidth = ceil((title as NSString).size(withAttributes: [
+            .font: VaultUI.label(10 * scale, weight: .semibold),
             .kern: 0.6
         ]).width)
-        // The row's width plus the plate's padding, and no more: a long name
+        // The name's width plus the plate's padding, and no more: a long name
         // is cut instead of widening it.
-        let plateWidth = min(max(40, detailWidth + 15 * scale), max(40, width))
+        let plateWidth = min(max(40, titleWidth + 15 * scale), max(40, width))
 
-        return VStack(alignment: .leading, spacing: 1) {
-            Text(saveTitle(save))
-                .font(Vault.label(10 * scale, weight: .semibold))
-                .foregroundColor(Theme.text)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            if !detail.isEmpty {
-                Text(detail)
-                    .font(Vault.label(9 * scale, weight: .regular))
-                    .kerning(0.6)
-                    .foregroundColor(Theme.dim)
-                    .lineLimit(1)
-            }
-        }
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 7 * scale)
-        .padding(.vertical, 5 * scale)
-        .frame(width: plateWidth)
-        .background(shape.fill(Color.black.opacity(0.40)))
-        .overlay(shape.stroke(Color.white.opacity(0.12), lineWidth: 1))
-        .overlay(
-            Rectangle()
-                .fill(Color.white.opacity(0.08))
-                .frame(height: 1)
-                .padding(.horizontal, 5),
-            alignment: .top
-        )
+        return Text(title)
+            .font(Vault.label(10 * scale, weight: .semibold))
+            .foregroundColor(Theme.text)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 7 * scale)
+            .padding(.vertical, 5 * scale)
+            .frame(width: plateWidth)
+            .background(shape.fill(Color.black.opacity(0.40)))
+            .overlay(shape.stroke(Color.white.opacity(0.12), lineWidth: 1))
+            .overlay(
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.horizontal, 5),
+                alignment: .top
+            )
     }
 
     /// Play time and level, or the date for saves written before the game kept
@@ -683,8 +679,7 @@ struct LauncherView: View {
             parts.append("\(L.t("LVL")) \(save.level)")
         }
 
-        // Close, but not tight enough to read as one word. When it was saved is
-        // the badge on the shot, so it is not repeated here.
+        // Close, but not tight enough to read as one word.
         return parts.joined(separator: "·")
     }
 
@@ -859,6 +854,7 @@ struct LauncherView: View {
         // line off centre by half of it; take it back with trailing padding.
         let titleKerning: CGFloat = 1.6
         let nameKerning: CGFloat = 1.3
+        let detailKerning: CGFloat = 1.4
 
         return Button {
             // An empty slot starts the game rather than loading a save that is
@@ -895,6 +891,18 @@ struct LauncherView: View {
                     .padding(.trailing, -nameKerning)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
+
+                if let detail = continueDetail {
+                    Text(detail)
+                        .font(Vault.label(9, weight: .regular))
+                        .kerning(detailKerning)
+                        .foregroundColor(Vault.ink.opacity(0.55))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.trailing, -detailKerning)
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+                }
             }
             // The height is set inside the style so the fill is that height
             // too, and PLAY stays as tall as CONTINUE.
@@ -949,6 +957,27 @@ struct LauncherView: View {
         }
 
         return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
+    }
+
+    private var continueDetail: String? {
+        guard !model.isInstalling, !picksEmptySlot else {
+            return nil
+        }
+
+        guard let save = selectedSave ?? model.saves.first else {
+            return nil
+        }
+
+        var parts: [String] = []
+        if let played = save.played {
+            parts.append(played)
+        }
+
+        if save.level > 0 {
+            parts.append("\(L.t("LVL")) \(save.level)")
+        }
+
+        return parts.isEmpty ? nil : parts.joined(separator: "·")
     }
 
     // MARK: - Pages
@@ -1250,9 +1279,9 @@ struct LauncherView: View {
     private static var continueHeight: CGFloat {
         let title = VaultUI.display(22).lineHeight
         let name = VaultUI.label(10, weight: .bold).lineHeight
-        // One gap between the two lines, plus the button's own padding. The
-        // save's time and level are on its card, not repeated here.
-        return title + name + 3 + 16
+        let detail = VaultUI.label(9, weight: .regular).lineHeight
+        // Two gaps between the three lines, plus the button's own padding.
+        return title + name + detail + 6 + 16
     }
 
     /// The saves row's height: CONTINUE's own plus what the page has left
@@ -1604,6 +1633,12 @@ struct LauncherView: View {
         let address: String?
     }
 
+    private struct UpdatePrompt: Equatable {
+        let version: String
+        let notes: String
+        let address: String?
+    }
+
     /// Asks GitHub for the newest release, styled like the other page links.
     private var checkForUpdatesButton: some View {
         Button {
@@ -1696,6 +1731,54 @@ struct LauncherView: View {
                                  address: address)
         }
         return UpdateOutcome(message: "\(L.t("Up to date")) · \(current)", address: address)
+    }
+
+    private static func promptFromGitHub(data: Data?, error: Error?, current: String) -> UpdatePrompt? {
+        guard error == nil,
+              let data = data,
+              let releases = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+              let release = releases.first,
+              let tag = release["tag_name"] as? String else {
+            return nil
+        }
+
+        let latest = tag.hasPrefix("v") || tag.hasPrefix("V") ? String(tag.dropFirst()) : tag
+        guard compareVersions(latest, current) > 0 else {
+            return nil
+        }
+
+        let notes = (release["body"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return UpdatePrompt(version: latest,
+                            notes: notes,
+                            address: release["html_url"] as? String)
+    }
+
+    private func checkForUpdatesOnLaunch() {
+        guard !hasCheckedForUpdates else {
+            return
+        }
+        hasCheckedForUpdates = true
+
+        guard let url = URL(string: "https://api.github.com/repos/shplash/vaultos/releases?per_page=1") else {
+            return
+        }
+
+        let current = appVersionShort
+        let skipped = UserDefaults.standard.string(forKey: "launcher.updateSkipped")
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 20
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            let prompt = LauncherView.promptFromGitHub(data: data, error: error, current: current)
+            DispatchQueue.main.async {
+                guard let prompt = prompt, prompt.version != skipped else {
+                    return
+                }
+                self.updatePrompt = prompt
+            }
+        }.resume()
     }
 
     /// Compares versions number by number, so 1.10 comes after 1.9; a missing
@@ -2169,13 +2252,14 @@ struct LauncherView: View {
                             badgeColour: Color? = nil,
                             mark: String? = nil,
                             markColour: Color? = nil) -> some View {
-        return HStack(spacing: 6) {
+        return HStack(spacing: 5) {
             Text(title)
                 .font(Vault.body(12, weight: .medium))
                 .foregroundColor(Theme.text)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
-            // A tick or a dash ahead of the note, small enough to read as part
+            // A tick or a cross ahead of the note, small enough to read as part
             // of the line rather than as an icon.
             if let mark = mark {
                 Image(systemName: mark)
@@ -2191,7 +2275,7 @@ struct LauncherView: View {
                     .kerning(0.8)
                     .foregroundColor(badgeColour ?? Theme.faint)
                     .lineLimit(1)
-                    .fixedSize()
+                    .minimumScaleFactor(0.6)
             }
 
             Spacer(minLength: 0)
@@ -2323,6 +2407,74 @@ struct LauncherView: View {
                         model.resetEverything()
                     }
                     .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 440)
+            .warningPlate()
+            .padding(24)
+        }
+    }
+
+    private func updateWarning(_ prompt: UpdatePrompt) -> some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L.t("Update available").uppercased())
+                    .font(Vault.display(20))
+                    .kerning(0.8)
+                    .foregroundColor(Theme.text)
+
+                Text(prompt.version)
+                    .font(Vault.label(10, weight: .bold))
+                    .kerning(0.8)
+                    .foregroundColor(accent)
+
+                if !prompt.notes.isEmpty {
+                    ScrollView(.vertical, showsIndicators: true) {
+                        Text(prompt.notes)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(Theme.dim)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxHeight: 200)
+                }
+
+                HStack(spacing: 10) {
+                    Button {
+                        UserDefaults.standard.set(prompt.version, forKey: "launcher.updateSkipped")
+                        updatePrompt = nil
+                    } label: {
+                        Text(L.t("Don't show again"))
+                            .font(Vault.label(9, weight: .regular))
+                            .underline()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(Theme.faint)
+
+                    Spacer(minLength: 0)
+
+                    if let address = prompt.address, let url = URL(string: address) {
+                        Button {
+                            UIApplication.shared.open(url)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(L.t("GITHUB"))
+
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                        }
+                        .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
+                    }
+
+                    Button(L.t("OK")) {
+                        updatePrompt = nil
+                    }
+                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
                 }
             }
             .padding(22)
