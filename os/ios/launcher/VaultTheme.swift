@@ -86,10 +86,6 @@ enum VaultUI {
             ?? UIFont.monospacedSystemFont(ofSize: size * 0.86, weight: .heavy)
     }
 
-    static func scaledDisplay(_ size: CGFloat) -> UIFont {
-        return UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: display(size))
-    }
-
     static func label(_ size: CGFloat, weight: UIFont.Weight = .semibold) -> UIFont {
         return UIFont.monospacedSystemFont(ofSize: max(10, size), weight: weight)
     }
