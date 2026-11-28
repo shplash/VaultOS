@@ -508,10 +508,8 @@ struct LauncherView: View {
         let installed = info.installed == 1
 
         VStack(alignment: .leading, spacing: spacing) {
-            // A tick once the files are in, a cross until they are, both in the
-            // game's own colour.
-            headerLine(L.t("Game data"),
-                       badge: installed ? "DONE" : "NEEDED",
+            headerLine("Game data",
+                       badge: installed ? "INSTALLED" : "NOT INSTALLED",
                        badgeColour: Theme.dim,
                        mark: installed ? "checkmark" : "xmark",
                        markColour: game.accent)
@@ -871,41 +869,21 @@ struct LauncherView: View {
     /// A hold asks before the save goes: the launcher deletes the slot, and the
     /// game writes its own three saves again while it runs.
     private func deleteWarning(_ save: LauncherModel.LauncherSave) -> some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
+        WarningPlate(title: L.t("Delete this save?"),
+                     message: L.t("The save is taken out of this installation. The game writes its own three automatic saves again the next time it runs."),
+                     destructive: true,
+                     actions: {
+                         Button(L.t("CANCEL")) {
+                             deleteCandidate = nil
+                         }
+                         .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
 
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L.t("Delete this save?").uppercased())
-                    .font(Vault.display(20))
-                    .kerning(0.8)
-                    .foregroundColor(Theme.text)
-
-                Text(L.t("The save is taken out of this installation. The game writes its own three automatic saves again the next time it runs."))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-
-                    Button(L.t("CANCEL")) {
-                        deleteCandidate = nil
-                    }
-                    .buttonStyle(SmallButtonStyle(accent: accent, tint: Theme.dim, minHeight: 36))
-
-                    Button(L.t("DELETE")) {
-                        deleteCandidate = nil
-                        model.delete(save: save)
-                    }
-                    .buttonStyle(ChipStyle(accent: accent, look: .selected, minHeight: 36))
-                }
-            }
-            .padding(22)
-            .frame(maxWidth: 440)
-            .warningPlate()
-            .padding(24)
-        }
+                         Button(L.t("DELETE")) {
+                             deleteCandidate = nil
+                             model.delete(save: save)
+                         }
+                         .buttonStyle(ChipStyle(accent: accent, look: .destructive, minHeight: 36))
+                     })
     }
 
     private var playButton: some View {
@@ -2907,6 +2885,75 @@ private struct LauncherBackdrop: View {
     }
 }
 
+private struct WarningPlate<Actions: View>: View {
+    let title: String
+    let message: String
+    var note: String? = nil
+    var notes: String? = nil
+    var destructive: Bool = false
+    var messageColour: Color? = nil
+    let actions: Actions
+
+    init(title: String, message: String, note: String? = nil, notes: String? = nil, destructive: Bool = false, messageColour: Color? = nil, @ViewBuilder actions: () -> Actions) {
+        self.title = title
+        self.message = message
+        self.note = note
+        self.notes = notes
+        self.destructive = destructive
+        self.messageColour = messageColour
+        self.actions = actions()
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .ignoresSafeArea()
+                .onTapGesture {}
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(L.t(title).uppercased())
+                    .font(Vault.display(20))
+                    .kerning(0.8)
+                    .foregroundColor(Theme.text)
+
+                Text(L.t(message))
+                    .font(Vault.body(12))
+                    .foregroundColor(messageColour ?? (destructive ? Vault.destructive : Theme.dim))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let note = note {
+                    Text(L.t(note))
+                        .font(Vault.body(12))
+                        .foregroundColor(Theme.dim)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let notes = notes, !notes.isEmpty {
+                    ScrollView(.vertical, showsIndicators: true) {
+                        Text(notes)
+                            .font(Vault.body(12))
+                            .foregroundColor(Theme.dim)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxHeight: 200)
+                }
+
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+                    actions
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 440)
+            .warningPlate()
+            .padding(24)
+            .accessibilityElement(children: .contain)
+            .accessibilityAddTraits(.isModal)
+        }
+    }
+}
+
 private struct PageIndicator: View {
     let current: Int
     let count: Int
@@ -2997,6 +3044,7 @@ private struct ChipStyle: ButtonStyle {
         case selected
         case unselected
         case quiet
+        case destructive
     }
 
     let accent: Color
@@ -3023,15 +3071,24 @@ private struct ChipStyle: ButtonStyle {
         case .selected: return Vault.ink
         case .unselected: return Theme.faint
         case .quiet: return Theme.dim
+        case .destructive: return Vault.destructive
         }
     }
 
     private var fill: Color {
-        return look == .selected ? accent : Color.white.opacity(0.04)
+        switch look {
+        case .selected: return accent
+        case .destructive: return Vault.destructive.opacity(0.16)
+        default: return Color.white.opacity(0.04)
+        }
     }
 
     private var stroke: Color {
-        return look == .selected ? Color.clear : Theme.hairline
+        switch look {
+        case .selected: return Color.clear
+        case .destructive: return Vault.destructive.opacity(0.7)
+        default: return Theme.hairline
+        }
     }
 }
 
