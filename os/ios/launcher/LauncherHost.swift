@@ -996,6 +996,9 @@ final class GameControlsOverlay: UIView {
     private var keyboardSwipe: UISwipeGestureRecognizer?
     private let helpBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let helpCard = InventoryHelpCard()
+    private let tutorialBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+    private let tutorialCard = TutorialCard()
+    private var tutorialHandled = false
     private var currentScreen: ScreenMode = .game
     private let game = ControlLayout.activeGame()
     private var sideButtons: [LabeledControlButton] = []
@@ -1372,6 +1375,15 @@ final class GameControlsOverlay: UIView {
         }
         addSubview(helpCard)
 
+        tutorialBackdrop.isHidden = true
+        addSubview(tutorialBackdrop)
+
+        tutorialCard.isHidden = true
+        tutorialCard.onContinue = { [weak self] in
+            self?.finishTutorial()
+        }
+        addSubview(tutorialCard)
+
         skipMovieButton.isHidden = true
         skipMovieButton.onTrigger = { [weak self] in
             // Asked again here because the overlay is not refreshed while the
@@ -1448,6 +1460,11 @@ final class GameControlsOverlay: UIView {
 
         movieShield.frame = bounds
         helpBackdrop.frame = bounds
+        tutorialBackdrop.frame = bounds
+
+        if !tutorialCard.isHidden {
+            layoutTutorial()
+        }
 
         if currentScreen.isMenu {
             layoutMenuControls()
@@ -1685,6 +1702,59 @@ final class GameControlsOverlay: UIView {
             + L.t("Hold an item with INSPECT on to open its extra actions: use, look, unload and drop.")
             + "\n\n"
             + L.t("Drag your finger to scroll the inventory.")
+    }
+
+    /// Explained once per game, the first time a world is on screen, and never
+    /// again in that install: a new game started later stays quiet.
+    private func showTutorialIfNeeded() {
+        guard !tutorialHandled else {
+            return
+        }
+        tutorialHandled = true
+
+        guard !UserDefaults.standard.bool(forKey: GameControlsOverlay.tutorialKey) else {
+            return
+        }
+
+        tutorialCard.show(tips: GameControlsOverlay.tutorialTips)
+        tutorialBackdrop.isHidden = false
+        tutorialCard.isHidden = false
+        setNeedsLayout()
+    }
+
+    private func finishTutorial() {
+        tutorialCard.isHidden = true
+        tutorialBackdrop.isHidden = true
+        UserDefaults.standard.set(true, forKey: GameControlsOverlay.tutorialKey)
+        selectionFeedback()
+    }
+
+    private func layoutTutorial() {
+        let width = min(bounds.width - 44, 460)
+        let size = tutorialCard.preferredSize(maxWidth: width)
+        let top = max(safeAreaInsets.top + 12, (bounds.height - size.height) / 2)
+        tutorialCard.frame = CGRect(x: (bounds.width - size.width) / 2,
+                                    y: top,
+                                    width: size.width,
+                                    height: size.height)
+    }
+
+    /// One flag per game, so both games teach their own controls the first time
+    /// they are played.
+    private static var tutorialKey: String {
+        return LauncherModel.optionKey("tutorialShown", for: ControlLayout.activeGame())
+    }
+
+    /// The three things the game itself never says out loud.
+    private static var tutorialTips: [(String, String)] {
+        return [
+            (L.t("Panning the camera"),
+             L.t("The CAMERA pad moves the view. The further you push it, the further the pointer goes, and the map pans once it reaches the edge.")),
+            (L.t("The pointer"),
+             L.t("Drag anywhere else on the screen to move the pointer, and tap to click. A tap with two fingers is the right button, which changes what a tap does.")),
+            (L.t("Looking at things"),
+             L.t("Toggle INSPECT to examine an item's characteristics. Hold an item while INSPECT is on to open its menu.")),
+        ]
     }
 
     private func layoutHelpCard() {
@@ -2287,6 +2357,10 @@ final class GameControlsOverlay: UIView {
         let shown = ControlLayout.touchControls() && fallout_ios_in_game() != 0
         if isHidden == shown {
             isHidden = !shown
+        }
+
+        if shown {
+            showTutorialIfNeeded()
         }
 
         let inCombat = fallout_ios_action_available(25) != 0
@@ -3311,5 +3385,250 @@ final class InventoryHelpCard: UIView {
 
     @objc private func close() {
         onClose?()
+    }
+}
+
+/// The walkthrough shown the first time a world loads. Each tip is a line of its
+/// own, divided by a hairline, with a circle to tick on the right; CONTINUE stays
+/// shut until every circle is ticked.
+private final class TutorialCard: UIView {
+    private final class Row {
+        let header = UILabel()
+        let body = UILabel()
+        let divider = UIView()
+        let tick = UIButton(type: .system)
+        var ticked = false
+    }
+
+    /// Called by CONTINUE, once every tip is ticked.
+    var onContinue: (() -> Void)?
+
+    private let plate = VaultPanelView()
+    private let heading = UILabel()
+    private let hint = UILabel()
+    private let continueButton = UIButton(type: .system)
+    private var rows: [Row] = []
+
+    private let inset: CGFloat = 18
+    private let headingHeight: CGFloat = 16
+    private let headingGap: CGFloat = 12
+    private let tickSide: CGFloat = 34
+    private let tickGap: CGFloat = 10
+    private let headerGap: CGFloat = 4
+    private let dividerGap: CGFloat = 13
+    private let dividerHeight: CGFloat = 1
+    private let continueHeight: CGFloat = 44
+    private let continueGap: CGFloat = 16
+    private let circlePoint: CGFloat = 22
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        backgroundColor = .clear
+        accessibilityViewIsModal = true
+
+        plate.fill = VaultUI.controlFill.withAlphaComponent(0.95)
+        plate.edge = VaultUI.controlBorder
+        plate.corner = 14
+        plate.shadowOpacity = 0.35
+        addSubview(plate)
+
+        heading.font = VaultUI.label(11, weight: .bold)
+        heading.textColor = ControlTheme.control
+        heading.text = L.t("FIRST STEPS")
+        heading.isUserInteractionEnabled = false
+        addSubview(heading)
+
+        hint.font = VaultUI.label(11, weight: .medium)
+        hint.textColor = VaultUI.faint
+        hint.numberOfLines = 0
+        hint.text = L.t("Three things worth knowing. Tick each one to carry on.")
+        hint.isUserInteractionEnabled = false
+        addSubview(hint)
+
+        continueButton.titleLabel?.font = VaultUI.label(13, weight: .bold)
+        continueButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        continueButton.titleLabel?.minimumScaleFactor = 0.7
+        continueButton.layer.cornerRadius = VaultShape.button
+        continueButton.layer.borderWidth = VaultShape.hairline
+        continueButton.clipsToBounds = true
+        continueButton.addTarget(self, action: #selector(continuePressed), for: .touchUpInside)
+        addSubview(continueButton)
+
+        updateContinue()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func show(tips: [(String, String)]) {
+        for row in rows {
+            row.header.removeFromSuperview()
+            row.body.removeFromSuperview()
+            row.divider.removeFromSuperview()
+            row.tick.removeFromSuperview()
+        }
+        rows.removeAll()
+
+        for (index, tip) in tips.enumerated() {
+            let row = Row()
+
+            row.header.font = VaultUI.label(13, weight: .bold)
+            row.header.textColor = ControlTheme.content
+            row.header.numberOfLines = 0
+            row.header.text = tip.0
+            row.header.isUserInteractionEnabled = false
+            addSubview(row.header)
+
+            row.body.font = VaultUI.label(12, weight: .medium)
+            row.body.textColor = VaultUI.dim
+            row.body.numberOfLines = 0
+            row.body.text = tip.1
+            row.body.isUserInteractionEnabled = false
+            addSubview(row.body)
+
+            row.divider.backgroundColor = ControlTheme.border.withAlphaComponent(0.45)
+            row.divider.isUserInteractionEnabled = false
+            row.divider.isHidden = index == tips.count - 1
+            addSubview(row.divider)
+
+            row.tick.tag = index
+            row.tick.tintColor = ControlTheme.control
+            row.tick.accessibilityLabel = tip.0
+            row.tick.addTarget(self, action: #selector(tickPressed(_:)), for: .touchUpInside)
+            addSubview(row.tick)
+
+            rows.append(row)
+            apply(ticked: false, to: row)
+        }
+
+        heading.text = L.t("FIRST STEPS")
+        hint.text = L.t("Three things worth knowing. Tick each one to carry on.")
+        continueButton.setTitle(L.t("CONTINUE"), for: .normal)
+        updateContinue()
+        setNeedsLayout()
+    }
+
+    private func apply(ticked: Bool, to row: Row) {
+        row.ticked = ticked
+
+        let configuration = UIImage.SymbolConfiguration(pointSize: circlePoint,
+                                                        weight: ticked ? .bold : .regular)
+        row.tick.setImage(UIImage(systemName: ticked ? "checkmark.circle.fill" : "circle",
+                                  withConfiguration: configuration),
+                          for: .normal)
+        // VoiceOver reads a ticked tip as selected rather than as a bare button.
+        row.tick.accessibilityTraits = ticked ? [.button, .selected] : .button
+    }
+
+    @objc private func tickPressed(_ sender: UIButton) {
+        guard sender.tag >= 0, sender.tag < rows.count else {
+            return
+        }
+
+        let row = rows[sender.tag]
+        apply(ticked: !row.ticked, to: row)
+        UISelectionFeedbackGenerator().selectionChanged()
+        updateContinue()
+    }
+
+    @objc private func continuePressed() {
+        guard !rows.isEmpty, rows.allSatisfy({ $0.ticked }) else {
+            return
+        }
+        onContinue?()
+    }
+
+    private func updateContinue() {
+        let ready = !rows.isEmpty && rows.allSatisfy { $0.ticked }
+
+        continueButton.isEnabled = ready
+        continueButton.backgroundColor = ready ? ControlTheme.control : UIColor(white: 1, alpha: 0.06)
+        continueButton.setTitleColor(ready ? VaultUI.ink : VaultUI.faint, for: .normal)
+        continueButton.setTitleColor(VaultUI.faint, for: .disabled)
+        continueButton.layer.borderColor = (ready ? ControlTheme.control : ControlTheme.border).cgColor
+    }
+
+    private func textWidth(for width: CGFloat) -> CGFloat {
+        return max(0, width - inset * 2 - tickSide - tickGap)
+    }
+
+    private func hintHeight(for width: CGFloat) -> CGFloat {
+        return hint.sizeThatFits(CGSize(width: max(0, width - inset * 2),
+                                        height: .greatestFiniteMagnitude)).height
+    }
+
+    private func rowHeights(for width: CGFloat) -> [CGFloat] {
+        let text = textWidth(for: width)
+        return rows.map { row in
+            let header = row.header.sizeThatFits(CGSize(width: text,
+                                                       height: .greatestFiniteMagnitude)).height
+            let body = row.body.sizeThatFits(CGSize(width: text,
+                                                   height: .greatestFiniteMagnitude)).height
+            return max(tickSide, header + headerGap + body)
+        }
+    }
+
+    private var dividersHeight: CGFloat {
+        return CGFloat(max(0, rows.count - 1)) * (dividerGap * 2 + dividerHeight)
+    }
+
+    func preferredSize(maxWidth: CGFloat) -> CGSize {
+        let height = inset
+            + headingHeight + 3 + hintHeight(for: maxWidth) + headingGap
+            + rowHeights(for: maxWidth).reduce(0, +)
+            + dividersHeight
+            + continueGap + continueHeight + inset
+        return CGSize(width: maxWidth, height: height)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        plate.frame = bounds
+
+        let text = textWidth(for: bounds.width)
+        let full = max(0, bounds.width - inset * 2)
+
+        heading.frame = CGRect(x: inset, y: inset, width: full, height: headingHeight)
+
+        let hintHeight = hintHeight(for: bounds.width)
+        hint.frame = CGRect(x: inset,
+                            y: inset + headingHeight + 3,
+                            width: full,
+                            height: hintHeight)
+
+        var y = inset + headingHeight + 3 + hintHeight + headingGap
+        let heights = rowHeights(for: bounds.width)
+
+        for (index, row) in rows.enumerated() {
+            let height = index < heights.count ? heights[index] : tickSide
+            let header = row.header.sizeThatFits(CGSize(width: text,
+                                                        height: .greatestFiniteMagnitude)).height
+            let body = row.body.sizeThatFits(CGSize(width: text,
+                                                    height: .greatestFiniteMagnitude)).height
+
+            row.header.frame = CGRect(x: inset, y: y, width: text, height: header)
+            row.body.frame = CGRect(x: inset, y: y + header + headerGap, width: text, height: body)
+            row.tick.frame = CGRect(x: bounds.width - inset - tickSide,
+                                    y: y + (header - tickSide) / 2,
+                                    width: tickSide,
+                                    height: tickSide)
+
+            if !row.divider.isHidden {
+                row.divider.frame = CGRect(x: inset,
+                                           y: y + height + dividerGap,
+                                           width: full,
+                                           height: dividerHeight)
+            }
+
+            y += height + dividerGap * 2 + dividerHeight
+        }
+
+        continueButton.frame = CGRect(x: inset,
+                                      y: bounds.height - inset - continueHeight,
+                                      width: full,
+                                      height: continueHeight)
     }
 }
