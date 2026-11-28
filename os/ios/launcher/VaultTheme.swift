@@ -7,13 +7,14 @@ enum Vault {
     static let inset = Color(red: 0.055, green: 0.063, blue: 0.075)
     static let text = Color(red: 0.914, green: 0.929, blue: 0.945)
     static let dim = Color(red: 0.604, green: 0.631, blue: 0.663)
-    static let faint = Color(red: 0.420, green: 0.447, blue: 0.478)
+    static let faint = Color(red: 0.520, green: 0.545, blue: 0.575)
     static let panel = Color.white.opacity(0.05)
     static let hairline = Color.white.opacity(0.09)
     static let edgeLight = Color.white.opacity(0.16)
     static let ink = Color(red: 0.043, green: 0.043, blue: 0.047)
     static let amber = Color(red: 0.898, green: 0.663, blue: 0.208)
     static let teal = Color(red: 0.373, green: 0.702, blue: 0.659)
+    static let destructive = Color(red: 0.925, green: 0.345, blue: 0.305)
 
     /// The touch HUD: near-black plates, one neutral outline, white glyphs.
     static let controlFill = Color(white: 0.063)
@@ -21,23 +22,34 @@ enum Vault {
     static let controlContent = Color(white: 0.949)
 
     static func display(_ size: CGFloat) -> Font {
-        if UIFont(name: VaultUI.displayName, size: size) != nil {
-            return Font.custom(VaultUI.displayName, fixedSize: size)
+        if UIFont(name: VaultUI.displayName, size: UIFontMetrics(forTextStyle: .largeTitle).scaledValue(for: size)) != nil {
+            return Font.custom(VaultUI.displayName, size: size, relativeTo: .largeTitle)
         }
-        return .system(size: size * 0.86, weight: .heavy, design: .monospaced)
+        return .system(size: UIFontMetrics(forTextStyle: .largeTitle).scaledValue(for: size * 0.86),
+                       weight: .heavy, design: .monospaced)
     }
 
     static func label(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        return .system(size: size, weight: weight, design: .monospaced)
+        return .system(size: UIFontMetrics(forTextStyle: .footnote).scaledValue(for: max(10, size)),
+                       weight: weight, design: .monospaced)
     }
 
     static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        return .system(size: size, weight: weight)
+        return .system(size: UIFontMetrics(forTextStyle: .body).scaledValue(for: size), weight: weight)
     }
 }
 
+enum VaultShape {
+    static let small: CGFloat = 6
+    static let control: CGFloat = 8
+    static let button: CGFloat = 12
+    static let surface: CGFloat = 20
+    static let hairline: CGFloat = 1
+    static let selected: CGFloat = 2
+}
+
 extension View {
-    func vaultPlate(corner: CGFloat = 8, fill: Color? = nil) -> some View {
+    func vaultPlate(corner: CGFloat = VaultShape.control, fill: Color? = nil) -> some View {
         let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         return self
             .background(shape.fill(fill ?? Vault.plate))
@@ -45,7 +57,7 @@ extension View {
             .overlay(
                 Rectangle()
                     .fill(Vault.edgeLight)
-                    .frame(height: 1)
+                    .frame(height: VaultShape.hairline)
                     .padding(.horizontal, corner),
                 alignment: .top
             )
@@ -59,7 +71,7 @@ enum VaultUI {
     static let plate = UIColor(red: 0.078, green: 0.086, blue: 0.102, alpha: 1)
     static let text = UIColor(red: 0.914, green: 0.929, blue: 0.945, alpha: 1)
     static let dim = UIColor(red: 0.604, green: 0.631, blue: 0.663, alpha: 1)
-    static let faint = UIColor(red: 0.420, green: 0.447, blue: 0.478, alpha: 1)
+    static let faint = UIColor(red: 0.520, green: 0.545, blue: 0.575, alpha: 1)
     static let ink = UIColor(red: 0.043, green: 0.043, blue: 0.047, alpha: 1)
     static let edgeLight = UIColor(white: 1, alpha: 0.16)
 
@@ -74,8 +86,12 @@ enum VaultUI {
             ?? UIFont.monospacedSystemFont(ofSize: size * 0.86, weight: .heavy)
     }
 
+    static func scaledDisplay(_ size: CGFloat) -> UIFont {
+        return UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: display(size))
+    }
+
     static func label(_ size: CGFloat, weight: UIFont.Weight = .semibold) -> UIFont {
-        return UIFont.monospacedSystemFont(ofSize: size, weight: weight)
+        return UIFont.monospacedSystemFont(ofSize: max(10, size), weight: weight)
     }
 }
 
@@ -86,7 +102,7 @@ final class VaultPanelView: UIView {
     private let edgeLayer = CAShapeLayer()
     private let innerLayer = CAShapeLayer()
 
-    var corner: CGFloat = 10 {
+    var corner: CGFloat = VaultShape.control {
         didSet { setNeedsLayout() }
     }
 
@@ -98,7 +114,7 @@ final class VaultPanelView: UIView {
         didSet { edgeLayer.strokeColor = edge.cgColor }
     }
 
-    var lineWidth: CGFloat = 1 {
+    var lineWidth: CGFloat = VaultShape.hairline {
         didSet {
             edgeLayer.lineWidth = lineWidth
             setNeedsLayout()

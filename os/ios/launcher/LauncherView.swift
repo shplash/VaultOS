@@ -84,7 +84,9 @@ struct LauncherView: View {
                 LauncherBackdrop(accent: accent)
 
                 HStack(spacing: 0) {
-                    rail(leading: screenInsets.leading, bottom: screenInsets.bottom)
+                    rail(leading: screenInsets.leading,
+                         bottom: screenInsets.bottom,
+                         width: geometry.size.width / scale >= 900 ? 208 : 172)
                     content
                 }
                 .frame(width: geometry.size.width / scale, height: geometry.size.height / scale)
@@ -283,11 +285,11 @@ struct LauncherView: View {
 
     // MARK: - Rail
 
-    private func rail(leading: CGFloat, bottom: CGFloat) -> some View {
+    private func rail(leading: CGFloat, bottom: CGFloat, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(LauncherPage.allCases) { item in
-                    railItem(item)
+                    railItem(item, railWidth: width)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
@@ -299,7 +301,7 @@ struct LauncherView: View {
         .padding(.trailing, Metrics.outer)
         .padding(.top, Metrics.outer)
         .padding(.bottom, Metrics.outer + bottom)
-        .frame(width: 172 + leading, alignment: .leading)
+        .frame(width: width + leading, alignment: .leading)
         .background(Theme.rail)
         .overlay(
             Rectangle()
@@ -309,7 +311,7 @@ struct LauncherView: View {
         )
     }
 
-    private func railItem(_ item: LauncherPage) -> some View {
+    private func railItem(_ item: LauncherPage, railWidth: CGFloat) -> some View {
         let selected = page == item
 
         return Button {
@@ -344,7 +346,7 @@ struct LauncherView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(maxHeight: 52)
+        .frame(maxHeight: railWidth >= 900 ? 56 : 52)
     }
 
     /// The saves, from the hero's divider to the card's bottom. That divider is
@@ -1042,22 +1044,18 @@ struct LauncherView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch page {
-        case .home:
-            homePager
-        case .display:
-            displaySheet
-        case .audio:
-            audioSheet
-        case .game:
-            gameSheet
-        case .touch:
-            controlsSheet
-        case .tips:
-            tipsSheet
-        case .about:
-            aboutSheet
+        Group {
+            switch page {
+            case .home: homePager
+            case .display: displaySheet
+            case .audio: audioSheet
+            case .game: gameSheet
+            case .touch: controlsSheet
+            case .tips: tipsSheet
+            case .about: aboutSheet
+            }
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.14), value: page)
     }
 
     private var homePager: some View {
@@ -1092,6 +1090,7 @@ struct LauncherView: View {
             .frame(width: width, height: geometry.size.height)
             .clipped()
             .contentShape(Rectangle())
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.14), value: model.selectedGame)
             // One gesture for the whole card: a drag that begins in the saves box
             // slides its slots, any other turns the page. It outranks the
             // controls under it, so a drag that starts on a button, a link or
@@ -1318,7 +1317,6 @@ struct LauncherView: View {
 
     private static let heroTitleSize: CGFloat = 68
 
-    /// Tagline and edition sizes: large enough to read as branding, not as notes.
     private static let heroTaglineSize: CGFloat = 16
     private static let heroEditionSize: CGFloat = 12
 
@@ -1448,6 +1446,10 @@ struct LauncherView: View {
                         }
                     }
                     .frame(width: LauncherView.heroEditionWidth, alignment: .leading)
+                    .overlay(
+                        PageIndicator(current: game == .fallout1 ? 0 : 1, count: 2, accent: game.accent)
+                            .offset(x: LauncherView.heroEditionWidth + 10, y: 30)
+                    )
                     // The tap area reaches further up and down than the marks it
                     // draws; pulling the row up by that much leaves the marks
                     // where they were.
@@ -2610,16 +2612,15 @@ struct LauncherView: View {
         HStack(alignment: .center, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(L.t(title))
-                    .font(Vault.display(27))
-                    .kerning(1.2)
+                    .font(Vault.body(13, weight: .semibold))
                     .foregroundColor(Theme.text)
                     .lineLimit(1)
                     .layoutPriority(1)
 
                 Text(L.t(detail))
-                    .font(Vault.label(9))
+                    .font(Vault.label(10))
                     .kerning(0.4)
-                    .foregroundColor(Theme.faint)
+                    .foregroundColor(Theme.dim)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -2647,7 +2648,7 @@ struct LauncherView: View {
                         }
                     }
                     .buttonStyle(ChipStyle(accent: accent, look: .quiet))
-                    .accessibilityLabel("Reset \(title) to defaults")
+                    .accessibilityLabel(L.t("Reset") + " \(L.t(title))")
                 }
             }
 
@@ -2655,14 +2656,13 @@ struct LauncherView: View {
                 .fill(accent.opacity(0.55))
                 .frame(height: 1)
 
-            VStack(alignment: .leading, spacing: 0) {
-                rows()
-            }
-            .padding(.horizontal, Metrics.sheetInset)
-            .padding(.top, 2)
-            .padding(.bottom, Metrics.outer)
-
-            Spacer(minLength: 0)
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 0) {
+                    rows()
+                }
+                .padding(.horizontal, Metrics.sheetInset)
+                .padding(.top, 2)
+                .padding(.bottom, Metrics.outer)
                 .background(
                     Color.clear
                         .contentShape(Rectangle())
@@ -2670,9 +2670,11 @@ struct LauncherView: View {
                             dismissKeyboard()
                         }
                 )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .vaultPlate(corner: 20, fill: Theme.rail)
+        .vaultPlate(corner: VaultShape.surface, fill: Theme.rail)
         .padding(.leading, Metrics.outer)
         .padding(.trailing, Metrics.outer)
         .padding(.top, Metrics.outer)
@@ -2902,6 +2904,23 @@ private struct LauncherBackdrop: View {
             )
         }
         .ignoresSafeArea()
+    }
+}
+
+private struct PageIndicator: View {
+    let current: Int
+    let count: Int
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<count, id: \.self) { index in
+                Circle()
+                    .fill(index == current ? accent : Color.white.opacity(0.22))
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
