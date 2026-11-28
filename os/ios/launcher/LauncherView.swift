@@ -525,7 +525,7 @@ struct LauncherView: View {
 
         VStack(alignment: .leading, spacing: spacing) {
             headerLine(L.t("Game data"),
-                       badge: installed ? "INSTALLED" : "NOT INSTALLED",
+                       badge: installed ? "DONE" : "NEEDED",
                        badgeColour: Theme.dim,
                        mark: installed ? "checkmark" : "xmark",
                        markColour: game.accent)
@@ -652,17 +652,8 @@ struct LauncherView: View {
                     .overlay(
                         Group {
                             if width >= 110 && pictureHeight >= 52 {
-                                Text(saveTitle(save).uppercased())
-                                    .font(Vault.label(9, weight: .bold))
-                                    .kerning(0.5)
-                                    .foregroundColor(Theme.text)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Color.black.opacity(0.55)))
+                                saveAgeBadge(saveTitle(save).uppercased())
                                     .padding(inset)
-                                    .allowsHitTesting(false)
                             }
                         },
                         alignment: .topLeading
@@ -923,8 +914,6 @@ struct LauncherView: View {
         // Kerning includes the space after the last letter, which pushes the
         // line off centre by half of it; take it back with trailing padding.
         let titleKerning: CGFloat = 1.6
-        let nameKerning: CGFloat = 1.3
-        let detailKerning: CGFloat = 1.4
 
         return Button {
             // An empty slot starts the game rather than loading a save that is
@@ -944,7 +933,7 @@ struct LauncherView: View {
                 showNewGameWarning = true
             }
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: 2) {
                 Text(buttonTitle)
                     .font(Vault.display(22))
                     .kerning(titleKerning)
@@ -952,27 +941,12 @@ struct LauncherView: View {
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
 
-                Text(statusText)
-                    .font(Vault.label(10, weight: .bold))
-                    .kerning(nameKerning)
-                    .foregroundColor(Vault.ink.opacity(0.68))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.7)
-                    .padding(.horizontal, 8)
-                    .frame(maxWidth: .infinity)
-                    .multilineTextAlignment(.center)
-
-                if let detail = continueDetail {
-                    Text(detail)
-                        .font(Vault.label(9, weight: .regular))
-                        .kerning(detailKerning)
-                        .foregroundColor(Vault.ink.opacity(0.55))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.trailing, -detailKerning)
-                        .frame(maxWidth: .infinity)
-                        .multilineTextAlignment(.center)
+                if continueLines.isEmpty {
+                    continueLine(statusText)
+                } else {
+                    ForEach(continueLines, id: \.self) { line in
+                        continueLine(line)
+                    }
                 }
             }
             // The height is set inside the style so the fill is that height
@@ -1013,6 +987,33 @@ struct LauncherView: View {
         return L.t("INSTALLING") + String(repeating: ".", count: installingDots + 1)
     }
 
+    /// The save CONTINUE would open, if it has one.
+    private var continueSave: LauncherModel.LauncherSave? {
+        guard !model.isInstalling, !picksEmptySlot else {
+            return nil
+        }
+
+        return selectedSave ?? model.saves.first
+    }
+
+    /// Time played and level, on a line each, in the place the save's name had.
+    private var continueLines: [String] {
+        guard let save = continueSave else {
+            return []
+        }
+
+        var lines: [String] = []
+        if let played = save.played {
+            lines.append(played)
+        }
+
+        if save.level > 0 {
+            lines.append("\(L.t("LVL")) \(save.level)")
+        }
+
+        return lines
+    }
+
     private var statusText: String {
         if model.isInstalling {
             return installingLabel
@@ -1023,33 +1024,23 @@ struct LauncherView: View {
             return L.t("NEW GAME")
         }
 
-        if let save = selectedSave ?? model.saves.first {
-            return saveTitle(save).uppercased()
-        }
-
         return L.t(model.install.installed == 1 ? "READY" : "NEEDS FILES")
     }
 
-    private var continueDetail: String? {
-        guard !model.isInstalling, !picksEmptySlot else {
-            return nil
-        }
-
-        guard let save = selectedSave ?? model.saves.first else {
-            return nil
-        }
-
-        var parts: [String] = []
-        if let played = save.played {
-            parts.append(played)
-        }
-
-        if save.level > 0 {
-            parts.append("\(L.t("LVL")) \(save.level)")
-        }
-
-        return parts.isEmpty ? nil : parts.joined(separator: "·")
+    private func continueLine(_ text: String) -> some View {
+        return Text(text)
+            .font(Vault.label(10, weight: .bold))
+            .kerning(LauncherView.continueLineKerning)
+            .foregroundColor(Vault.ink.opacity(0.68))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
     }
+
+    private static let continueLineKerning: CGFloat = 1.3
 
     // MARK: - Pages
 
